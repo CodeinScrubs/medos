@@ -65,8 +65,9 @@ wrong, never rewrite them to look better.
 
 - `npm run check` green: typecheck, lint, formatting, 277 tests.
 - CI green on GitHub for the previous commit (the same checks on a clean Linux machine).
-- Release APK builds and is signed with the owner's key (`dist/MedOS-0.2.0.apk`,
-  versionCode 2, SHA-256 `1119f776…7e0c`).
+- Release APK builds and is signed with the owner's key (`dist/MedOS-0.2.1.apk`,
+  versionCode 3, SHA-256 `1119f776…7e0c`). 0.2.1 is the first build that contains the
+  fixes above; 0.2.0 was built before them.
 
 **Not verified**
 
@@ -78,14 +79,18 @@ wrong, never rewrite them to look better.
 
 **Open threads**
 
-1. **Device test.** Install `dist/MedOS-0.2.0.apk`, make a full backup, restore it into
+1. **Device test.** Install `dist/MedOS-0.2.1.apk`, make a full backup, restore it into
    MedOS Dev, and confirm a patient, a photo and a voice note survive.
 2. **Trash is patients-only.** Notes, lab panels, imaging and attachments are soft-deleted
    with no way back in the UI. The promise "nothing is ever lost" is only half true today.
 3. Occasions/birthday reminders (phase 3) must register in
    `features/reminders/reschedule.ts` when they are built.
 4. Vitals and diagnoses tables exist with no screens (phase 2 leftovers).
-5. Roadmap next module: doctors directory (phase 3).
+5. The hardware Back button still navigates the screens underneath the lock cover. The
+   cover keeps blocking touches and the content stays hidden, so nothing leaks, but after
+   unlocking the user can find themselves on a different screen. A `BackHandler` while
+   covered fixes it; left out of 0.2.1 so the built APK matches this commit.
+6. Roadmap next module: doctors directory (phase 3).
 
 **Gotchas**
 
