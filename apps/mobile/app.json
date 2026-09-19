@@ -1,0 +1,91 @@
+{
+  "expo": {
+    "name": "MedOS",
+    "slug": "medos",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "medos",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.shayan.medos",
+      "versionCode": 2,
+      "allowBackup": false,
+      "adaptiveIcon": {
+        "backgroundColor": "#0E4A5F",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ],
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Vazirmatn-Regular.ttf",
+            "./assets/fonts/Vazirmatn-Medium.ttf",
+            "./assets/fonts/Vazirmatn-SemiBold.ttf",
+            "./assets/fonts/Vazirmatn-Bold.ttf"
+          ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E4A5F",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MedOS برای افزودن تصویر آزمایش، رادیولوژی و ضایعات به پرونده‌ی بیمار به گالری دسترسی می‌خواهد.",
+          "cameraPermission": "MedOS برای عکس گرفتن از برگه‌ی آزمایش و ضایعات پوستی به دوربین دسترسی می‌خواهد."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "MedOS برای ضبط وویس‌نوت روی پرونده‌ی بیمار به میکروفون دسترسی می‌خواهد."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "برای باز کردن قفل MedOS"
+        }
+      ],
+      "expo-sharing",
+      "expo-secure-store",
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "forcesRTL": true,
+          "supportedLocales": ["fa-IR"]
+        }
+      ],
+      "./plugins/with-release-signing",
+      "./plugins/with-android-build-tuning",
+      "./plugins/with-dev-variant"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

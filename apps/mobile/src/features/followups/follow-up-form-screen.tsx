@@ -1,0 +1,102 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Alert } from 'react-native';
+
+import { alertError } from '@/components/feedback';
+import { QuickDateField } from '@/components/quick-date-field';
+import { Button, ChipSelect, Column, Input, Screen, Segmented, Text } from '@/components/ui';
+import type { FollowUp } from '@/db/schema';
+import { createFollowUp } from '@/features/followups/queries';
+import { useTheme } from '@/theme';
+
+import { FOLLOWUP_CHANNEL_LABELS, FOLLOWUP_PRIORITY_LABELS } from './labels';
+import { defaultDueDate } from './logic';
+
+const COMMON_REASONS = [
+  'پیگیری جواب پاتولوژی',
+  'کنترل آزمایش',
+  'ویزیت مجدد',
+  'پرسیدن حال عمومی',
+  'پیگیری عوارض دارو',
+  'پیگیری جواب تصویربرداری',
+];
+
+const CHANNEL_OPTIONS = (Object.keys(FOLLOWUP_CHANNEL_LABELS) as FollowUp['channel'][]).map((k) => ({
+  value: k,
+  label: FOLLOWUP_CHANNEL_LABELS[k],
+}));
+
+const PRIORITY_OPTIONS = (Object.keys(FOLLOWUP_PRIORITY_LABELS) as FollowUp['priority'][]).map((k) => ({
+  value: k,
+  label: FOLLOWUP_PRIORITY_LABELS[k],
+}));
+
+/** New follow-up for a patient. The reminder is scheduled on save. */
+export function FollowUpFormScreen() {
+  const { id: patientId } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { spacing } = useTheme();
+
+  const [reason, setReason] = useState('');
+  const [dueAt, setDueAt] = useState(() => defaultDueDate());
+  const [channel, setChannel] = useState<FollowUp['channel']>('call');
+  const [priority, setPriority] = useState<FollowUp['priority']>('normal');
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!reason.trim()) {
+      Alert.alert('دلیل پیگیری را بنویسید');
+      return;
+    }
+    setSaving(true);
+    try {
+      await createFollowUp({ patientId, reason, dueAt, channel, priority });
+      router.back();
+    } catch (e) {
+      alertError('ذخیره نشد', e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Screen scroll>
+      <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <Input
+          label="برای چه؟"
+          required
+          value={reason}
+          onChangeText={setReason}
+          placeholder="مثلاً جواب بیوپسی"
+          autoFocus
+        />
+        <ChipSelect
+          options={COMMON_REASONS}
+          value={COMMON_REASONS.includes(reason) ? reason : null}
+          onChange={(v) => setReason(v ?? '')}
+          allowDeselect
+        />
+
+        <QuickDateField label="کِی؟" value={dueAt} onChange={setDueAt} direction="future" withTime />
+
+        <ChipSelect label="چطور؟" options={CHANNEL_OPTIONS} value={channel} onChange={(v) => v && setChannel(v)} />
+
+        <Segmented label="اهمیت" options={PRIORITY_OPTIONS} value={priority} onChange={setPriority} />
+
+        <Text variant="tiny" color="textFaint">
+          در زمان تعیین‌شده گوشی یادآوری می‌کند. اگر اجازه‌ی اعلان داده نشود، پیگیری فقط در صفحه‌ی «امروز» دیده می‌شود.
+        </Text>
+
+        <Button
+          label="ثبت پیگیری"
+          icon="alarm-outline"
+          onPress={() => void save()}
+          loading={saving}
+          full
+          style={{ marginTop: spacing.sm }}
+        />
+        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+      </Column>
+    </Screen>
+  );
+}

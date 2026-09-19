@@ -1,0 +1,24 @@
+{
+  "name": "medos",
+  "private": true,
+  "version": "0.2.0",
+  "description": "MedOS — personal clinical operating system",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace=@medos/mobile",
+    "android": "npm run android --workspace=@medos/mobile",
+    "apk": "npm run apk --workspace=@medos/mobile",
+    "db:generate": "npm run db:generate --workspace=@medos/mobile",
+    "check": "npm run check --workspace=@medos/mobile",
+    "typecheck": "npm run typecheck --workspace=@medos/mobile",
+    "lint": "npm run lint --workspace=@medos/mobile",
+    "test": "npm run test --workspace=@medos/mobile",
+    "format": "npm run format --workspace=@medos/mobile"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

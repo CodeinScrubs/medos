@@ -1,0 +1,11 @@
+# Generated, or not ours to format.
+**/node_modules/
+**/android/
+**/ios/
+**/dist/
+**/.expo/
+apps/mobile/src/db/migrations/
+package-lock.json
+
+# Prose stays as written: Persian paragraphs and tables are hand-wrapped.
+*.md

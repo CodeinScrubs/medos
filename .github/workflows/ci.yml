@@ -1,0 +1,51 @@
+name: CI
+
+# Every push and pull request: the same checks `npm run check` runs locally,
+# plus two that only make sense on a clean machine.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint, test, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck, lint, formatting, tests
+        run: npm run check
+
+      # A schema change without its generated migration would ship an app
+      # whose code expects columns the phone's database does not have.
+      - name: Migrations match the schema
+        run: |
+          npm run db:generate
+          if [ -n "$(git status --porcelain -- apps/mobile/src/db/migrations)" ]; then
+            echo "::error::src/db/schema changed without a migration. Run 'npm run db:generate' and commit the result."
+            git status --porcelain -- apps/mobile/src/db/migrations
+            exit 1
+          fi
+
+      # Catches anything that type-checks but cannot be bundled for the phone
+      # (a missing asset, an import Metro cannot resolve).
+      - name: Bundle the app for Android
+        run: npm run bundle --workspace=@medos/mobile

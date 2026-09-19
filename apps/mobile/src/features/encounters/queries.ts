@@ -1,0 +1,146 @@
+import { and, desc, eq, isNull } from 'drizzle-orm';
+
+import { db } from '@/db/client';
+import { doctors, encounters, patients, places, type Encounter, type PatientStatus } from '@/db/schema';
+import { newId, softDelete, stamps, touch } from '@/lib/ids';
+
+import { statusAfterDischarge, statusForEncounterKind } from './logic';
+
+const alive = isNull(encounters.deletedAt);
+
+/** Active encounter plus the hospital and attending, for the record header. */
+export function activeEncounterDetailQuery(patientId: string) {
+  return db
+    .select({ encounter: encounters, place: places, attending: doctors })
+    .from(encounters)
+    .leftJoin(places, eq(encounters.placeId, places.id))
+    .leftJoin(doctors, eq(encounters.attendingId, doctors.id))
+    .where(and(alive, eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
+    .orderBy(desc(encounters.admittedAt))
+    .limit(1);
+}
+
+export function encounterHistoryQuery(patientId: string) {
+  return db
+    .select({ encounter: encounters, place: places, attending: doctors })
+    .from(encounters)
+    .leftJoin(places, eq(encounters.placeId, places.id))
+    .leftJoin(doctors, eq(encounters.attendingId, doctors.id))
+    .where(and(alive, eq(encounters.patientId, patientId)))
+    .orderBy(desc(encounters.admittedAt));
+}
+
+export function encounterQuery(id: string) {
+  return db.select().from(encounters).where(eq(encounters.id, id)).limit(1);
+}
+
+/**
+ * The encounter new notes, orders and labs should attach to: the active one,
+ * if any. Returning null is normal — an outpatient's note belongs to no
+ * admission.
+ */
+export async function resolveActiveEncounterId(patientId: string): Promise<string | null> {
+  const rows = await db
+    .select({ id: encounters.id })
+    .from(encounters)
+    .where(and(alive, eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
+    .orderBy(desc(encounters.admittedAt))
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
+export type EncounterInput = {
+  patientId: string;
+  kind: Encounter['kind'];
+  placeId?: string | null;
+  ward?: string | null;
+  bed?: string | null;
+  service?: string | null;
+  attendingId?: string | null;
+  chiefComplaint?: string | null;
+  admittedAt?: Date | null;
+};
+
+/**
+ * Open a new encounter. A patient has at most one active encounter, so any
+ * other active one is closed first — without a discharge type, because it was
+ * superseded rather than discharged.
+ */
+export async function openEncounter(input: EncounterInput): Promise<string> {
+  const id = newId();
+  const now = new Date();
+
+  db.transaction((tx) => {
+    tx.update(encounters)
+      .set({ isActive: false, ...touch(now) })
+      .where(and(eq(encounters.patientId, input.patientId), eq(encounters.isActive, true)))
+      .run();
+
+    tx.insert(encounters)
+      .values({
+        id,
+        ...stamps(now),
+        patientId: input.patientId,
+        kind: input.kind,
+        placeId: input.placeId ?? null,
+        ward: input.ward ?? null,
+        bed: input.bed ?? null,
+        service: input.service ?? null,
+        attendingId: input.attendingId ?? null,
+        chiefComplaint: input.chiefComplaint ?? null,
+        admittedAt: input.admittedAt ?? now,
+        isActive: true,
+      })
+      .run();
+
+    tx.update(patients)
+      .set({ status: statusForEncounterKind(input.kind), ...touch(now) })
+      .where(eq(patients.id, input.patientId))
+      .run();
+  });
+
+  return id;
+}
+
+export async function updateEncounter(id: string, patch: Partial<Omit<EncounterInput, 'patientId'>>): Promise<void> {
+  await db
+    .update(encounters)
+    .set({ ...patch, ...touch() })
+    .where(eq(encounters.id, id));
+}
+
+export type DischargeInput = {
+  dischargedAt: Date;
+  dischargeType: NonNullable<Encounter['dischargeType']>;
+  outcomeNotes?: string | null;
+  /** What the patient becomes afterwards: usually discharged, or still followed. */
+  nextStatus: PatientStatus;
+};
+
+export async function dischargeEncounter(id: string, input: DischargeInput): Promise<void> {
+  const current = (await encounterQuery(id))[0];
+  if (!current) throw new Error(`Encounter ${id} not found`);
+  const now = new Date();
+
+  db.transaction((tx) => {
+    tx.update(encounters)
+      .set({
+        isActive: false,
+        dischargedAt: input.dischargedAt,
+        dischargeType: input.dischargeType,
+        outcomeNotes: input.outcomeNotes ?? null,
+        ...touch(now),
+      })
+      .where(eq(encounters.id, id))
+      .run();
+
+    tx.update(patients)
+      .set({ status: statusAfterDischarge(input.dischargeType, input.nextStatus), ...touch(now) })
+      .where(eq(patients.id, current.patientId))
+      .run();
+  });
+}
+
+export async function deleteEncounter(id: string): Promise<void> {
+  await db.update(encounters).set(softDelete()).where(eq(encounters.id, id));
+}

@@ -1,0 +1,20 @@
+# Line endings are LF in the repository and on checkout, on every OS, so a
+# diff never shows a whole file changed because it was saved on Windows.
+* text=auto eol=lf
+
+# Windows scripts need CRLF to run.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files are never touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.jar binary
+*.apk binary
+*.keystore binary
+*.jks binary
+*.db binary
