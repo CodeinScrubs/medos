@@ -1,0 +1,10 @@
+
+# What changed, and why. First line under ~70 characters, imperative mood.
+#
+# Body: the reasoning a reviewer cannot get from the diff — what was wrong,
+# what you chose, what you rejected, what you could not verify.
+#
+# Keep the trailer below and fill in who did the work, so `git log` answers
+# "which agent touched this?". Delete it if you are the owner typing by hand.
+
+Agent: <model> via <tool>

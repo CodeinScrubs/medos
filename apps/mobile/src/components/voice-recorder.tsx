@@ -7,7 +7,7 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { alertError } from '@/components/feedback';
@@ -44,6 +44,17 @@ export function VoiceRecorder({
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const state = useAudioRecorderState(recorder, 250);
   const [busy, setBusy] = useState(false);
+
+  // Leaving the screen while recording (the back gesture, a notification tap)
+  // unmounts this. expo-audio releases the recorder itself, but the audio mode
+  // stays switched to recording until something switches it back — harmless to
+  // repeat when nothing was being recorded.
+  useEffect(
+    () => () => {
+      void setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+    },
+    [],
+  );
 
   async function start() {
     const permission = await requestRecordingPermissionsAsync();

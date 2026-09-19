@@ -140,6 +140,27 @@ module.exports = defineConfig([
           selector: 'Literal[value=/^(?:rgb|hsl)a?[(]/]',
           message: 'Colours come from the theme (src/theme/tokens.ts).',
         },
+        /*
+         * The two invariants a reviewer cannot see by reading a diff.
+         *
+         * An async transaction callback returns a promise immediately, so the
+         * driver commits before any awaited statement has run: the work looks
+         * transactional and is not. Inside a transaction use .run() / .all() / .get().
+         */
+        {
+          selector:
+            "CallExpression[callee.property.name='transaction'] > :matches(ArrowFunctionExpression, FunctionExpression)[async=true]",
+          message:
+            'db.transaction() is synchronous with this driver: an async callback commits before your statements run. Use .run() / .all() / .get() inside it.',
+        },
+        /*
+         * Clinical data is never removed, only stamped with deletedAt, so a
+         * mistaken delete during a shift stays recoverable.
+         */
+        {
+          selector: "CallExpression[callee.object.name=/^(db|tx)$/][callee.property.name='delete']",
+          message: 'Clinical data is never hard-deleted. Stamp deletedAt with softDelete() instead.',
+        },
       ],
     },
   },

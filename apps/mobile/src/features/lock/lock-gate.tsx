@@ -100,9 +100,16 @@ export function LockGate({ children }: { children: ReactNode }) {
 
   return (
     <View style={styles.flex}>
-      {children}
+      {/* Hidden from screen readers while covered: the lock must not read out a chart. */}
+      <View style={styles.flex} importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}>
+        {children}
+      </View>
       {covered ? (
-        <View style={[StyleSheet.absoluteFill, styles.center, { backgroundColor: colors.background }]}>
+        <View
+          accessibilityViewIsModal
+          importantForAccessibility="yes"
+          style={[StyleSheet.absoluteFill, styles.center, { backgroundColor: colors.background }]}
+        >
           {enabled.loaded ? (
             <Column gap="md" style={{ alignItems: 'center', padding: spacing.xxl }}>
               <Ionicons name="lock-closed" size={48} color={colors.primary} />

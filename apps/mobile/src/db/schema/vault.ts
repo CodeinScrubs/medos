@@ -10,7 +10,8 @@ import { baseColumns, bool, jsonList } from './_shared';
  * Logins for prescription portals (سامانه نسخه‌نویسی), insurance systems,
  * hospital HIS and similar.
  *
- * Storage rules enforced by `src/lib/vault.ts`:
+ * Storage rules, to be enforced by the vault feature when it is built
+ * (`src/features/vault/`; nothing reads or writes these tables yet):
  *
  * 1. `secretCipher` holds AES-256-GCM ciphertext. The plaintext password is
  *    never written to a column, a log, or a backup in readable form.

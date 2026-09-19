@@ -10,12 +10,11 @@ import { backupRuns } from '@/db/schema';
 import { runSeeds } from '@/db/seed';
 import { readSetting, writeSetting } from '@/db/settings';
 import { snapshotDatabase } from '@/db/snapshots';
-import { rescheduleReminders } from '@/features/followups/queries';
+import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
 import { newId, stamps, touch } from '@/lib/ids';
 import { MEDIA_ROOT } from '@/platform/media';
-import { cancelAllReminders } from '@/platform/notifications';
 
 import {
   archiveEnd,
@@ -517,8 +516,7 @@ export async function restoreBackup({
 
     // The reminders the OS holds belong to the data just replaced, and the ids
     // in the backup to the phone that made it: start over from the rows.
-    await cancelAllReminders();
-    const reminders = await rescheduleReminders();
+    const { followUps: reminders } = await rescheduleAllReminders();
 
     // Keep backing up with the same passphrase on this phone from now on.
     await storeBackupKey({ key, salt: header.salt, kdf: header.kdf });

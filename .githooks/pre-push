@@ -1,0 +1,9 @@
+#!/bin/sh
+# Nothing reaches GitHub without passing the same checks CI runs.
+# In a genuine emergency: git push --no-verify (and say so in docs/HANDOFF.md).
+echo "[MedOS] npm run check before pushing…"
+npm run check || {
+  echo ""
+  echo "[MedOS] Push stopped: the checks are red. Fix them, or push with --no-verify and explain why."
+  exit 1
+}

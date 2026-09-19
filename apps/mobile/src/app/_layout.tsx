@@ -72,7 +72,8 @@ function AppStack() {
   const { colors, isDark, typography } = useTheme();
 
   useEffect(() => {
-    void SplashScreen.hideAsync();
+    // The splash screen is taken down by StartupGate, which also covers the
+    // case where startup fails and this never renders.
     void setupNotifications();
   }, []);
 

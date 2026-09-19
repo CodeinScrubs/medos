@@ -8,15 +8,19 @@
     "packages/*"
   ],
   "scripts": {
+    "brief": "node scripts/brief.js",
+    "setup": "node scripts/setup-repo.js",
+    "prepare": "node scripts/setup-repo.js",
     "start": "npm run start --workspace=@medos/mobile",
     "android": "npm run android --workspace=@medos/mobile",
     "apk": "npm run apk --workspace=@medos/mobile",
     "db:generate": "npm run db:generate --workspace=@medos/mobile",
-    "check": "npm run check --workspace=@medos/mobile",
+    "check": "npm run check --workspace=@medos/mobile && npm run format:check",
     "typecheck": "npm run typecheck --workspace=@medos/mobile",
     "lint": "npm run lint --workspace=@medos/mobile",
     "test": "npm run test --workspace=@medos/mobile",
-    "format": "npm run format --workspace=@medos/mobile"
+    "format": "prettier --write \"scripts/**/*.js\" \"*.json\" \".github/**/*.yml\" && npm run format --workspace=@medos/mobile",
+    "format:check": "prettier --check \"scripts/**/*.js\" \"*.json\" \".github/**/*.yml\""
   },
   "engines": {
     "node": ">=20.19"

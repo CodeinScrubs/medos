@@ -51,6 +51,12 @@ const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
  * the project rules, are always nullable or defaulted. A table missing from
  * the backup ends up empty, which is what "restore this backup" means.
  *
+ * Foreign keys are not enforced statement by statement during the copy (the
+ * tables are briefly inconsistent while they are emptied and refilled), so the
+ * whole result is checked before the transaction commits: a backup with a row
+ * pointing at something that is not there rolls back instead of landing as a
+ * broken record.
+ *
  * Throws, leaving `main` untouched, if any table cannot be copied.
  */
 export function importTables(conn: SqlConnection, source = 'restore_src'): { tables: number; rows: number } {
@@ -94,6 +100,12 @@ export function importTables(conn: SqlConnection, source = 'restore_src'): { tab
       );
       rows += conn.getFirstSync<{ n: number }>('SELECT changes() AS n')?.n ?? 0;
       tables += 1;
+    }
+
+    const broken = conn.getAllSync<{ table: string }>('PRAGMA main.foreign_key_check');
+    if (broken.length > 0) {
+      const where = [...new Set(broken.map((r) => r.table))].join(', ');
+      throw new Error(`بکاپ ناقص است: ارجاع‌های نادرست در ${where}`);
     }
   });
 

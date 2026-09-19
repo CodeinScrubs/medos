@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { auditLog, backupRuns, imagingStudies, patients, settings } from '@/db/schema';
+import { auditLog, backupRuns, imagingStudies, notes, patients, settings } from '@/db/schema';
 import { newId, stamps } from '@/lib/ids';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -134,6 +134,32 @@ describe('importTables', () => {
     importTables(live.conn);
 
     expect(await live.db.select().from(imagingStudies)).toEqual([]);
+  });
+
+  it('refuses a backup whose rows point at something that is not there', async () => {
+    await addPatient(live, 'Current');
+    // A note whose patient is missing from the backup: foreign keys are off
+    // during the copy, so this is only caught by the check before commit.
+    const alpha = await addPatient(backup, 'Alpha');
+    await backup.db
+      .insert(notes)
+      .values({ id: 'n1', ...stamps(), patientId: alpha, type: 'progress', noteDate: new Date() });
+    backup.conn.execSync('PRAGMA foreign_keys = OFF');
+    backup.conn.execSync("UPDATE notes SET patient_id = 'ghost-patient' WHERE id = 'n1'");
+    attachAsBackup(live, backup);
+
+    // The restore turns enforcement off while the tables are refilled, exactly
+    // as importDatabase() does on the phone; the check before commit is what
+    // catches this.
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      expect(() => importTables(live.conn)).toThrow('ارجاع‌های نادرست');
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(await names(live)).toEqual(['Current']);
+    expect(await live.db.select().from(notes)).toEqual([]);
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
   });
 
   it('changes nothing when any table fails to import', async () => {

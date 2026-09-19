@@ -1,3 +1,4 @@
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
@@ -31,15 +32,22 @@ export function StartupGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    startApp().then(
-      () => {
-        if (!cancelled) setState({ status: 'ready' });
-      },
-      (e: unknown) => {
-        logError(e, { source: 'startup', fatal: true });
-        if (!cancelled) setState({ status: 'error', error: e instanceof Error ? e : new Error(String(e)) });
-      },
-    );
+    startApp()
+      .then(
+        () => {
+          if (!cancelled) setState({ status: 'ready' });
+        },
+        (e: unknown) => {
+          logError(e, { source: 'startup', fatal: true });
+          if (!cancelled) setState({ status: 'error', error: e instanceof Error ? e : new Error(String(e)) });
+        },
+      )
+      // Whatever happened, the splash screen comes down — otherwise a startup
+      // failure would leave the app on the splash image for ever, with the
+      // message explaining it hidden underneath.
+      .finally(() => {
+        void SplashScreen.hideAsync();
+      });
     return () => {
       cancelled = true;
     };

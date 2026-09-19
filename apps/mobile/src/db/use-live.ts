@@ -19,6 +19,12 @@ import { tablesOf } from './query-tables';
  * This hook watches every table the query touches (FROM plus joins), coalesces
  * bursts of change events into one re-run, and reports `data: undefined`
  * until the first result, so `loading` is real.
+ *
+ * When `deps` change, the previous rows stay on screen until the new query
+ * lands — a few milliseconds against a local database. That is deliberate: a
+ * patient list that emptied on every keystroke would flicker. Screens that
+ * must never show another record's data get a fresh mount per record, which
+ * the router already does for `/patient/[id]`.
  */
 
 type Thenable<T> = { then: Promise<T>['then'] };
