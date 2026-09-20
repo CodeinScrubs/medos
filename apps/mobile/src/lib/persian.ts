@@ -203,3 +203,23 @@ export function initials(first?: string | null, last?: string | null): string {
   const b = last?.trim()[0] ?? '';
   return a + b || '؟';
 }
+
+/*
+ * Bidirectional isolation for a value written in Latin characters.
+ *
+ * The app is forced RTL, so a paragraph's direction is right-to-left, and a
+ * string of digits and punctuation carries no direction of its own — digits
+ * are weak, `<` and `>` are neutral *and* mirrored. A lab result of ">100"
+ * therefore renders as "100<", which a reader takes as "less than 100": the
+ * opposite of what the lab reported. `writingDirection: 'ltr'` on the Text
+ * does not fix it, because the run still has no strong character to anchor to.
+ *
+ * Wrapping the value in an isolate gives it one. Only for values that may
+ * begin with a comparator or a sign; ordinary Persian text needs none.
+ */
+const LTR_ISOLATE = String.fromCharCode(0x2066);
+const POP_ISOLATE = String.fromCharCode(0x2069);
+
+export function ltrIsolate(text: string | null | undefined): string {
+  return text ? LTR_ISOLATE + text + POP_ISOLATE : '';
+}

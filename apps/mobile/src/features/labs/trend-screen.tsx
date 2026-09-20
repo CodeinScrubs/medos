@@ -8,7 +8,7 @@ import { FLAG_LABEL, flagTone, formatRange, parseLabValue } from '@/features/lab
 import { sameUnitSeries } from '@/features/labs/logic';
 import { analyteSeriesQuery } from '@/features/labs/queries';
 import { formatJalali, formatJalaliDateTime, toJalali } from '@/lib/jalali';
-import { toPersianDigits } from '@/lib/persian';
+import { ltrIsolate, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 /** One analyte's history for one patient. Params: `id` (patient), `analyte`. */
@@ -129,7 +129,7 @@ export function TrendScreen() {
                         </Text>
                         <Row gap="xs">
                           <Text numeric style={{ color }}>
-                            {r.value.value}
+                            {ltrIsolate(r.value.value)}
                           </Text>
                           {r.value.flag && r.value.flag !== 'normal' ? (
                             <Text variant="captionStrong" ltr style={{ color }}>

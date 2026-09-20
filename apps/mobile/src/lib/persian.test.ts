@@ -7,6 +7,7 @@ import {
   hasPersianLetters,
   initials,
   isValidNationalId,
+  ltrIsolate,
   normalizePersian,
   normalizePhone,
   parseDecimal,
@@ -173,5 +174,24 @@ describe('names', () => {
     expect(hasPersianLetters('Hb')).toBe(false);
     expect(hasPersianLetters('قند خون')).toBe(true);
     expect(hasPersianLetters(null)).toBe(false);
+  });
+});
+
+describe('ltrIsolate', () => {
+  /*
+   * The app is forced RTL. ">100" has no strong direction of its own, so it
+   * renders as "100<" — which reads as *less* than 100, the opposite of the
+   * result. Found on the phone, in a lab table, where it matters most.
+   */
+  it('anchors a value that starts with a comparator', () => {
+    const isolated = ltrIsolate('>100');
+    expect(isolated.codePointAt(0)).toBe(0x2066);
+    expect(isolated.codePointAt(isolated.length - 1)).toBe(0x2069);
+    expect(isolated).toContain('>100');
+  });
+
+  it('leaves nothing behind for an empty value', () => {
+    expect(ltrIsolate('')).toBe('');
+    expect(ltrIsolate(null)).toBe('');
   });
 });

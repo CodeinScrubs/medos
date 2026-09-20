@@ -11,7 +11,7 @@ import { useLive } from '@/db/use-live';
 import { askPhotoSource, pickPhotos, storeAndAttach } from '@/features/attachments/capture';
 import { patientMediaQuery } from '@/features/attachments/queries';
 import { formatJalali, formatJalaliDateTime, formatTime, toJalali } from '@/lib/jalali';
-import { hasPersianLetters, toPersianDigits } from '@/lib/persian';
+import { hasPersianLetters, ltrIsolate, toPersianDigits } from '@/lib/persian';
 import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
@@ -241,8 +241,7 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
                     >
                       {v ? (
                         <Text numeric numberOfLines={1} align="center" style={{ color, fontSize: 13 }}>
-                          {v.value}
-                          {v.flag && v.flag !== 'normal' ? ` ${FLAG_LABEL[v.flag]}` : ''}
+                          {ltrIsolate(v.value + (v.flag && v.flag !== 'normal' ? ` ${FLAG_LABEL[v.flag]}` : ''))}
                         </Text>
                       ) : (
                         <Text variant="tiny" color="textFaint" align="center">

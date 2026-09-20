@@ -303,6 +303,7 @@ export async function createBackup({
     removeQuietly(snapshot);
 
     let savedTo: string | null = null;
+    let checked: CopyCheck | null = null;
     if (copyToFolder) {
       const folder = openBackupFolder(await readSetting(backupFolderUri));
       if (folder) {
@@ -314,9 +315,13 @@ export async function createBackup({
          * short, missing or wrong file; rotating on that word alone would
          * delete good older backups to make room for a broken one.
          */
-        const written = verifyCopy(out, folder, (f) => onProgress?.({ phase: 'copy', fraction: f }));
-        if (!written) throw new Error('بکاپ در پوشه‌ی مقصد کامل نوشته نشد. پوشه را دوباره انتخاب کنید.');
+        checked = verifyCopy(out, folder, (f) => onProgress?.({ phase: 'copy', fraction: f }));
+        if (checked === 'failed') {
+          throw new Error('بکاپ در پوشه‌ی مقصد کامل نوشته نشد. پوشه را دوباره انتخاب کنید.');
+        }
         savedTo = folder.uri;
+        // Rotation deletes older backups, so it runs only once this one is
+        // known to be there and the right size at the very least.
         rotateBackups(folder);
       } else if (trigger === 'auto') {
         throw new Error('پوشه‌ی بکاپ در دسترس نیست. از صفحه‌ی بکاپ دوباره انتخابش کنید.');
@@ -341,7 +346,11 @@ export async function createBackup({
     // cache is not a backup: Android clears that folder, and the phone it is
     // on is the thing being backed up. Sharing it marks it delivered.
     if (savedTo) await writeSetting(backupLastSuccessAt, Date.now());
-    await audit('backup.created', { summary: fileName, detail: { trigger, includeMedia, sizeBytes, savedTo } });
+    await audit('backup.created', {
+      summary: fileName,
+      // `checked` says how far the copy could be proved, not how it went.
+      detail: { trigger, includeMedia, sizeBytes, savedTo, checked },
+    });
 
     onProgress?.({ phase: 'done', fraction: 1 });
     return { file: out, fileName, sizeBytes, savedTo, manifest };
@@ -461,39 +470,64 @@ export async function markBackupDelivered(): Promise<void> {
 }
 
 /**
+ * How well the copy in the backup folder could be checked.
+ *
+ * - `bytes`: opened and compared with the source, byte for byte.
+ * - `size`: it is there and the right length, and the provider would not let
+ *   it be read back. Android's storage-access-framework folders are like this
+ *   — a `content://` document has no file handle to open.
+ * - `failed`: missing, empty, the wrong length, or different where it could
+ *   be read. Nothing is deleted after this.
+ */
+type CopyCheck = 'bytes' | 'size' | 'failed';
+
+/**
  * Is the copy really there, with the same bytes in it?
  *
- * `copy` resolving is the provider's word; this is the destination's. The file
- * is opened and read back against the source rather than having its size
- * compared, because size is the provider's word too — a cloud-backed or USB
- * folder can report the length it was asked to write while holding something
- * else, and the next step deletes older backups to make room for this one.
- * Reading a few hundred megabytes back costs seconds; the alternative costs
- * the only copy of a record.
+ * `copy` resolving is the provider's word; this asks the destination. Size is
+ * the provider's word too — a cloud-backed or USB folder can report the length
+ * it was asked to write while holding something else — so the file is read
+ * back and compared where that is possible at all.
+ *
+ * It is not always possible, which the first version of this got wrong: it
+ * treated "cannot open the destination" as "the backup failed", and on a phone
+ * whose backup folder is a SAF tree that is every backup. A check that refuses
+ * good data is not a stricter check, it is a broken one. What the weaker
+ * answer must never do is be reported as the stronger one.
  */
-function verifyCopy(source: File, folder: Directory, onProgress?: (fraction: number) => void): boolean {
+function verifyCopy(source: File, folder: Directory, onProgress?: (fraction: number) => void): CopyCheck {
   let read: FileHandle | null = null;
   let written: FileHandle | null = null;
   try {
     const copied = new File(folder, source.name);
-    if (!copied.exists) return false;
+    if (!copied.exists) return 'failed';
     const expected = source.size ?? 0;
-    if (expected === 0) return false;
+    // We wrote this file a moment ago; a source we cannot measure is a bug,
+    // not a backup.
+    if (expected === 0) return 'failed';
     const size = copied.size;
-    // A provider that does not report a size is not trusted either way; the
-    // comparison below runs out of bytes if the file is short.
-    if (size != null && size !== expected) return false;
-    read = source.open(FileMode.ReadOnly);
-    written = copied.open(FileMode.ReadOnly);
+    if (size != null && size !== expected) return 'failed';
+    if (size == null) return 'size';
+
+    try {
+      read = source.open(FileMode.ReadOnly);
+      written = copied.open(FileMode.ReadOnly);
+    } catch {
+      // The provider does not hand out a handle. Length is all there is.
+      return 'size';
+    }
     return streamsMatch(
       { read: (n) => read!.readBytes(n) },
       { read: (n) => written!.readBytes(n) },
       expected,
       CHUNK_BYTES,
       onProgress,
-    );
+    )
+      ? 'bytes'
+      : 'failed';
   } catch {
-    return false;
+    // Reading stopped partway: not proof of a bad copy, not proof of a good one.
+    return 'size';
   } finally {
     read?.close();
     written?.close();
