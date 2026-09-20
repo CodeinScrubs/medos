@@ -57,8 +57,6 @@ export function MoreScreen() {
     },
   ];
 
-  const coming: Item[] = [];
-
   return (
     <Screen scroll>
       <Column gap="none" style={{ paddingTop: spacing.md }}>
@@ -69,9 +67,6 @@ export function MoreScreen() {
 
         <SectionHeader title="داده‌ها و امنیت" />
         <MenuCard items={ready} />
-
-        <SectionHeader title="در مرحله‌ی بعد" />
-        <MenuCard items={coming} />
       </Column>
     </Screen>
   );
