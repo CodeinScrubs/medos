@@ -110,10 +110,12 @@ migration never reaches the phone.
 
 `StartupGate` (`src/features/startup/`) renders nothing but a spinner until, in order:
 
-1. the connection is open with `foreign_keys`, WAL and `busy_timeout` set (`db/client.ts`,
-   at module load, before any query can run);
+1. the connection is open with `foreign_keys`, WAL, `synchronous = FULL` and
+   `busy_timeout` set (`db/client.ts`, at module load, before any query can run);
 2. `startDatabase()` — snapshot if needed, migrations, seeds;
-3. search indexes are rebuilt if their version changed.
+3. a restore that was killed halfway is undone (`recoverInterruptedRestore`);
+4. search indexes are rebuilt if their version changed;
+5. stored lab flags are recomputed if the rule that sets them changed.
 
 A failure is shown (with the error text redacted), logged, and never swallowed: carrying on
 against a half-migrated schema would fail later in more confusing ways, or write bad data.
@@ -220,6 +222,20 @@ message if it was deleted), then the form component initialises its state from i
 Copying a loaded record into form state with an effect shows an empty form for a moment,
 can overwrite what the user started typing, and — if the record had been deleted — would
 save the empty form as a new record.
+
+---
+
+## Drafts: the text is safe before the record exists
+
+The note editor writes what is being typed to `note_drafts` continuously (`lib/autosave.ts`
+schedules it: a short debounce, plus a hard ceiling so continuous typing cannot postpone the
+write for ever), and a voice recording is moved into media storage the moment it stops. The
+note itself is still written once, when the user saves — a chart entry is a decision, not a
+side effect of typing — and the draft is dropped at that point.
+
+This is why the editor's own live query is read only at mount: it is watching a row the same
+screen is writing, and feeding those writes back into the fields would fight the keyboard.
+Drafts nobody finished are surfaced on Today rather than left to be found by accident.
 
 ---
 

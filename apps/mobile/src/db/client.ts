@@ -27,8 +27,15 @@ export const sqlite = SQLite.openDatabaseSync(DATABASE_NAME, { enableChangeListe
  * - WAL keeps reads fast while a write is in flight (a photo import running
  *   behind the patient list).
  * - `busy_timeout` makes a briefly locked database wait instead of failing.
+ * - `synchronous = FULL` is set explicitly rather than left to whatever the
+ *   bundled SQLite was compiled with. In WAL mode the usual default is
+ *   NORMAL, which keeps the database consistent across a power cut but may
+ *   lose the last committed transactions — and the last committed transaction
+ *   here is the sentence someone just typed into a note. FULL costs an fsync
+ *   per commit; a phone that dies mid-shift costs more.
  */
 sqlite.execSync('PRAGMA journal_mode = WAL;');
+sqlite.execSync('PRAGMA synchronous = FULL;');
 sqlite.execSync('PRAGMA foreign_keys = ON;');
 sqlite.execSync('PRAGMA busy_timeout = 5000;');
 

@@ -33,6 +33,84 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (latest) — Typing that survives the phone, and photos that keep their pixels
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last two commits
+
+A second external review (016) went through the owner's long product conversation with
+another assistant. Its findings about *that* proposal are not this repository's business,
+but two about this code were right and are fixed here. The chart from the last entry was
+also cluttered, which the owner said plainly.
+
+**Changed**
+
+- **A note no longer waits for Save to be safe.** `note_drafts` holds what is being typed;
+  `lib/autosave.ts` schedules the write with a short debounce *and* a hard ceiling, so
+  continuous typing — the case a plain debounce protects least — still reaches storage
+  every few seconds. Writes are serialized, a failed one keeps its value and retries, and
+  the screen never says "saved" when it is not. The editor flushes on unmount and when the
+  app leaves the foreground.
+- **The note itself is still written once, on Save.** A chart entry is a decision; a
+  half-typed note should not appear in a patient's timeline because the phone rang. What
+  the button stopped controlling is whether the words survive.
+- **Voice is stored when recording stops**, not when the note is saved. The draft carries
+  the stored paths; Save turns them into attachments.
+- **Drafts are visible.** `UnfinishedNotes` on Today: a draft nobody finished is otherwise
+  only offered when the same patient's editor is opened again.
+- **`PRAGMA synchronous = FULL`**, set explicitly. In WAL mode the usual default is NORMAL,
+  which survives a crash but can lose the last commits to a power cut — and the last commit
+  is now the sentence someone just typed.
+- **Photos keep their original bytes** for clinical photos and radiology (`media.keepOriginals`,
+  settable to always/never in Settings). Every photo is re-encoded to 2400px JPEG, which is
+  right for a lab sheet and wrong for a lesion followed over weeks or two ECGs compared
+  side by side. The re-encode cannot be undone later, so the choice has to be made on the
+  way in. The viewer zooms and shares the original when there is one.
+- **One marker per point on a trend chart.** The previous entry's arrows sat on top of
+  circles and needed three lines of small print; now the shape says it (round = measured,
+  triangle = a bound) and one short line explains the shapes that are actually present.
+
+**Verified**
+
+- `npm run check` green: 22 suites / **367 tests** (354 before).
+- The scheduler is tested with fake time, including the case that matters: twenty
+  keystrokes 200 ms apart, where a pure debounce would never write at all.
+- Draft round-trip, per-note separation, discard-keeps-the-row and voice carriage are
+  tested against real SQLite (sql.js) with the app's own migrations.
+- The earlier review's restore probe was rebuilt against the fixed engine: all four
+  failure paths now preserve the data. Script is not committed (it is a diagnostic).
+
+**Not verified**
+
+- Still nothing on a phone. Everything since 0.2.2 is untested on device, and these
+  changes add two things only a device settles: whether `synchronous = FULL` costs
+  anything noticeable on an A52s, and whether keeping originals fills the phone faster
+  than the owner expects.
+- Process death during typing has not been *demonstrated*; it has been designed for. The
+  test kills the write, not the app.
+
+**Open threads**
+
+- Version history for notes (the owner chose "remember everything"): drafts are the
+  foundation, the history table is not built. Retention is still an open owner decision —
+  and the reviewer is right that it must not block anything else.
+- Old `scheduledMessages` rows still claim a confirmation that never happened
+  (`deliveryEvidence` column); still deferred, still cheap, still should happen before the
+  doctors module has real history.
+- Admission duration (O11: elapsed days/hours, 12:01 PM when the hour is unknown) is
+  confirmed by the owner but not implemented — `hospitalDay` is still calendar-day-plus-one.
+  It needs a stored "hour not recorded" marker and must not leak into the kardex D-count,
+  which is a different clock.
+
+**Gotchas**
+
+- `react-hooks/refs` bans reading a ref during render, which is the obvious way to take
+  "only the first value" from a live query. `useState(() => …)` does the same job legally.
+- A live query the same screen writes to must be read once, at mount. Feeding its own
+  writes back into the form fields fights the keyboard.
+- `jest --rootDir apps/mobile` from the repository root breaks `@/` resolution. Run jest
+  from `apps/mobile`.
+
 ## 2026-09-20 (later) — A second external review, and what it was right about
 
 **Agent:** claude-opus-5 via Claude Code

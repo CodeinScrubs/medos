@@ -211,6 +211,53 @@ export const notes = sqliteTable(
   ],
 );
 
+/** A recording already moved into storage, waiting for its note to exist. */
+export type DraftVoice = { relativePath: string; durationMs: number | null; sizeBytes: number | null };
+
+/**
+ * What is being typed, before it is part of the record.
+ *
+ * A note is a clinical document: it enters the chart when the user says so,
+ * and it should not appear half-written in a patient's timeline because the
+ * phone rang. But the text has to survive the phone ringing, so the editor
+ * writes here continuously — a few seconds behind the keyboard at worst — and
+ * the note itself is written once, on save.
+ *
+ * `noteId` is null while the draft belongs to a note that does not exist yet.
+ * Rows are kept by `deletedAt` like everything else: a draft that was
+ * committed is not worth resurrecting, but a draft the user discarded by
+ * mistake at 3 a.m. is.
+ */
+export const noteDrafts = sqliteTable(
+  'note_drafts',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'cascade' }),
+    /** The note being edited, or null for one not yet created. */
+    noteId: text('note_id').references(() => notes.id, { onDelete: 'cascade' }),
+
+    type: text('type', { enum: NOTE_TYPES })
+      .notNull()
+      .$default(() => 'progress' as const),
+    title: text('title'),
+    body: text('body'),
+    subjective: text('subjective'),
+    objective: text('objective'),
+    assessment: text('assessment'),
+    plan: text('plan'),
+    noteDate: integer('note_date', { mode: 'timestamp_ms' }),
+    doctorId: text('doctor_id').references(() => doctors.id),
+    specialty: text('specialty'),
+    isPinned: bool('is_pinned'),
+    isDraft: bool('is_draft'),
+    /** Voice notes are stored the moment recording stops, not on save. */
+    voices: text('voices', { mode: 'json' }).$type<DraftVoice[]>(),
+  },
+  (t) => [index('note_drafts_target_idx').on(t.patientId, t.noteId)],
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Kardex: drugs, fluids, diet and nursing orders                              */
 /* -------------------------------------------------------------------------- */
@@ -461,6 +508,7 @@ export type PatientContact = typeof patientContacts.$inferSelect;
 export type Encounter = typeof encounters.$inferSelect;
 export type Diagnosis = typeof diagnoses.$inferSelect;
 export type Note = typeof notes.$inferSelect;
+export type NoteDraft = typeof noteDrafts.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type Vital = typeof vitals.$inferSelect;
 export type LabPanel = typeof labPanels.$inferSelect;

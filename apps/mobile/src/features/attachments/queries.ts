@@ -37,6 +37,8 @@ export type AttachmentInput = {
   kind: AttachmentKind;
   relativePath: string;
   thumbnailPath?: string | null;
+  /** The untouched file, when it was kept; see `attachments.originalPath`. */
+  originalPath?: string | null;
   mimeType?: string | null;
   sizeBytes?: number | null;
   width?: number | null;
@@ -58,6 +60,7 @@ export async function addAttachment(input: AttachmentInput): Promise<string> {
     kind: input.kind,
     relativePath: input.relativePath,
     thumbnailPath: input.thumbnailPath ?? null,
+    originalPath: input.originalPath ?? null,
     mimeType: input.mimeType ?? null,
     sizeBytes: input.sizeBytes ?? null,
     width: input.width ?? null,

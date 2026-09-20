@@ -2,9 +2,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
 import type { AttachmentEntity, AttachmentKind } from '@/db/schema';
+import { readSetting } from '@/db/settings';
 import { storePhoto } from '@/platform/media';
 
 import { addAttachment } from './queries';
+import { keepOriginalsMode, shouldKeepOriginal } from './settings';
 
 export type PhotoSource = 'camera' | 'library';
 
@@ -58,8 +60,9 @@ export type AttachTarget = {
 /** Compress, store and attach already-picked assets. Returns the new attachment ids. */
 export async function storeAndAttach(assets: ImagePicker.ImagePickerAsset[], target: AttachTarget): Promise<string[]> {
   const ids: string[] = [];
+  const keepOriginal = shouldKeepOriginal(await readSetting(keepOriginalsMode), target.kind);
   for (const asset of assets) {
-    const stored = await storePhoto({ uri: asset.uri, width: asset.width, height: asset.height });
+    const stored = await storePhoto({ uri: asset.uri, width: asset.width, height: asset.height }, { keepOriginal });
     ids.push(
       await addAttachment({
         entityType: target.entityType,
@@ -68,6 +71,7 @@ export async function storeAndAttach(assets: ImagePicker.ImagePickerAsset[], tar
         kind: target.kind,
         relativePath: stored.relativePath,
         thumbnailPath: stored.thumbnailPath,
+        originalPath: stored.originalPath,
         mimeType: stored.mimeType,
         sizeBytes: stored.sizeBytes,
         width: stored.width,

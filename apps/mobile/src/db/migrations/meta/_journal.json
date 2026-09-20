@@ -8,6 +8,20 @@
       "when": 1789813086555,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789922642464,
+      "tag": "0001_yellow_prism",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789923107269,
+      "tag": "0002_high_the_leader",
+      "breakpoints": true
     }
   ]
 }

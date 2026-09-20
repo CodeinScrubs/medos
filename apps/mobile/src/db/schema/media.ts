@@ -61,6 +61,15 @@ export const attachments = sqliteTable(
     /** Path relative to the app documents directory, e.g. "media/2026/09/ab12.jpg". */
     relativePath: text('relative_path').notNull(),
     thumbnailPath: text('thumbnail_path'),
+    /**
+     * The file exactly as it arrived, when it was kept.
+     *
+     * `relativePath` is a re-encode — 2400px, JPEG — which is right for a
+     * chart photo and wrong for the two things that need the sensor's own
+     * pixels: zooming into a lesion, and putting two ECGs side by side. Null
+     * means the original was not kept, never that it is missing.
+     */
+    originalPath: text('original_path'),
     mimeType: text('mime_type'),
     sizeBytes: integer('size_bytes'),
     width: integer('width'),

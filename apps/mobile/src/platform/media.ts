@@ -92,6 +92,8 @@ export async function storeFile(
 
 export type StoredPhoto = StoredFile & {
   thumbnailPath: string;
+  /** The untouched file, when the setting asks for it to be kept. */
+  originalPath: string | null;
   width: number;
   height: number;
   mimeType: 'image/jpeg';
@@ -117,13 +119,24 @@ async function renderJpeg(uri: string, width: number, height: number, maxEdge: n
 }
 
 /**
- * Store a photo: a compressed full-size copy plus a small thumbnail.
+ * Store a photo: a compressed full-size copy, a small thumbnail, and — when
+ * asked — the file exactly as it arrived.
  *
  * A modern phone camera produces 4-12 MB per shot. Over a few years of
  * clinical photos that is tens of gigabytes; at 2400px / 85% JPEG the same
- * photos are roughly a tenth of that, which also keeps backups practical.
+ * photos are roughly a tenth of that, which also keeps backups practical. That
+ * trade is right for a photo of a lab sheet and wrong for a lesion being
+ * followed over weeks or two ECGs being compared, so keeping the original is a
+ * setting rather than a rule — and when it is on, the original is stored
+ * first: an original that exists only until the re-encode succeeds is not a
+ * preserved original.
  */
-export async function storePhoto(source: { uri: string; width: number; height: number }): Promise<StoredPhoto> {
+export async function storePhoto(
+  source: { uri: string; width: number; height: number },
+  { keepOriginal = false }: { keepOriginal?: boolean } = {},
+): Promise<StoredPhoto> {
+  const original = keepOriginal ? await storeFile(source.uri, extensionOf(source.uri, 'jpg')) : null;
+
   const full = await renderJpeg(source.uri, source.width, source.height, PHOTO_MAX_EDGE, PHOTO_QUALITY);
   const thumb = await renderJpeg(source.uri, source.width, source.height, THUMB_MAX_EDGE, THUMB_QUALITY);
 
@@ -133,6 +146,7 @@ export async function storePhoto(source: { uri: string; width: number; height: n
   return {
     ...stored,
     thumbnailPath: storedThumb.relativePath,
+    originalPath: original?.relativePath ?? null,
     width: full.width,
     height: full.height,
     mimeType: 'image/jpeg',

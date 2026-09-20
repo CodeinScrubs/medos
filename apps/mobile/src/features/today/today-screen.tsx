@@ -9,6 +9,7 @@ import { useLive } from '@/db/use-live';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { dueFollowUpsQuery, pendingFollowUpsQuery } from '@/features/followups/queries';
+import { UnfinishedNotes } from '@/features/notes/unfinished-notes';
 import { PatientCard } from '@/features/patients/patient-card';
 import { patientListQuery } from '@/features/patients/queries';
 import { daysBetween, formatJalaliWithWeekday, toIsoDate, toJalali } from '@/lib/jalali';
@@ -90,6 +91,8 @@ export function TodayScreen() {
             ))}
           </>
         )}
+
+        <UnfinishedNotes />
 
         <UpcomingOccasions now={now} />
 

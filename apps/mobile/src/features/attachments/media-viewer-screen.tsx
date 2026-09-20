@@ -24,8 +24,12 @@ export function MediaViewerScreen() {
 
   const { data } = useLive(attachmentQuery(attachmentId), [attachmentId]);
   const item = data?.[0];
-  const uri = item ? mediaUri(item.relativePath) : null;
-  const missing = item ? !mediaExists(item.relativePath) : false;
+  // Zoom against the original when one was kept: this screen is where the
+  // difference between the sensor's pixels and a 2400px re-encode is the whole
+  // point. Sharing follows suit — what leaves is what arrived.
+  const shown = item && item.originalPath && mediaExists(item.originalPath) ? item.originalPath : item?.relativePath;
+  const uri = shown ? mediaUri(shown) : null;
+  const missing = shown ? !mediaExists(shown) : false;
 
   async function share() {
     if (!uri) return;

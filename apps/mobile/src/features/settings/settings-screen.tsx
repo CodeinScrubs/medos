@@ -8,6 +8,7 @@ import { Card, Column, DataRow, Divider, Row, Screen, SectionHeader, Segmented, 
 import { databaseSizeBytes } from '@/db/files';
 import { writeSetting } from '@/db/settings';
 import { useSetting } from '@/db/use-setting';
+import { keepOriginalsMode, type KeepOriginalsMode } from '@/features/attachments/settings';
 import { disableAppLock, enableAppLock } from '@/features/lock/lock-gate';
 import { lockEnabled, lockGraceSeconds } from '@/features/lock/settings';
 import { formatBytes } from '@/lib/format';
@@ -20,6 +21,7 @@ export function SettingsScreen() {
   const { colors, spacing } = useTheme();
   const lockOn = useSetting(lockEnabled).value;
   const grace = useSetting(lockGraceSeconds).value;
+  const keepOriginals = useSetting(keepOriginalsMode).value;
 
   // Measured once when the screen opens; both are quick, synchronous reads.
   const [storage] = useState(() => ({ db: databaseSizeBytes(), media: mediaFolderSize() }));
@@ -68,6 +70,21 @@ export function SettingsScreen() {
         <Card>
           <DataRow label="دیتابیس" value={formatBytes(storage.db)} />
           <DataRow label="عکس‌ها و صداها" value={formatBytes(storage.media)} />
+          <Divider />
+          <Segmented
+            label="نگه داشتن اصل عکس‌ها"
+            value={keepOriginals}
+            onChange={(v) => void writeSetting(keepOriginalsMode, v as KeepOriginalsMode)}
+            options={[
+              { value: 'clinical', label: 'عکس بالینی' },
+              { value: 'always', label: 'همه' },
+              { value: 'never', label: 'هیچ' },
+            ]}
+          />
+          <Text variant="tiny" color="textFaint">
+            هر عکس برای پرونده به ۲۴۰۰ پیکسل فشرده می‌شود. اصلِ عکس حدود ۸ تا ۱۰ برابر جا می‌گیرد، ولی برای زوم روی
+            ضایعه و مقایسه‌ی نوار قلب لازم است. این تنظیم روی عکس‌های قبلی اثری ندارد.
+          </Text>
         </Card>
 
         <SectionHeader title="عیب‌یابی" />
