@@ -10,17 +10,25 @@ import type { Credential } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { SearchBar } from '@/features/knowledge/search-bar';
 import { formatJalali } from '@/lib/jalali';
+import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
 
 import { createVault, isVaultConfigured, loadVaultKey, unlockVault } from './keys';
 import { CREDENTIAL_CATEGORY_LABELS, CREDENTIAL_OWNER_LABELS } from './labels';
 import { daysUntilExpiry } from './logic';
-import { credentialsQuery } from './queries';
+import { credentialsQuery, finishPendingRekey } from './queries';
 
 type Gate = 'loading' | 'new' | 'locked' | 'open';
 
 async function gateState(): Promise<Gate> {
   if (!(await isVaultConfigured())) return 'new';
+  // A passphrase change the app was killed in the middle of is finished here,
+  // before anything is read: until it is, the vault holds two generations.
+  try {
+    await finishPendingRekey();
+  } catch (e) {
+    logError(e, { source: 'handled', context: 'vault: finishing a passphrase change' });
+  }
   return (await loadVaultKey()) ? 'open' : 'locked';
 }
 

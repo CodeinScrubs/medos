@@ -336,3 +336,37 @@ export function encodeJson(value: unknown): Uint8Array {
 export function decodeJson<T>(bytes: Uint8Array): T {
   return JSON.parse(decoder.decode(bytes)) as T;
 }
+
+/** Anything that hands back the next `length` bytes, or fewer at the end. */
+export type ChunkReader = { read(length: number): Uint8Array };
+
+/**
+ * Do two byte streams hold the same `expected` bytes?
+ *
+ * Used to check a backup that was copied out against the one that was written,
+ * without either of them being held in memory. A stream that runs out early —
+ * the short file a storage provider leaves behind when a write is cut off —
+ * fails like any other difference.
+ */
+export function streamsMatch(
+  a: ChunkReader,
+  b: ChunkReader,
+  expected: number,
+  chunkBytes = CHUNK_BYTES,
+  onProgress?: (fraction: number) => void,
+): boolean {
+  let done = 0;
+  while (done < expected) {
+    const want = Math.min(chunkBytes, expected - done);
+    const left = a.read(want);
+    const right = b.read(want);
+    if (left.length === 0 || left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) return false;
+    }
+    done += left.length;
+    onProgress?.(done / expected);
+  }
+  // Neither may have anything left over: a longer file is not this backup.
+  return a.read(1).length === 0 && b.read(1).length === 0;
+}

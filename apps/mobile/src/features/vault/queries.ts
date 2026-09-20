@@ -16,7 +16,17 @@ import {
 } from '@/lib/crypto';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
-import { deriveVaultKey, loadVaultKey, replaceVaultKeyset, vaultKeysetRecord, type VaultKeyset } from './keys';
+import {
+  commitNextKeyset,
+  deriveVaultKey,
+  discardPendingKeyset,
+  loadVaultKey,
+  pendingKeysetRecord,
+  stageNextKeyset,
+  vaultKeyForVersion,
+  vaultKeysetRecord,
+  type VaultKeyset,
+} from './keys';
 import { credentialSearchText } from './logic';
 
 /*
@@ -113,7 +123,9 @@ export async function createCredential(input: CredentialInput): Promise<string> 
 
   const id = newId();
   const row = values(input);
-  const secret = input.secret?.trim();
+  // Never trimmed: a password is whatever the other system accepts, spaces
+  // included, and an empty one means there is none to store.
+  const secret = input.secret;
   const sealedParts = secret ? await sealFor(id, secret, record.keyVersion) : {};
 
   await db.insert(credentials).values({
@@ -140,7 +152,7 @@ export async function updateCredential(id: string, patch: Partial<CredentialInpu
   // `secret: undefined` means "leave the stored one alone"; an empty string
   // means "remove it".
   const secretGiven = patch.secret !== undefined;
-  const secret = patch.secret?.trim();
+  const secret = patch.secret;
   const sealedParts = secretGiven
     ? secret
       ? await sealFor(id, secret, record.keyVersion)
@@ -163,7 +175,9 @@ export async function updateCredential(id: string, patch: Partial<CredentialInpu
 export async function revealSecret(id: string): Promise<string | null> {
   const row = (await credentialQuery(id))[0];
   if (!row?.secretCipher || !row.secretNonce) return null;
-  const key = await loadVaultKey();
+  // By the row's own generation, not the vault's: a passphrase change that was
+  // interrupted leaves both, and this row knows which one sealed it.
+  const key = await vaultKeyForVersion(row.keyVersion);
   if (!key) throw new VaultLockedError();
 
   const opened = await openSecret(
@@ -190,33 +204,35 @@ export async function deleteCredential(id: string): Promise<void> {
 }
 
 /**
- * Change the vault passphrase: every stored secret is opened with the old key
- * and sealed again with the new one, then the keyset is replaced.
+ * Re-seal every stored secret with a key of a newer generation.
  *
- * Order matters. The rows are written first and the keyset last, so an
- * interruption leaves rows sealed with the old key and a keyset that still
- * describes it — recoverable. Replacing the keyset first would leave secrets
- * nothing could open.
+ * Rows are taken one at a time and each is committed on its own, so an
+ * interruption leaves a vault half in each generation rather than a
+ * half-written row. That is only survivable because both keys are already on
+ * the phone before this runs: see `stageNextKeyset`. A row whose own key is
+ * not available is counted and skipped, never overwritten.
  */
-export async function rekeyVault(
-  currentPassphrase: string,
-  nextPassphrase: string,
+async function resealRows(
+  keyFor: (version: number) => Promise<Uint8Array | null>,
+  newKey: Uint8Array,
+  nextVersion: number,
   onProgress?: (fraction: number) => void,
-): Promise<{ rekeyed: number }> {
-  const record: VaultKeyset | null = await vaultKeysetRecord();
-  if (!record) throw new VaultLockedError();
-
-  const { key: oldKey, matches } = await deriveVaultKey(currentPassphrase, record, (f) => onProgress?.(f * 0.4));
-  if (!matches) throw new Error('رمز فعلی درست نیست');
-
-  const salt = randomBytes(SALT_BYTES);
-  const newKey = await deriveKey(nextPassphrase, salt, DEFAULT_KDF, (f) => onProgress?.(0.4 + f * 0.4));
-  const nextVersion = record.keyVersion + 1;
-
+): Promise<{ rekeyed: number; skipped: number }> {
   const rows = await db.select().from(credentials);
   let rekeyed = 0;
+  let skipped = 0;
+  let seen = 0;
   for (const row of rows) {
-    if (!row.secretCipher || !row.secretNonce) continue;
+    seen += 1;
+    onProgress?.(seen / Math.max(rows.length, 1));
+    // Soft-deleted rows are re-sealed too: they are still restorable, and a
+    // password nobody can open is not a deletion anyone asked for.
+    if (!row.secretCipher || !row.secretNonce || row.keyVersion === nextVersion) continue;
+    const oldKey = await keyFor(row.keyVersion);
+    if (!oldKey) {
+      skipped += 1;
+      continue;
+    }
     const plain = await openSecret(
       oldKey,
       { nonce: fromBase64(row.secretNonce), sealed: fromBase64(row.secretCipher) },
@@ -229,8 +245,82 @@ export async function rekeyVault(
       .where(eq(credentials.id, row.id));
     rekeyed += 1;
   }
+  return { rekeyed, skipped };
+}
 
-  await replaceVaultKeyset(newKey, salt, nextVersion);
+/**
+ * Carry on a passphrase change that was interrupted.
+ *
+ * Safe to call at any time: without a pending keyset it does nothing. The new
+ * keyset is only made the vault's own when every secret has reached it —
+ * committing earlier would lock the stragglers out, since the key that sealed
+ * them is the one being replaced.
+ */
+export async function finishPendingRekey(onProgress?: (fraction: number) => void): Promise<{
+  rekeyed: number;
+  remaining: number;
+}> {
+  const pending = await pendingKeysetRecord();
+  if (!pending) return { rekeyed: 0, remaining: 0 };
+
+  const record = await vaultKeysetRecord();
+  if (record && record.keyVersion >= pending.keyVersion) {
+    // The change went through; this is only its marker left behind.
+    await discardPendingKeyset();
+    return { rekeyed: 0, remaining: 0 };
+  }
+
+  const newKey = await vaultKeyForVersion(pending.keyVersion);
+  if (!newKey) {
+    const rows = await db.select().from(credentials);
+    return { rekeyed: 0, remaining: rows.filter((r) => r.secretCipher && r.keyVersion !== pending.keyVersion).length };
+  }
+
+  const { rekeyed, skipped } = await resealRows(vaultKeyForVersion, newKey, pending.keyVersion, onProgress);
+  if (skipped === 0) {
+    await commitNextKeyset();
+    await audit('vault.rekeyed', { detail: { rekeyed, keyVersion: pending.keyVersion, resumed: true } });
+  }
+  return { rekeyed, remaining: skipped };
+}
+
+/**
+ * Change the vault passphrase.
+ *
+ * The new key and its salt are written down first, then every secret is opened
+ * with the old key and sealed again with the new one, and only then does the
+ * new keyset become the vault's own. Nothing here is atomic — it cannot be,
+ * since the Keystore and the database are two stores — so the order is chosen
+ * so that every intermediate state is one both keys can be recovered from.
+ * `finishPendingRekey` picks up whichever one the app was killed in.
+ */
+export async function rekeyVault(
+  currentPassphrase: string,
+  nextPassphrase: string,
+  onProgress?: (fraction: number) => void,
+): Promise<{ rekeyed: number }> {
+  await finishPendingRekey();
+
+  const record: VaultKeyset | null = await vaultKeysetRecord();
+  if (!record) throw new VaultLockedError();
+
+  const { key: oldKey, matches } = await deriveVaultKey(currentPassphrase, record, (f) => onProgress?.(f * 0.4));
+  if (!matches) throw new Error('رمز فعلی درست نیست');
+
+  const salt = randomBytes(SALT_BYTES);
+  const newKey = await deriveKey(nextPassphrase, salt, DEFAULT_KDF, (f) => onProgress?.(0.4 + f * 0.4));
+  const nextVersion = record.keyVersion + 1;
+  await stageNextKeyset(newKey, salt, nextVersion);
+
+  // The old key came from the typed passphrase, so this works on a vault that
+  // was locked; anything sealed at another generation goes through the store.
+  const keyFor = async (version: number) => (version === record.keyVersion ? oldKey : vaultKeyForVersion(version));
+  const { rekeyed, skipped } = await resealRows(keyFor, newKey, nextVersion, (f) => onProgress?.(0.8 + f * 0.2));
+  if (skipped > 0) {
+    throw new Error(`${skipped} رمز با کلید دیگری قفل است و باز نشد؛ تغییر رمز ناتمام ماند و چیزی از بین نرفت.`);
+  }
+
+  await commitNextKeyset();
   onProgress?.(1);
   await audit('vault.rekeyed', { detail: { rekeyed, keyVersion: nextVersion } });
   return { rekeyed };

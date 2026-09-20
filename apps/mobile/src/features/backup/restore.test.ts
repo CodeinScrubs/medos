@@ -98,6 +98,24 @@ describe('importTables', () => {
     expect(await settingValue(live, 'lock.enabled')).toBe('true');
   });
 
+  /*
+   * What makes a killed restore recoverable: the marker saying "the files were
+   * replaced, the database was not" is an ordinary setting, so the import that
+   * commits the new database deletes it in the same transaction. There is no
+   * moment where the marker and the data disagree.
+   */
+  it('clears the restore-in-flight marker in the transaction that commits the data', async () => {
+    await putSetting(live, 'restore.inFlight', { dir: 'abc', at: 1 });
+    await putSetting(live, 'backup.folderUri', 'content://this-phone');
+    attachAsBackup(live, backup);
+
+    importTables(live.conn);
+
+    expect(await settingValue(live, 'restore.inFlight')).toBeNull();
+    // And it is not simply that every setting went: the phone's own stayed.
+    expect(await settingValue(live, 'backup.folderUri')).toBe('"content://this-phone"');
+  });
+
   it('merges the audit log instead of replacing it', async () => {
     await addAudit(live, 'a-live');
     await addAudit(live, 'a-shared');

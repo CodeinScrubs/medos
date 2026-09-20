@@ -10,6 +10,7 @@ import { backupRuns } from '@/db/schema';
 import { runSeeds } from '@/db/seed';
 import { readSetting, writeSetting } from '@/db/settings';
 import { snapshotDatabase } from '@/db/snapshots';
+import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
 import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
@@ -34,11 +35,20 @@ import {
   parseHeader,
   readArchiveStart,
   readEntryHeader,
+  streamsMatch,
 } from './format';
 import { importTables } from './import';
 import { hasBackupKey, loadBackupKey, storeBackupKey } from './keys';
 import { isBackupDue } from './logic';
 import { parseManifest, type BackupManifest } from './manifest';
+import {
+  MediaRestoreError,
+  placeRestoredMedia,
+  putBackDisplacedMedia,
+  type DisplacedMedia,
+  type MediaFileSystem,
+  type MediaPaths,
+} from './media-swap';
 import { BACKUP_FILE_RE, backupFileName, restoreTargetPath } from './paths';
 import {
   backupAutoEnabled,
@@ -46,6 +56,7 @@ import {
   backupFolderUri,
   backupIntervalHours,
   backupLastSuccessAt,
+  restoreInFlight,
 } from './settings';
 
 /* -------------------------------------------------------------------------- */
@@ -55,6 +66,9 @@ import {
 /** How many of each kind to keep in the backup folder. */
 const KEEP_FULL = 3;
 const KEEP_DB_ONLY = 7;
+
+/** Where a restore keeps the files it replaces, under the document folder. */
+const DISPLACED_ROOT = 'restore-displaced';
 
 export type BackupConfig = {
   folderUri: string | null;
@@ -295,12 +309,12 @@ export async function createBackup({
         onProgress?.({ phase: 'copy', fraction: 0 });
         await out.copy(folder, { overwrite: true });
         /*
-         * Reopen the destination and compare sizes before anything is deleted.
-         * A copy onto a storage provider can come back without throwing and
-         * still leave a short or missing file; rotating on that word alone
-         * would delete good older backups to make room for a broken one.
+         * Read the destination back before anything is deleted. A copy onto a
+         * storage provider can come back without throwing and still leave a
+         * short, missing or wrong file; rotating on that word alone would
+         * delete good older backups to make room for a broken one.
          */
-        const written = verifyCopy(folder, fileName, out.size ?? 0);
+        const written = verifyCopy(out, folder, (f) => onProgress?.({ phase: 'copy', fraction: f }));
         if (!written) throw new Error('بکاپ در پوشه‌ی مقصد کامل نوشته نشد. پوشه را دوباره انتخاب کنید.');
         savedTo = folder.uri;
         rotateBackups(folder);
@@ -350,18 +364,90 @@ export async function createBackup({
 }
 
 /**
- * Undo step 3 after a failed import: the database is the one that was already
- * there, so the files it points at must be the ones it knew. A file that
- * cannot be put back is logged by path — those are opaque ids, not names.
+ * The real file system, for `media-swap`.
+ *
+ * `moveSync` repoints the instance it is called on, so every destination is
+ * built again from its path rather than a `File` being reused.
  */
-function putBackDisplacedMedia(displaced: { savedUri: string; path: string }[]): void {
-  for (const item of displaced) {
-    try {
-      new File(item.savedUri).moveSync(new File(Paths.document, item.path), { overwrite: true });
-    } catch (e) {
-      logError(e, { source: 'handled', context: `restore rollback: ${item.path}` });
+const mediaFs: MediaFileSystem = {
+  exists: (path) => new File(path).exists,
+  ensureParent: (path) => new File(path).parentDirectory.create({ intermediates: true, idempotent: true }),
+  move: (from, to, options) => new File(from).moveSync(new File(to), options),
+};
+
+/**
+ * Where a restore keeps the files it is replacing.
+ *
+ * In the document folder, not the cache scratch: the scratch is deleted on the
+ * way out of every restore, and these are the only copy of files the live
+ * database still points at. One folder per restore, so an earlier run that
+ * could not put everything back is not cleared away by the next one.
+ */
+function displacedDir(runId: string): Directory {
+  const dir = new Directory(Paths.document, `${DISPLACED_ROOT}/${runId}`);
+  dir.create({ intermediates: true, idempotent: true });
+  return dir;
+}
+
+/** Every file kept in a displaced folder, by the path it came from. */
+function listDisplaced(dir: Directory): DisplacedMedia[] {
+  const out: DisplacedMedia[] = [];
+  const walk = (folder: Directory, prefix: string) => {
+    for (const entry of folder.list()) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry instanceof Directory) walk(entry, path);
+      else out.push({ savedPath: entry.uri, path });
     }
+  };
+  if (dir.exists) walk(dir, '');
+  return out;
+}
+
+const livePaths: MediaPaths = {
+  target: (path) => new File(Paths.document, path).uri,
+  // Unused on the way back: a file being put back is not displaced again.
+  displaced: () => {
+    throw new Error('unreachable');
+  },
+};
+
+/**
+ * Finish undoing a restore that the app was killed in the middle of.
+ *
+ * Run before anything reads a media file. A marker in the database means the
+ * files were replaced but the database was not: the dataset on this phone is
+ * still the old one, so the files it points at have to be the old ones too.
+ * Once the marker is gone the displaced copies are only clutter, and go.
+ *
+ * Returns the files it could not put back — those are kept where they are,
+ * because they exist nowhere else.
+ */
+export async function recoverInterruptedRestore(): Promise<{ putBack: number; failed: DisplacedMedia[] }> {
+  const marker = await readSetting(restoreInFlight);
+  const root = new Directory(Paths.document, DISPLACED_ROOT);
+
+  if (!marker) {
+    // The restore committed (or none ran): whatever it set aside is obsolete.
+    if (root.exists) removeQuietly(root);
+    return { putBack: 0, failed: [] };
   }
+
+  const dir = new Directory(Paths.document, `${DISPLACED_ROOT}/${marker.dir}`);
+  const displaced = listDisplaced(dir);
+  const failed = putBackDisplacedMedia(mediaFs, livePaths, displaced);
+  if (failed.length === 0) {
+    removeQuietly(dir);
+    await writeSetting(restoreInFlight, null);
+  } else {
+    logError(new Error(`${failed.length} restored file(s) could not be put back`), {
+      source: 'handled',
+      context: `restore recovery: kept in ${DISPLACED_ROOT}/${marker.dir}`,
+    });
+  }
+  await audit('backup.restoreRolledBack', {
+    detail: { putBack: displaced.length - failed.length, kept: failed.length },
+  });
+  return { putBack: displaced.length - failed.length, failed };
 }
 
 /**
@@ -375,20 +461,42 @@ export async function markBackupDelivered(): Promise<void> {
 }
 
 /**
- * Is the copy really there, with the whole file in it?
+ * Is the copy really there, with the same bytes in it?
  *
- * `copy` resolving is the provider's word; this is the destination's. Sizes
- * are compared rather than only existence, because an interrupted write on a
- * SAF provider leaves a real but short file.
+ * `copy` resolving is the provider's word; this is the destination's. The file
+ * is opened and read back against the source rather than having its size
+ * compared, because size is the provider's word too — a cloud-backed or USB
+ * folder can report the length it was asked to write while holding something
+ * else, and the next step deletes older backups to make room for this one.
+ * Reading a few hundred megabytes back costs seconds; the alternative costs
+ * the only copy of a record.
  */
-function verifyCopy(folder: Directory, fileName: string, expectedBytes: number): boolean {
+function verifyCopy(source: File, folder: Directory, onProgress?: (fraction: number) => void): boolean {
+  let read: FileHandle | null = null;
+  let written: FileHandle | null = null;
   try {
-    const copied = new File(folder, fileName);
+    const copied = new File(folder, source.name);
     if (!copied.exists) return false;
-    const size = copied.size ?? 0;
-    return expectedBytes === 0 || size === expectedBytes;
+    const expected = source.size ?? 0;
+    if (expected === 0) return false;
+    const size = copied.size;
+    // A provider that does not report a size is not trusted either way; the
+    // comparison below runs out of bytes if the file is short.
+    if (size != null && size !== expected) return false;
+    read = source.open(FileMode.ReadOnly);
+    written = copied.open(FileMode.ReadOnly);
+    return streamsMatch(
+      { read: (n) => read!.readBytes(n) },
+      { read: (n) => written!.readBytes(n) },
+      expected,
+      CHUNK_BYTES,
+      onProgress,
+    );
   } catch {
     return false;
+  } finally {
+    read?.close();
+    written?.close();
   }
 }
 
@@ -506,10 +614,19 @@ export async function restoreBackup({
   onProgress?: (p: RestoreProgress) => void;
 }): Promise<RestoreResult> {
   if (running) throw new Error('یک بکاپ در حال انجام است؛ چند لحظه بعد دوباره امتحان کنید.');
+  // A restore that was cut short has to be undone before another one starts,
+  // or its files would be put back on top of this one's.
+  const unfinished = await recoverInterruptedRestore();
+  if (unfinished.failed.length > 0) {
+    throw new Error('بازگردانی قبلی ناتمام مانده و چند فایل سر جایشان برنگشته‌اند. اول با یک بکاپ سالم شروع کنید.');
+  }
   running = true;
 
   let handle: FileHandle | null = null;
   let work: Directory | null = null;
+  // Hoisted so the exit paths can decide whether to keep it: it holds the only
+  // copy of every file this restore replaced.
+  let kept: Directory | null = null;
   try {
     const source = new File(fileUri);
     handle = source.open(FileMode.ReadOnly);
@@ -566,23 +683,23 @@ export async function restoreBackup({
      *
      * The database import can still fail and roll back, and a rolled-back
      * database expects the files it knew. Any file being replaced is moved
-     * into the scratch folder first and only abandoned once the new database
-     * is committed — the scratch folder is deleted on the way out either way.
+     * into a folder of its own — not the scratch folder, which is deleted on
+     * the way out — and abandoned only once the new database is committed.
      */
-    const displaced: { savedUri: string; path: string }[] = [];
-    for (const m of media) {
-      const target = new File(Paths.document, m.path);
-      target.parentDirectory.create({ intermediates: true, idempotent: true });
-      if (target.exists) {
-        const saved = new File(work, `displaced/${m.path}`);
-        saved.parentDirectory.create({ intermediates: true, idempotent: true });
-        // `moveSync` repoints the instance it is called on, so the destination
-        // is built again from the path rather than reusing `target`.
-        target.moveSync(saved);
-        displaced.push({ savedUri: saved.uri, path: m.path });
-      }
-      m.staged.moveSync(new File(Paths.document, m.path), { overwrite: true });
-    }
+    const keptDir = displacedDir(newId());
+    kept = keptDir;
+    // Written before the first file moves and wiped by the import itself: see
+    // `restoreInFlight`. Between the two, a killed app is recoverable.
+    await writeSetting(restoreInFlight, { dir: keptDir.name, at: Date.now() });
+    const paths: MediaPaths = {
+      target: (path) => new File(Paths.document, path).uri,
+      displaced: (path) => new File(keptDir, path).uri,
+    };
+    const displaced: DisplacedMedia[] = placeRestoredMedia(
+      mediaFs,
+      paths,
+      media.map((m) => ({ stagedPath: m.staged.uri, path: m.path })),
+    );
 
     // 4. The database. Everything up to here can still fail cleanly.
     onProgress?.({ phase: 'database', fraction: 0 });
@@ -590,9 +707,11 @@ export async function restoreBackup({
     try {
       imported = importDatabase(dbFile);
     } catch (e) {
-      putBackDisplacedMedia(displaced);
-      throw e;
+      throw new MediaRestoreError(e, putBackDisplacedMedia(mediaFs, paths, displaced));
     }
+
+    // Committed: the files that were replaced are not coming back.
+    removeQuietly(kept);
 
     /*
      * From this point the data is back, and the rest is housekeeping. A
@@ -612,6 +731,8 @@ export async function restoreBackup({
 
     await housekeeping('فهرست‌های پیش‌فرض', runSeeds);
     await housekeeping('بازسازی جست‌وجو', reindexSearchIfNeeded);
+    // The restored rows were flagged by whichever build wrote them.
+    await housekeeping('بازبینی پرچم آزمایش‌ها', reflagLabValuesIfNeeded);
     // The reminders the OS holds belong to the data just replaced, and the ids
     // in the backup to the phone that made it: start over from the rows.
     let reminders = 0;
@@ -633,6 +754,20 @@ export async function restoreBackup({
 
     onProgress?.({ phase: 'done', fraction: 1 });
     return { manifest, ...imported, files: media.length, reminders, warnings };
+  } catch (e) {
+    // A file that could not be put back exists nowhere else. The folder stays,
+    // and the error the user reads says so.
+    if (e instanceof MediaRestoreError && e.notPutBack.length > 0) {
+      // The marker stays too: those files are still the live database's.
+      logError(e, {
+        source: 'handled',
+        context: `restore: ${e.notPutBack.length} file(s) left in ${DISPLACED_ROOT}/${kept?.name ?? '?'}`,
+      });
+    } else {
+      removeQuietly(kept);
+      await writeSetting(restoreInFlight, null).catch(() => undefined);
+    }
+    throw e;
   } finally {
     handle?.close();
     removeQuietly(work);

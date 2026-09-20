@@ -33,6 +33,94 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (later) — A second external review, and what it was right about
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last commit
+
+A reviewer (GPT-6 via Codex) went through `da630e7` and reported six defects. All six
+were real. Five are fixed here; the sixth is fixed as far as it can be without an owner
+decision. None of them were found by the test suite, which is the lesson.
+
+**Changed**
+
+- **Restore no longer destroys what it displaces.** The files being replaced were moved
+  into the scratch folder, which `finally` deletes — so a move that threw after the
+  original had been set aside took the original with it, and a failed rollback did the
+  same. They now go to `restore-displaced/<run>` under the document folder, the swap is
+  rolled back on any failure, and files that could not be put back are reported and kept
+  rather than logged and deleted. `features/backup/media-swap.ts`, with the file system
+  as a parameter so the failure paths are testable at all.
+- **A killed restore is recoverable.** `restore.inFlight` is written before the first
+  file moves. It is an ordinary setting, so the import that commits the new database
+  deletes it in the same SQLite transaction: present means the swap was not committed,
+  absent means it was, nothing in between. `recoverInterruptedRestore` runs at startup
+  and before any new restore.
+- **The copy in the backup folder is read back.** `verifyCopy` opens the destination and
+  compares it with the source through `streamsMatch`, chunk by chunk. It used to compare
+  `.size` and call that verified; a same-size corrupt file passed, and rotation then
+  deleted good backups to make room for it. An unknown source size now fails closed.
+- **The vault will not use a key from the dataset it replaced.** `loadVaultKey` proved
+  the stored key only by its length, so after a restore the key derived here from the old
+  passphrase was handed out for the imported vault: the next password would be sealed
+  with a key that vault can never derive, discovered only after unlocking it properly.
+  The key is now checked against the keyset's own check value.
+- **Changing the vault passphrase is interruptible.** The new key and salt are staged
+  (`stageNextKeyset`) before a single row is re-sealed, rows are opened by their own
+  `keyVersion`, and the new keyset is committed only once every row has reached it.
+  Before, the new key existed in a local variable until the end: an interruption left
+  already-rewritten rows sealed with a key that no longer existed anywhere. The old
+  comment claiming this was "recoverable" was wrong. `finishPendingRekey` resumes, and is
+  called by the vault gate.
+- **Stored passwords keep their spaces.** `.trim()` on a third-party password is the app
+  deciding what the other system accepts.
+- **Bounded and unit-less lab results are visible as such on a chart.** `>100` is drawn
+  at 100 with an arrow instead of as an exact point, results with no recorded unit are
+  drawn hollow, and the reference range comes from the newest row *on the chart* rather
+  than the newest row overall, which may be the one in another unit that was left off it.
+- **Old lab rows are re-flagged.** `LAB_FLAG_VERSION` + `reflagLabValuesIfNeeded`, on the
+  `SEARCH_INDEX_VERSION` pattern: the flag rule changed in `da630e7` but stored flags did
+  not, and an old `>=100 H` reads as a fact, not as an old build's opinion.
+
+**Verified**
+
+- `npm run check` green: typecheck, lint, format, 19 suites / 354 tests (338 before).
+- The new tests fail against the old code: the interrupted rekey, the stranded key, the
+  displaced-file rollback and the same-size corrupt copy were each reproduced first.
+
+**Not verified**
+
+- Nothing on a phone. The A52s has not been connected since 0.2.2, so everything from
+  0.3.0 (doctors, knowledge, vault) plus these fixes is untested on device. The restore
+  paths in particular now depend on `expo-file-system` behaviour — `moveSync` over an
+  existing file, `readBytes` at EOF — that only the phone can settle.
+- `recoverInterruptedRestore` has never run for real. Its decision logic is glue over
+  tested parts, but the walk of `restore-displaced` and the kill-the-app-mid-restore case
+  are device work.
+
+**Open threads**
+
+- Old `scheduledMessages` rows written by `logGreetingSent` still claim a confirmation
+  that never happened. A `deliveryEvidence` column defaulting to "assumed" would mark
+  them honestly; deliberately deferred because the module is five commits old and has no
+  real history yet. Do it before the doctors module has any.
+- Unit-less results are still plotted with the series, now marked. Keeping them off the
+  chart entirely is the reviewer's reading of the contract; most results in this app are
+  typed without a unit, so that would empty most charts. Owner's call.
+- The vault key is still stored without `requireAuthentication`. The reviewer is right
+  that the async SecureStore API does not block JS — that part of the last session's
+  reasoning was wrong. What remains true: enrolment changes invalidate the key, so it
+  needs a recovery path before it goes in.
+
+**Gotchas**
+
+- `importTables` keeps `settings` rows matching `backup.%` and replaces the rest. That is
+  what makes a non-`backup.` marker atomic with the import — and what would make a
+  `backup.`-prefixed one useless. The test in `restore.test.ts` pins it.
+- A `MediaPaths.displaced` that is never called on the way back should throw, not return
+  a plausible path. The first version returned the live path and would have moved a file
+  onto itself.
+
 ## 2026-09-20 (late) — The credential vault (phase 5), and the roadmap is built
 
 **Agent:** claude-opus-5 via Claude Code

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { TrendChart, type TrendPoint } from '@/components/trend-chart';
 import { Card, Column, Divider, EmptyState, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
-import { FLAG_LABEL, flagTone, formatRange } from '@/features/labs/flags';
+import { FLAG_LABEL, flagTone, formatRange, parseLabValue } from '@/features/labs/flags';
 import { sameUnitSeries } from '@/features/labs/logic';
 import { analyteSeriesQuery } from '@/features/labs/queries';
 import { formatJalali, formatJalaliDateTime, toJalali } from '@/lib/jalali';
@@ -19,15 +19,36 @@ export function TrendScreen() {
   const rows = data ?? [];
 
   // Only results in the same unit share an axis; the rest are counted below.
-  const { series, excluded, unlabelled } = sameUnitSeries(rows.map((r) => ({ ...r, unit: r.value.unit })));
+  const {
+    series,
+    unit: seriesUnit,
+    excluded,
+    unlabelled,
+  } = sameUnitSeries(rows.map((r) => ({ ...r, unit: r.value.unit })));
+  const hasUnit = (u: string | null | undefined) => !!(u ?? '').trim();
   const numeric: TrendPoint[] = series
     .filter((r) => r.value.valueNum != null)
-    .map((r) => ({ at: r.collectedAt, value: r.value.valueNum!, flag: r.value.flag }));
+    .map((r) => {
+      // `>100` is stored as the text it was typed as and the number 100. On a
+      // chart those are not the same thing, so the point says which it is.
+      const comparator = parseLabValue(r.value.value)?.comparator ?? null;
+      return {
+        at: r.collectedAt,
+        value: r.value.valueNum!,
+        flag: r.value.flag,
+        bound: comparator === '>' || comparator === '>=' ? 'above' : comparator ? 'below' : null,
+        assumedUnit: seriesUnit != null && !hasUnit(r.value.unit),
+      };
+    });
+  const bounded = numeric.filter((p) => p.bound).length;
 
-  // The most recent row's range is the one worth drawing: labs change ranges
-  // when they change methods, and the latest is what today's values are read against.
-  const latest = rows[rows.length - 1]?.value;
-  const unit = latest?.unit;
+  // The most recent range is the one worth drawing: labs change ranges when
+  // they change methods, and the latest is what today's values are read
+  // against. It has to come from a row that is actually on the chart — the
+  // newest result overall may be the one in another unit, left off it, and its
+  // range would be drawn against an axis it does not belong to.
+  const latest = series[series.length - 1]?.value;
+  const unit = seriesUnit ?? latest?.unit;
 
   return (
     <>
@@ -65,9 +86,16 @@ export function TrendScreen() {
                     برای نمودار حداقل دو مقدار عددی لازم است.
                   </Text>
                 )}
+                {bounded > 0 ? (
+                  <Text variant="tiny" color="textFaint" style={{ marginTop: spacing.xs }}>
+                    {toPersianDigits(bounded)} مقدار با پیکان، عدد دقیق نیست (مثل «&gt;۱۰۰»)؛ مقدار واقعی آن‌سوی نقطه
+                    است.
+                  </Text>
+                ) : null}
                 {unlabelled > 0 ? (
                   <Text variant="tiny" color="textFaint" style={{ marginTop: spacing.xs }}>
-                    {toPersianDigits(unlabelled)} مقدار بدون واحد ثبت شده و همین واحد برایشان فرض شده است.
+                    {toPersianDigits(unlabelled)} مقدار بدون واحد ثبت شده؛ با دایره‌ی توخالی نشان داده شده و همین واحد
+                    برایشان فرض شده است.
                   </Text>
                 ) : null}
                 {excluded > 0 ? (

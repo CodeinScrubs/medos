@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 
 import { encounters, labValues, notes, orders, patients } from '@/db/schema';
 import { useTestDatabase } from '@/test/db-client';
@@ -8,6 +9,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 import { dischargeEncounter, openEncounter, updateEncounter } from './encounters/queries';
 import { createOrder, patientOrdersQuery, setOrderStatus, suggestOrderNames } from './kardex/queries';
 import { analyteSeriesQuery, createLabPanel, updateLabPanel } from './labs/queries';
+import { reflagLabValuesIfNeeded } from './labs/reflag';
 import { createNote, updateNote } from './notes/queries';
 import { createPatient } from './patients/queries';
 import { createExtension, createPlace, extensionsQuery, updatePlace } from './places/queries';
@@ -102,6 +104,40 @@ describe('labs', () => {
       ['K', '۵٫۸', 5.8, 'high'],
       ['Nitrite', 'Positive', null, null],
     ]);
+  });
+
+  /*
+   * A flag is worked out once and stored, so a change to the rule leaves
+   * earlier rows carrying the old verdict. On a lab table that reads as a
+   * fact, not as an old build's opinion.
+   */
+  it('works stored flags out again when the rule that sets them changes', async () => {
+    await createLabPanel({
+      patientId,
+      collectedAt: new Date(2025, 0, 1),
+      source: 'manual',
+      values: [
+        { analyte: 'ESR', value: '>=100', refLow: 0, refHigh: 100 },
+        { analyte: 'K', value: '5.8', refLow: 3.5, refHigh: 5.1 },
+      ],
+    });
+    // What an older build wrote: the bound read as if it were the number.
+    await t.db.update(labValues).set({ flag: 'high' }).where(eq(labValues.analyte, 'ESR'));
+
+    await reflagLabValuesIfNeeded();
+
+    const flags = async () =>
+      (await t.db.select().from(labValues).orderBy(labValues.sortOrder)).map((r) => [r.analyte, r.flag]);
+    // `>=100` may be exactly 100, which is in range: no flag, rather than a wrong one.
+    expect(await flags()).toEqual([
+      ['ESR', null],
+      ['K', 'high'],
+    ]);
+
+    // And it is a one-off: the version is recorded, so nothing is rewritten again.
+    await t.db.update(labValues).set({ flag: 'low' }).where(eq(labValues.analyte, 'ESR'));
+    await reflagLabValuesIfNeeded();
+    expect((await flags())[0]).toEqual(['ESR', 'low']);
   });
 
   it('keeps the old values when a panel is edited, and plots only the live ones', async () => {

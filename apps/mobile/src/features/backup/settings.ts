@@ -21,3 +21,19 @@ export const backupIntervalHours = defineSetting(
 
 /** Unix ms of the last backup that completed. */
 export const backupLastSuccessAt = defineSetting('backup.lastSuccessAt', z.number().nullable(), null);
+
+/**
+ * A restore that has replaced the media files but not yet the database.
+ *
+ * The key deliberately does **not** start with `backup.`: those settings are
+ * this phone's and are kept through a restore, while everything else is
+ * replaced by the backup's own rows. So this marker disappears in the same
+ * SQLite transaction that commits the new database — present means the swap
+ * was not committed, absent means it was, with nothing in between. That is the
+ * only thing in the app that survives the process being killed mid-restore.
+ */
+export const restoreInFlight = defineSetting(
+  'restore.inFlight',
+  z.object({ dir: z.string().min(1), at: z.number() }).nullable(),
+  null,
+);

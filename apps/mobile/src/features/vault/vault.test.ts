@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
+import * as SecureStore from 'expo-secure-store';
 
 import { credentials } from '@/db/schema';
-import { fromBase64 } from '@/lib/crypto';
+import { fromBase64, randomBytes, toBase64 } from '@/lib/crypto';
 import { useTestDatabase } from '@/test/db-client';
-import { resetSecureStore } from '@/test/mocks/secure-store';
+import { resetSecureStore, seedSecureStore } from '@/test/mocks/secure-store';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { createVault, forgetVaultKey, isVaultConfigured, unlockVault, vaultKeysetRecord } from './keys';
+import { createVault, forgetVaultKey, isVaultConfigured, loadVaultKey, unlockVault, vaultKeysetRecord } from './keys';
 import { credentialSearchText, daysUntilExpiry, secretHint } from './logic';
 import {
   createCredential,
   credentialsQuery,
   deleteCredential,
+  finishPendingRekey,
   rekeyVault,
   revealSecret,
   updateCredential,
@@ -55,6 +57,30 @@ describe('the vault key', () => {
     expect(await unlockVault('not the passphrase')).toBe(false);
     expect(await unlockVault(PASSPHRASE)).toBe(true);
   });
+
+  /*
+   * After a restore the database is another dataset — another salt, another
+   * check value — while the Keystore still holds the key derived here from the
+   * old one. Measuring that key's length says it is fine; it is not, and a
+   * password sealed with it would be unreadable the moment the vault was
+   * opened properly.
+   */
+  it('will not use a key left over from the dataset that was replaced', async () => {
+    await createVault(PASSPHRASE);
+    const strandedKey = (await SecureStore.getItemAsync('medos.vault.key'))!;
+
+    // A restore: new database, same phone, same Keystore entry.
+    t = useTestDatabase(await createTestDatabase());
+    await createVault('the other phone’s passphrase');
+    seedSecureStore({ 'medos.vault.key': strandedKey });
+
+    expect(await loadVaultKey()).toBeNull();
+    await expect(createCredential({ systemName: 'HIS', secret: SECRET })).rejects.toBeInstanceOf(VaultLockedError);
+
+    // And the vault's own passphrase still opens it.
+    expect(await unlockVault('the other phone’s passphrase')).toBe(true);
+    expect(await loadVaultKey()).not.toBeNull();
+  });
 });
 
 describe('credentials', () => {
@@ -90,6 +116,17 @@ describe('credentials', () => {
 
     expect(await unlockVault(PASSPHRASE)).toBe(true);
     expect(await revealSecret(id)).toBe(SECRET);
+  });
+
+  // A password is whatever the other system accepts. Trimming it was the app
+  // deciding that the spaces the user typed were not part of it.
+  it('stores a password exactly as typed, spaces and all', async () => {
+    const padded = '  two spaces each side  ';
+    const id = await createCredential({ systemName: 'HIS', secret: padded });
+    expect(await revealSecret(id)).toBe(padded);
+
+    await updateCredential(id, { secret: ' \t' });
+    expect(await revealSecret(id)).toBe(' \t');
   });
 
   it('leaves the stored password alone on an edit that does not mention it, and clears it when asked', async () => {
@@ -154,6 +191,47 @@ describe('changing the vault passphrase', () => {
     await forgetVaultKey();
     expect(await unlockVault(PASSPHRASE)).toBe(false);
     expect(await unlockVault('a different passphrase')).toBe(true);
+  });
+
+  /*
+   * The change is three writes to two stores and cannot be atomic. What it can
+   * be is recoverable: the new key and its salt are written down before a
+   * single row is touched, so a vault caught halfway has both generations on
+   * the phone and every password still opens. Here the second row's ciphertext
+   * is damaged, which stops the loop exactly where a killed app would.
+   */
+  it('loses nothing when it is interrupted, and carries on afterwards', async () => {
+    await createVault(PASSPHRASE);
+    const first = await createCredential({ systemName: 'A', secret: SECRET });
+    const second = await createCredential({ systemName: 'B', secret: 'second' });
+    const intact = (await rawRow(second))!.secretCipher;
+
+    await t.db
+      .update(credentials)
+      .set({ secretCipher: toBase64(randomBytes(32)) })
+      .where(eq(credentials.id, second));
+    await expect(rekeyVault(PASSPHRASE, 'a different passphrase')).rejects.toThrow();
+
+    // Half re-sealed, and the half that was re-sealed is still readable —
+    // with the old code its key existed only in a local variable.
+    expect((await rawRow(first))?.keyVersion).toBe(2);
+    expect((await vaultKeysetRecord())?.keyVersion).toBe(1);
+    expect(await revealSecret(first)).toBe(SECRET);
+
+    await t.db.update(credentials).set({ secretCipher: intact }).where(eq(credentials.id, second));
+    const { rekeyed, remaining } = await finishPendingRekey();
+    expect({ rekeyed, remaining }).toEqual({ rekeyed: 1, remaining: 0 });
+
+    expect((await vaultKeysetRecord())?.keyVersion).toBe(2);
+    expect(await revealSecret(first)).toBe(SECRET);
+    expect(await revealSecret(second)).toBe('second');
+    await forgetVaultKey();
+    expect(await unlockVault('a different passphrase')).toBe(true);
+  });
+
+  it('does nothing when no change is in flight', async () => {
+    await createVault(PASSPHRASE);
+    expect(await finishPendingRekey()).toEqual({ rekeyed: 0, remaining: 0 });
   });
 });
 

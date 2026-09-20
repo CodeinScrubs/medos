@@ -14,10 +14,14 @@ export type AuditAction =
   | 'attachment.deleted'
   | 'backup.created'
   | 'backup.restored'
+  // A restore that was cut short and had its files put back.
+  | 'backup.restoreRolledBack'
   | 'db.migrated'
   | 'lock.enabled'
   | 'lock.disabled'
   | 'search.reindexed'
+  // Stored H/L flags worked out again after a change to the rule.
+  | 'labs.reflagged'
   // The vault records that a credential was written or read, never its value.
   | 'vault.created'
   | 'vault.updated'

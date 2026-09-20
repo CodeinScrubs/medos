@@ -4,6 +4,8 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui';
 import { startDatabase } from '@/db/startup';
+import { recoverInterruptedRestore } from '@/features/backup/engine';
+import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { redactErrorText } from '@/lib/redact';
 import { logError } from '@/platform/error-log';
@@ -16,7 +18,10 @@ type State = { status: 'starting' } | { status: 'ready' } | { status: 'error'; e
  *
  * 1. The database: connection settings, a snapshot if an update brought
  *    migrations, the migrations themselves, seeds (`db/startup.ts`).
- * 2. Search indexes rebuilt if the rules that build them changed.
+ * 2. A restore that was killed halfway, undone — before any screen can show a
+ *    file that belongs to a dataset this phone did not keep.
+ * 3. Search indexes rebuilt if the rules that build them changed.
+ * 4. Stored lab flags worked out again if the rule that sets them changed.
  *
  * A failure is shown, never swallowed. If the schema is not what the code
  * expects, every screen below would fail in a more confusing way, and carrying
@@ -24,7 +29,9 @@ type State = { status: 'starting' } | { status: 'ready' } | { status: 'error'; e
  */
 async function startApp(): Promise<void> {
   await startDatabase();
+  await recoverInterruptedRestore();
   await reindexSearchIfNeeded();
+  await reflagLabValuesIfNeeded();
 }
 
 export function StartupGate({ children }: { children: ReactNode }) {

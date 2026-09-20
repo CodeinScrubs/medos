@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
@@ -8,6 +8,15 @@ export type TrendPoint = {
   at: Date;
   value: number;
   flag?: 'high' | 'low' | 'normal' | 'critical_high' | 'critical_low' | null;
+  /**
+   * The result was reported as a bound, not a number: `>100` is drawn at 100
+   * with an arrow, because the true value is somewhere above it. Plotting it
+   * as the plain number puts a ">1000 mg/L" next to a 90 and makes it look
+   * like the same measurement.
+   */
+  bound?: 'above' | 'below' | null;
+  /** No unit was recorded; the series' unit is an assumption, drawn hollow. */
+  assumedUnit?: boolean;
 };
 
 const PAD = { top: 16, right: 16, bottom: 28, left: 44 };
@@ -120,17 +129,37 @@ export function TrendChart({
 
           <Path d={path} stroke={colors.primary} strokeWidth={2} fill="none" />
 
-          {points.map((p, i) => (
-            <Circle
-              key={`p${i}`}
-              cx={x(i)}
-              cy={y(p.value)}
-              r={4.5}
-              fill={pointColor(p.flag)}
-              stroke={colors.surface}
-              strokeWidth={2}
-            />
-          ))}
+          {points.map((p, i) => {
+            const tone = pointColor(p.flag);
+            // Hollow means "this one is not quite what it looks like": either
+            // its unit was assumed, or it is a bound rather than a value.
+            const open = p.assumedUnit || p.bound != null;
+            const cy = y(p.value);
+            return (
+              <React.Fragment key={`p${i}`}>
+                {p.bound && (
+                  <Path
+                    d={
+                      p.bound === 'above'
+                        ? `M${x(i) - 4},${cy - 8} L${x(i)},${cy - 14} L${x(i) + 4},${cy - 8}`
+                        : `M${x(i) - 4},${cy + 8} L${x(i)},${cy + 14} L${x(i) + 4},${cy + 8}`
+                    }
+                    stroke={tone}
+                    strokeWidth={2}
+                    fill="none"
+                  />
+                )}
+                <Circle
+                  cx={x(i)}
+                  cy={cy}
+                  r={4.5}
+                  fill={open ? colors.surface : tone}
+                  stroke={open ? tone : colors.surface}
+                  strokeWidth={2}
+                />
+              </React.Fragment>
+            );
+          })}
 
           {points.map((p, i) =>
             i % labelEvery === 0 || i === points.length - 1 ? (

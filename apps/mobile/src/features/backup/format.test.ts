@@ -20,6 +20,7 @@ import {
   NotABackupError,
   parseHeader,
   readArchiveStart,
+  streamsMatch,
   readEntryHeader,
   WrongPassphraseError,
 } from './format';
@@ -249,5 +250,43 @@ describe('parseHeader', () => {
     ['a huge chunk size', (h: Uint8Array) => h.fill(0xff, 40, 44)],
   ])('rejects %s', (_, damage) => {
     expect(() => parseHeader(damage(valid()))).toThrow(NotABackupError);
+  });
+});
+
+describe('streamsMatch', () => {
+  const reader = (bytes: number[]) => {
+    let at = 0;
+    return {
+      read(length: number) {
+        const out = Uint8Array.from(bytes.slice(at, at + length));
+        at += out.length;
+        return out;
+      },
+    };
+  };
+
+  const source = [1, 2, 3, 4, 5, 6, 7];
+
+  it('accepts a copy that is byte for byte the same', () => {
+    expect(streamsMatch(reader(source), reader([...source]), source.length, 3)).toBe(true);
+  });
+
+  // The whole point: a destination whose length was reported correctly and
+  // whose contents are not what was written.
+  it('rejects a copy of the same length with a byte changed', () => {
+    expect(streamsMatch(reader(source), reader([1, 2, 3, 9, 5, 6, 7]), source.length, 3)).toBe(false);
+  });
+
+  it('rejects a copy that runs out early', () => {
+    expect(streamsMatch(reader(source), reader([1, 2, 3, 4]), source.length, 3)).toBe(false);
+  });
+
+  it('rejects a copy with something appended to it', () => {
+    expect(streamsMatch(reader(source), reader([...source, 8]), source.length, 3)).toBe(false);
+  });
+
+  it('reads in chunks, whatever the chunk size', () => {
+    expect(streamsMatch(reader(source), reader([...source]), source.length, 1)).toBe(true);
+    expect(streamsMatch(reader(source), reader([...source]), source.length, 1024)).toBe(true);
   });
 });
