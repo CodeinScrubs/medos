@@ -45,11 +45,17 @@ export function parseLabNumber(raw: string | null | undefined): number | null {
 /**
  * Out-of-range flag against the row's own reference range: H, L or normal.
  *
- * A bounded result is judged by what the bound actually proves. ">100" with an
- * upper limit of 100 is high. ">0.01" inside the range proves nothing about
- * the true value, so it gets no flag rather than a reassuring one. "<0.01" at
- * or below the lower limit is low, and below the upper limit it is genuinely
- * not high.
+ * The reference interval is inclusive — a value exactly on a limit is normal —
+ * and a bounded result is flagged only when **every** value it allows falls on
+ * the same side. Anything else gets no flag at all, because on a lab table an
+ * absent flag reads as "not judged" while a wrong one reads as a fact:
+ *
+ * - `>100` against 3–100 is high: every value above 100 is out of range.
+ * - `>=100` is **not**: the result may be exactly 100, which is normal.
+ * - `<3` is low, `<=3` is not (3 itself is allowed).
+ * - `<5` against 3–100 proves nothing: the true value may be 2 or 4.
+ * - With no lower limit at all, `<0.01` under an upper limit of 0.04 really is
+ *   normal — there is nothing below to fall out of.
  *
  * There is deliberately no automatic "critical" flag. Critical thresholds are
  * analyte-specific and nothing like a multiple of the normal range — a rule
@@ -67,11 +73,23 @@ export function computeFlag(
   if (refLow == null && refHigh == null) return null;
   const { value, comparator } = typeof parsed === 'number' ? { value: parsed, comparator: null } : parsed;
 
+  // A lower bound: the true value is above `value` (or at it, for `>=`).
   if (comparator === '>' || comparator === '>=') {
-    return refHigh != null && value >= refHigh ? 'high' : null;
+    if (refHigh != null) {
+      const allAbove = comparator === '>' ? value >= refHigh : value > refHigh;
+      return allAbove ? 'high' : null;
+    }
+    // No upper limit: everything from the lower limit up is normal.
+    return refLow != null && value >= refLow ? 'normal' : null;
   }
+
+  // An upper bound: the true value is below `value` (or at it, for `<=`).
   if (comparator === '<' || comparator === '<=') {
-    if (refLow != null && value <= refLow) return 'low';
+    if (refLow != null) {
+      const allBelow = comparator === '<' ? value <= refLow : value < refLow;
+      return allBelow ? 'low' : null;
+    }
+    // No lower limit: everything up to the upper limit is normal.
     return refHigh != null && value <= refHigh ? 'normal' : null;
   }
 

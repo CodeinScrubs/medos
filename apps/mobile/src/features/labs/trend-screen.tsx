@@ -19,7 +19,7 @@ export function TrendScreen() {
   const rows = data ?? [];
 
   // Only results in the same unit share an axis; the rest are counted below.
-  const { series, excluded } = sameUnitSeries(rows.map((r) => ({ ...r, unit: r.value.unit })));
+  const { series, excluded, unlabelled } = sameUnitSeries(rows.map((r) => ({ ...r, unit: r.value.unit })));
   const numeric: TrendPoint[] = series
     .filter((r) => r.value.valueNum != null)
     .map((r) => ({ at: r.collectedAt, value: r.value.valueNum!, flag: r.value.flag }));
@@ -65,6 +65,11 @@ export function TrendScreen() {
                     برای نمودار حداقل دو مقدار عددی لازم است.
                   </Text>
                 )}
+                {unlabelled > 0 ? (
+                  <Text variant="tiny" color="textFaint" style={{ marginTop: spacing.xs }}>
+                    {toPersianDigits(unlabelled)} مقدار بدون واحد ثبت شده و همین واحد برایشان فرض شده است.
+                  </Text>
+                ) : null}
                 {excluded > 0 ? (
                   <Text variant="tiny" color="warning" style={{ marginTop: spacing.xs }}>
                     {toPersianDigits(excluded)} مقدار با واحد دیگر در نمودار نیامد (واحدها تبدیل نمی‌شوند). در جدول

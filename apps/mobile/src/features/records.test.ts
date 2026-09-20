@@ -5,7 +5,7 @@ import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { dischargeEncounter, openEncounter } from './encounters/queries';
+import { dischargeEncounter, openEncounter, updateEncounter } from './encounters/queries';
 import { createOrder, patientOrdersQuery, setOrderStatus, suggestOrderNames } from './kardex/queries';
 import { analyteSeriesQuery, createLabPanel, updateLabPanel } from './labs/queries';
 import { createNote, updateNote } from './notes/queries';
@@ -38,6 +38,22 @@ describe('encounters', () => {
 
     await dischargeEncounter(second, { dischargedAt: new Date(), dischargeType: 'improved', nextStatus: 'followup' });
     expect(await patientStatus()).toBe('followup');
+  });
+
+  // Correcting an admission that was really an ER visit has to move the patient
+  // too, or the admitted list keeps a bed that does not exist.
+  it('follows a change of kind on the active episode, and leaves closed ones alone', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission' });
+    expect(await patientStatus()).toBe('admitted');
+
+    await updateEncounter(id, { kind: 'outpatient' });
+    expect(await patientStatus()).toBe('outpatient');
+
+    await dischargeEncounter(id, { dischargedAt: new Date(), dischargeType: 'improved', nextStatus: 'discharged' });
+    await updateEncounter(id, { kind: 'admission', ward: 'CCU' });
+    // The episode is history now; editing it does not readmit anyone.
+    expect(await patientStatus()).toBe('discharged');
+    expect((await t.db.select().from(encounters)).find((e) => e.id === id)?.ward).toBe('CCU');
   });
 
   it('records a death as deceased whatever follow-up status was chosen', async () => {

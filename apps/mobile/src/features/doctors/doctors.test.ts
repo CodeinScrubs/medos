@@ -16,7 +16,7 @@ import {
   ratedAxisCount,
   ratingAverage,
 } from './logic';
-import { doctorMessagesQuery, logGreetingSent } from './messages-queries';
+import { confirmGreetingSent, doctorMessagesQuery, logGreetingPrepared } from './messages-queries';
 import {
   cancelDoctorOccasionReminders,
   createOccasion,
@@ -194,7 +194,7 @@ describe('occasion reminders', () => {
 });
 
 describe('greetings', () => {
-  it('logs the ones that were handed to a messenger', async () => {
+  it('records a handed-over text as prepared, and only the owner can call it sent', async () => {
     const doctorId = await createDoctor({ firstName: 'رضا', lastName: 'قاسمی', relationship: 'professor' });
     const later = toJalali(new Date(Date.now() + 60 * 86_400_000));
     const occasionId = await createOccasion({
@@ -205,14 +205,28 @@ describe('greetings', () => {
       jalaliDay: later.jd,
     });
 
-    await logGreetingSent({ doctorId, occasionId, channel: 'whatsapp', body: 'تولدت مبارک' });
-    const rows = await doctorMessagesQuery(doctorId);
-    expect(rows).toHaveLength(1);
-    // "Sent" means the messenger was opened with the text; MedOS never sends
-    // anything itself, but the log is what answers "did I congratulate them?".
-    expect(rows[0]?.status).toBe('sent');
-    expect(rows[0]?.occasionId).toBe(occasionId);
-    expect(rows[0]?.sentAt).toBeInstanceOf(Date);
+    const messageId = await logGreetingPrepared({
+      doctorId,
+      occasionId,
+      channel: 'whatsapp',
+      body: 'تولدت مبارک',
+    });
+
+    /*
+     * Opening WhatsApp is not sending a message: the user can close it
+     * without pressing send. Until they say otherwise the log says `ready`,
+     * with no sent date to quote back at them next year.
+     */
+    const prepared = await doctorMessagesQuery(doctorId);
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0]?.status).toBe('ready');
+    expect(prepared[0]?.sentAt).toBeNull();
+    expect(prepared[0]?.occasionId).toBe(occasionId);
+
+    await confirmGreetingSent(messageId);
+    const confirmed = await doctorMessagesQuery(doctorId);
+    expect(confirmed[0]?.status).toBe('sent');
+    expect(confirmed[0]?.sentAt).toBeInstanceOf(Date);
   });
 
   it('fills the template with the name and the occasion', () => {

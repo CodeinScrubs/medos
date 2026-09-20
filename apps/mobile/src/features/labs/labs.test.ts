@@ -54,6 +54,23 @@ describe('computeFlag', () => {
     expect(parseLabValue('Positive')).toBeNull();
   });
 
+  /*
+   * The reference interval is inclusive, so a bound that still allows a normal
+   * value must not be flagged. A wrong flag on a lab table reads as a fact.
+   */
+  it.each([
+    ['>100', 'high'],
+    ['>=100', null],
+    ['<3', 'low'],
+    ['<=3', null],
+    ['<5', null],
+    ['>5', null],
+    ['100', 'normal'],
+    ['3', 'normal'],
+  ])('reads %j against an inclusive 3–100 range as %s', (typed, expected) => {
+    expect(computeFlag(parseLabValue(typed), 3, 100)).toBe(expected);
+  });
+
   it('judges a bounded result by what the bound proves', () => {
     // At or above the upper limit: high, whatever the true value is.
     expect(computeFlag(parseLabValue('>100'), null, 100)).toBe('high');
@@ -186,7 +203,7 @@ describe('sameUnitSeries', () => {
   // like a tenfold rise, so the odd ones out are left off and counted.
   it('keeps the unit of the most recent result and counts what it drops', () => {
     const rows = [row('µmol/L', 88.4), row('mg/dL', 1), row('mg/dL', 1.4)];
-    expect(sameUnitSeries(rows)).toEqual({ series: [rows[1], rows[2]], unit: 'mg/dL', excluded: 1 });
+    expect(sameUnitSeries(rows)).toEqual({ series: [rows[1], rows[2]], unit: 'mg/dL', excluded: 1, unlabelled: 0 });
   });
 
   it('treats spacing and case as the same unit', () => {
@@ -197,8 +214,11 @@ describe('sameUnitSeries', () => {
   // not a different one, so it stays on the chart.
   it('keeps results typed without a unit, and takes the unit from the newest that has one', () => {
     const rows = [row('mg/dL', 1), row(null, 1.4)];
-    expect(sameUnitSeries(rows)).toEqual({ series: rows, unit: 'mg/dL', excluded: 0 });
+    // Kept on the chart, but counted: assuming the unit is an assumption the
+    // screen has to admit to.
+    expect(sameUnitSeries(rows)).toEqual({ series: rows, unit: 'mg/dL', excluded: 0, unlabelled: 1 });
     expect(sameUnitSeries([row(null, 1), row(null, 2)]).unit).toBeNull();
-    expect(sameUnitSeries([])).toEqual({ series: [], unit: null, excluded: 0 });
+    expect(sameUnitSeries([row(null, 1), row(null, 2)]).unlabelled).toBe(0);
+    expect(sameUnitSeries([])).toEqual({ series: [], unit: null, excluded: 0, unlabelled: 0 });
   });
 });

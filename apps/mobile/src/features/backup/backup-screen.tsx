@@ -152,7 +152,16 @@ export function BackupScreen() {
           mimeType: 'application/octet-stream',
           dialogTitle: 'کجا ذخیره شود؟',
         });
-        await markBackupDelivered();
+        /*
+         * The share sheet closing proves nothing: it returns the same way
+         * whether the file was sent to Telegram or the sheet was dismissed.
+         * Counting it as a backup is how "اطلاعات شما پشتیبان دارد" ends up
+         * lying. One question, and only a yes moves the date.
+         */
+        Alert.alert('فرستاده شد؟', 'اگر فایل را واقعاً جایی ذخیره یا ارسال کردید، «بله» را بزنید.', [
+          { text: 'نه', style: 'cancel' },
+          { text: 'بله', onPress: () => void markBackupDelivered() },
+        ]);
       } else if (!result.savedTo) {
         Alert.alert(
           'بکاپ ساخته شد ولی جایی ذخیره نشد',

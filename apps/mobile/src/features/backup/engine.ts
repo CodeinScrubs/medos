@@ -294,6 +294,14 @@ export async function createBackup({
       if (folder) {
         onProgress?.({ phase: 'copy', fraction: 0 });
         await out.copy(folder, { overwrite: true });
+        /*
+         * Reopen the destination and compare sizes before anything is deleted.
+         * A copy onto a storage provider can come back without throwing and
+         * still leave a short or missing file; rotating on that word alone
+         * would delete good older backups to make room for a broken one.
+         */
+        const written = verifyCopy(folder, fileName, out.size ?? 0);
+        if (!written) throw new Error('بکاپ در پوشه‌ی مقصد کامل نوشته نشد. پوشه را دوباره انتخاب کنید.');
         savedTo = folder.uri;
         rotateBackups(folder);
       } else if (trigger === 'auto') {
@@ -341,9 +349,47 @@ export async function createBackup({
   }
 }
 
-/** The user handed a backup to the share sheet: it has left the phone. */
+/**
+ * Undo step 3 after a failed import: the database is the one that was already
+ * there, so the files it points at must be the ones it knew. A file that
+ * cannot be put back is logged by path — those are opaque ids, not names.
+ */
+function putBackDisplacedMedia(displaced: { savedUri: string; path: string }[]): void {
+  for (const item of displaced) {
+    try {
+      new File(item.savedUri).moveSync(new File(Paths.document, item.path), { overwrite: true });
+    } catch (e) {
+      logError(e, { source: 'handled', context: `restore rollback: ${item.path}` });
+    }
+  }
+}
+
+/**
+ * The user confirmed a shared backup really reached somewhere.
+ *
+ * Not called on the share sheet closing: `Sharing.shareAsync` resolves whether
+ * the file was sent or the sheet was dismissed, so only the user can say.
+ */
 export async function markBackupDelivered(): Promise<void> {
   await writeSetting(backupLastSuccessAt, Date.now());
+}
+
+/**
+ * Is the copy really there, with the whole file in it?
+ *
+ * `copy` resolving is the provider's word; this is the destination's. Sizes
+ * are compared rather than only existence, because an interrupted write on a
+ * SAF provider leaves a real but short file.
+ */
+function verifyCopy(folder: Directory, fileName: string, expectedBytes: number): boolean {
+  try {
+    const copied = new File(folder, fileName);
+    if (!copied.exists) return false;
+    const size = copied.size ?? 0;
+    return expectedBytes === 0 || size === expectedBytes;
+  } catch {
+    return false;
+  }
 }
 
 /** Keep the newest few of each kind; never let daily DB-only backups push out the last full one. */
@@ -443,9 +489,12 @@ function importDatabase(snapshot: File): { tables: number; rows: number } {
  *    single byte of the live data has changed.
  * 2. A plain snapshot of the current database is kept, so even a successful
  *    restore of the wrong backup can be undone.
- * 3. Media files are moved into place. A photo the old database does not
- *    reference is harmless; a database row whose photo is missing is not.
- * 4. The database is replaced in one transaction.
+ * 3. Media files are moved into place, and any file they replace is kept in
+ *    the scratch folder until the database is in. A photo the old database
+ *    does not reference is harmless; a database row whose photo has been
+ *    replaced by another dataset's bytes is not.
+ * 4. The database is replaced in one transaction. If that fails, the replaced
+ *    files are put back, so the rolled-back database still matches its media.
  */
 export async function restoreBackup({
   fileUri,
@@ -512,16 +561,38 @@ export async function restoreBackup({
     // 2. Keep a way back.
     snapshotDatabase('pre-restore');
 
-    // 3. Media into place.
+    /*
+     * 3. Media into place, keeping whatever was there.
+     *
+     * The database import can still fail and roll back, and a rolled-back
+     * database expects the files it knew. Any file being replaced is moved
+     * into the scratch folder first and only abandoned once the new database
+     * is committed — the scratch folder is deleted on the way out either way.
+     */
+    const displaced: { savedUri: string; path: string }[] = [];
     for (const m of media) {
       const target = new File(Paths.document, m.path);
       target.parentDirectory.create({ intermediates: true, idempotent: true });
-      m.staged.moveSync(target, { overwrite: true });
+      if (target.exists) {
+        const saved = new File(work, `displaced/${m.path}`);
+        saved.parentDirectory.create({ intermediates: true, idempotent: true });
+        // `moveSync` repoints the instance it is called on, so the destination
+        // is built again from the path rather than reusing `target`.
+        target.moveSync(saved);
+        displaced.push({ savedUri: saved.uri, path: m.path });
+      }
+      m.staged.moveSync(new File(Paths.document, m.path), { overwrite: true });
     }
 
     // 4. The database. Everything up to here can still fail cleanly.
     onProgress?.({ phase: 'database', fraction: 0 });
-    const imported = importDatabase(dbFile);
+    let imported: { tables: number; rows: number };
+    try {
+      imported = importDatabase(dbFile);
+    } catch (e) {
+      putBackDisplacedMedia(displaced);
+      throw e;
+    }
 
     /*
      * From this point the data is back, and the rest is housekeeping. A

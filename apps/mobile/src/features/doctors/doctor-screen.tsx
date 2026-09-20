@@ -39,7 +39,7 @@ import {
   ratedAxisCount,
   ratingAverage,
 } from './logic';
-import { doctorMessagesQuery, logGreetingSent } from './messages-queries';
+import { confirmGreetingSent, doctorMessagesQuery, logGreetingPrepared } from './messages-queries';
 import { cancelDoctorOccasionReminders, deleteOccasion, doctorOccasionsQuery } from './occasions-queries';
 import { deleteDoctor, doctorQuery, setDoctorStarred } from './queries';
 import { doctorProfileQuery, doctorRatingsQuery } from './ratings-queries';
@@ -355,7 +355,7 @@ function OccasionsSection({ doctor }: { doctor: Doctor }) {
             doctor={doctor}
             occasion={occasion}
             at={at}
-            lastSentAt={(messages ?? []).find((m) => m.occasionId === occasion.id)?.sentAt ?? null}
+            lastMessage={(messages ?? []).find((m) => m.occasionId === occasion.id) ?? null}
           />
         ))}
         <Button
@@ -374,12 +374,12 @@ function OccasionRow({
   doctor,
   occasion,
   at,
-  lastSentAt,
+  lastMessage,
 }: {
   doctor: Doctor;
   occasion: Occasion;
   at: Date | null;
-  lastSentAt: Date | null;
+  lastMessage: ScheduledMessage | null;
 }) {
   const router = useRouter();
   const { colors } = useTheme();
@@ -400,10 +400,10 @@ function OccasionRow({
      */
     const hand = (channel: ScheduledMessage['channel'], go: () => Promise<boolean>) => () => {
       void (async () => {
-        // Only a messenger that actually opened counts as sent; otherwise the
-        // log would answer "yes, congratulated" for a message nobody saw.
+        // A messenger that opened is all this can know. Whether the message
+        // was actually sent is the user's to say, on the row afterwards.
         if (await go()) {
-          await logGreetingSent({ doctorId: doctor.id, occasionId: occasion.id, channel, body: text });
+          await logGreetingPrepared({ doctorId: doctor.id, occasionId: occasion.id, channel, body: text });
         }
       })();
     };
@@ -432,10 +432,27 @@ function OccasionRow({
             {at ? formatJalaliLong(at) : 'بدون تاریخ'}
             {days != null ? ` — ${daysUntilLabel(days)}` : ''}
           </Text>
-          {lastSentAt ? (
+          {lastMessage?.status === 'sent' && lastMessage.sentAt ? (
             <Text variant="tiny" color="textFaint">
-              آخرین تبریک: {formatJalali(lastSentAt)}
+              آخرین تبریک: {formatJalali(lastMessage.sentAt)}
             </Text>
+          ) : null}
+          {lastMessage?.status === 'ready' ? (
+            <Row gap="xs">
+              <Text variant="tiny" color="textFaint">
+                متن {formatJalali(lastMessage.createdAt)} آماده شد
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="ثبت اینکه فرستاده شد"
+                hitSlop={8}
+                onPress={() => void confirmGreetingSent(lastMessage.id)}
+              >
+                <Text variant="tiny" color="primary">
+                  فرستادم
+                </Text>
+              </Pressable>
+            </Row>
           ) : null}
         </Column>
         <Row gap="xxs">

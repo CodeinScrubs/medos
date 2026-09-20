@@ -79,7 +79,7 @@ function splitCsv(line: string): string[] {
  */
 export function sameUnitSeries<T extends { unit: string | null }>(
   rows: T[],
-): { series: T[]; unit: string | null; excluded: number } {
+): { series: T[]; unit: string | null; excluded: number; unlabelled: number } {
   const normal = (u: string | null) => (u ?? '').trim().toLowerCase();
   let unit: string | null = null;
   for (let i = rows.length - 1; i >= 0; i -= 1) {
@@ -89,7 +89,10 @@ export function sameUnitSeries<T extends { unit: string | null }>(
     }
   }
   const series = rows.filter((r) => !normal(r.unit) || normal(r.unit) === normal(unit));
-  return { series, unit, excluded: rows.length - series.length };
+  // Counted, not hidden: once a unit is known for the series, a point with no
+  // unit is an assumption the chart is making, and the screen says so.
+  const unlabelled = unit == null ? 0 : series.filter((r) => !normal(r.unit)).length;
+  return { series, unit, excluded: rows.length - series.length, unlabelled };
 }
 
 const HEADER_WORDS = /^(test|analyte|name|result|value|آزمایش|نام|نتیجه|مقدار)$/i;

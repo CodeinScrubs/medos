@@ -2,15 +2,16 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { scheduledMessages, type ScheduledMessage } from '@/db/schema';
-import { newId, stamps } from '@/lib/ids';
+import { newId, stamps, touch } from '@/lib/ids';
 
 /*
- * The log of greetings that were actually handed to a messenger.
+ * The log of greetings.
  *
- * MedOS never sends anything itself, so "sent" here means the user tapped a
- * channel and the messenger opened with the text. That is still the useful
- * fact months later: whether this person was congratulated this year, and
- * what was written, so the next message does not repeat it word for word.
+ * MedOS never sends anything itself, and a messenger opening is not a message
+ * arriving — the user can still close it without pressing send. So a handed
+ * over text is recorded as `ready`, and only the user's own confirmation makes
+ * it `sent`. Months later the honest answer to "did I congratulate them?" is
+ * worth more than a cheerful one.
  */
 
 const alive = isNull(scheduledMessages.deletedAt);
@@ -23,7 +24,8 @@ export function doctorMessagesQuery(doctorId: string) {
     .orderBy(desc(scheduledMessages.scheduledFor));
 }
 
-export async function logGreetingSent(input: {
+/** The text was handed to a messenger. Whether it left is not known yet. */
+export async function logGreetingPrepared(input: {
   doctorId: string;
   occasionId?: string | null;
   channel: ScheduledMessage['channel'];
@@ -39,8 +41,24 @@ export async function logGreetingSent(input: {
     channel: input.channel,
     body: input.body,
     scheduledFor: now,
-    status: 'sent',
-    sentAt: now,
+    status: 'ready',
   });
   return id;
+}
+
+/** The user says they sent it. Only this writes `sentAt`. */
+export async function confirmGreetingSent(id: string): Promise<void> {
+  const now = new Date();
+  await db
+    .update(scheduledMessages)
+    .set({ status: 'sent', sentAt: now, ...touch(now) })
+    .where(eq(scheduledMessages.id, id));
+}
+
+/** The user says they did not. */
+export async function markGreetingSkipped(id: string): Promise<void> {
+  await db
+    .update(scheduledMessages)
+    .set({ status: 'skipped', ...touch() })
+    .where(eq(scheduledMessages.id, id));
 }

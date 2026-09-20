@@ -116,11 +116,33 @@ export async function openEncounter(input: EncounterInput): Promise<string> {
   return id;
 }
 
+/**
+ * Edit an encounter.
+ *
+ * Changing the kind of the **active** episode changes what the patient is:
+ * correcting an admission that was really an ER visit must move the patient
+ * out of the admitted list too, or the list keeps a bed that does not exist.
+ * A closed episode is history and moves nothing.
+ */
 export async function updateEncounter(id: string, patch: Partial<Omit<EncounterInput, 'patientId'>>): Promise<void> {
-  await db
-    .update(encounters)
-    .set({ ...patch, ...touch() })
-    .where(eq(encounters.id, id));
+  const current = (await encounterQuery(id))[0];
+  if (!current) throw new Error(`Encounter ${id} not found`);
+  const now = new Date();
+  const kindChanged = patch.kind != null && patch.kind !== current.kind;
+
+  db.transaction((tx) => {
+    tx.update(encounters)
+      .set({ ...patch, ...touch(now) })
+      .where(eq(encounters.id, id))
+      .run();
+
+    if (kindChanged && current.isActive) {
+      tx.update(patients)
+        .set({ status: statusForEncounterKind(patch.kind!), ...touch(now) })
+        .where(eq(patients.id, current.patientId))
+        .run();
+    }
+  });
 }
 
 export type DischargeInput = {
