@@ -33,6 +33,12 @@ export function MoreScreen() {
       tone: freshness === 'never' ? 'danger' : freshness === 'stale' ? 'warning' : 'success',
     },
     { icon: 'trash-outline', title: 'حذف‌شده‌ها', subtitle: 'برگرداندن پرونده‌های حذف‌شده', href: '/trash' },
+    {
+      icon: 'lock-closed-outline',
+      title: 'گاوصندوق',
+      subtitle: 'یوزرنیم و پسورد سامانه‌ها، رمزنگاری‌شده',
+      href: '/vault',
+    },
     { icon: 'settings-outline', title: 'تنظیمات', subtitle: 'قفل اپ، حافظه', href: '/settings' },
   ];
 
@@ -51,9 +57,7 @@ export function MoreScreen() {
     },
   ];
 
-  const coming: Item[] = [
-    { icon: 'lock-closed-outline', title: 'گاوصندوق', subtitle: 'یوزرنیم و پسورد سامانه‌ها، رمزنگاری‌شده' },
-  ];
+  const coming: Item[] = [];
 
   return (
     <Screen scroll>

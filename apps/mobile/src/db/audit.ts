@@ -17,7 +17,13 @@ export type AuditAction =
   | 'db.migrated'
   | 'lock.enabled'
   | 'lock.disabled'
-  | 'search.reindexed';
+  | 'search.reindexed'
+  // The vault records that a credential was written or read, never its value.
+  | 'vault.created'
+  | 'vault.updated'
+  | 'vault.revealed'
+  | 'vault.deleted'
+  | 'vault.rekeyed';
 
 export async function audit(
   action: AuditAction,

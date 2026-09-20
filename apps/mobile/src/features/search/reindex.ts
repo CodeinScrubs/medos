@@ -10,6 +10,7 @@ import { reindexSpecialtyProfiles } from '@/features/knowledge/specialty-profile
 import { reindexNotes } from '@/features/notes/queries';
 import { reindexPatients } from '@/features/patients/queries';
 import { reindexPlaces } from '@/features/places/queries';
+import { reindexCredentials } from '@/features/vault/queries';
 
 /**
  * Every searchable row stores a pre-normalised `searchText`. When the rules
@@ -39,6 +40,7 @@ export async function reindexSearchIfNeeded(): Promise<void> {
     specialtyProfiles: await reindexSpecialtyProfiles(),
     prescriptions: await reindexPrescriptions(),
     ideas: await reindexIdeas(),
+    credentials: await reindexCredentials(),
   };
   await writeSetting(indexedVersion, SEARCH_INDEX_VERSION);
 

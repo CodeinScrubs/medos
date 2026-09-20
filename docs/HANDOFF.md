@@ -33,6 +33,71 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (late) — The credential vault (phase 5), and the roadmap is built
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** see `git log` for this date
+
+**Changed** — the last unbuilt module. The schema already described the design; this
+implements it.
+
+- **`lib/crypto.ts`** gained `sealSecret` / `openSecret`: one-shot AES-256-GCM with a
+  random 12-byte nonce and an AAD, for a short value written on its own. The chunked
+  stream is untouched — the backup format stays frozen.
+- **`features/vault/keys.ts`** splits the key deliberately. The **salt, KDF parameters and
+  a check value** are an ordinary setting (`vault.keyset`, not `backup.`-prefixed), so they
+  travel inside the encrypted backup; without that, the same passphrase on a new phone
+  would derive a different key and every password would be lost. The **derived key** lives
+  only in the Android Keystore, so a stolen backup file plus the backup passphrase still
+  does not open the vault.
+- **`features/vault/queries.ts`**: only the password is encrypted. The system name,
+  username, URL and notes stay ordinary columns and are searchable — a vault nobody can
+  search is a vault nobody uses — and the secret is never in `searchText`, so the search
+  box cannot be used to confirm a guess. The AAD is `credential:<id>:v<keyVersion>`, so a
+  ciphertext copied into another row will not open. `rekeyVault` re-seals every row and
+  replaces the keyset **last**, so an interruption leaves rows the old key still opens.
+- **Screens**: the vault has three states (no vault / locked / open). Revealing a password
+  asks for the phone's own biometric or screen lock, shows it until the screen is left, and
+  is audited without the value. Credentials belonging to a colleague carry a warning and
+  the consent note the schema asks for.
+- The vault entry moved out of "coming next" in the More tab, and `docs/security.md` now
+  describes what is built rather than what was planned.
+
+**Verified**
+
+- `npm run check` green: typecheck, lint, formatting, 329 tests — 12 new ones, including
+  ciphertext at rest, no secret in the index, the AAD binding (a moved ciphertext refuses
+  to open), refusal while locked, and a full passphrase change.
+- Release APK builds and is signed: `dist/MedOS-0.5.0.apk`, versionCode 7.
+
+**Not verified**
+
+- **Not run on a phone.** Unproven on device: the biometric prompt before a reveal, how
+  long scrypt takes to open the vault on this hardware (backups take ~25 s), and the
+  clipboard copy.
+- No restore-onto-another-phone test of the vault. The salt travelling in the backup is
+  covered by a unit test, not by a real round trip.
+
+**Open threads**
+
+1. Device test of everything since 0.2.2: the doctors directory, knowledge, the vault.
+2. **Trash is patients-only.** Every other soft-deleted row has no way back in the UI.
+3. Credentials are excluded from nothing today: the schema's idea that colleague entries
+   stay out of ordinary exports is not implemented, because there is no export other than
+   the encrypted backup, which contains everything by design.
+4. Vitals and diagnoses tables exist with no screens (phase 2 leftovers).
+5. The roadmap's modules are all built; what comes next is the owner's own idea inbox.
+
+**Gotchas**
+
+- `SealedData.ciphertext()` returns a **promise**; `chunkCipher.seal` gets away with
+  returning it directly only because its return type is a promise.
+- The repo's `react-hooks/set-state-in-effect` rule rejects `useEffect(() => { void
+  refresh() })` when `refresh` sets state. The accepted shape is
+  `useEffect(() => { void something().then(setState) }, [dep])`.
+
+---
+
 ## 2026-09-20 (night) — The knowledge module (phase 4)
 
 **Agent:** claude-opus-5 via Claude Code
