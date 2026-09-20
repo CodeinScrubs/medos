@@ -6,11 +6,12 @@ import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
-import { Button, ChipSelect, Column, Input, Row, Screen, SelectField } from '@/components/ui';
+import { Button, ChipSelect, Column, Input, Row, Screen, SelectField, Toggle } from '@/components/ui';
 import type { Encounter } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
+import { isInpatient, withAssumedHour } from '@/features/encounters/logic';
 import { createPlace, placesQuery } from '@/features/places/queries';
 import { useTheme } from '@/theme';
 
@@ -53,6 +54,10 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
   const [attendingId, setAttendingId] = useState<string | null>(encounter?.attendingId ?? null);
   const [chiefComplaint, setChiefComplaint] = useState(encounter?.chiefComplaint ?? '');
   const [admittedAt, setAdmittedAt] = useState(() => encounter?.admittedAt ?? new Date());
+  // New admissions are usually entered as they happen, so the clock is real.
+  // Back-dating one is where the hour gets invented, and the owner's rule is
+  // to assume 12:01 PM and say so rather than to pick a plausible-looking time.
+  const [hourKnown, setHourKnown] = useState(encounter?.admittedAtHasTime ?? true);
   const [saving, setSaving] = useState(false);
   const [picker, setPicker] = useState<'place' | 'attending' | null>(null);
 
@@ -88,7 +93,8 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
         service: service.trim() || null,
         attendingId,
         chiefComplaint: chiefComplaint.trim() || null,
-        admittedAt,
+        admittedAt: hourKnown ? admittedAt : withAssumedHour(admittedAt),
+        admittedAtHasTime: hourKnown,
       };
       if (encounter) await updateEncounter(encounter.id, payload);
       else await openEncounter({ patientId, ...payload });
@@ -151,10 +157,23 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
         <QuickDateField
           label={kind === 'outpatient' ? 'تاریخ ویزیت' : 'تاریخ بستری'}
           value={admittedAt}
-          onChange={setAdmittedAt}
+          onChange={(v) => {
+            setAdmittedAt(v);
+            // Touching the field is how a real time gets in.
+            setHourKnown(true);
+          }}
           direction="past"
-          withTime
+          withTime={hourKnown}
         />
+
+        {isInpatient(kind) ? (
+          <Toggle
+            label="ساعت بستری را نمی‌دانم"
+            description="مدت بستری فقط به روز نشان داده می‌شود"
+            value={!hourKnown}
+            onChange={(v) => setHourKnown(!v)}
+          />
+        ) : null}
 
         <Button
           label={isEdit ? 'ذخیره تغییرات' : kind === 'outpatient' ? 'ثبت ویزیت' : 'ثبت بستری'}

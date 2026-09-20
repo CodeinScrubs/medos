@@ -97,10 +97,14 @@ also cluttered, which the owner said plainly.
 - Old `scheduledMessages` rows still claim a confirmation that never happened
   (`deliveryEvidence` column); still deferred, still cheap, still should happen before the
   doctors module has real history.
-- Admission duration (O11: elapsed days/hours, 12:01 PM when the hour is unknown) is
-  confirmed by the owner but not implemented — `hospitalDay` is still calendar-day-plus-one.
-  It needs a stored "hour not recorded" marker and must not leak into the kardex D-count,
-  which is a different clock.
+- Admission duration (O11) is now implemented, in the same session: `hospitalDay` is gone,
+  replaced by `admissionElapsed` / `formatAdmissionElapsed`. The patient card shows "۳ روز
+  و ۴ ساعت" instead of "روز ۴", `encounters.admittedAtHasTime` records whether the hour was
+  ever known, and when it was not the stored time is 12:01 PM and only whole days are
+  shown ("حدود ۲ روز"). The kardex D-count is deliberately untouched: a drug course is
+  counted in calendar days from day 1 and that is a different clock. Existing rows default
+  to `admittedAtHasTime = true`, which is right for admissions entered as they happened and
+  wrong for any that were back-dated — there are none with real data yet.
 
 **Gotchas**
 

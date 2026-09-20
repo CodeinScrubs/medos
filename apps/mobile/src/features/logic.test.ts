@@ -1,7 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { doctorDisplayName, doctorSearchText, parseDoctorName } from './doctors/logic';
-import { hospitalDay, isInpatient, statusAfterDischarge, statusForEncounterKind } from './encounters/logic';
+import {
+  admissionElapsed,
+  formatAdmissionElapsed,
+  isInpatient,
+  statusAfterDischarge,
+  statusForEncounterKind,
+  withAssumedHour,
+} from './encounters/logic';
 import { defaultDueDate, parseReminderPayload, postponedDueDate, urgencyOf } from './followups/logic';
 import { endAtForStatus, isRunning, orderSig, therapyDay } from './kardex/logic';
 import { isHighlighted, notePreview } from './notes/logic';
@@ -38,9 +45,42 @@ describe('kardex', () => {
 });
 
 describe('encounters', () => {
-  it('counts hospital days from the admission day', () => {
-    expect(hospitalDay(d(2024, 6, 1, 23, 30), d(2024, 6, 2, 8))).toBe(2);
-    expect(hospitalDay(null)).toBeNull();
+  /*
+   * Elapsed time, not the calendar count this replaced: a patient admitted at
+   * 23:30 was "day 2" half an hour later, which is how a chart ends up saying
+   * two days about eight hours.
+   */
+  it('measures an admission by how long it has lasted', () => {
+    expect(admissionElapsed(d(2024, 6, 1, 23, 30), true, d(2024, 6, 2, 8))).toEqual({
+      days: 0,
+      hours: 8,
+      approximate: false,
+    });
+    expect(admissionElapsed(d(2024, 6, 1, 8), true, d(2024, 6, 5, 20))).toEqual({
+      days: 4,
+      hours: 12,
+      approximate: false,
+    });
+    expect(admissionElapsed(null, true)).toBeNull();
+  });
+
+  it('says days only when the hour of admission was never recorded', () => {
+    const admitted = withAssumedHour(d(2024, 6, 1));
+    expect(admitted.getHours()).toBe(12);
+    expect(admitted.getMinutes()).toBe(1);
+
+    const guessed = admissionElapsed(admitted, false, d(2024, 6, 3, 20));
+    expect(guessed).toEqual({ days: 2, hours: 7, approximate: true });
+    // The hours are real arithmetic on an assumed start, so they are not shown.
+    expect(formatAdmissionElapsed(guessed)).toBe('حدود ۲ روز');
+  });
+
+  it('reads as a duration a person would say out loud', () => {
+    expect(formatAdmissionElapsed({ days: 3, hours: 4, approximate: false })).toBe('۳ روز و ۴ ساعت');
+    expect(formatAdmissionElapsed({ days: 0, hours: 7, approximate: false })).toBe('۷ ساعت');
+    expect(formatAdmissionElapsed({ days: 2, hours: 0, approximate: false })).toBe('۲ روز');
+    expect(formatAdmissionElapsed({ days: 0, hours: 0, approximate: true })).toBe('امروز');
+    expect(formatAdmissionElapsed(null)).toBeNull();
   });
 
   it('derives the patient status', () => {

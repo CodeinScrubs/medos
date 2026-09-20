@@ -73,6 +73,8 @@ export type EncounterInput = {
   attendingId?: string | null;
   chiefComplaint?: string | null;
   admittedAt?: Date | null;
+  /** False when the hour was never recorded; see `admissionElapsed`. */
+  admittedAtHasTime?: boolean;
 };
 
 /**
@@ -103,6 +105,7 @@ export async function openEncounter(input: EncounterInput): Promise<string> {
         attendingId: input.attendingId ?? null,
         chiefComplaint: input.chiefComplaint ?? null,
         admittedAt: input.admittedAt ?? now,
+        admittedAtHasTime: input.admittedAtHasTime ?? true,
         isActive: true,
       })
       .run();

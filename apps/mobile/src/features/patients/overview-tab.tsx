@@ -7,7 +7,7 @@ import type { Patient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { ENCOUNTER_KIND_LABELS } from '@/features/encounters/labels';
-import { hospitalDay, isInpatient } from '@/features/encounters/logic';
+import { admissionElapsed, formatAdmissionElapsed, isInpatient } from '@/features/encounters/logic';
 import { activeEncounterDetailQuery } from '@/features/encounters/queries';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { patientFollowUpsQuery } from '@/features/followups/queries';
@@ -200,7 +200,7 @@ function AdmissionCard({ patientId }: { patientId: string }) {
   }
 
   const { encounter, place, attending } = current;
-  const day = hospitalDay(encounter.admittedAt);
+  const elapsed = formatAdmissionElapsed(admissionElapsed(encounter.admittedAt, encounter.admittedAtHasTime));
   const location = [place?.name, encounter.ward, encounter.bed ? `تخت ${toPersianDigits(encounter.bed)}` : null]
     .filter(Boolean)
     .join(' • ');
@@ -223,7 +223,7 @@ function AdmissionCard({ patientId }: { patientId: string }) {
             ) : null}
           </Column>
 
-          {isAdmission && day != null ? (
+          {isAdmission && elapsed ? (
             <View
               style={{
                 backgroundColor: colors.primarySoft,
@@ -233,11 +233,11 @@ function AdmissionCard({ patientId }: { patientId: string }) {
                 alignItems: 'center',
               }}
             >
-              <Text variant="title" color="primary">
-                {toPersianDigits(day)}
+              <Text variant="subheading" color="primary">
+                {elapsed}
               </Text>
               <Text variant="tiny" color="primary">
-                روز بستری
+                از بستری
               </Text>
             </View>
           ) : null}

@@ -1,0 +1,1 @@
+ALTER TABLE `encounters` ADD `admitted_at_has_time` integer DEFAULT true NOT NULL;

@@ -105,6 +105,16 @@ export const encounters = sqliteTable(
 
     chiefComplaint: text('chief_complaint'),
     admittedAt: integer('admitted_at', { mode: 'timestamp_ms' }),
+    /**
+     * Was the hour of admission actually known?
+     *
+     * A timestamp always has one, so without this there is no way to tell a
+     * recorded 12:01 from an assumed one — and the duration on the patient's
+     * card would claim a precision the record does not have. False means the
+     * stored time is the assumption (12:01 PM, the owner's rule), and the
+     * duration is shown in whole days only.
+     */
+    admittedAtHasTime: bool('admitted_at_has_time').notNull().default(true),
     dischargedAt: integer('discharged_at', { mode: 'timestamp_ms' }),
     dischargeType: text('discharge_type', {
       enum: ['recovered', 'improved', 'referred', 'ama', 'death', 'other'],
