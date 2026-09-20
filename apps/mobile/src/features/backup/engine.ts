@@ -317,6 +317,12 @@ export async function createBackup({
          */
         checked = verifyCopy(out, folder, (f) => onProgress?.({ phase: 'copy', fraction: f }));
         if (checked === 'failed') {
+          // Sizes only — no file names, no data. Without this the owner's
+          // report is "it says the backup failed" and nothing else.
+          logError(new Error(`backup copy check failed (source ${out.size ?? -1} bytes)`), {
+            source: 'handled',
+            context: `backup: verifying the copy in ${folder.uri.slice(0, 40)}`,
+          });
           throw new Error('بکاپ در پوشه‌ی مقصد کامل نوشته نشد. پوشه را دوباره انتخاب کنید.');
         }
         savedTo = folder.uri;
@@ -499,8 +505,15 @@ function verifyCopy(source: File, folder: Directory, onProgress?: (fraction: num
   let read: FileHandle | null = null;
   let written: FileHandle | null = null;
   try {
-    const copied = new File(folder, source.name);
-    if (!copied.exists) return 'failed';
+    /*
+     * The copy is found by listing the folder, not by building a path inside
+     * it. A storage-access-framework folder is a tree of documents whose URIs
+     * the provider hands out; `new File(folder, name)` composes a path that
+     * looks right and resolves to nothing, so the file that was just written
+     * reads as missing. Listing returns the provider's own handles.
+     */
+    const copied = folder.list().find((entry): entry is File => entry instanceof File && entry.name === source.name);
+    if (!copied) return 'failed';
     const expected = source.size ?? 0;
     // We wrote this file a moment ago; a source we cannot measure is a bug,
     // not a backup.

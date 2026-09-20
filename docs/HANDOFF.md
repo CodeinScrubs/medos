@@ -33,6 +33,89 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (device) — Everything since 0.2.2, on the A52s at last
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last commits (0.6.0)
+
+The phone was connected for the first time since 0.2.2, so this covers doctors,
+knowledge, the vault, both review fix batches, drafts, photo originals and admission
+duration — all of it previously host-tested only. Two real defects turned up, both
+introduced this week, both invisible to 369 passing tests.
+
+**Verified on a Galaxy A52s (SM-A528B, Android 14), release build, installed over the
+0.2.2 install that was already there**
+
+- **Migrations 0001–0003 applied on upgrade** (note_drafts, attachments.original_path,
+  encounters.admitted_at_has_time). App started to Today with no error screen.
+- **Autosave survives a process kill.** Typed a subjective into a new note, never pressed
+  Save, `am force-stop`, relaunched: Today listed it under "نوت‌های ناتمام" and the editor
+  reopened it with the recovery banner and the text intact. Saving it moved it into the
+  record and cleared the draft.
+- **Admission duration**: admitted "پریروز" with the new "ساعت بستری را نمی‌دانم" switch
+  on; the card reads "حدود ۲ روز / از بستری", and the time field disappears while the
+  switch is on.
+- **Trend chart**: CRP 30 → ">100" draws a filled circle and a triangle at the bound,
+  with the single legend line "مثلث: عدد دقیق نیست" and no unit line (all rows had the
+  preset unit). A non-numeric value in the same series was skipped by the line and still
+  listed in the table.
+- **Vault**: created on device — scrypt takes ~15 s on this phone, the button shows busy
+  throughout — and the credential list opened.
+- **Backup**: passphrase set (scrypt again), SAF folder chosen and granted, and — after
+  the fix below — a full backup written, verified and reported as
+  "آخرین بکاپ: ۱ دقیقه پیش".
+
+**Fixed because of this run**
+
+- `>100` rendered as `100<`. Forced RTL + a run with no strong character = the bidi
+  algorithm resolves against the paragraph and mirrors the bracket. On a lab table that
+  reads as the opposite result. `ltrIsolate` in `lib/persian.ts`, applied to both lab
+  value tables.
+- **`verifyCopy` rejected every good backup**, and had done since `da630e7` — which is to
+  say the fix written for the first review's R5 broke folder backups outright, and only
+  the phone could show it. The copy lands (the files are on disk); what fails is finding
+  it afterwards. `new File(folder, name)` composes a path inside a storage-access-framework
+  tree, which resolves to nothing: SAF children have provider-issued document URIs. The
+  lookup now goes through `folder.list()`, the same way `rotateBackups` already did.
+  While chasing it the check also became three-valued — `bytes` / `size` / `failed`, where
+  `size` means "there, right length, and the provider would not hand out a file handle" —
+  and only `failed` stops a backup. The audit records which of the three ran, so a weaker
+  check is never filed as the stronger one. Two commits in this session name `open()` as
+  the cause; that was the first hypothesis and it was wrong.
+
+  The lesson is the one this codebase keeps writing down in the other direction: a check
+  that refuses good data is not a stricter check, and an unverified verification is worse
+  than none, because it fails closed on exactly the operation that protects the record.
+
+- **Restore, on the phone, for the first time.** A full backup was restored over the live
+  data: "بازگردانی کامل شد — ۱ بیمار، ۰ فایل", the pre-restore snapshot was kept, the
+  in-flight marker was cleared by the import itself, and the vault stayed open afterwards
+  — `loadVaultKey` proved the stored key against the restored keyset rather than locking
+  spuriously. Rotation keeps exactly `KEEP_FULL` files in the folder.
+- The app's error log holds only the two backup failures from before the fix, and nothing
+  from the restore.
+
+**Not verified**
+
+- Restore of a backup from a *different* dataset or phone — the case R3 is really about.
+  This one restored the phone's own backup, so the keyset matched by construction.
+- Photo originals: no camera capture was driven, so `storePhoto({keepOriginal})` has not
+  run on the phone.
+- Doctors and knowledge screens were not walked through this time.
+- Nothing measured: no timing for `synchronous = FULL`, no battery or storage figures.
+
+**Gotchas**
+
+- `adb shell input text` splits on spaces — pass `%s`, or the rest of the sentence lands
+  nowhere. One value in the test data reads "45 to by" because of this.
+- Tapping a button whose uiautomator bounds are ~10 px tall means the keyboard is over it;
+  the tap lands on the IME or the gesture bar and can background the app. Check
+  `dumpsys input_method | grep mInputShown` and close the keyboard first.
+- A uiautomator dump only lists nodes that have text, so an empty text field is invisible
+  in it. Move between fields with keyevent 61 (TAB) rather than guessing coordinates.
+- `npm run apk` does not re-run prebuild when `android/` exists, so a version bump in
+  `app.json` does not reach the APK. Run `npx expo prebuild --platform android` first.
+
 ## 2026-09-20 (latest) — Typing that survives the phone, and photos that keep their pixels
 
 **Agent:** claude-opus-5 via Claude Code
