@@ -40,7 +40,14 @@ export function TrendScreen() {
         assumedUnit: seriesUnit != null && !hasUnit(r.value.unit),
       };
     });
-  const bounded = numeric.filter((p) => p.bound).length;
+  // One short line under the chart, only for the shapes that are actually on
+  // it. Two or three sentences of small print turn a glance into reading.
+  const legend = [
+    numeric.some((p) => p.bound) ? 'مثلث: عدد دقیق نیست' : null,
+    unlabelled > 0 ? 'توخالی: واحد ثبت نشده' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   // The most recent range is the one worth drawing: labs change ranges when
   // they change methods, and the latest is what today's values are read
@@ -86,16 +93,9 @@ export function TrendScreen() {
                     برای نمودار حداقل دو مقدار عددی لازم است.
                   </Text>
                 )}
-                {bounded > 0 ? (
+                {legend ? (
                   <Text variant="tiny" color="textFaint" style={{ marginTop: spacing.xs }}>
-                    {toPersianDigits(bounded)} مقدار با پیکان، عدد دقیق نیست (مثل «&gt;۱۰۰»)؛ مقدار واقعی آن‌سوی نقطه
-                    است.
-                  </Text>
-                ) : null}
-                {unlabelled > 0 ? (
-                  <Text variant="tiny" color="textFaint" style={{ marginTop: spacing.xs }}>
-                    {toPersianDigits(unlabelled)} مقدار بدون واحد ثبت شده؛ با دایره‌ی توخالی نشان داده شده و همین واحد
-                    برایشان فرض شده است.
+                    {legend}
                   </Text>
                 ) : null}
                 {excluded > 0 ? (

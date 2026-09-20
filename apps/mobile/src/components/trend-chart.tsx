@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
@@ -129,36 +129,32 @@ export function TrendChart({
 
           <Path d={path} stroke={colors.primary} strokeWidth={2} fill="none" />
 
+          {/*
+           * One marker per point, never two: a chart with arrows and rings
+           * stacked on the same dot stops being readable at a glance, which is
+           * the only thing a trend is for. The shape carries the meaning —
+           * round is a measured value, a triangle pointing away from the axis
+           * is a bound — and hollow means the unit was assumed.
+           */}
           {points.map((p, i) => {
             const tone = pointColor(p.flag);
-            // Hollow means "this one is not quite what it looks like": either
-            // its unit was assumed, or it is a bound rather than a value.
-            const open = p.assumedUnit || p.bound != null;
+            const cx = x(i);
             const cy = y(p.value);
-            return (
-              <React.Fragment key={`p${i}`}>
-                {p.bound && (
-                  <Path
-                    d={
-                      p.bound === 'above'
-                        ? `M${x(i) - 4},${cy - 8} L${x(i)},${cy - 14} L${x(i) + 4},${cy - 8}`
-                        : `M${x(i) - 4},${cy + 8} L${x(i)},${cy + 14} L${x(i) + 4},${cy + 8}`
-                    }
-                    stroke={tone}
-                    strokeWidth={2}
-                    fill="none"
-                  />
-                )}
-                <Circle
-                  cx={x(i)}
-                  cy={cy}
-                  r={4.5}
-                  fill={open ? colors.surface : tone}
-                  stroke={open ? tone : colors.surface}
-                  strokeWidth={2}
+            const fill = p.assumedUnit ? colors.surface : tone;
+            const stroke = p.assumedUnit ? tone : colors.surface;
+            if (p.bound) {
+              const dir = p.bound === 'above' ? -1 : 1;
+              return (
+                <Path
+                  key={`p${i}`}
+                  d={`M${cx - 5},${cy - dir * 3} L${cx + 5},${cy - dir * 3} L${cx},${cy + dir * 6} Z`}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={1.5}
                 />
-              </React.Fragment>
-            );
+              );
+            }
+            return <Circle key={`p${i}`} cx={cx} cy={cy} r={4.5} fill={fill} stroke={stroke} strokeWidth={2} />;
           })}
 
           {points.map((p, i) =>
