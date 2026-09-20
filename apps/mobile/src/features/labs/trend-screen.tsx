@@ -5,6 +5,7 @@ import { TrendChart, type TrendPoint } from '@/components/trend-chart';
 import { Card, Column, Divider, EmptyState, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { FLAG_LABEL, flagTone, formatRange } from '@/features/labs/flags';
+import { sameUnitSeries } from '@/features/labs/logic';
 import { analyteSeriesQuery } from '@/features/labs/queries';
 import { formatJalali, formatJalaliDateTime, toJalali } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
@@ -17,7 +18,9 @@ export function TrendScreen() {
   const { data } = useLive(analyteSeriesQuery(patientId, analyte), [patientId, analyte]);
   const rows = data ?? [];
 
-  const numeric: TrendPoint[] = rows
+  // Only results in the same unit share an axis; the rest are counted below.
+  const { series, excluded } = sameUnitSeries(rows.map((r) => ({ ...r, unit: r.value.unit })));
+  const numeric: TrendPoint[] = series
     .filter((r) => r.value.valueNum != null)
     .map((r) => ({ at: r.collectedAt, value: r.value.valueNum!, flag: r.value.flag }));
 
@@ -62,6 +65,12 @@ export function TrendScreen() {
                     برای نمودار حداقل دو مقدار عددی لازم است.
                   </Text>
                 )}
+                {excluded > 0 ? (
+                  <Text variant="tiny" color="warning" style={{ marginTop: spacing.xs }}>
+                    {toPersianDigits(excluded)} مقدار با واحد دیگر در نمودار نیامد (واحدها تبدیل نمی‌شوند). در جدول
+                    پایین همه هست.
+                  </Text>
+                ) : null}
               </Card>
 
               <Card padded={false}>

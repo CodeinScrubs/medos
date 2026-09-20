@@ -5,7 +5,7 @@ import { labPanels, labValues, type LabPanel } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
-import { computeFlag, parseLabNumber } from './flags';
+import { computeFlag, parseLabValue } from './flags';
 
 const panelAlive = isNull(labPanels.deletedAt);
 const valueAlive = isNull(labValues.deletedAt);
@@ -80,7 +80,7 @@ function valueRows(panelId: string, patientId: string, values: LabValueInput[], 
   return values
     .filter((v) => v.analyte.trim() && v.value.trim())
     .map((v, i) => {
-      const valueNum = parseLabNumber(v.value);
+      const parsed = parseLabValue(v.value);
       return {
         id: newId(),
         ...stamps(now),
@@ -88,11 +88,11 @@ function valueRows(panelId: string, patientId: string, values: LabValueInput[], 
         patientId,
         analyte: v.analyte.trim(),
         value: v.value.trim(),
-        valueNum,
+        valueNum: parsed?.value ?? null,
         unit: v.unit ?? null,
         refLow: v.refLow ?? null,
         refHigh: v.refHigh ?? null,
-        flag: computeFlag(valueNum, v.refLow, v.refHigh),
+        flag: computeFlag(parsed, v.refLow, v.refHigh),
         notes: v.notes ?? null,
         sortOrder: i,
       };

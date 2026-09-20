@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
@@ -27,7 +28,7 @@ export function TodayScreen() {
   const now = new Date(useNow());
   const today = toIsoDate(now);
 
-  const { data: due } = useLive(dueFollowUpsQuery(endOfDay(now)), [today]);
+  const { data: due, error } = useLive(dueFollowUpsQuery(endOfDay(now)), [today]);
   const { data: pending } = useLive(pendingFollowUpsQuery());
   const { data: admitted } = useLive(patientListQuery({ statuses: ['admitted'] }));
   const { data: starred } = useLive(patientListQuery({ starredOnly: true }));
@@ -47,6 +48,8 @@ export function TodayScreen() {
           {formatJalaliWithWeekday(now)} {toPersianDigits(jy)}
         </Text>
         <Text variant="display">امروز</Text>
+
+        <ErrorNotice error={error} what="کارهای امروز" />
 
         <Row gap="sm" style={{ marginTop: spacing.lg }}>
           <StatTile icon="alarm-outline" label="پیگیری امروز" value={dueRows.length} alert={overdue > 0} />

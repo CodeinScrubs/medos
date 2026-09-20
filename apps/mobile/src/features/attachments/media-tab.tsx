@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, ChipSelect, Column, EmptyState, SectionHeader } from '@/components/ui';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
@@ -43,7 +44,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
   const [filter, setFilter] = useState<PhotoFilter>('all');
   const [adding, setAdding] = useState(false);
 
-  const { data } = useLive(patientMediaQuery(patientId), [patientId]);
+  const { data, error } = useLive(patientMediaQuery(patientId), [patientId]);
   const all = data ?? [];
   const photos = all.filter(
     (a) =>
@@ -81,6 +82,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
+      <ErrorNotice error={error} what="عکس‌ها و صداها" />
       <ChipSelect options={FILTERS} value={filter} onChange={(v) => setFilter(v ?? 'all')} />
 
       <Button

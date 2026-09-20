@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { PatientStatus } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -37,7 +38,7 @@ export function PatientListScreen() {
     return [tab];
   }, [tab]);
 
-  const { data: rows } = useLive(patientListQuery({ search, statuses }), [search, tab]);
+  const { data: rows, error } = useLive(patientListQuery({ search, statuses }), [search, tab]);
   const patients = rows ?? [];
 
   const tabs: { key: Tab; label: string }[] = [
@@ -54,6 +55,8 @@ export function PatientListScreen() {
             {toPersianDigits(patients.length)} نفر
           </Text>
         </Row>
+
+        <ErrorNotice error={error} what="لیست بیماران" />
 
         <Row
           gap="sm"

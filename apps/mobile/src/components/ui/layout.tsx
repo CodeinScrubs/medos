@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -29,6 +29,11 @@ export function Screen({
 }) {
   const { colors, spacing } = useTheme();
   const pad = padded ? { paddingHorizontal: spacing.lg } : null;
+  // The app draws edge to edge, so on a screen without a tab bar the last rows
+  // of a form would end up behind Android's navigation bar. `edges` decides
+  // whether SafeAreaView already handles it.
+  const insets = useSafeAreaInsets();
+  const bottomInset = edges.includes('bottom') ? 0 : insets.bottom;
 
   if (scroll) {
     // Keyboard-aware: since Android 15 apps draw edge-to-edge and the window
@@ -38,7 +43,7 @@ export function Screen({
       <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor: colors.background }, style]}>
         <KeyboardAwareScrollView
           style={styles.flex}
-          contentContainerStyle={[pad, { paddingBottom: spacing.huge }, contentStyle]}
+          contentContainerStyle={[pad, { paddingBottom: spacing.huge + bottomInset }, contentStyle]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           bottomOffset={spacing.xl}

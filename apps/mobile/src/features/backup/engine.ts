@@ -14,6 +14,7 @@ import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
 import { newId, stamps, touch } from '@/lib/ids';
+import { logError } from '@/platform/error-log';
 import { MEDIA_ROOT } from '@/platform/media';
 
 import {
@@ -314,8 +315,11 @@ export async function createBackup({
         ...touch(),
       })
       .where(eq(backupRuns.id, runId));
-    await writeSetting(backupLastSuccessAt, Date.now());
-    await audit('backup.created', { summary: fileName, detail: { trigger, includeMedia, sizeBytes } });
+    // "Last backup" means a copy that left the app. A file sitting in the
+    // cache is not a backup: Android clears that folder, and the phone it is
+    // on is the thing being backed up. Sharing it marks it delivered.
+    if (savedTo) await writeSetting(backupLastSuccessAt, Date.now());
+    await audit('backup.created', { summary: fileName, detail: { trigger, includeMedia, sizeBytes, savedTo } });
 
     onProgress?.({ phase: 'done', fraction: 1 });
     return { file: out, fileName, sizeBytes, savedTo, manifest };
@@ -335,6 +339,11 @@ export async function createBackup({
     removeQuietly(snapshot);
     running = false;
   }
+}
+
+/** The user handed a backup to the share sheet: it has left the phone. */
+export async function markBackupDelivered(): Promise<void> {
+  await writeSetting(backupLastSuccessAt, Date.now());
 }
 
 /** Keep the newest few of each kind; never let daily DB-only backups push out the last full one. */
@@ -402,6 +411,8 @@ export type RestoreResult = {
   rows: number;
   files: number;
   reminders: number;
+  /** Steps that failed *after* the data was already back. Not a failed restore. */
+  warnings: string[];
 };
 
 /** Attach the restored snapshot and copy it into the live database. */
@@ -508,25 +519,49 @@ export async function restoreBackup({
       m.staged.moveSync(target, { overwrite: true });
     }
 
-    // 4. The database.
+    // 4. The database. Everything up to here can still fail cleanly.
     onProgress?.({ phase: 'database', fraction: 0 });
     const imported = importDatabase(dbFile);
-    await runSeeds();
-    await reindexSearchIfNeeded();
 
+    /*
+     * From this point the data is back, and the rest is housekeeping. A
+     * failure here must not be reported as "restore failed" — the user would
+     * think their records were untouched when in fact they were replaced.
+     * Each step is collected as a warning instead.
+     */
+    const warnings: string[] = [];
+    const housekeeping = async (what: string, step: () => Promise<unknown>) => {
+      try {
+        await step();
+      } catch (e) {
+        warnings.push(what);
+        logError(e, { source: 'handled', context: `restore: ${what}` });
+      }
+    };
+
+    await housekeeping('فهرست‌های پیش‌فرض', runSeeds);
+    await housekeeping('بازسازی جست‌وجو', reindexSearchIfNeeded);
     // The reminders the OS holds belong to the data just replaced, and the ids
     // in the backup to the phone that made it: start over from the rows.
-    const { followUps: reminders } = await rescheduleAllReminders();
-
+    let reminders = 0;
+    await housekeeping('یادآورها', async () => {
+      reminders = (await rescheduleAllReminders()).followUps;
+    });
     // Keep backing up with the same passphrase on this phone from now on.
-    await storeBackupKey({ key, salt: header.salt, kdf: header.kdf });
+    await housekeeping('ذخیره‌ی رمز بکاپ', () => storeBackupKey({ key, salt: header.salt, kdf: header.kdf }));
     await audit('backup.restored', {
       summary: manifest.createdAt,
-      detail: { tables: imported.tables, rows: imported.rows, files: media.length, device: manifest.device },
+      detail: {
+        tables: imported.tables,
+        rows: imported.rows,
+        files: media.length,
+        device: manifest.device,
+        warnings,
+      },
     });
 
     onProgress?.({ phase: 'done', fraction: 1 });
-    return { manifest, ...imported, files: media.length, reminders };
+    return { manifest, ...imported, files: media.length, reminders, warnings };
   } finally {
     handle?.close();
     removeQuietly(work);

@@ -33,6 +33,107 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (later) — Nine claims from a third review, fixed and tested on the phone
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** see `git log` for this date
+
+**Changed** — all nine claims were real; all nine are fixed.
+
+1. **Backup key was three separate SecureStore writes.** Interrupted between them, a new
+   key could end up beside an old salt and every later backup would be undecryptable
+   for ever. Now one record (`medos.backup.keyset`), with a read path that migrates the
+   old three items and deletes them only after the record is written.
+2. **Restore reported failure after the data had already been replaced,** and a backup
+   that only reached the cache counted as "last successful backup". Post-import steps
+   (seeds, reindex, reminders, key) are now collected as warnings — "اطلاعات برگشت، با
+   چند کار ناتمام" — and `backupLastSuccessAt` is written only when a file was saved to
+   the user's folder or shared.
+3. **The kardex showed every order the patient ever had.** `patientOrdersQuery` now takes
+   the current encounter and returns its orders plus standing ones (`encounterId is null`);
+   discharge completes that admission's running and held orders inside the transaction.
+   This was the one with real clinical consequences.
+4. **Trend charts mixed units**, and lab flags dropped the comparator. `sameUnitSeries`
+   keeps the unit of the newest result that has one and counts what it left off;
+   `parseLabValue` keeps `<`/`>` so ">100" against a limit of 100 is high and ">0.01"
+   inside the range gets no flag instead of a reassuring "normal".
+5. **Pasted spreadsheet rows shifted columns** when a cell was empty, and a quoted
+   `"250,000"` split in two. Column positions are now kept; rows without a name and a
+   value are skipped.
+6. **`redactErrorText` only cleaned the first line** of a failed-query message, so a note
+   containing newlines leaked into the error log. Everything from `params:` on goes.
+7. **Note + voice was not atomic:** a failed voice save made "save" write a second copy of
+   the note. The new id is remembered, the retry updates, stored voices leave the queue.
+8. **`useLive` errors were invisible** — a failed read looked like "no drugs". New
+   `ErrorNotice` shows a Persian card, logs once, and is wired into the seven list screens.
+9. **A release build with no keystore silently fell back to the debug key.** Gradle now
+   throws instead; an APK signed with another key cannot update the installed app without
+   uninstalling it, which deletes the database.
+
+Also fixed, found on the phone rather than in the code: **the bottom tab bar was drawn
+underneath Android's navigation bar** (`tabBarStyle` had a hardcoded `height`/`paddingBottom`,
+which overrides the inset React Navigation would have added). Tapping "پزشکان" went Home.
+`Screen`'s scrolling content had the same problem for stack screens — the Cancel button of
+a long form sat behind the nav bar. Both now add `useSafeAreaInsets().bottom`.
+
+LockGate now blocks the hardware Back button and sets `pointerEvents: none` on the covered
+content (open thread #5 of the previous entry).
+
+**Verified**
+
+- `npm run check` green: typecheck, lint, formatting, 290 tests (13 new).
+- **On the owner's phone** (Galaxy A52s, Android 14, release APK 0.2.2, versionCode 4):
+  install over adb, cold start, patient created, admitted to ICU with the hospital-day
+  count and Jalali dates right; Ceftriaxone added to the kardex; discharge → the order
+  became "قطع‌شده" and the running list emptied; re-admission → **the new kardex is empty**,
+  which is claim 3 proven end to end. Troponin ">100" against "< 0.04" flags H; changing
+  it to ">0.01" leaves no flag at all (claim 4b proven).
+- Backup passphrase set (scrypt takes ~25 s on this phone); a full backup wrote
+  `MedOS-1405-06-29_072155-full.medosbak` to the folder the user picked. The file has the
+  expected header (`MEDOSBAK`, format 1, scheme 2, log2N 15, r 8, p 1) and contains no
+  plaintext at all — not "SQLite", not a patient name.
+- Restore end to end, twice: a patient created after the backup disappeared, the backed-up
+  patient came back with their lab panel, and a second round trip returned "۱ بیمار، ۱ فایل"
+  with the voice note still attached to its note. No warnings, and the app's own error log
+  stayed empty through all of it.
+- Tab bar after the fix: `uiautomator` reports the tabs at y 2134–2256, clear of the
+  navigation bar at 2274+; before it they were at 2257–2379, inside it.
+- The phone was left clean: app data cleared, test backups deleted. An empty `MedOS/`
+  folder remains on the phone's storage.
+
+**Not verified**
+
+- App lock (biometric) — it needs a real fingerprint, which adb cannot supply.
+- Photos, imaging, the crop/zoom viewer, follow-up reminder notifications, trash.
+- The voice note was recorded and restored, but nobody listened to the restored audio.
+- `pm clear` was used at the end, so the keyset **migration** path (claim 1) has only been
+  proven by unit test, not on a phone that carried an old key.
+
+**Open threads**
+
+1. **Trash is patients-only.** Notes, lab panels, imaging and attachments are soft-deleted
+   with no way back in the UI.
+2. Occasions/birthday reminders (phase 3) must register in
+   `features/reminders/reschedule.ts` when they are built.
+3. Vitals and diagnoses tables exist with no screens (phase 2 leftovers).
+4. Roadmap next module: doctors directory (phase 3).
+5. Nothing enforces the safe-area rule mechanically; it is an AGENTS.md convention. A
+   render test would need `@testing-library/react-native`, which is not installed.
+
+**Gotchas**
+
+- The JS bundle is built in the first minute of `npm run apk`. Edits made after that are
+  silently absent from the APK — check `android/app/build/generated/assets/react/release/
+  index.android.bundle`'s timestamp against your edits before believing a device test.
+- `adb shell input text` cannot type Persian, and `<`/`>` need the inner quoting
+  `adb shell "input text '>100'"`; without it `%3e` arrives literally.
+- `uiautomator dump /sdcard/ui.xml` from Git Bash needs `MSYS_NO_PATHCONV=1`, or the path
+  becomes `/Files/Git/sdcard/ui.xml`.
+- This phone has a secondary user (Secure Folder). `pm list packages` fails without
+  `--user 0`, and so does `adb install` in some flows — pass `--user 0`.
+
+---
+
 ## 2026-09-20 — Claims review from a second AI, fixes, and this multi-agent workflow
 
 **Agent:** claude-opus-5 via Claude Code

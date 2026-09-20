@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Segmented, Text } from '@/components/ui';
 import type { LabPanel, LabValue } from '@/db/schema';
@@ -30,7 +31,7 @@ export function LabsTab({ patientId }: { patientId: string }) {
   const [view, setView] = useState<LabsView>('flowsheet');
   const [capturing, setCapturing] = useState(false);
 
-  const { data: values } = useLive(patientLabValuesQuery(patientId), [patientId]);
+  const { data: values, error } = useLive(patientLabValuesQuery(patientId), [patientId]);
   const { data: panels } = useLive(patientLabPanelsQuery(patientId), [patientId]);
   const { data: sheets } = useLive(patientMediaQuery(patientId, ['lab_sheet']), [patientId]);
 
@@ -64,6 +65,7 @@ export function LabsTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
+      <ErrorNotice error={error} what="آزمایش‌ها" />
       <Row gap="sm">
         <View style={styles.grow}>
           <Button

@@ -1,11 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/theme';
 
 export default function TabsLayout() {
   const { colors, typography } = useTheme();
+  // The app draws edge to edge, so the tab bar would otherwise sit underneath
+  // Android's own navigation bar: on a phone with three buttons, tapping
+  // "پزشکان" goes Home instead. Fixing the height means adding that inset here.
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -17,9 +22,9 @@ export default function TabsLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: 62,
+          height: 62 + insets.bottom,
           paddingTop: 6,
-          paddingBottom: 8,
+          paddingBottom: 8 + insets.bottom,
         },
         tabBarLabelStyle: {
           fontFamily: typography.tiny.fontFamily,

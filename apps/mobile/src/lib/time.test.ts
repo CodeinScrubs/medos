@@ -65,6 +65,15 @@ describe('redactErrorText', () => {
     );
   });
 
+  // A note or a pasted lab table contains newlines, so the parameter list in a
+  // failed-query message spans several lines. Redacting only the first line
+  // used to leave the rest of the patient's text in the error log.
+  it('removes parameters that run over several lines', () => {
+    const message = 'Failed query: insert into "notes" ("body") values (?)\nparams: سطر اول\nسطر دوم\nسطر سوم';
+    expect(redactErrorText(message)).toBe('Failed query: insert into "notes" ("body") values (?)\nparams: [redacted]');
+    expect(redactErrorText(message)).not.toContain('دوم');
+  });
+
   it('leaves other text alone', () => {
     expect(redactErrorText('Network request failed')).toBe('Network request failed');
   });

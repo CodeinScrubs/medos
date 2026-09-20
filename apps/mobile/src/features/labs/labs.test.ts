@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { computeFlag, flagTone, formatRange, parseLabNumber, parseRangeInput } from './flags';
-import { parsePastedTable } from './logic';
+import { computeFlag, flagTone, formatRange, parseLabNumber, parseLabValue, parseRangeInput } from './flags';
+import { parsePastedTable, sameUnitSeries } from './logic';
 import { analyteDef, ANALYTE_ORDER, LAB_PRESETS, rangeFor } from './presets';
 
 describe('parseLabNumber', () => {
@@ -43,6 +43,29 @@ describe('computeFlag', () => {
     // K 9.9 against 3.5–5.1 is "high", not "critical": critical thresholds
     // are the physician's call, not a multiple of the normal range.
     expect(computeFlag(9.9, 3.5, 5.1)).toBe('high');
+  });
+
+  // A bounded result is not the number it contains. Dropping the sign is how a
+  // troponin reported as ">100" against an upper limit of 100 ends up green.
+  it('keeps the comparator a lab reported the result with', () => {
+    expect(parseLabValue('>100')).toEqual({ value: 100, comparator: '>' });
+    expect(parseLabValue('≤ ۰٫۰۱')).toEqual({ value: 0.01, comparator: '<=' });
+    expect(parseLabValue('4.1')).toEqual({ value: 4.1, comparator: null });
+    expect(parseLabValue('Positive')).toBeNull();
+  });
+
+  it('judges a bounded result by what the bound proves', () => {
+    // At or above the upper limit: high, whatever the true value is.
+    expect(computeFlag(parseLabValue('>100'), null, 100)).toBe('high');
+    expect(computeFlag(parseLabValue('>=0.5'), null, 0.04)).toBe('high');
+    // A lower bound inside the range proves nothing — no reassuring flag.
+    expect(computeFlag(parseLabValue('>0.01'), null, 0.04)).toBeNull();
+    // An upper bound at or below the lower limit is low; below the upper
+    // limit it is genuinely not high.
+    expect(computeFlag(parseLabValue('<3.5'), 3.5, 5.1)).toBe('low');
+    expect(computeFlag(parseLabValue('<0.01'), null, 0.04)).toBe('normal');
+    // ...but an upper bound above the upper limit says nothing either way.
+    expect(computeFlag(parseLabValue('<200'), null, 100)).toBeNull();
   });
 
   it('maps flags to tones', () => {
@@ -141,5 +164,41 @@ describe('parsePastedTable', () => {
 
   it('ignores lines without a name and a value', () => {
     expect(parsePastedTable('\nCBC\n\nWBC\t7.2\n')).toEqual([['WBC', '7.2', undefined]]);
+  });
+
+  // An empty cell used to be dropped, which slid every later column one to the
+  // left: a row with no value took its unit as the result.
+  it('keeps column positions when a cell is empty', () => {
+    expect(parsePastedTable('Na\t\tmEq/L\nK\t4.1\tmEq/L')).toEqual([['K', '4.1', 'mEq/L']]);
+    expect(parsePastedTable('Cr,,mg/dL\nCr,1.1,mg/dL')).toEqual([['Cr', '1.1', 'mg/dL']]);
+  });
+
+  it('reads a quoted CSV cell that contains the separator', () => {
+    expect(parsePastedTable('Plt,"250,000",/µL')).toEqual([['Plt', '250,000', '/µL']]);
+    expect(parseLabNumber('250,000')).toBe(250000);
+  });
+});
+
+describe('sameUnitSeries', () => {
+  const row = (unit: string | null, value: number) => ({ unit, value });
+
+  // Cr 1.0 mg/dL and Cr 88.4 µmol/L are the same result. On one axis they look
+  // like a tenfold rise, so the odd ones out are left off and counted.
+  it('keeps the unit of the most recent result and counts what it drops', () => {
+    const rows = [row('µmol/L', 88.4), row('mg/dL', 1), row('mg/dL', 1.4)];
+    expect(sameUnitSeries(rows)).toEqual({ series: [rows[1], rows[2]], unit: 'mg/dL', excluded: 1 });
+  });
+
+  it('treats spacing and case as the same unit', () => {
+    expect(sameUnitSeries([row('MG/DL ', 1), row('mg/dL', 1.4)]).excluded).toBe(0);
+  });
+
+  // Most results are typed without a unit. That is a unit nobody wrote down,
+  // not a different one, so it stays on the chart.
+  it('keeps results typed without a unit, and takes the unit from the newest that has one', () => {
+    const rows = [row('mg/dL', 1), row(null, 1.4)];
+    expect(sameUnitSeries(rows)).toEqual({ series: rows, unit: 'mg/dL', excluded: 0 });
+    expect(sameUnitSeries([row(null, 1), row(null, 2)]).unit).toBeNull();
+    expect(sameUnitSeries([])).toEqual({ series: [], unit: null, excluded: 0 });
   });
 });

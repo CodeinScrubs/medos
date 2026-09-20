@@ -4,9 +4,11 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Button, Card, Column, EmptyState, Row, SectionHeader, Text } from '@/components/ui';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { currentEncounterQuery } from '@/features/encounters/queries';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -25,7 +27,9 @@ export function KardexTab({ patientId }: { patientId: string }) {
   const { spacing } = useTheme();
   const [showStopped, setShowStopped] = useState(false);
 
-  const { data } = useLive(patientOrdersQuery(patientId), [patientId]);
+  const { data: encounters } = useLive(currentEncounterQuery(patientId), [patientId]);
+  const encounterId = encounters?.[0]?.id ?? null;
+  const { data, error } = useLive(patientOrdersQuery(patientId, encounterId), [patientId, encounterId]);
   const all = data ?? [];
   const current = all.filter(isRunning);
   const stopped = all.filter((o) => !isRunning(o));
@@ -35,6 +39,7 @@ export function KardexTab({ patientId }: { patientId: string }) {
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
       <Button label="دستور جدید" icon="add" variant="secondary" full onPress={openNew} />
+      <ErrorNotice error={error} what="کاردکس" />
 
       {all.length === 0 ? (
         <EmptyState

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, AppState, StyleSheet, View } from 'react-native';
+import { Alert, AppState, BackHandler, StyleSheet, View } from 'react-native';
 
 import { Button, Column, Text } from '@/components/ui';
 import { audit } from '@/db/audit';
@@ -98,10 +98,24 @@ export function LockGate({ children }: { children: ReactNode }) {
   // flash patient data for the few milliseconds before it knows it is locked.
   const covered = !enabled.loaded || (enabled.value && locked);
 
+  // The hardware back button does not go through the cover — it would pop the
+  // screen underneath, so the app would come back unlocked onto a different
+  // screen than the one that was left. While covered, back does nothing.
+  useEffect(() => {
+    if (!covered) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => sub.remove();
+  }, [covered]);
+
   return (
     <View style={styles.flex}>
-      {/* Hidden from screen readers while covered: the lock must not read out a chart. */}
-      <View style={styles.flex} importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}>
+      {/* Hidden from screen readers while covered: the lock must not read out a chart.
+          Touches are blocked here as well as by the cover: a modal, a bottom sheet or
+          anything else rendered into a portal sits above the cover, not below it. */}
+      <View
+        style={[styles.flex, covered ? styles.inert : null]}
+        importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}
+      >
         {children}
       </View>
       {covered ? (
@@ -157,5 +171,6 @@ export async function disableAppLock(): Promise<boolean> {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  inert: { pointerEvents: 'none' },
   center: { alignItems: 'center', justifyContent: 'center', zIndex: 1000, elevation: 1000 },
 });

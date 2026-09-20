@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Button, Card, ChipSelect, Column, EmptyState, Row, Text } from '@/components/ui';
 import type { Note, NoteType } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -22,7 +23,7 @@ export function NotesTab({ patientId }: { patientId: string }) {
   const { spacing } = useTheme();
   const [filter, setFilter] = useState<Filter>('all');
 
-  const { data } = useLive(patientNotesQuery(patientId), [patientId]);
+  const { data, error } = useLive(patientNotesQuery(patientId), [patientId]);
   const { data: media } = useLive(patientMediaQuery(patientId, ['voice']), [patientId]);
   const notes = data ?? [];
 
@@ -42,6 +43,7 @@ export function NotesTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
+      <ErrorNotice error={error} what="نوت‌ها" />
       <Button
         label="نوت جدید"
         icon="add"

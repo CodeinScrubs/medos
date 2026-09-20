@@ -33,6 +33,7 @@ import {
   backupHistoryQuery,
   chooseBackupFolder,
   createBackup,
+  markBackupDelivered,
   openBackupFolder,
   restoreBackup,
   type BackupConfig,
@@ -151,6 +152,7 @@ export function BackupScreen() {
           mimeType: 'application/octet-stream',
           dialogTitle: 'کجا ذخیره شود؟',
         });
+        await markBackupDelivered();
       } else if (!result.savedTo) {
         Alert.alert(
           'بکاپ ساخته شد ولی جایی ذخیره نشد',
@@ -192,12 +194,16 @@ export function BackupScreen() {
         onProgress: (p: RestoreProgress) => setProgress(p),
       });
       recheckKey();
-      Alert.alert(
-        'بازگردانی کامل شد',
+      const summary =
         `بکاپ ${formatJalaliDateTime(result.manifest.createdAt)}\n` +
-          `${toPersianDigits(result.manifest.counts.patients ?? 0)} بیمار، ` +
-          `${toPersianDigits(result.files)} فایل.\n\n` +
-          'یک نسخه از اطلاعات قبلی هم داخل گوشی نگه داشته شد.',
+        `${toPersianDigits(result.manifest.counts.patients ?? 0)} بیمار، ` +
+        `${toPersianDigits(result.files)} فایل.\n\n` +
+        'یک نسخه از اطلاعات قبلی هم داخل گوشی نگه داشته شد.';
+      Alert.alert(
+        result.warnings.length === 0 ? 'بازگردانی کامل شد' : 'اطلاعات برگشت، با چند کار ناتمام',
+        result.warnings.length === 0
+          ? summary
+          : `${summary}\n\nاین‌ها کامل نشد: ${result.warnings.join('، ')}. یک بار اپ را ببندید و باز کنید؛ اگر ماند، از «گزارش خطاها» بفرستید.`,
       );
     } catch (e) {
       if (e instanceof WrongPassphraseError) {

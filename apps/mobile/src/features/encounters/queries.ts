@@ -1,7 +1,7 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { doctors, encounters, patients, places, type Encounter, type PatientStatus } from '@/db/schema';
+import { doctors, encounters, orders, patients, places, type Encounter, type PatientStatus } from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { statusAfterDischarge, statusForEncounterKind } from './logic';
@@ -28,6 +28,20 @@ export function encounterHistoryQuery(patientId: string) {
     .leftJoin(doctors, eq(encounters.attendingId, doctors.id))
     .where(and(alive, eq(encounters.patientId, patientId)))
     .orderBy(desc(encounters.admittedAt));
+}
+
+/**
+ * The encounter the record's current lists belong to: the active one, or the
+ * most recent if the patient is not admitted. Null for a patient who has never
+ * had an encounter, whose orders and notes stand on their own.
+ */
+export function currentEncounterQuery(patientId: string) {
+  return db
+    .select()
+    .from(encounters)
+    .where(and(alive, eq(encounters.patientId, patientId)))
+    .orderBy(desc(encounters.isActive), desc(encounters.admittedAt))
+    .limit(1);
 }
 
 export function encounterQuery(id: string) {
@@ -132,6 +146,14 @@ export async function dischargeEncounter(id: string, input: DischargeInput): Pro
         ...touch(now),
       })
       .where(eq(encounters.id, id))
+      .run();
+
+    // Inpatient orders end with the admission. Without this they stay
+    // "active" for ever and reappear on the next admission's kardex, day
+    // count and all — a drug the patient stopped months ago.
+    tx.update(orders)
+      .set({ status: 'completed', endAt: input.dischargedAt, ...touch(now) })
+      .where(and(eq(orders.encounterId, id), isNull(orders.deletedAt), inArray(orders.status, ['active', 'held'])))
       .run();
 
     tx.update(patients)

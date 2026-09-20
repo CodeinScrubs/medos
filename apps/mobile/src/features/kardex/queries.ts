@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { orders, type Order } from '@/db/schema';
@@ -10,11 +10,23 @@ import { endAtForStatus } from './logic';
 
 const alive = isNull(orders.deletedAt);
 
-export function patientOrdersQuery(patientId: string) {
+/**
+ * The kardex of one admission, plus the patient's standing orders (those
+ * belonging to no encounter). Scoping to the encounter is what keeps a drug
+ * from a previous admission out of today's list; without it an old order shows
+ * as running, counting days, next to the current ones.
+ */
+export function patientOrdersQuery(patientId: string, encounterId: string | null) {
   return db
     .select()
     .from(orders)
-    .where(and(alive, eq(orders.patientId, patientId)))
+    .where(
+      and(
+        alive,
+        eq(orders.patientId, patientId),
+        encounterId ? or(eq(orders.encounterId, encounterId), isNull(orders.encounterId)) : isNull(orders.encounterId),
+      ),
+    )
     .orderBy(asc(orders.sortOrder), desc(orders.startAt));
 }
 

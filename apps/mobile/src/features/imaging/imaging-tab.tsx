@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Button, Card, Column, EmptyState, Row, Text } from '@/components/ui';
 import type { ImagingStudy } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -27,11 +28,12 @@ const MODALITY_ICON: Record<ImagingStudy['modality'], keyof typeof Ionicons.glyp
 export function ImagingTab({ patientId }: { patientId: string }) {
   const router = useRouter();
   const { spacing } = useTheme();
-  const { data } = useLive(patientImagingQuery(patientId), [patientId]);
+  const { data, error } = useLive(patientImagingQuery(patientId), [patientId]);
   const studies = data ?? [];
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
+      <ErrorNotice error={error} what="تصویربرداری" />
       <Button
         label="تصویربرداری جدید"
         icon="add"

@@ -68,8 +68,18 @@ function applyReleaseSigning(contents) {
     .replace(
       RELEASE_BUILDTYPE_ANCHOR,
       (_match, indent) =>
-        `// MedOS: use the project's own key when private/keystore.properties exists.\n` +
-        `${indent}signingConfig medosKeystorePropsFile.exists() ? signingConfigs.release : signingConfigs.debug`,
+        // No silent fallback to the debug key: an APK signed with a different
+        // key cannot update the installed app without uninstalling it, and
+        // that deletes the patient database. Gradle stops instead — including
+        // when the build was started from Android Studio rather than npm.
+        `// MedOS: the release build is signed with the project's own key, or not at all.\n` +
+        `${indent}if (!medosKeystorePropsFile.exists()) {\n` +
+        `${indent}    throw new GradleException("MedOS: private/keystore.properties is missing. " +\n` +
+        `${indent}        "A release signed with any other key cannot update the installed app " +\n` +
+        `${indent}        "without uninstalling it, which deletes the patient database. " +\n` +
+        `${indent}        "Restore the private/ folder from your backup.")\n` +
+        `${indent}}\n` +
+        `${indent}signingConfig signingConfigs.release`,
     );
 }
 

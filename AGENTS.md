@@ -123,6 +123,12 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
   `alertError(title, error)`.
 - Anything time-dependent takes `now` as a parameter; screens get it from `useNow()`.
 - Every `IconButton` needs a `label` (the type requires it) — it is all a screen reader gets.
+- **The app draws edge to edge.** Anything anchored to the bottom of the window — a tab
+  bar, a fixed footer, the last row of a scroll view — must add `useSafeAreaInsets().bottom`
+  (or let `SafeAreaView` consume that edge), or Android's navigation bar sits on top of it
+  and swallows the taps. `Screen` already does this for scrolling content. A hardcoded
+  `height`/`paddingBottom` on a navigator's `tabBarStyle` overrides what React Navigation
+  would have added: that is how the 0.2.1 tab bar ended up under the three-button bar.
 - Persian UI strings live inline in the component. There is no i18n layer.
 - Look-alike letters and invisible characters are written as `\u` escapes in
   `lib/persian.ts` and `lib/crypto.ts`. Keep them escaped — some tools silently decode
@@ -161,8 +167,16 @@ misses, a backup that cannot be opened a year from now.
   `prebuild --clean` belongs in a config plugin.
 - **The repository is public.** No patient data, no keys, and no personal details of the
   owner (city, workplace, local phone prefixes) in code, tests, comments or commits.
-- **`npm run apk` takes minutes and needs a phone to verify.** An agent cannot test on a
-  device. Say so instead of implying you did.
+- **`npm run apk` takes minutes.** A clean `android/` is a ~14-minute build; an incremental
+  one is ~2. The JS bundle is built early, so a source edit made *after* the build started
+  is not in the APK — rebuild rather than guess.
+- **Testing on the phone is possible when it is plugged in.** `adb install --user 0 -r`,
+  then drive the UI with `adb shell input tap` using coordinates from
+  `adb shell uiautomator dump` (never guess them from a screenshot), and read the result
+  from another dump. Deep links (`adb shell am start -a android.intent.action.VIEW -d
+  "medos://patients"`) beat tapping through navigation. `adb shell input text` is ASCII
+  only: `<` and `>` need `adb shell "input text '>100'"`, and Persian cannot be typed at
+  all. Say plainly what you ran on a device and what you did not.
 - **Do not reformat or "tidy" files you are not changing.** It buries the real diff.
 - **Do not add dependencies casually.** Each one is a native build risk and a supply-chain
   risk on a machine behind a filtered network. If you add one, say why in the handoff.

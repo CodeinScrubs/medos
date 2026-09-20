@@ -20,7 +20,7 @@ import { toLatinDigits, toPersianDigits } from '@/lib/persian';
 import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
-import { computeFlag, FLAG_LABEL, flagTone, formatRange, parseLabNumber, parseRangeInput } from './flags';
+import { computeFlag, FLAG_LABEL, flagTone, formatRange, parseLabValue, parseRangeInput } from './flags';
 import { parsePastedTable } from './logic';
 import { analyteDef, LAB_PRESETS, rangeFor } from './presets';
 import { createLabPanel, labPanelQuery, panelValuesQuery, updateLabPanel } from './queries';
@@ -376,8 +376,8 @@ function LabRowEditor({
   onEditRange: () => void;
 }) {
   const { colors, radii, spacing, typography } = useTheme();
-  const num = row.qualitative ? null : parseLabNumber(row.value);
-  const flag = row.qualitative ? null : computeFlag(num, row.refLow, row.refHigh);
+  const parsed = row.qualitative ? null : parseLabValue(row.value);
+  const flag = row.qualitative ? null : computeFlag(parsed, row.refLow, row.refHigh);
   const tone = flagTone(flag);
   const flagColor =
     tone === 'danger' ? colors.danger : tone === 'warning' ? colors.warning : tone === 'info' ? colors.info : null;

@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -58,6 +58,8 @@ function NoteEditor({ patientId, note, initialType }: { patientId: string; note:
   const [isPinned, setIsPinned] = useState(note?.isPinned ?? false);
   const [isDraft, setIsDraft] = useState(note?.isDraft ?? false);
   const [pendingVoices, setPendingVoices] = useState<Recording[]>([]);
+  /** Set once the note exists, so a retry after a failed voice save updates it. */
+  const savedId = useRef<string | null>(null);
   const [pickingDoctor, setPickingDoctor] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -103,21 +105,34 @@ function NoteEditor({ patientId, note, initialType }: { patientId: string; note:
       isDraft,
     };
 
+    /*
+     * The note is written once. If a voice note fails to store afterwards,
+     * pressing save again must not write a second copy of the note, so the new
+     * id is remembered and the retry becomes an update. Voice notes already
+     * stored leave the pending list for the same reason.
+     */
+    let written = false;
     try {
+      const existingId = note?.id ?? savedId.current;
       let id: string;
-      if (note) {
-        id = note.id;
+      if (existingId) {
+        id = existingId;
         await updateNote(id, payload);
       } else {
         id = await createNote({ patientId, ...payload });
+        savedId.current = id;
       }
+      written = true;
 
-      for (const rec of pendingVoices) {
-        await saveRecording(rec, { entityType: 'note', entityId: id, patientId });
+      const remaining = [...pendingVoices];
+      while (remaining.length > 0) {
+        await saveRecording(remaining[0]!, { entityType: 'note', entityId: id, patientId });
+        remaining.shift();
+        setPendingVoices([...remaining]);
       }
       router.back();
     } catch (e) {
-      alertError('ذخیره نشد', e);
+      alertError(written ? 'نوت ذخیره شد، ولی وویس نه' : 'ذخیره نشد', e);
     } finally {
       setSaving(false);
     }

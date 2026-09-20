@@ -3,23 +3,53 @@ import { parseDecimal, toLatinDigits } from '@/lib/persian';
 
 export type LabFlag = NonNullable<LabValue['flag']>;
 
+/** How a result is qualified when the lab cannot give an exact number. */
+export type Comparator = '<' | '<=' | '>' | '>=';
+
+export type LabNumber = { value: number; comparator: Comparator | null };
+
+const COMPARATOR_RE = /^(<=|>=|<|>|≤|≥)\s*/;
+
+const COMPARATORS: Record<string, Comparator> = {
+  '<': '<',
+  '<=': '<=',
+  '≤': '<=',
+  '>': '>',
+  '>=': '>=',
+  '≥': '>=',
+};
+
 /**
- * Parse a typed result into a number, or null when it is not numeric.
+ * Parse a typed result, keeping the comparator it came with.
  *
- * Accepts Persian digits and separators (see `parseDecimal`), and reads a
- * comparator-prefixed value ("<0.01", ">1000") as its bound — good enough to
- * plot, while the original text is always what gets displayed. A thousands
- * separator is read as one: "7,500" is 7500, never 7.5.
+ * "<0.01" and ">100" are not the numbers 0.01 and 100 — they are bounds, and
+ * dropping the sign is how a troponin of ">100" against an upper limit of 100
+ * ends up flagged normal. Accepts Persian digits and separators (see
+ * `parseDecimal`); a thousands separator is read as one, so "7,500" is 7500.
+ * Whatever was typed is what gets displayed; this is for flags and plots.
  */
-export function parseLabNumber(raw: string | null | undefined): number | null {
+export function parseLabValue(raw: string | null | undefined): LabNumber | null {
   if (raw == null) return null;
-  return parseDecimal(toLatinDigits(raw).trim().replace(COMPARATOR_RE, ''));
+  const text = toLatinDigits(raw).trim();
+  const match = COMPARATOR_RE.exec(text);
+  const value = parseDecimal(match ? text.slice(match[0].length) : text);
+  if (value == null) return null;
+  return { value, comparator: match ? (COMPARATORS[match[1]!] ?? null) : null };
 }
 
-const COMPARATOR_RE = /^(?:<=?|>=?|≤|≥)\s*/;
+/** Just the number, for storing and plotting. */
+export function parseLabNumber(raw: string | null | undefined): number | null {
+  return parseLabValue(raw)?.value ?? null;
+}
 
 /**
  * Out-of-range flag against the row's own reference range: H, L or normal.
+ *
+ * A bounded result is judged by what the bound actually proves. ">100" with an
+ * upper limit of 100 is high. ">0.01" inside the range proves nothing about
+ * the true value, so it gets no flag rather than a reassuring one. "<0.01" at
+ * or below the lower limit is low, and below the upper limit it is genuinely
+ * not high.
  *
  * There is deliberately no automatic "critical" flag. Critical thresholds are
  * analyte-specific and nothing like a multiple of the normal range — a rule
@@ -29,12 +59,22 @@ const COMPARATOR_RE = /^(?:<=?|>=?|≤|≥)\s*/;
  * future per-analyte threshold the user sets themselves.
  */
 export function computeFlag(
-  value: number | null,
+  parsed: LabNumber | number | null,
   refLow: number | null | undefined,
   refHigh: number | null | undefined,
 ): LabFlag | null {
-  if (value == null) return null;
+  if (parsed == null) return null;
   if (refLow == null && refHigh == null) return null;
+  const { value, comparator } = typeof parsed === 'number' ? { value: parsed, comparator: null } : parsed;
+
+  if (comparator === '>' || comparator === '>=') {
+    return refHigh != null && value >= refHigh ? 'high' : null;
+  }
+  if (comparator === '<' || comparator === '<=') {
+    if (refLow != null && value <= refLow) return 'low';
+    return refHigh != null && value <= refHigh ? 'normal' : null;
+  }
+
   if (refHigh != null && value > refHigh) return 'high';
   if (refLow != null && value < refLow) return 'low';
   return 'normal';

@@ -6,7 +6,7 @@ import { resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { dischargeEncounter, openEncounter } from './encounters/queries';
-import { createOrder, setOrderStatus, suggestOrderNames } from './kardex/queries';
+import { createOrder, patientOrdersQuery, setOrderStatus, suggestOrderNames } from './kardex/queries';
 import { analyteSeriesQuery, createLabPanel, updateLabPanel } from './labs/queries';
 import { createNote, updateNote } from './notes/queries';
 import { createPatient } from './patients/queries';
@@ -120,6 +120,53 @@ describe('kardex', () => {
     expect((await t.db.select().from(orders))[0]?.endAt).toBeInstanceOf(Date);
     await setOrderStatus(id, 'active');
     expect((await t.db.select().from(orders))[0]?.endAt).toBeNull();
+  });
+
+  // The bug this replaces: every order the patient ever had came back on the
+  // kardex of the new admission, still "active", still counting days.
+  it('shows this admission’s orders plus standing ones, never the previous admission’s', async () => {
+    const standing = await createOrder({ patientId, kind: 'drug', name: 'Levothyroxine', dose: '100 mcg' });
+
+    const first = await openEncounter({ patientId, kind: 'admission' });
+    const old = await createOrder({ patientId, kind: 'drug', name: 'Ceftriaxone', dose: '1 g' });
+    await dischargeEncounter(first, {
+      dischargedAt: new Date(),
+      dischargeType: 'improved',
+      nextStatus: 'discharged',
+    });
+
+    const second = await openEncounter({ patientId, kind: 'admission' });
+    const current = await createOrder({ patientId, kind: 'drug', name: 'Vancomycin', dose: '1 g' });
+
+    const onKardex = (await patientOrdersQuery(patientId, second)).map((o) => o.id);
+    expect(onKardex).toContain(current);
+    expect(onKardex).toContain(standing);
+    expect(onKardex).not.toContain(old);
+
+    // And the old admission's kardex still reads as it did.
+    expect((await patientOrdersQuery(patientId, first)).map((o) => o.id)).toContain(old);
+  });
+
+  it('ends the admission’s running orders at discharge, leaving standing ones alone', async () => {
+    const standing = await createOrder({ patientId, kind: 'drug', name: 'Levothyroxine' });
+    const encounterId = await openEncounter({ patientId, kind: 'admission' });
+    const running = await createOrder({ patientId, kind: 'drug', name: 'Ceftriaxone' });
+    const held = await createOrder({ patientId, kind: 'drug', name: 'Enoxaparin' });
+    await setOrderStatus(held, 'held');
+    const stopped = await createOrder({ patientId, kind: 'drug', name: 'Metronidazole' });
+    await setOrderStatus(stopped, 'discontinued');
+
+    const dischargedAt = new Date();
+    await dischargeEncounter(encounterId, { dischargedAt, dischargeType: 'improved', nextStatus: 'discharged' });
+
+    const byId = Object.fromEntries((await t.db.select().from(orders)).map((o) => [o.id, o]));
+    expect(byId[running]?.status).toBe('completed');
+    expect(byId[running]?.endAt).toEqual(dischargedAt);
+    expect(byId[held]?.status).toBe('completed');
+    // Already stopped: its own end date is not moved to the discharge date.
+    expect(byId[stopped]?.status).toBe('discontinued');
+    // A standing order belongs to no admission and keeps running.
+    expect(byId[standing]?.status).toBe('active');
   });
 
   it('suggests names the user has typed before, most used first, matching the prefix literally', async () => {
