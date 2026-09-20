@@ -33,6 +33,67 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (night) — The knowledge module (phase 4)
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** see `git log` for this date
+
+**Changed** — four notebooks under one tab, since none of them is opened daily.
+
+- **Topics** (`features/knowledge/queries.ts`, `topics-list`, `topic-screen`, `topic-form-screen`):
+  a summary per subject with the professor who taught it, the context, the date, the
+  verbatim "what the professor said", the pearls and the source. The teacher's name and the
+  specialty's names are copied into `searchText`, so searching a professor's surname finds
+  their teaching even though the name lives in another table. Voice notes attach to a topic
+  (`topic` was already an allowed attachment entity). "نیاز به مرور" is a flag plus a
+  `lastReviewedAt` stamp, not a scheduler.
+- **Specialty profiles**: one research page per field — daily work, residency length,
+  lifestyle, market, pros and cons, a 1–5 personal fit and who said so.
+- **Prescription templates**: the user's own routine prescriptions, items as a JSON array
+  edited as a list of cards. `prescriptionLine` writes a readable line, an explicit `sig`
+  wins over the parts, and blank rows are dropped on save. "کپی متن و ثبت استفاده" copies
+  and counts the use, and the list orders by that count, so the three templates written
+  every clinic rise on their own. Nothing suggests a drug, checks a dose or warns about an
+  interaction, and the screen says so.
+- **Idea inbox**: kind/status/priority/area, ordered by what is moving rather than
+  alphabetically, with one tap on the status badge to advance it.
+- All four register with `reindexSearchIfNeeded`. `SEARCH_INDEX_VERSION` is unchanged
+  deliberately: the rules for the existing tables did not change, and these tables are
+  empty on every phone.
+
+**Verified**
+
+- `npm run check` green: typecheck, lint, formatting, 317 tests — 13 new ones covering the
+  teacher-name search index, index rebuild on a partial edit, the review flag, tag
+  suggestions, prescription line/text rendering, blank-row cleaning, usage counting,
+  duplication, idea ordering and the specialty index.
+- Release APK builds and is signed: `dist/MedOS-0.4.0.apk`, versionCode 6.
+
+**Not verified**
+
+- **Not run on a phone.** The device has been unplugged since the 0.2.2 test. Unproven on
+  device: every knowledge screen, the prescription item editor on a small screen, voice
+  notes on a topic, and the clipboard copy.
+
+**Open threads**
+
+1. Device test of everything built since 0.2.2 — the doctors directory and this module.
+2. **Trash is patients-only.** Notes, labs, imaging, attachments, doctors and now topics,
+   prescriptions and ideas are soft-deleted with no way back in the UI.
+3. Roadmap: only the credential vault (phase 5) is left unbuilt.
+4. Vitals and diagnoses tables exist with no screens (phase 2 leftovers).
+5. The greeting log has no history screen; only the last message shows on the occasion row.
+
+**Gotchas**
+
+- `Input` has `numericFold`, not `numeric`; `QuickDateField` takes a non-null `Date` and a
+  `direction`, unlike `JalaliDateField` which takes an ISO string or null.
+- A route file under `src/app/**` must also be listed in `_layout.tsx`'s `Stack` to get a
+  Persian title and the modal presentation; without it the screen still works but shows the
+  file name.
+
+---
+
 ## 2026-09-20 (evening) — The doctors directory (phase 3)
 
 **Agent:** claude-opus-5 via Claude Code

@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { audit } from '@/db/audit';
 import { defineSetting, readSetting, writeSetting } from '@/db/settings';
 import { reindexDoctors } from '@/features/doctors/queries';
+import { reindexIdeas } from '@/features/knowledge/ideas-queries';
+import { reindexPrescriptions } from '@/features/knowledge/prescriptions-queries';
+import { reindexTopics } from '@/features/knowledge/queries';
+import { reindexSpecialtyProfiles } from '@/features/knowledge/specialty-profiles-queries';
 import { reindexNotes } from '@/features/notes/queries';
 import { reindexPatients } from '@/features/patients/queries';
 import { reindexPlaces } from '@/features/places/queries';
@@ -31,6 +35,10 @@ export async function reindexSearchIfNeeded(): Promise<void> {
     notes: await reindexNotes(),
     doctors: await reindexDoctors(),
     places: await reindexPlaces(),
+    topics: await reindexTopics(),
+    specialtyProfiles: await reindexSpecialtyProfiles(),
+    prescriptions: await reindexPrescriptions(),
+    ideas: await reindexIdeas(),
   };
   await writeSetting(indexedVersion, SEARCH_INDEX_VERSION);
 

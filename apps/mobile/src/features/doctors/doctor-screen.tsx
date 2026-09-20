@@ -20,6 +20,7 @@ import {
 } from '@/components/ui';
 import { RATING_AXES, type Doctor, type DoctorProfile, type Occasion, type ScheduledMessage } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { topicsByTeacherQuery } from '@/features/knowledge/queries';
 import { openInMaps } from '@/features/places/actions';
 import { placeQuery } from '@/features/places/queries';
 import { formatJalali, formatJalaliLong, daysBetween } from '@/lib/jalali';
@@ -96,6 +97,7 @@ export function DoctorScreen() {
         <QuickActions doctor={doctor} />
         <RatingSection doctor={doctor} />
         <OccasionsSection doctor={doctor} />
+        <TaughtSection doctor={doctor} />
         <ProfileSection doctor={doctor} />
         <ContactSection doctor={doctor} />
         <ReferralSection doctor={doctor} />
@@ -462,6 +464,38 @@ function OccasionRow({
         </Row>
       </Row>
     </Card>
+  );
+}
+
+/** What this person taught me — the other half of the link the topics carry. */
+function TaughtSection({ doctor }: { doctor: Doctor }) {
+  const router = useRouter();
+  const { data } = useLive(topicsByTeacherQuery(doctor.id), [doctor.id]);
+  const rows = data ?? [];
+  if (rows.length === 0) return null;
+
+  return (
+    <CollapsibleSection title="از ایشان یاد گرفته‌ام" icon="book-outline" filledCount={rows.length} defaultOpen>
+      <Column gap="xs">
+        {rows.slice(0, 10).map((topic) => (
+          <Pressable
+            key={topic.id}
+            onPress={() => router.push({ pathname: '/knowledge/topic/[id]', params: { id: topic.id } })}
+          >
+            <Row gap="sm" justify="space-between">
+              <Text variant="body" numberOfLines={1} style={styles.grow}>
+                {topic.title}
+              </Text>
+              {topic.taughtAt ? (
+                <Text variant="tiny" color="textFaint">
+                  {formatJalali(topic.taughtAt)}
+                </Text>
+              ) : null}
+            </Row>
+          </Pressable>
+        ))}
+      </Column>
+    </CollapsibleSection>
   );
 }
 

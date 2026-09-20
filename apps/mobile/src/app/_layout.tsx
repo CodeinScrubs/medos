@@ -128,6 +128,14 @@ function AppStack() {
         <Stack.Screen name="doctor/profile" options={modal('پروفایل شخصی')} />
         <Stack.Screen name="doctor/occasion" options={modal('مناسبت')} />
 
+        <Stack.Screen name="knowledge/topic/[id]" options={{ title: 'مبحث' }} />
+        <Stack.Screen name="knowledge/topic/edit" options={modal('مبحث')} />
+        <Stack.Screen name="knowledge/rx/[id]" options={{ title: 'نسخه' }} />
+        <Stack.Screen name="knowledge/rx/edit" options={modal('نسخه')} />
+        <Stack.Screen name="knowledge/specialty/[id]" options={{ title: 'رشته' }} />
+        <Stack.Screen name="knowledge/specialty/edit" options={modal('رشته')} />
+        <Stack.Screen name="knowledge/idea" options={modal('ایده')} />
+
         <Stack.Screen name="media/[attachmentId]" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="backup" options={{ title: 'پشتیبان‌گیری' }} />
         <Stack.Screen name="trash" options={{ title: 'حذف‌شده‌ها' }} />
