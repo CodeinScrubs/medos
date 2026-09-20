@@ -9,8 +9,10 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useAutoBackup } from '@/features/backup/use-auto-backup';
+import { parseOccasionReminder } from '@/features/doctors/logic';
 import { parseReminderPayload } from '@/features/followups/logic';
 import { LockGate } from '@/features/lock/lock-gate';
+import { useReminderUpkeep } from '@/features/reminders/use-reminder-upkeep';
 import { StartupGate } from '@/features/startup/startup-gate';
 import { installGlobalErrorLogging } from '@/platform/error-log';
 import { setupNotifications } from '@/platform/notifications';
@@ -57,14 +59,20 @@ export default function RootLayout() {
   );
 }
 
-/** Tapping a follow-up reminder opens that patient's record. */
+/** Tapping a reminder opens what it is about: a patient's record, or a doctor. */
 function useNotificationNavigation() {
   const router = useRouter();
   const response = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
-    const payload = parseReminderPayload(response?.notification.request.content.data);
-    if (payload) router.push({ pathname: '/patient/[id]', params: { id: payload.patientId } });
+    const data = response?.notification.request.content.data;
+    const followUp = parseReminderPayload(data);
+    if (followUp) {
+      router.push({ pathname: '/patient/[id]', params: { id: followUp.patientId } });
+      return;
+    }
+    const occasion = parseOccasionReminder(data);
+    if (occasion?.doctorId) router.push({ pathname: '/doctor/[id]', params: { id: occasion.doctorId } });
   }, [response, router]);
 }
 
@@ -79,6 +87,7 @@ function AppStack() {
 
   useNotificationNavigation();
   useAutoBackup();
+  useReminderUpkeep();
 
   const modal = (title: string) => ({ title, presentation: 'modal', animation: 'slide_from_bottom' }) as const;
 
@@ -112,6 +121,12 @@ function AppStack() {
         <Stack.Screen name="patient/[id]/lab" options={modal('آزمایش')} />
         <Stack.Screen name="patient/[id]/imaging" options={modal('تصویربرداری')} />
         <Stack.Screen name="patient/[id]/trend" options={{ title: 'روند' }} />
+
+        <Stack.Screen name="doctor/[id]" options={{ title: 'پزشک' }} />
+        <Stack.Screen name="doctor/edit" options={modal('پزشک')} />
+        <Stack.Screen name="doctor/rate" options={modal('امتیاز')} />
+        <Stack.Screen name="doctor/profile" options={modal('پروفایل شخصی')} />
+        <Stack.Screen name="doctor/occasion" options={modal('مناسبت')} />
 
         <Stack.Screen name="media/[attachmentId]" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="backup" options={{ title: 'پشتیبان‌گیری' }} />

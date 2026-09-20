@@ -1,3 +1,4 @@
+import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
 import { rescheduleReminders } from '@/features/followups/queries';
 import { cancelAllReminders } from '@/platform/notifications';
 
@@ -9,10 +10,10 @@ import { cancelAllReminders } from '@/platform/notifications';
  * phone that made it, so everything is cancelled and scheduled again.
  *
  * **Any feature that schedules a reminder must be rescheduled here.** Today
- * that is follow-ups; when occasions (birthdays) start scheduling, add them,
- * or a restore will silently leave the phone with no birthday reminders.
+ * that is follow-ups and the occasions (birthdays) of the doctors directory.
+ * Miss one and a restore leaves the phone quietly without those reminders.
  */
-export async function rescheduleAllReminders(): Promise<{ followUps: number }> {
+export async function rescheduleAllReminders(): Promise<{ followUps: number; occasions: number }> {
   await cancelAllReminders();
-  return { followUps: await rescheduleReminders() };
+  return { followUps: await rescheduleReminders(), occasions: await rescheduleOccasionReminders() };
 }

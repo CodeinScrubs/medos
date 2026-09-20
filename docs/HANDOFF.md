@@ -33,6 +33,76 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (evening) — The doctors directory (phase 3)
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** see `git log` for this date
+
+**Changed** — the module the roadmap had next. Tables existed; everything above them is new.
+
+- **Directory** (`features/doctors/doctors-screen.tsx`): Persian search, relationship chips,
+  a real specialty filter from the seeded tree, starred first, the average of each person's
+  newest rating on the card, one-tap call and star.
+- **Doctor form**: title/name/rank, specialty + subspecialty pickers (a subspecialty that
+  belongs to another specialty is cleared rather than kept), messengers, office and referral
+  details, insurances and tags as comma-separated lists.
+- **Doctor screen**: quick actions (call, SMS, WhatsApp, Telegram, copy, map), and collapsible
+  sections for the rating, occasions, the social profile, contacts and referral.
+- **Ratings** (`ratings-queries.ts`): a rating is always *added*, never edited in place, so a
+  changed opinion keeps its history. Axes left blank stay blank — `ratingAverage` averages
+  only what was scored, because "no opinion about their teaching" must not read as a 1.
+- **Social profile**: one row per doctor, written or created by `saveDoctorProfile`.
+- **Occasions** (`occasions-queries.ts`): recurring dates stored as Jalali month/day,
+  reminders `remindDaysBefore` days ahead at 9am, and a prepared greeting the user sends
+  from their own messenger — MedOS still sends nothing by itself.
+- **Greeting log** (`messages-queries.ts`): handing the text to a messenger records it in
+  `scheduled_messages`, and the occasion row shows "آخرین تبریک: …". Whether this person was
+  already congratulated this year is not something anyone remembers a year later.
+- **Reminder upkeep**: `rescheduleAllReminders` now covers occasions too (open thread #2 of
+  the previous entry), and `useReminderUpkeep` re-arms them on every app start, because a
+  recurring reminder that has fired leaves a stale id and would never fire again.
+- Tapping an occasion notification opens that doctor; `_layout.tsx` routes both payload kinds.
+- The Today screen shows occasions coming up within a fortnight.
+- Roadmap: phase 3 is now complete.
+
+**Verified**
+
+- `npm run check` green: typecheck, lint, formatting, 304 tests — 14 new ones covering the
+  rating average, the Jalali occasion maths (including "this year's reminder is already
+  past, so use next year's"), reminder create/update/delete/reschedule, the greeting
+  template and its log, and directory search.
+- Release APK builds and is signed: `dist/MedOS-0.3.0.apk`, versionCode 5.
+
+**Not verified**
+
+- **Nothing in this module has been run on a phone.** The device was unplugged before the
+  build finished. Unproven on device: every doctors screen, the specialty pickers, the
+  greeting hand-off to SMS/WhatsApp/Telegram, and whether a birthday notification actually
+  arrives.
+- The schema was already there, so there is no new migration — but that also means the
+  module has never been exercised against a database with real rows in these tables.
+
+**Open threads**
+
+1. **Device test of the doctors module**: add a colleague, rate them, set a birthday two
+   days out with a same-day reminder, and check the notification arrives and opens them.
+2. **Trash is patients-only.** Notes, labs, imaging, attachments and now doctors are
+   soft-deleted with no way back in the UI.
+3. The greeting log records what was handed over, but there is no screen listing a
+   person's message history — only the last one, on the occasion row.
+4. Vitals and diagnoses tables exist with no screens (phase 2 leftovers).
+5. Roadmap next module: knowledge (phase 4).
+
+**Gotchas**
+
+- `EditGate` shows "پیدا نشد" for a missing row, which is wrong for a one-row-per-parent
+  table like `doctor_profiles`: "no profile yet" is the normal state. That screen waits for
+  the read itself instead.
+- `Button` has `variant="danger"`, not a `tone` prop; `DataRow` has no `copyable`; the
+  radius token is `radii.full`, and the colour on a filled button is `colors.primaryText`.
+
+---
+
 ## 2026-09-20 (later) — Nine claims from a third review, fixed and tested on the phone
 
 **Agent:** claude-opus-5 via Claude Code

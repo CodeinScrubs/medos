@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
+import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { dueFollowUpsQuery, pendingFollowUpsQuery } from '@/features/followups/queries';
 import { PatientCard } from '@/features/patients/patient-card';
@@ -89,6 +90,8 @@ export function TodayScreen() {
             ))}
           </>
         )}
+
+        <UpcomingOccasions now={now} />
 
         {upcoming.length > 0 && (
           <>
