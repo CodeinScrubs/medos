@@ -126,7 +126,7 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
           secureTextEntry
           ltr
           autoCapitalize="none"
-          hint={hint ?? (credential ? 'خالی بگذارید تا رمز فعلی دست نخورد' : 'رمزگذاری‌شده ذخیره می‌شود')}
+          hint={hint ?? (credential ? 'خالی بگذارید تا رمز فعلی دست نخورد' : 'همان‌طور که می‌نویسید ذخیره می‌شود')}
         />
         <Input label="آدرس سامانه" value={url} onChangeText={setUrl} ltr autoCapitalize="none" keyboardType="url" />
 

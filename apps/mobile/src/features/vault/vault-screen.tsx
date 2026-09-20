@@ -1,66 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
-import { Badge, Button, Card, ChipSelect, Column, EmptyState, Fab, Input, Row, Screen, Text } from '@/components/ui';
+import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Screen, Text } from '@/components/ui';
 import type { Credential } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { SearchBar } from '@/features/knowledge/search-bar';
 import { formatJalali } from '@/lib/jalali';
-import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
 
-import { createVault, isVaultConfigured, loadVaultKey, unlockVault } from './keys';
 import { CREDENTIAL_CATEGORY_LABELS, CREDENTIAL_OWNER_LABELS } from './labels';
 import { daysUntilExpiry } from './logic';
-import { credentialsQuery, finishPendingRekey } from './queries';
-
-type Gate = 'loading' | 'new' | 'locked' | 'open';
-
-async function gateState(): Promise<Gate> {
-  if (!(await isVaultConfigured())) return 'new';
-  // A passphrase change the app was killed in the middle of is finished here,
-  // before anything is read: until it is, the vault holds two generations.
-  try {
-    await finishPendingRekey();
-  } catch (e) {
-    logError(e, { source: 'handled', context: 'vault: finishing a passphrase change' });
-  }
-  return (await loadVaultKey()) ? 'open' : 'locked';
-}
+import { credentialsQuery } from './queries';
 
 /**
- * The credential vault.
+ * Saved logins: the prescription portal, insurance, the hospital HIS.
  *
- * Three states, in the order the owner meets them: no vault yet, a vault that
- * needs its passphrase on this phone, and an open one. Deriving the key takes
- * a few seconds on purpose — it is scrypt, the same as backups.
+ * There is no passphrase and no unlock step, because the owner asked for a
+ * tidy list rather than a vault — this replaces a note in Samsung Notes. What
+ * guards it is the phone's own lock and, if it is turned on, the app lock.
  */
 export function VaultScreen() {
   const router = useRouter();
   const { spacing } = useTheme();
-  const [gate, setGate] = useState<Gate>('loading');
-  // Which state applies cannot be read from a query: half of it is the key in
-  // the Android Keystore. It is re-read whenever a child says it changed.
-  const [reload, setReload] = useState(0);
-  const again = () => setReload((n) => n + 1);
-
-  useEffect(() => {
-    void gateState().then(setGate);
-  }, [reload]);
-
-  if (gate === 'loading') {
-    return (
-      <Screen>
-        <View />
-      </Screen>
-    );
-  }
-  if (gate === 'new') return <CreateVault onDone={again} />;
-  if (gate === 'locked') return <UnlockVault onDone={again} />;
 
   return (
     <View style={styles.flex}>
@@ -71,96 +35,11 @@ export function VaultScreen() {
   );
 }
 
-function CreateVault({ onDone }: { onDone: () => void }) {
-  const { spacing } = useTheme();
-  const [passphrase, setPassphrase] = useState('');
-  const [repeat, setRepeat] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function create() {
-    if (passphrase.length < 8) {
-      Alert.alert('رمز کوتاه است', 'حداقل ۸ نویسه بنویسید.');
-      return;
-    }
-    if (passphrase !== repeat) {
-      Alert.alert('دو رمز یکی نیستند');
-      return;
-    }
-    setBusy(true);
-    try {
-      await createVault(passphrase);
-      onDone();
-    } catch (e) {
-      alertError('ساخته نشد', e);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Screen scroll>
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <Text variant="title">گاوصندوق رمزها</Text>
-        <Text variant="body" color="textMuted">
-          یوزرنیم و پسورد سامانه‌هایی که هر روز با آن‌ها کار می‌کنید — سامانه‌ی نسخه، بیمه، HIS بیمارستان.
-        </Text>
-        <Card tone="alt">
-          <Column gap="xs">
-            <Text variant="captionStrong">رمز گاوصندوق جدا از رمز بکاپ است</Text>
-            <Text variant="tiny" color="textMuted">
-              پسوردها با این رمز قفل می‌شوند و حتی داخل فایل بکاپ هم رمزگذاری‌شده می‌مانند. اگر این رمز را فراموش کنید،
-              هیچ راهی برای باز کردنشان نیست — جایی بیرون از گوشی بنویسیدش.
-            </Text>
-          </Column>
-        </Card>
-
-        <Input label="رمز گاوصندوق" value={passphrase} onChangeText={setPassphrase} secureTextEntry />
-        <Input label="تکرار رمز" value={repeat} onChangeText={setRepeat} secureTextEntry />
-        <Button label="ساخت گاوصندوق" icon="lock-closed" onPress={() => void create()} loading={busy} full />
-        <Text variant="tiny" color="textFaint">
-          ساخت کلید چند ثانیه طول می‌کشد؛ همین کندی است که حدس زدن رمز را گران می‌کند.
-        </Text>
-      </Column>
-    </Screen>
-  );
-}
-
-function UnlockVault({ onDone }: { onDone: () => void }) {
-  const { spacing } = useTheme();
-  const [passphrase, setPassphrase] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function unlock() {
-    setBusy(true);
-    try {
-      if (await unlockVault(passphrase)) onDone();
-      else Alert.alert('رمز درست نیست');
-    } catch (e) {
-      alertError('باز نشد', e);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Screen scroll>
-      <Column gap="md" style={{ paddingTop: spacing.md, alignItems: 'stretch' }}>
-        <Text variant="title">گاوصندوق قفل است</Text>
-        <Text variant="body" color="textMuted">
-          رمز گاوصندوق را بنویسید. بعد از این، تا وقتی خودتان قفلش نکنید باز می‌ماند.
-        </Text>
-        <Input label="رمز گاوصندوق" value={passphrase} onChangeText={setPassphrase} secureTextEntry />
-        <Button label="باز کردن" icon="lock-open" onPress={() => void unlock()} loading={busy} full />
-      </Column>
-    </Screen>
-  );
-}
-
 type CategoryFilter = 'all' | Credential['category'];
 
 function CredentialList() {
   const router = useRouter();
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
 
@@ -181,19 +60,16 @@ function CredentialList() {
   return (
     <Screen scroll>
       <Column gap="sm" style={{ paddingTop: spacing.md }}>
-        <Row justify="space-between">
-          <Text variant="display">گاوصندوق</Text>
-          <Ionicons name="lock-open-outline" size={18} color={colors.success} />
-        </Row>
+        <Text variant="display">رمزها</Text>
         <SearchBar value={search} onChange={setSearch} placeholder="نام سامانه، یوزرنیم…" />
         <ChipSelect options={options} value={category} onChange={(v) => v && setCategory(v)} />
-        <ErrorNotice error={error} what="گاوصندوق" />
+        <ErrorNotice error={error} what="رمزها" />
 
         {rows.length === 0 && data !== undefined ? (
           <EmptyState
             icon="lock-closed-outline"
             title={search || category !== 'all' ? 'چیزی پیدا نشد' : 'هنوز رمزی ثبت نشده'}
-            description="پسوردها رمزگذاری‌شده ذخیره می‌شوند؛ بقیه‌ی فیلدها معمولی‌اند تا بشود پیدایشان کرد."
+            description="یوزرنیم و پسورد سامانه‌هایی که هر روز با آن‌ها کار می‌کنید، یک‌جا و مرتب."
           />
         ) : (
           rows.map((credential) => (

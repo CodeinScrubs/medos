@@ -136,7 +136,7 @@ function AppStack() {
         <Stack.Screen name="knowledge/specialty/edit" options={modal('رشته')} />
         <Stack.Screen name="knowledge/idea" options={modal('ایده')} />
 
-        <Stack.Screen name="vault/index" options={{ title: 'گاوصندوق' }} />
+        <Stack.Screen name="vault/index" options={{ title: 'رمزها' }} />
         <Stack.Screen name="vault/[id]" options={{ title: 'رمز' }} />
         <Stack.Screen name="vault/edit" options={modal('رمز')} />
 

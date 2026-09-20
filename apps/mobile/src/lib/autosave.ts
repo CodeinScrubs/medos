@@ -66,10 +66,17 @@ export class Autosave<T> {
     this.arm(Math.max(0, Math.min(this.delayMs, this.maxWaitMs - waited)));
   }
 
-  /** Write whatever is waiting, now. Resolves once nothing is left to write. */
-  async flush(): Promise<void> {
+  /**
+   * Write whatever is waiting, now.
+   *
+   * Resolves to whether everything reached storage. A failed write keeps its
+   * value and resolves all the same, so a caller that leaves the screen on
+   * this promise would discard the only copy: callers must look at the answer.
+   */
+  async flush(): Promise<boolean> {
     this.clearTimer();
     await this.run();
+    return !this.unsaved;
   }
 
   /**
@@ -116,10 +123,15 @@ export class Autosave<T> {
     this.onState({ status: 'writing' });
     try {
       await this.write(item.value);
-      // Anything typed while this was in flight is already waiting in
-      // `pending`; only a clean run resets the ceiling.
-      if (this.pending == null) this.firstChangeAt = null;
-      this.onState({ status: 'saved', at: this.now() });
+      if (this.pending == null) {
+        this.firstChangeAt = null;
+        this.onState({ status: 'saved', at: this.now() });
+      } else {
+        // Something was typed while this write was in flight. What is stored
+        // is now one revision behind, and "saved" would be a lie about the
+        // words on the screen.
+        this.onState({ status: 'pending' });
+      }
     } catch (error) {
       // Keep the newer value if one arrived meanwhile; never overwrite it.
       if (this.pending == null) this.pending = item;

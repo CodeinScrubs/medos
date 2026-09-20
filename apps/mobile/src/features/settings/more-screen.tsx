@@ -34,9 +34,9 @@ export function MoreScreen() {
     },
     { icon: 'trash-outline', title: 'حذف‌شده‌ها', subtitle: 'برگرداندن پرونده‌های حذف‌شده', href: '/trash' },
     {
-      icon: 'lock-closed-outline',
-      title: 'گاوصندوق',
-      subtitle: 'یوزرنیم و پسورد سامانه‌ها، رمزنگاری‌شده',
+      icon: 'key-outline',
+      title: 'رمزها',
+      subtitle: 'یوزرنیم و پسورد سامانه‌ها، یک‌جا و مرتب',
       href: '/vault',
     },
     { icon: 'settings-outline', title: 'تنظیمات', subtitle: 'قفل اپ، حافظه', href: '/settings' },

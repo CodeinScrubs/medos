@@ -57,6 +57,7 @@ import {
   backupIntervalHours,
   backupLastSuccessAt,
   restoreInFlight,
+  restoreMediaUnresolved,
 } from './settings';
 
 /* -------------------------------------------------------------------------- */
@@ -444,12 +445,14 @@ export async function recoverInterruptedRestore(): Promise<{ putBack: number; fa
   if (!marker) {
     // The restore committed (or none ran): whatever it set aside is obsolete.
     if (root.exists) removeQuietly(root);
+    await writeSetting(restoreMediaUnresolved, 0);
     return { putBack: 0, failed: [] };
   }
 
   const dir = new Directory(Paths.document, `${DISPLACED_ROOT}/${marker.dir}`);
   const displaced = listDisplaced(dir);
   const failed = putBackDisplacedMedia(mediaFs, livePaths, displaced);
+  await writeSetting(restoreMediaUnresolved, failed.length);
   if (failed.length === 0) {
     removeQuietly(dir);
     await writeSetting(restoreInFlight, null);
@@ -588,6 +591,9 @@ export async function markStaleRunsFailed(): Promise<void> {
  */
 export async function runAutoBackupIfDue(): Promise<'skipped' | 'done' | 'failed'> {
   if (running) return 'skipped';
+  // A dataset whose files were not put back is not a thing to copy anywhere
+  // automatically; backing it up would spread the disagreement.
+  if ((await readSetting(restoreMediaUnresolved)) > 0) return 'skipped';
   const cfg = await getBackupConfig();
   if (!cfg.autoEnabled || !cfg.folderUri || !(await hasBackupKey())) return 'skipped';
   if (!isBackupDue(cfg.lastSuccessAt, cfg.intervalHours, Date.now())) return 'skipped';
@@ -626,10 +632,22 @@ function importDatabase(snapshot: File): { tables: number; rows: number } {
     try {
       return importTables(sqlite);
     } finally {
-      sqlite.execSync('DETACH DATABASE restore_src');
+      // Detaching and re-enabling foreign keys happen after the import has
+      // either committed or rolled back. Letting them throw here would report
+      // a committed restore as a failed one, and the caller would undo the
+      // media of a dataset that is already live.
+      tidyUp('DETACH DATABASE restore_src');
     }
   } finally {
-    sqlite.execSync('PRAGMA foreign_keys = ON');
+    tidyUp('PRAGMA foreign_keys = ON');
+  }
+}
+
+function tidyUp(statement: string): void {
+  try {
+    sqlite.execSync(statement);
+  } catch (e) {
+    logError(e, { source: 'handled', context: `restore cleanup: ${statement}` });
   }
 }
 
@@ -748,10 +766,17 @@ export async function restoreBackup({
       media.map((m) => ({ stagedPath: m.staged.uri, path: m.path })),
     );
 
-    // 4. The database. Everything up to here can still fail cleanly.
-    onProgress?.({ phase: 'database', fraction: 0 });
+    /*
+     * 4. The database.
+     *
+     * Everything from here to the commit is inside one catch, not just the
+     * import: a progress callback that throws, or anything else between the
+     * files moving and the database landing, leaves exactly the same
+     * disagreement and has to undo exactly the same move.
+     */
     let imported: { tables: number; rows: number };
     try {
+      onProgress?.({ phase: 'database', fraction: 0 });
       imported = importDatabase(dbFile);
     } catch (e) {
       throw new MediaRestoreError(e, putBackDisplacedMedia(mediaFs, paths, displaced));

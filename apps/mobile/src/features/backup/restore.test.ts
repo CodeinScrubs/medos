@@ -116,6 +116,26 @@ describe('importTables', () => {
     expect(await settingValue(live, 'backup.folderUri')).toBe('"content://this-phone"');
   });
 
+  /*
+   * A backup taken while an earlier restore was unresolved carries that
+   * restore's marker in its settings. Importing it would tell the next launch
+   * to put old files back over the dataset that was just restored.
+   */
+  it('never takes restore state from the backup', async () => {
+    await putSetting(live, 'restore.inFlight', { dir: 'live-run', at: 1 });
+    await putSetting(backup, 'restore.inFlight', { dir: 'from-the-backup', at: 2 });
+    await putSetting(backup, 'restore.mediaUnresolved', 3);
+    await putSetting(backup, 'lock.enabled', true);
+    attachAsBackup(live, backup);
+
+    importTables(live.conn);
+
+    expect(await settingValue(live, 'restore.inFlight')).toBeNull();
+    expect(await settingValue(live, 'restore.mediaUnresolved')).toBeNull();
+    // Everything else still comes from the backup.
+    expect(await settingValue(live, 'lock.enabled')).toBe('true');
+  });
+
   it('merges the audit log instead of replacing it', async () => {
     await addAudit(live, 'a-live');
     await addAudit(live, 'a-shared');

@@ -37,3 +37,14 @@ export const restoreInFlight = defineSetting(
   z.object({ dir: z.string().min(1), at: z.number() }).nullable(),
   null,
 );
+
+/**
+ * How many files a restore could not put back, still unresolved.
+ *
+ * Recovery does not throw — refusing to start the app would leave the owner
+ * with no way to reach the records that *are* intact. But the dataset and the
+ * files on disk disagree until this is zero, so it is written down where the
+ * screens and the automatic backup can see it rather than being logged and
+ * forgotten. Not a `backup.` key: a restore that succeeds clears it.
+ */
+export const restoreMediaUnresolved = defineSetting('restore.mediaUnresolved', z.number().int().min(0), 0);

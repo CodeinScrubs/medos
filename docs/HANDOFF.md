@@ -33,6 +33,62 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-20 (0.7.0) — The vault becomes a notebook, permissions get a home
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last commits
+
+**The owner's decision, in his words:** he does not want the password screen to be a vault
+and does not need it to be secure. He wants a tidy, reliable place for working passwords
+instead of a note in Samsung Notes.
+
+**Changed**
+
+- **The vault is gone; the list stays.** No passphrase, no unlock, no scrypt, no key in the
+  Keystore, no biometric gate before a password appears. `credentials.secretText` holds the
+  password as typed; the screen hides it behind a show/hide toggle, which is for shoulders
+  in a corridor, not for security, and the docs now say exactly that. `features/vault/keys.ts`
+  is deleted along with `rekeyVault`, `finishPendingRekey`, `stageNextKeyset` and the whole
+  two-generation protocol — which also dissolves review 017's F3 rather than fixing it.
+  What is kept: the password never enters `searchText`, and it is stored untrimmed.
+  Rows sealed by the old build are shown as "با نسخه‌ی قبلی رمزگذاری شده", not as empty.
+- **A permissions card in Settings.** Notifications, camera, microphone and the backup
+  folder, each with its real status and the one action that fixes it — request if Android
+  still allows it, otherwise the system settings page. Android asks at the point of use,
+  which is right, but a refusal months ago is invisible afterwards and looks like a broken
+  app. Also a line about "Alarms & reminders", which is the setting that makes reminders
+  arrive on time and cannot be requested from inside the app.
+- **Review 017's findings.** F4: `Autosave.flush()` now returns whether everything reached
+  storage, and "نگه دار" stays on the screen when it did not — it used to navigate away on
+  a failed write, discarding the only copy. F5: `saved` is no longer reported when a newer
+  revision arrived during the write; that state is `pending`. F1: a failed media recovery is
+  recorded in `restore.mediaUnresolved`, shown as a red card on Today with a retry, and
+  blocks automatic backup until it is zero. F2: the rollback now covers everything between
+  placing the media and committing the database (a throwing progress callback used to slip
+  past it), `DETACH`/`PRAGMA` failures after a commit are logged instead of reported as a
+  failed import, and `restore.*` settings are never imported from a backup — a backup taken
+  while an old restore was unresolved would otherwise reintroduce its marker.
+
+**Verified**
+
+- `npm run check` green: 22 suites / 367 tests. (Down from 371: the vault's key tests went
+  with the keys, and four smaller cases replaced them.)
+- Review 017's blocker — `npm run check` failing on `app.json` formatting — was a snapshot
+  of an uncommitted working tree mid-session. It passes on every commit.
+
+**Not verified**
+
+- Nothing in this entry has run on the phone yet; a 0.7.0 build was made for that.
+- The permissions card reads real statuses but has only been typechecked, not tapped.
+
+**Open threads**
+
+- Old encrypted credential rows cannot be read by this build at all. There were none on the
+  owner's phone (the vault was created empty during the device test), but if a backup from
+  0.5.0–0.6.0 is ever restored, those passwords are lost to the app and must be retyped.
+- The reviewer is right that autosave is not note history. Versioning is still unbuilt and
+  still waiting on a retention decision.
+
 ## 2026-09-20 (device) — Everything since 0.2.2, on the A52s at last
 
 **Agent:** claude-opus-5 via Claude Code

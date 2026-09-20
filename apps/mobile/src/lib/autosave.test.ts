@@ -148,3 +148,39 @@ describe('Autosave', () => {
     expect(written).toEqual([]);
   });
 });
+
+describe('what Autosave promises', () => {
+  it('does not report saved while a newer revision is waiting', async () => {
+    let release: (() => void) | null = null;
+    const { saver, states } = build(
+      async () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    saver.change('first');
+    const flushed = saver.flush();
+    await Promise.resolve();
+    // Typed while the write is in flight.
+    saver.change('second');
+    release!();
+    await flushed;
+
+    expect(states.at(-1)?.status).toBe('pending');
+    expect(saver.unsaved).toBe(true);
+  });
+
+  it('tells the caller whether the flush actually landed', async () => {
+    let fail = true;
+    const { saver } = build(async () => {
+      if (fail) throw new Error('disk full');
+    });
+
+    saver.change('important');
+    expect(await saver.flush()).toBe(false);
+
+    fail = false;
+    expect(await saver.flush()).toBe(true);
+  });
+});

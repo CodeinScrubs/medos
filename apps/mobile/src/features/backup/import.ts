@@ -35,6 +35,21 @@ export const DEVICE_LOCAL_ROWS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Rows that are wiped from the live database and **not** taken from the backup.
+ *
+ * `restore.*` settings describe an operation happening on this phone right
+ * now: which files a restore set aside, and how many it could not put back.
+ * They are cleared by the import — that is what makes the in-flight marker
+ * trustworthy — but they must not be replaced by whatever the backup's own
+ * snapshot happened to contain. A backup taken while an older restore was
+ * unresolved would otherwise reintroduce its marker, and the next launch would
+ * put files back over the dataset that has just been restored.
+ */
+export const SOURCE_SKIPPED_ROWS: Readonly<Record<string, string>> = {
+  settings: "key LIKE 'restore.%'",
+};
+
+/**
  * Append-only history, merged rather than replaced: what happened on this
  * phone before the restore stays on record next to what the backup brings.
  */
@@ -80,6 +95,10 @@ export function importTables(conn: SqlConnection, source = 'restore_src'): { tab
       const t = quoteIdent(table);
       const localRows = DEVICE_LOCAL_ROWS[table];
       const onlyShared = localRows ? ` WHERE NOT (${localRows})` : '';
+      // Skipped rows are deleted like any other, and simply not brought back.
+      const skipped = SOURCE_SKIPPED_ROWS[table];
+      const fromSource = [localRows ? `NOT (${localRows})` : null, skipped ? `NOT (${skipped})` : null].filter(Boolean);
+      const sourceWhere = fromSource.length > 0 ? ` WHERE ${fromSource.join(' AND ')}` : '';
       const merge = MERGED_TABLES.has(table);
 
       if (!merge) conn.execSync(`DELETE FROM main.${t}${onlyShared}`);
@@ -96,7 +115,7 @@ export function importTables(conn: SqlConnection, source = 'restore_src'): { tab
       if (!cols) continue;
 
       conn.execSync(
-        `INSERT ${merge ? 'OR IGNORE ' : ''}INTO main.${t} (${cols}) SELECT ${cols} FROM ${src}.${t}${onlyShared}`,
+        `INSERT ${merge ? 'OR IGNORE ' : ''}INTO main.${t} (${cols}) SELECT ${cols} FROM ${src}.${t}${sourceWhere}`,
       );
       rows += conn.getFirstSync<{ n: number }>('SELECT changes() AS n')?.n ?? 0;
       tables += 1;

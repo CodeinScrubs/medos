@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
+import { RestoreTrouble } from '@/features/backup/restore-trouble';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { dueFollowUpsQuery, pendingFollowUpsQuery } from '@/features/followups/queries';
@@ -52,6 +53,7 @@ export function TodayScreen() {
         <Text variant="display">امروز</Text>
 
         <ErrorNotice error={error} what="کارهای امروز" />
+        <RestoreTrouble />
 
         <Row gap="sm" style={{ marginTop: spacing.lg }}>
           <StatTile icon="alarm-outline" label="پیگیری امروز" value={dueRows.length} alert={overdue > 0} />

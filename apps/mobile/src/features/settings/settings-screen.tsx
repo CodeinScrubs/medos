@@ -9,6 +9,7 @@ import { databaseSizeBytes } from '@/db/files';
 import { writeSetting } from '@/db/settings';
 import { useSetting } from '@/db/use-setting';
 import { keepOriginalsMode, type KeepOriginalsMode } from '@/features/attachments/settings';
+import { PermissionsCard } from '@/features/settings/permissions-card';
 import { disableAppLock, enableAppLock } from '@/features/lock/lock-gate';
 import { lockEnabled, lockGraceSeconds } from '@/features/lock/settings';
 import { formatBytes } from '@/lib/format';
@@ -65,6 +66,9 @@ export function SettingsScreen() {
             )}
           </Column>
         </Card>
+
+        <SectionHeader title="دسترسی‌ها" />
+        <PermissionsCard />
 
         <SectionHeader title="حافظه" />
         <Card>

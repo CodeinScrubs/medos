@@ -290,7 +290,18 @@ function NoteEditor({
       {
         text: 'نگه دار',
         onPress: () => {
-          void saver.flush().then(() => router.back());
+          // Only leave if the text actually reached storage. `flush` resolves
+          // either way; treating that as success would close the screen on the
+          // one copy of the note that exists.
+          void saver.flush().then((stored) => {
+            if (stored) router.back();
+            else {
+              Alert.alert(
+                'هنوز ذخیره نشد',
+                'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
+              );
+            }
+          });
         },
       },
       {

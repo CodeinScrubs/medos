@@ -1,25 +1,32 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, DataRow, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { copyText } from '@/features/doctors/actions';
 import { formatJalaliLong } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
-import { forgetVaultKey } from './keys';
 import { CREDENTIAL_CATEGORY_LABELS, CREDENTIAL_OWNER_LABELS } from './labels';
 import { daysUntilExpiry } from './logic';
-import { credentialQuery, deleteCredential, revealSecret, setCredentialStarred } from './queries';
+import {
+  credentialQuery,
+  credentialSecret,
+  deleteCredential,
+  markCredentialUsed,
+  setCredentialStarred,
+} from './queries';
 
 /**
- * One credential. The password is shown only after the phone's own check, and
- * only until the screen is left.
+ * One saved login.
+ *
+ * The password is hidden until it is asked for — that is for shoulders in a
+ * ward corridor, not for security; anyone holding the unlocked phone can press
+ * the button. Turning on the app lock in settings is what puts a fingerprint
+ * in front of all of this.
  *
  * Route param: `id`.
  */
@@ -30,8 +37,7 @@ export function CredentialScreen() {
 
   const { data, error } = useLive(credentialQuery(id ?? ''), [id]);
   const credential = data?.[0];
-  const [secret, setSecret] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [shown, setShown] = useState(false);
 
   if (!credential) {
     return (
@@ -50,31 +56,7 @@ export function CredentialScreen() {
     );
   }
 
-  /**
-   * The phone's own biometric or screen lock stands between the open vault and
-   * a password on screen. On a phone with no lock at all there is nothing to
-   * check against, so the vault passphrase — already entered — is the gate.
-   */
-  async function reveal() {
-    setBusy(true);
-    try {
-      const level = await LocalAuthentication.getEnrolledLevelAsync();
-      if (level !== LocalAuthentication.SecurityLevel.NONE) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'نمایش رمز',
-          cancelLabel: 'انصراف',
-          disableDeviceFallback: false,
-        });
-        if (!result.success) return;
-      }
-      setSecret(await revealSecret(credential!.id));
-    } catch (e) {
-      alertError('باز نشد', e);
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  const secret = credentialSecret(credential);
   const days = daysUntilExpiry(credential.expiresAt);
 
   return (
@@ -135,20 +117,34 @@ export function CredentialScreen() {
                 <Text variant="caption" color="textMuted">
                   رمز
                 </Text>
-                <Text variant="bodyStrong" ltr selectable={Boolean(secret)}>
-                  {secret ?? (credential.secretCipher ? '••••••••' : '—')}
+                <Text variant="bodyStrong" ltr selectable={shown}>
+                  {secret.sealed
+                    ? 'با نسخه‌ی قبلی رمزگذاری شده — دوباره بنویسیدش'
+                    : secret.text
+                      ? shown
+                        ? secret.text
+                        : '••••••••'
+                      : '—'}
                 </Text>
               </Column>
-              {credential.secretCipher ? (
+              {secret.text ? (
                 <Row gap="xs">
-                  {secret ? (
-                    <>
-                      <IconButton icon="copy-outline" label="کپی رمز" onPress={() => void copyText(secret)} />
-                      <IconButton icon="eye-off-outline" label="پنهان کردن" onPress={() => setSecret(null)} />
-                    </>
-                  ) : (
-                    <Button label="نمایش" icon="eye-outline" size="sm" onPress={() => void reveal()} loading={busy} />
-                  )}
+                  <IconButton
+                    icon="copy-outline"
+                    label="کپی رمز"
+                    onPress={() => {
+                      void copyText(secret.text!);
+                      void markCredentialUsed(credential.id);
+                    }}
+                  />
+                  <IconButton
+                    icon={shown ? 'eye-off-outline' : 'eye-outline'}
+                    label={shown ? 'پنهان کردن' : 'نمایش'}
+                    onPress={() => {
+                      setShown(!shown);
+                      if (!shown) void markCredentialUsed(credential.id);
+                    }}
+                  />
                 </Row>
               ) : null}
             </Row>
@@ -186,19 +182,6 @@ export function CredentialScreen() {
             ))}
           </Row>
         ) : null}
-
-        <Button
-          label="قفل کردن گاوصندوق"
-          icon="lock-closed-outline"
-          variant="secondary"
-          full
-          onPress={() => {
-            void forgetVaultKey().then(() => {
-              setSecret(null);
-              router.back();
-            });
-          }}
-        />
 
         <Button
           label="حذف این رمز"
