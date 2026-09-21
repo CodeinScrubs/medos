@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-21 (M2, first half) — Shifts and tasks
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last commits
+
+**Changed**
+
+- **Shifts.** `shifts` and `shift_patients`: one open shift at a time (starting another
+  closes it, the way an admission supersedes the last), patients carried in round order,
+  each with a per-shift line, a handoff note and a seen/not-seen mark. A shift owns nothing
+  — deleting one drops the list and never touches a patient or their record, which is what
+  the test suite spends most of its assertions on.
+- **Tasks.** `tasks`: a title, a state, and every link optional — including the patient.
+  Follow-ups are a patient's appointments with the future and cannot exist without one;
+  half a working day is "ring radiology about the CT", which had nowhere to live. An
+  undated task counts as due now, because it is not waiting for anything.
+- **Screens.** `/shift` is the round: add a patient, tap to mark them seen, write the
+  handoff line, jump to a note. Today leads with the shift and its progress, then the tasks
+  with nobody's name on them. The patient overview has its own task list.
+- Tasks joined the search index registry.
+
+**Verified**
+
+- `npm run check` green: 26 suites / 408 tests (394 before). Thirteen of the new ones are
+  about shifts and tasks, and the sharpest is "takes nothing with it when it goes".
+
+**Not verified**
+
+- No screen here has run on a phone.
+
+**Still open from the owner's plan**
+
+- M2's other half: consultations as their own entity, the timeline projection, round mode
+  as a dedicated one-patient-at-a-time flow, and the capture inbox.
+- M3 (vitals and diagnoses UI), M5 (trash for everything), M6 (backup round-trip on a
+  second phone), M7 (device acceptance).
+
 ## 2026-09-21 (M1 + note history) — Working from the owner's plan
 
 **Agent:** claude-opus-5 via Claude Code

@@ -8,6 +8,7 @@ import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { ENCOUNTER_KIND_LABELS } from '@/features/encounters/labels';
 import { admissionElapsed, formatAdmissionElapsed, isInpatient } from '@/features/encounters/logic';
+import { TasksSection } from '@/features/tasks/tasks-section';
 import { activeEncounterDetailQuery } from '@/features/encounters/queries';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { patientFollowUpsQuery } from '@/features/followups/queries';
@@ -42,6 +43,8 @@ export function OverviewTab({ patient }: { patient: Patient }) {
   return (
     <Column gap="none">
       <AdmissionCard patientId={patientId} />
+
+      <TasksSection patientId={patientId} title="کارهای این بیمار" limit={8} />
 
       <SectionHeader
         title="پیگیری‌ها"

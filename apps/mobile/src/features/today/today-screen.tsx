@@ -9,6 +9,8 @@ import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { RestoreTrouble } from '@/features/backup/restore-trouble';
 import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
+import { ShiftCard } from '@/features/shifts/shift-card';
+import { TasksSection } from '@/features/tasks/tasks-section';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { dueFollowUpsQuery, pendingFollowUpsQuery } from '@/features/followups/queries';
@@ -97,6 +99,10 @@ export function TodayScreen() {
             ))}
           </>
         )}
+
+        <ShiftCard />
+
+        <TasksSection patientId={null} title="کارهای بدون بیمار" />
 
         <UnfinishedNotes />
 

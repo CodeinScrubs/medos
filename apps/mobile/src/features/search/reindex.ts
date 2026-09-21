@@ -10,6 +10,7 @@ import { reindexSpecialtyProfiles } from '@/features/knowledge/specialty-profile
 import { reindexNotes } from '@/features/notes/queries';
 import { reindexPatients } from '@/features/patients/queries';
 import { reindexPlaces } from '@/features/places/queries';
+import { reindexTasks } from '@/features/tasks/queries';
 import { reindexCredentials } from '@/features/vault/queries';
 
 /**
@@ -41,6 +42,7 @@ export async function reindexSearchIfNeeded(): Promise<void> {
     prescriptions: await reindexPrescriptions(),
     ideas: await reindexIdeas(),
     credentials: await reindexCredentials(),
+    tasks: await reindexTasks(),
   };
   await writeSetting(indexedVersion, SEARCH_INDEX_VERSION);
 

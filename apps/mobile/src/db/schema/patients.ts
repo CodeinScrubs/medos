@@ -518,6 +518,131 @@ export const followUps = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Shifts: the unit of the owner's working day                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One period on duty.
+ *
+ * The record is organised around patients and episodes, and the day is
+ * organised around shifts — which patients am I carrying tonight, which ones
+ * have I seen, what is left. A shift is not a clinical fact about a patient;
+ * it is where the owner's attention was, and it is what "today" should show
+ * first.
+ *
+ * A shift owns nothing. Its patients keep their own records; removing a shift
+ * removes the list, never the people on it.
+ */
+export const shifts = sqliteTable(
+  'shifts',
+  {
+    ...baseColumns,
+    placeId: text('place_id').references(() => places.id),
+    ward: text('ward'),
+    /** The attending or senior on for this shift, when there is one. */
+    supervisorId: text('supervisor_id').references(() => doctors.id),
+
+    startAt: integer('start_at', { mode: 'timestamp_ms' }).notNull(),
+    endAt: integer('end_at', { mode: 'timestamp_ms' }),
+    /** Open until it is closed by hand; a shift nobody closed is still a shift. */
+    isActive: bool('is_active')
+      .notNull()
+      .$default(() => true),
+    notes: text('notes'),
+  },
+  (t) => [index('shifts_active_idx').on(t.isActive, t.startAt), index('shifts_start_idx').on(t.startAt)],
+);
+
+/**
+ * A patient carried on a shift.
+ *
+ * Separate from the patient and from the episode, because the same patient can
+ * be on many shifts and a shift says something neither of them does: whether
+ * they have been seen yet tonight, and the one line to remember about them for
+ * the next few hours.
+ */
+export const shiftPatients = sqliteTable(
+  'shift_patients',
+  {
+    ...baseColumns,
+    shiftId: text('shift_id')
+      .notNull()
+      .references(() => shifts.id, { onDelete: 'cascade' }),
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'cascade' }),
+    encounterId: text('encounter_id').references(() => encounters.id, { onDelete: 'cascade' }),
+
+    /** Where they sit in the round; ties are broken by when they were added. */
+    sortOrder: integer('sort_order')
+      .notNull()
+      .$default(() => 0),
+    /** The line that matters tonight, not the patient's permanent summary. */
+    shiftSummary: text('shift_summary'),
+    /** What to tell whoever takes over. */
+    handoffNote: text('handoff_note'),
+    reviewedAt: integer('reviewed_at', { mode: 'timestamp_ms' }),
+  },
+  (t) => [
+    index('shift_patients_shift_idx').on(t.shiftId, t.sortOrder),
+    index('shift_patients_patient_idx').on(t.patientId),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Tasks: what is left to do, with or without a patient                        */
+/* -------------------------------------------------------------------------- */
+
+export const TASK_KINDS = ['lab', 'imaging', 'consult', 'procedure', 'call', 'general'] as const;
+
+/**
+ * Something to do.
+ *
+ * `follow_ups` are a patient's appointments with the future — call them in a
+ * week, check the culture on Tuesday — and they require a patient. Half of a
+ * working day does not: "ring radiology about the CT", "collect the forms".
+ * Those had nowhere to live, so they lived on paper and in memory.
+ *
+ * Every link is optional, including the patient. What a task must have is a
+ * title and a state.
+ */
+export const tasks = sqliteTable(
+  'tasks',
+  {
+    ...baseColumns,
+    patientId: text('patient_id').references(() => patients.id, { onDelete: 'cascade' }),
+    encounterId: text('encounter_id').references(() => encounters.id, { onDelete: 'cascade' }),
+    shiftId: text('shift_id').references(() => shifts.id, { onDelete: 'set null' }),
+    doctorId: text('doctor_id').references(() => doctors.id),
+    placeId: text('place_id').references(() => places.id),
+
+    title: text('title').notNull(),
+    kind: text('kind', { enum: TASK_KINDS })
+      .notNull()
+      .$default(() => 'general' as const),
+    dueAt: integer('due_at', { mode: 'timestamp_ms' }),
+    priority: text('priority', { enum: ['low', 'normal', 'high'] })
+      .notNull()
+      .$default(() => 'normal' as const),
+    status: text('status', { enum: ['open', 'done', 'cancelled'] })
+      .notNull()
+      .$default(() => 'open' as const),
+    /** Where it came from: typed by hand, or lifted out of a note. */
+    source: text('source'),
+    notes: text('notes'),
+    completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+    outcome: text('outcome'),
+    searchText: text('search_text'),
+  },
+  (t) => [
+    index('tasks_status_idx').on(t.status, t.dueAt),
+    index('tasks_patient_idx').on(t.patientId),
+    index('tasks_shift_idx').on(t.shiftId),
+    index('tasks_search_idx').on(t.searchText),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Relations                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -579,3 +704,7 @@ export type LabPanel = typeof labPanels.$inferSelect;
 export type LabValue = typeof labValues.$inferSelect;
 export type ImagingStudy = typeof imagingStudies.$inferSelect;
 export type FollowUp = typeof followUps.$inferSelect;
+export type Shift = typeof shifts.$inferSelect;
+export type ShiftPatient = typeof shiftPatients.$inferSelect;
+export type Task = typeof tasks.$inferSelect;
+export type TaskKind = (typeof TASK_KINDS)[number];
