@@ -3,6 +3,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { encounters, patients, type PatientStatus } from '@/db/schema';
 import { touch } from '@/lib/ids';
+import { toPersianDigits } from '@/lib/persian';
 
 import { statusForEncounterKind } from './logic';
 
@@ -116,4 +117,33 @@ export async function reconcileAllPatientStatuses(): Promise<number> {
     fixed += 1;
   }
   return fixed;
+}
+
+/**
+ * Where every admitted patient is, in one query.
+ *
+ * The patient list is read on a round with twenty-odd inpatients, and "which
+ * bed" is the question that decides where to walk next. Fetching it per card
+ * would be one query per row; this is one for the screen.
+ */
+export function activeLocationsQuery() {
+  return db
+    .select({
+      patientId: encounters.patientId,
+      ward: encounters.ward,
+      bed: encounters.bed,
+      kind: encounters.kind,
+    })
+    .from(encounters)
+    .where(and(isNull(encounters.deletedAt), eq(encounters.isActive, true)));
+}
+
+export type ActiveLocation = { ward: string | null; bed: string | null };
+
+/** "داخلی ۲ • تخت ۴", or nothing when neither is recorded. */
+export function locationLabel(location: ActiveLocation | undefined): string | null {
+  if (!location) return null;
+  const parts = [location.ward?.trim(), location.bed?.trim() ? `تخت ${toPersianDigits(location.bed.trim())}` : null];
+  const label = parts.filter(Boolean).join(' • ');
+  return label || null;
 }

@@ -113,6 +113,7 @@ function AppStack() {
         <Stack.Screen name="patient/[id]/index" options={{ title: 'پرونده بیمار' }} />
         <Stack.Screen name="patient/[id]/edit" options={modal('ویرایش بیمار')} />
         <Stack.Screen name="patient/[id]/note" options={modal('نوت')} />
+        <Stack.Screen name="patient/[id]/note-history" options={modal('تاریخچه‌ی نوت')} />
         <Stack.Screen name="patient/[id]/encounter" options={modal('بستری / ویزیت')} />
         <Stack.Screen name="patient/[id]/discharge" options={modal('ترخیص')} />
         <Stack.Screen name="patient/[id]/contact" options={modal('شماره‌ی همراه')} />

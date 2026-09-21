@@ -124,7 +124,13 @@ export async function createExtension(input: ExtensionInput): Promise<string> {
 }
 
 export async function updateExtension(id: string, input: Partial<ExtensionInput>): Promise<void> {
-  const current = (await db.select().from(extensions).where(eq(extensions.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(extensions)
+      .where(and(aliveExt, eq(extensions.id, id)))
+      .limit(1)
+  )[0];
   if (!current) throw new Error(`Extension ${id} not found`);
   await db
     .update(extensions)
@@ -133,7 +139,7 @@ export async function updateExtension(id: string, input: Partial<ExtensionInput>
       ...touch(),
       searchText: extensionSearchText({ ...current, ...input }, await placeName(input.placeId ?? current.placeId)),
     })
-    .where(eq(extensions.id, id));
+    .where(and(aliveExt, eq(extensions.id, id)));
 }
 
 /** Bumped on every call or copy, so the list learns what is actually used. */
@@ -141,7 +147,7 @@ export async function recordExtensionUse(id: string): Promise<void> {
   await db
     .update(extensions)
     .set({ usageCount: sql`${extensions.usageCount} + 1` })
-    .where(eq(extensions.id, id));
+    .where(and(aliveExt, eq(extensions.id, id)));
 }
 
 export async function setExtensionStarred(id: string, starred: boolean): Promise<void> {

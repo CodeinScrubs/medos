@@ -16,12 +16,16 @@ import { PATIENT_STATUS, SEX_LABELS } from './labels';
  * are, and the one-line reminder of who they are. Everything else is one tap
  * away.
  */
-export function PatientCard({ patient }: { patient: Patient }) {
+export function PatientCard({ patient, location }: { patient: Patient; location?: string | null }) {
   const { colors, spacing } = useTheme();
   const status = PATIENT_STATUS[patient.status];
   const age = formatAge(patient.birthDate, patient.ageYears);
 
-  const meta = [age !== '—' ? age : null, patient.sex ? SEX_LABELS[patient.sex] : null].filter(Boolean).join(' • ');
+  // Ward and bed come first for someone on a ward: on a round it is the field
+  // that decides where to walk next, and looking it up meant opening the file.
+  const meta = [location, age !== '—' ? age : null, patient.sex ? SEX_LABELS[patient.sex] : null]
+    .filter(Boolean)
+    .join(' • ');
 
   return (
     <Link href={{ pathname: '/patient/[id]', params: { id: patient.id } }} asChild>

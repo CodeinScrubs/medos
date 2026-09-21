@@ -6,7 +6,24 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { createPatient } from '../patients/queries';
 import { createNote, deleteNote, noteQuery, restoreNoteVersion, updateNote } from './queries';
+import { noteDraftQuery, writeNoteDraft } from './draft-queries';
 import { backfillNoteVersionsIfNeeded, contentHashOf, noteVersionsQuery } from './version-queries';
+
+const blankDraft = {
+  type: 'progress' as const,
+  title: null,
+  body: null,
+  subjective: null,
+  objective: null,
+  assessment: null,
+  plan: null,
+  noteDate: new Date(2026, 0, 1),
+  doctorId: null,
+  specialty: null,
+  isPinned: false,
+  isDraft: false,
+  voices: [],
+};
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -102,5 +119,24 @@ describe('note versions', () => {
     };
     expect(contentHashOf(fields)).toBe(contentHashOf({ ...fields }));
     expect(contentHashOf(fields)).not.toBe(contentHashOf({ ...fields, body: 'متن دیگر' }));
+  });
+});
+
+describe('restoring while an unsaved edit exists', () => {
+  /*
+   * The editor reads the draft before the note. A restore that left an older
+   * draft behind would reopen showing the text the restore replaced — and
+   * saving that would put it back.
+   */
+  it('drops the draft that the restore made obsolete', async () => {
+    const id = await createNote({ patientId, type: 'progress', subjective: 'first' });
+    await updateNote(id, { subjective: 'second' });
+    await writeNoteDraft('d-1', { patientId, noteId: id }, { ...blankDraft, subjective: 'half-typed third' });
+    const first = (await noteVersionsQuery(id)).at(-1)!;
+
+    await restoreNoteVersion(first.id);
+
+    expect(await noteDraftQuery(patientId, id)).toHaveLength(0);
+    expect((await noteQuery(id))[0]?.subjective).toBe('first');
   });
 });

@@ -6,6 +6,7 @@ import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { noteSearchText } from './logic';
+import { discardNoteDraftFor } from './draft-queries';
 import { noteVersionQuery, writeNoteVersion } from './version-queries';
 
 const alive = isNull(notes.deletedAt);
@@ -125,6 +126,15 @@ export async function restoreNoteVersion(versionId: string): Promise<void> {
     .set({ ...fields, ...touch(), searchText: noteSearchText(fields) })
     .where(and(alive, eq(notes.id, version.noteId)));
 
+  /*
+   * Any unsaved edit of this note is now older than what the note says, and
+   * the editor reads the draft first — reopening it would show the text the
+   * restore was meant to replace, and saving would put it back. The restored
+   * text is in the history either way, but showing someone the opposite of
+   * what they just asked for is its own kind of wrong.
+   */
+  await discardNoteDraftFor(version.noteId);
+
   const [restored] = await noteQuery(version.noteId);
   if (restored) await writeNoteVersion(restored, 'restored', versionId);
 }
@@ -133,7 +143,7 @@ export async function setNotePinned(id: string, isPinned: boolean): Promise<void
   await db
     .update(notes)
     .set({ isPinned, ...touch() })
-    .where(eq(notes.id, id));
+    .where(and(alive, eq(notes.id, id)));
 }
 
 export async function deleteNote(id: string): Promise<void> {

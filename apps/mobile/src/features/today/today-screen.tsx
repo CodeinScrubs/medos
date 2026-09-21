@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
@@ -7,6 +8,7 @@ import { Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/co
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { RestoreTrouble } from '@/features/backup/restore-trouble';
+import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { dueFollowUpsQuery, pendingFollowUpsQuery } from '@/features/followups/queries';
@@ -35,6 +37,8 @@ export function TodayScreen() {
   const { data: pending } = useLive(pendingFollowUpsQuery());
   const { data: admitted } = useLive(patientListQuery({ statuses: ['admitted'] }));
   const { data: starred } = useLive(patientListQuery({ starredOnly: true }));
+  const { data: locationRows } = useLive(activeLocationsQuery());
+  const locations = useMemo(() => new Map((locationRows ?? []).map((r) => [r.patientId, r])), [locationRows]);
 
   const { jy } = toJalali(now);
   const dueRows = due ?? [];
@@ -89,7 +93,7 @@ export function TodayScreen() {
           <>
             <SectionHeader title="بیماران بستری" count={admitted!.length} />
             {admitted!.slice(0, 8).map((p) => (
-              <PatientCard key={p.id} patient={p} />
+              <PatientCard key={p.id} patient={p} location={locationLabel(locations.get(p.id))} />
             ))}
           </>
         )}

@@ -11,6 +11,7 @@ import type { PatientStatus } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { CURRENT_STATUSES } from '@/features/patients/logic';
 import { PatientCard } from '@/features/patients/patient-card';
+import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
 import { patientListQuery } from '@/features/patients/queries';
 import { toPersianDigits } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
@@ -39,6 +40,9 @@ export function PatientListScreen() {
   }, [tab]);
 
   const { data: rows, error } = useLive(patientListQuery({ search, statuses }), [search, tab]);
+  // One query for the whole list: which ward and bed each admitted patient is in.
+  const { data: locationRows } = useLive(activeLocationsQuery());
+  const locations = useMemo(() => new Map((locationRows ?? []).map((r) => [r.patientId, r])), [locationRows]);
   const patients = rows ?? [];
 
   const tabs: { key: Tab; label: string }[] = [
@@ -138,7 +142,7 @@ export function PatientListScreen() {
           <FlashList
             data={patients}
             keyExtractor={(p) => p.id}
-            renderItem={({ item }) => <PatientCard patient={item} />}
+            renderItem={({ item }) => <PatientCard patient={item} location={locationLabel(locations.get(item.id))} />}
             contentContainerStyle={{
               paddingHorizontal: spacing.lg,
               paddingBottom: spacing.huge * 2,

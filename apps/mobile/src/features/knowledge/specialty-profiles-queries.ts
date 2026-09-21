@@ -60,7 +60,13 @@ export async function createSpecialtyProfile(input: SpecialtyProfileInput): Prom
 }
 
 export async function updateSpecialtyProfile(id: string, patch: SpecialtyProfileInput): Promise<void> {
-  const current = (await db.select().from(specialtyProfiles).where(eq(specialtyProfiles.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(specialtyProfiles)
+      .where(and(alive, eq(specialtyProfiles.id, id)))
+      .limit(1)
+  )[0];
   if (!current) throw new Error(`Specialty profile ${id} not found`);
   const merged = { ...current, ...patch };
   await db
@@ -70,7 +76,7 @@ export async function updateSpecialtyProfile(id: string, patch: SpecialtyProfile
       searchText: specialtyProfileSearchText(merged, await specialtyWords(merged.specialtyId)),
       ...touch(),
     })
-    .where(eq(specialtyProfiles.id, id));
+    .where(and(alive, eq(specialtyProfiles.id, id)));
 }
 
 export async function deleteSpecialtyProfile(id: string): Promise<void> {

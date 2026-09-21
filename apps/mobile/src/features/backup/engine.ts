@@ -10,7 +10,9 @@ import { backupRuns } from '@/db/schema';
 import { runSeeds } from '@/db/seed';
 import { readSetting, writeSetting } from '@/db/settings';
 import { snapshotDatabase } from '@/db/snapshots';
+import { reconcileAllPatientStatuses } from '@/features/encounters/status';
 import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
+import { backfillNoteVersionsIfNeeded } from '@/features/notes/version-queries';
 import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
@@ -805,11 +807,19 @@ export async function restoreBackup({
     await housekeeping('بازسازی جست‌وجو', reindexSearchIfNeeded);
     // The restored rows were flagged by whichever build wrote them.
     await housekeeping('بازبینی پرچم آزمایش‌ها', reflagLabValuesIfNeeded);
+    // The same passes the app runs at startup. A restore replaces the dataset
+    // without restarting the app, so whatever those would have corrected has
+    // to be corrected here too — otherwise it waits for the next launch.
+    await housekeeping('هماهنگی وضعیت بیماران', reconcileAllPatientStatuses);
+    await housekeeping('تاریخچه‌ی نوت‌ها', backfillNoteVersionsIfNeeded);
     // The reminders the OS holds belong to the data just replaced, and the ids
     // in the backup to the phone that made it: start over from the rows.
     let reminders = 0;
     await housekeeping('یادآورها', async () => {
-      reminders = (await rescheduleAllReminders()).followUps;
+      const rescheduled = await rescheduleAllReminders();
+      // Both kinds are rescheduled; both are counted, or the number under-reports
+      // what was actually put back.
+      reminders = rescheduled.followUps + rescheduled.occasions;
     });
     // Keep backing up with the same passphrase on this phone from now on.
     await housekeeping('ذخیره‌ی رمز بکاپ', () => storeBackupKey({ key, salt: header.salt, kdf: header.kdf }));

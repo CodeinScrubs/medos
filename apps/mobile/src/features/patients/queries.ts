@@ -12,7 +12,7 @@ import {
   type PatientStatus,
 } from '@/db/schema';
 import { contains, matchesSearch } from '@/db/search';
-import { activeEncounter, statusFor } from '@/features/encounters/status';
+import { activeEncounter, reconcilePatientStatus, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
@@ -172,14 +172,7 @@ export async function setPatientStarred(id: string, starred: boolean): Promise<v
   await db
     .update(patients)
     .set({ starred, ...touch() })
-    .where(eq(patients.id, id));
-}
-
-export async function setPatientStatus(id: string, status: PatientStatus): Promise<void> {
-  await db
-    .update(patients)
-    .set({ status, ...touch() })
-    .where(eq(patients.id, id));
+    .where(and(alive, eq(patients.id, id)));
 }
 
 /**
@@ -199,6 +192,9 @@ export async function restorePatient(id: string): Promise<void> {
     .update(patients)
     .set({ deletedAt: null, ...touch() })
     .where(eq(patients.id, id));
+  // Back from the trash with whatever status it had when it went in, which may
+  // no longer match its episodes — and only the episodes can say.
+  await reconcilePatientStatus(id);
   await rescheduleReminders({ patientId: id });
   await audit('patient.restored', { entityType: 'patient', entityId: id });
 }

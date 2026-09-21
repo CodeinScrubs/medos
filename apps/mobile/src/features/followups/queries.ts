@@ -106,7 +106,13 @@ export async function createFollowUp(input: FollowUpInput): Promise<string> {
 }
 
 export async function updateFollowUp(id: string, patch: Partial<Omit<FollowUpInput, 'patientId'>>): Promise<void> {
-  const current = (await db.select().from(followUps).where(eq(followUps.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(followUps)
+      .where(and(alive, eq(followUps.id, id)))
+      .limit(1)
+  )[0];
   if (!current) throw new Error(`Follow-up ${id} not found`);
 
   const merged = { ...current, ...patch };
@@ -117,28 +123,40 @@ export async function updateFollowUp(id: string, patch: Partial<Omit<FollowUpInp
   await db
     .update(followUps)
     .set({ ...patch, notificationId, ...touch() })
-    .where(eq(followUps.id, id));
+    .where(and(alive, eq(followUps.id, id)));
 }
 
 export async function completeFollowUp(id: string, outcome: string | null): Promise<void> {
-  const current = (await db.select().from(followUps).where(eq(followUps.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(followUps)
+      .where(and(alive, eq(followUps.id, id)))
+      .limit(1)
+  )[0];
   if (!current) return;
   await cancelReminder(current.notificationId);
   await db
     .update(followUps)
     .set({ status: 'done', outcome, completedAt: new Date(), notificationId: null, ...touch() })
-    .where(eq(followUps.id, id));
+    .where(and(alive, eq(followUps.id, id)));
 }
 
 export async function setFollowUpStatus(id: string, status: 'missed' | 'cancelled' | 'pending'): Promise<void> {
-  const current = (await db.select().from(followUps).where(eq(followUps.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(followUps)
+      .where(and(alive, eq(followUps.id, id)))
+      .limit(1)
+  )[0];
   if (!current) return;
   await cancelReminder(current.notificationId);
   const notificationId = status === 'pending' ? await scheduleFor(current) : null;
   await db
     .update(followUps)
     .set({ status, notificationId, completedAt: status === 'pending' ? null : new Date(), ...touch() })
-    .where(eq(followUps.id, id));
+    .where(and(alive, eq(followUps.id, id)));
 }
 
 export async function deleteFollowUp(id: string): Promise<void> {

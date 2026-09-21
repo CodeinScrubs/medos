@@ -101,6 +101,14 @@ export async function writeNoteDraft(
     .onConflictDoUpdate({ target: noteDrafts.id, set: { ...values, ...touch(now) } });
 }
 
+/** Drop whatever unsaved edit exists for a note, whichever draft row it is. */
+export async function discardNoteDraftFor(noteId: string): Promise<void> {
+  await db
+    .update(noteDrafts)
+    .set(softDelete())
+    .where(and(alive, eq(noteDrafts.noteId, noteId)));
+}
+
 /** The draft is no longer wanted: saved into a note, or thrown away. */
 export async function discardNoteDraft(id: string): Promise<void> {
   await db.update(noteDrafts).set(softDelete()).where(eq(noteDrafts.id, id));

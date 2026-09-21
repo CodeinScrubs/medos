@@ -84,7 +84,7 @@ export async function updateAttachment(
   await db
     .update(attachments)
     .set({ ...patch, ...touch() })
-    .where(eq(attachments.id, id));
+    .where(and(alive, eq(attachments.id, id)));
 }
 
 /**
