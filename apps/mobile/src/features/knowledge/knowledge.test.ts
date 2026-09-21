@@ -17,6 +17,8 @@ import { createTopic, markTopicReviewed, reindexTopics, suggestTopicTags, topics
 import { createSpecialtyProfile, specialtyProfilesQuery } from './specialty-profiles-queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
+// Reached through the doctors queries, which cancel reminders on delete.
+jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 
 let t: TestDatabase;
 

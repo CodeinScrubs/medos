@@ -7,11 +7,12 @@ import { resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { deleteEncounter, dischargeEncounter, openEncounter, updateEncounter } from './encounters/queries';
+import { reconcileAllPatientStatuses } from './encounters/status';
 import { createOrder, patientOrdersQuery, setOrderStatus, suggestOrderNames } from './kardex/queries';
 import { analyteSeriesQuery, createLabPanel, updateLabPanel } from './labs/queries';
 import { reflagLabValuesIfNeeded } from './labs/reflag';
 import { createNote, updateNote } from './notes/queries';
-import { createPatient } from './patients/queries';
+import { createPatient, updatePatient } from './patients/queries';
 import { createExtension, createPlace, extensionsQuery, updatePlace } from './places/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -274,5 +275,49 @@ describe('deleting an episode', () => {
     // The one the patient is actually in still decides.
     expect(await patientStatus()).toBe('admitted');
     expect((await t.db.select().from(encounters)).find((e) => e.id === second)?.isActive).toBe(true);
+  });
+});
+
+describe('who decides that a patient is on a ward', () => {
+  /*
+   * The status used to be writable from the patient form, so a patient could
+   * be "admitted" with no admission behind them — on the ward list with no
+   * bed, no ward and no kardex.
+   */
+  it('refuses to make a patient admitted without an episode', async () => {
+    const id = await createPatient({ firstName: 'مریم', lastName: 'کریمی', status: 'admitted' });
+    expect((await t.db.select().from(patients)).find((p) => p.id === id)?.status).toBe('outpatient');
+
+    await updatePatient(id, { status: 'admitted' });
+    expect((await t.db.select().from(patients)).find((p) => p.id === id)?.status).toBe('outpatient');
+  });
+
+  it('keeps an admitted patient admitted when the form says otherwise', async () => {
+    await openEncounter({ patientId, kind: 'admission' });
+    await updatePatient(patientId, { status: 'discharged' });
+    // The episode is still open; only discharging it can end the stay.
+    expect(await patientStatus()).toBe('admitted');
+  });
+
+  it('puts a drifted status back in step at startup', async () => {
+    await openEncounter({ patientId, kind: 'admission' });
+    // What an older build could leave behind: no open episode, still admitted.
+    await t.db.update(encounters).set({ isActive: false }).where(eq(encounters.patientId, patientId));
+
+    expect(await reconcileAllPatientStatuses()).toBe(1);
+    expect(await patientStatus()).toBe('outpatient');
+    // And it is a no-op the second time.
+    expect(await reconcileAllPatientStatuses()).toBe(0);
+  });
+
+  it('survives deleting the same episode twice', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission' });
+    await deleteEncounter(id);
+    await updatePatient(patientId, { status: 'followup' });
+
+    await deleteEncounter(id);
+
+    // The second delete must not rewrite the status of a patient who moved on.
+    expect(await patientStatus()).toBe('followup');
   });
 });

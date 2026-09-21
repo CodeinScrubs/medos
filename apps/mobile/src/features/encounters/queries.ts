@@ -5,6 +5,7 @@ import { doctors, encounters, orders, patients, places, type Encounter, type Pat
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { statusAfterDischarge, statusForEncounterKind } from './logic';
+import { statusFor } from './status';
 
 const alive = isNull(encounters.deletedAt);
 
@@ -195,27 +196,40 @@ export async function dischargeEncounter(id: string, input: DischargeInput): Pro
 /**
  * Delete an episode that should not be in the record.
  *
- * If it was the active one, the patient is not on a ward any more — leaving
- * the status at "admitted" would keep a bed on the admitted list that nothing
- * points at. There is no history of what they were before, so they become
- * outpatient: a patient with a file and no admission, which is the one thing
- * that is certainly true afterwards and is a single tap to correct.
+ * Only a live episode can be deleted — deleting one twice must not run the
+ * status logic a second time on a patient who has moved on since. If the
+ * deleted episode was the active one, the patient's status is worked out again
+ * from whatever episodes remain (`statusFor`), which is the same rule the rest
+ * of the app uses: no open episode means they are not on a ward.
  */
 export async function deleteEncounter(id: string): Promise<void> {
-  const current = (await db.select().from(encounters).where(eq(encounters.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(encounters)
+      .where(and(alive, eq(encounters.id, id)))
+      .limit(1)
+  )[0];
   if (!current) return;
   const now = new Date();
 
   db.transaction((tx) => {
     tx.update(encounters)
       .set({ ...softDelete(now), isActive: false })
-      .where(eq(encounters.id, id))
+      .where(and(alive, eq(encounters.id, id)))
       .run();
-    if (current.isActive) {
-      tx.update(patients)
-        .set({ status: 'outpatient', ...touch(now) })
-        .where(eq(patients.id, current.patientId))
-        .run();
-    }
+
+    if (!current.isActive) return;
+    // Any other open episode decides; otherwise the patient is not admitted.
+    const other = tx
+      .select()
+      .from(encounters)
+      .where(and(alive, eq(encounters.patientId, current.patientId), eq(encounters.isActive, true)))
+      .limit(1)
+      .all()[0];
+    tx.update(patients)
+      .set({ status: statusFor(other ?? null, 'outpatient'), ...touch(now) })
+      .where(eq(patients.id, current.patientId))
+      .run();
   });
 }

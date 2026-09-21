@@ -1,13 +1,15 @@
 import { and, asc, desc, eq, isNull, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { doctors, specialties, type Doctor, type NewDoctor } from '@/db/schema';
+import { doctors, occasions, specialties, type Doctor, type NewDoctor } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { normalizePhone } from '@/lib/persian';
+import { logError } from '@/platform/error-log';
+import { cancelReminder } from '@/platform/notifications';
 
 import { doctorDisplayName, doctorSearchText, parseDoctorName } from './logic';
-import { removeDoctorOccasions } from './occasions-queries';
+import { occasionNotificationIds } from './occasions-queries';
 
 const alive = isNull(doctors.deletedAt);
 
@@ -85,7 +87,7 @@ export async function updateDoctor(id: string, input: Partial<DoctorInput>): Pro
       phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
       searchText: doctorSearchText(merged, await specialtyWords(merged)),
     })
-    .where(eq(doctors.id, id));
+    .where(and(alive, eq(doctors.id, id)));
 }
 
 export async function setDoctorStarred(id: string, starred: boolean): Promise<void> {
@@ -95,11 +97,36 @@ export async function setDoctorStarred(id: string, starred: boolean): Promise<vo
     .where(eq(doctors.id, id));
 }
 
+/**
+ * Remove a doctor from the directory, with everything that hangs off them.
+ *
+ * The database part is one transaction: the doctor and their occasions go
+ * together or not at all, so there is no state where the occasions are gone
+ * and the doctor is still listed. Cancelling the alarms is the operating
+ * system's business and happens afterwards — it cannot be rolled back with a
+ * database, and an alarm left behind is repaired by the upkeep pass rather
+ * than by holding the transaction open across it.
+ */
 export async function deleteDoctor(id: string): Promise<void> {
-  // The occasions and their alarms go with the doctor, wherever the delete
-  // was pressed. Doing this in a screen only covers the screen.
-  await removeDoctorOccasions(id);
-  await db.update(doctors).set(softDelete()).where(eq(doctors.id, id));
+  const notifications = await occasionNotificationIds(id);
+  const now = new Date();
+
+  db.transaction((tx) => {
+    tx.update(occasions)
+      .set(softDelete(now))
+      .where(and(isNull(occasions.deletedAt), eq(occasions.doctorId, id)))
+      .run();
+    tx.update(doctors)
+      .set(softDelete(now))
+      .where(and(alive, eq(doctors.id, id)))
+      .run();
+  });
+
+  for (const notificationId of notifications) {
+    await cancelReminder(notificationId).catch((e: unknown) =>
+      logError(e, { source: 'handled', context: 'doctor delete: cancelling an occasion alarm' }),
+    );
+  }
 }
 
 /**

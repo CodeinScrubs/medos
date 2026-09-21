@@ -17,10 +17,14 @@ import { defineSetting } from '@/db/settings';
  */
 export const KEEP_ORIGINAL_KINDS: readonly AttachmentKind[] = ['clinical_photo', 'radiology'];
 
+/**
+ * The owner's decision: keep the original of every photo, not only the
+ * clinical ones. Storage is cheaper than a lesion photographed once.
+ */
 export const keepOriginalsMode = defineSetting(
   'media.keepOriginals',
   z.enum(['clinical', 'always', 'never']),
-  'clinical',
+  'always',
 );
 
 export type KeepOriginalsMode = z.infer<typeof keepOriginalsMode.schema>;

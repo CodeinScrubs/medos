@@ -7,11 +7,13 @@ import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { noteSearchText } from './logic';
 
+const alive = isNull(notes.deletedAt);
+
 export function patientNotesQuery(patientId: string) {
   return db
     .select()
     .from(notes)
-    .where(and(eq(notes.patientId, patientId), isNull(notes.deletedAt)))
+    .where(and(alive, eq(notes.patientId, patientId)))
     .orderBy(desc(notes.isPinned), desc(notes.noteDate));
 }
 
@@ -66,13 +68,19 @@ export async function createNote(input: NoteInput): Promise<string> {
 }
 
 export async function updateNote(id: string, input: Partial<NoteInput>): Promise<void> {
-  const current = (await db.select().from(notes).where(eq(notes.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(notes)
+      .where(and(alive, eq(notes.id, id)))
+      .limit(1)
+  )[0];
   if (!current) throw new Error(`Note ${id} not found`);
 
   await db
     .update(notes)
     .set({ ...input, ...touch(), searchText: noteSearchText({ ...current, ...input }) })
-    .where(eq(notes.id, id));
+    .where(and(alive, eq(notes.id, id)));
 }
 
 export async function setNotePinned(id: string, isPinned: boolean): Promise<void> {

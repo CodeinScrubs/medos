@@ -142,7 +142,7 @@ export async function updateOccasion(id: string, patch: Partial<OccasionInput>):
   await db
     .update(occasions)
     .set({ ...next, notificationId, ...touch() })
-    .where(eq(occasions.id, id));
+    .where(and(alive, eq(occasions.id, id)));
 }
 
 export async function deleteOccasion(id: string): Promise<void> {
@@ -181,20 +181,19 @@ export async function rescheduleOccasionReminders(): Promise<number> {
 
 /** Silence a doctor's reminders without forgetting the occasions themselves. */
 /**
- * Everything that belongs to a doctor being deleted: the alarms Android is
- * holding, and the occasions themselves.
+ * The alarms Android is holding for one doctor's occasions.
  *
- * This lives next to the occasions rather than in the delete screen, because a
- * reminder cancelled by a button is a reminder that rings whenever the doctor
- * is deleted from anywhere else — and a birthday greeting for someone removed
- * from the directory is the kind of thing that is noticed at 8 a.m.
+ * Returns the notification ids it cleared, so the caller can decide what to do
+ * if the operating system refuses: the database part has already committed by
+ * then, and an alarm that survives its occasion is a greeting that rings for
+ * someone who is no longer in the directory.
  */
-export async function removeDoctorOccasions(doctorId: string): Promise<void> {
-  await cancelDoctorOccasionReminders(doctorId);
-  await db
-    .update(occasions)
-    .set(softDelete())
+export async function occasionNotificationIds(doctorId: string): Promise<string[]> {
+  const rows = await db
+    .select()
+    .from(occasions)
     .where(and(alive, eq(occasions.doctorId, doctorId)));
+  return rows.map((o) => o.notificationId).filter((id): id is string => Boolean(id));
 }
 
 export async function cancelDoctorOccasionReminders(doctorId: string): Promise<void> {

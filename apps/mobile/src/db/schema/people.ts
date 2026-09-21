@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import { baseColumns, bool, isoDate, jsonList } from './_shared';
@@ -174,7 +174,16 @@ export const doctorProfiles = sqliteTable(
     communicationStyle: text('communication_style'),
     personalNotes: text('personal_notes'),
   },
-  (t) => [index('doctor_profiles_doctor_idx').on(t.doctorId)],
+  (t) => [
+    /*
+     * One profile per doctor, enforced by the database rather than by the one
+     * function that happens to upsert it. Partial, so a profile that was
+     * deleted does not block writing a new one.
+     */
+    uniqueIndex('doctor_profiles_doctor_idx')
+      .on(t.doctorId)
+      .where(sql`deleted_at is null`),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */

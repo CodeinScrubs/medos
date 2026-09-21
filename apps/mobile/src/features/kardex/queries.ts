@@ -84,7 +84,7 @@ export async function updateOrder(id: string, patch: Partial<Omit<OrderInput, 'p
   await db
     .update(orders)
     .set({ ...patch, ...touch() })
-    .where(eq(orders.id, id));
+    .where(and(alive, eq(orders.id, id)));
 }
 
 /**

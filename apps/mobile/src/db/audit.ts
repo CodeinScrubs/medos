@@ -22,6 +22,8 @@ export type AuditAction =
   | 'search.reindexed'
   // Stored H/L flags worked out again after a change to the rule.
   | 'labs.reflagged'
+  // A patient's status put back in step with their episodes.
+  | 'patient.statusReconciled'
   // The vault records that a credential was written or read, never its value.
   | 'vault.created'
   | 'vault.updated'

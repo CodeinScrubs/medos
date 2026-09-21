@@ -7,10 +7,11 @@ import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, Column, Input, Row, Screen, Segmented, Text } from '@/components/ui';
 import type { Patient, PatientStatus } from '@/db/schema';
+import { CHOOSABLE_STATUSES, isChoosableStatus } from '@/features/encounters/status';
 import { isValidNationalId, toLatinDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
-import { BLOOD_TYPES, PATIENT_STATUS, PATIENT_STATUS_ORDER, SEX_LABELS } from './labels';
+import { BLOOD_TYPES, PATIENT_STATUS, SEX_LABELS } from './labels';
 import { createPatient, findPossibleDuplicates, updatePatient, type PatientInput } from './queries';
 
 type FormState = {
@@ -41,7 +42,7 @@ function initialState(patient?: Patient): FormState {
     sex: patient?.sex ?? null,
     birthDate: patient?.birthDate ?? null,
     ageYears: patient?.ageYears != null ? String(patient.ageYears) : '',
-    status: patient?.status ?? 'admitted',
+    status: patient?.status ?? 'outpatient',
     summary: patient?.summary ?? '',
     nationalId: patient?.nationalId ?? '',
     fileNumber: patient?.fileNumber ?? '',
@@ -222,15 +223,30 @@ export function PatientForm({ patient }: { patient?: Patient }) {
           </View>
         </Row>
 
+        {/*
+          "بستری" is not here on purpose: being on a ward is what an open
+          admission means, and this form cannot open one. Choosing it here used
+          to put a patient on the admitted list with no ward, no bed, no
+          admission time and no kardex behind them.
+        */}
         <Segmented
           label="وضعیت"
-          value={form.status}
+          value={isChoosableStatus(form.status) ? form.status : 'outpatient'}
           onChange={(v) => set('status', v)}
-          options={PATIENT_STATUS_ORDER.slice(0, 3).map((s) => ({
+          options={CHOOSABLE_STATUSES.slice(0, 3).map((s) => ({
             value: s,
             label: PATIENT_STATUS[s].label,
           }))}
         />
+        {form.status === 'admitted' ? (
+          <Text variant="tiny" color="textFaint">
+            این بیمار بستری است؛ وضعیتش از پرونده‌ی بستری می‌آید و اینجا عوض نمی‌شود.
+          </Text>
+        ) : (
+          <Text variant="tiny" color="textFaint">
+            برای بستری کردن، از «ثبت بستری / ویزیت» در صفحه‌ی بیمار استفاده کنید.
+          </Text>
+        )}
 
         <Input
           label="خلاصه‌ی یک‌خطی"

@@ -12,6 +12,7 @@ import {
   type PatientStatus,
 } from '@/db/schema';
 import { contains, matchesSearch } from '@/db/search';
+import { activeEncounter, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
@@ -129,6 +130,10 @@ export async function createPatient(input: PatientInput): Promise<string> {
     ...input,
     id,
     ...stamps(),
+    // A patient being created has no episode yet, so nothing can make them
+    // admitted. Coerced rather than refused: the value can also arrive from an
+    // import or an older backup, and losing the patient over it would be worse.
+    status: input.status === 'admitted' ? 'outpatient' : input.status,
     phone: input.phone ? normalizePhone(input.phone) : null,
     searchText: patientSearchText(input),
   });
@@ -139,19 +144,28 @@ export async function updatePatient(id: string, input: Partial<PatientInput>): P
   // `searchText` is derived, so it has to be rebuilt from the merged row rather
   // than from the patch alone — otherwise editing only the phone would wipe the
   // name out of the search index.
-  const current = (await db.select().from(patients).where(eq(patients.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(patients)
+      .where(and(alive, eq(patients.id, id)))
+      .limit(1)
+  )[0];
   if (!current) throw new Error(`Patient ${id} not found`);
 
   const merged = { ...current, ...input };
+  // Whether they are on a ward is the episode's answer, not this form's.
+  const status = input.status === undefined ? undefined : statusFor(await activeEncounter(id), input.status);
   await db
     .update(patients)
     .set({
       ...input,
+      status,
       ...touch(),
       phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
       searchText: patientSearchText(merged),
     })
-    .where(eq(patients.id, id));
+    .where(and(alive, eq(patients.id, id)));
 }
 
 export async function setPatientStarred(id: string, starred: boolean): Promise<void> {

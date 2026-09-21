@@ -119,7 +119,13 @@ export async function createTopic(input: TopicInput): Promise<string> {
 }
 
 export async function updateTopic(id: string, patch: Partial<TopicInput>): Promise<void> {
-  const current = (await db.select().from(topics).where(eq(topics.id, id)).limit(1))[0];
+  const current = (
+    await db
+      .select()
+      .from(topics)
+      .where(and(alive, eq(topics.id, id)))
+      .limit(1)
+  )[0];
   if (!current) throw new Error(`Topic ${id} not found`);
   // Rebuilt from the merged row, never from the patch: editing only the title
   // must not drop the body out of the index.
@@ -131,7 +137,7 @@ export async function updateTopic(id: string, patch: Partial<TopicInput>): Promi
       searchText: topicSearchText(merged, await relatedWords(merged)),
       ...touch(),
     })
-    .where(eq(topics.id, id));
+    .where(and(alive, eq(topics.id, id)));
 }
 
 /** Mark a subject reviewed: the flag comes off and the date is stamped. */

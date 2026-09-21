@@ -94,7 +94,7 @@ export async function updatePrescription(id: string, patch: Partial<Prescription
   await db
     .update(prescriptionTemplates)
     .set({ ...row, searchText: prescriptionSearchText(row, row.items), ...touch() })
-    .where(eq(prescriptionTemplates.id, id));
+    .where(and(alive, eq(prescriptionTemplates.id, id)));
 }
 
 /**

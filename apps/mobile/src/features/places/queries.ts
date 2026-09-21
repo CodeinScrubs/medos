@@ -53,7 +53,7 @@ export async function updatePlace(id: string, input: Partial<PlaceInput>): Promi
   db.transaction((tx) => {
     tx.update(places)
       .set({ ...input, ...touch(), searchText: placeSearchText({ ...current, ...input }) })
-      .where(eq(places.id, id))
+      .where(and(alivePlace, eq(places.id, id)))
       .run();
     for (const e of exts) {
       tx.update(extensions)

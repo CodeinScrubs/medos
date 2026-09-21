@@ -149,7 +149,7 @@ export async function updateLabPanel(panelId: string, input: Omit<LabPanelInput,
         notes: input.notes ?? null,
         ...touch(now),
       })
-      .where(eq(labPanels.id, panelId))
+      .where(and(panelAlive, eq(labPanels.id, panelId)))
       .run();
     tx.update(labValues)
       .set(softDelete(now))

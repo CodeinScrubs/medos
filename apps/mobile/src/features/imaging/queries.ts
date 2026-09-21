@@ -79,7 +79,7 @@ export async function updateImagingStudy(id: string, patch: Partial<Omit<Imaging
   await db
     .update(imagingStudies)
     .set({ ...patch, ...touch() })
-    .where(eq(imagingStudies.id, id));
+    .where(and(alive, eq(imagingStudies.id, id)));
 }
 
 export async function deleteImagingStudy(id: string): Promise<void> {

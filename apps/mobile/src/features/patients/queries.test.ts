@@ -118,3 +118,31 @@ describe('deleting a patient', () => {
     expect(actions).toEqual(['patient.deleted', 'patient.restored']);
   });
 });
+
+describe('a record that was deleted', () => {
+  /*
+   * The queries are filtered now, so a screen cannot load a deleted row. A
+   * screen that was already open still holds one, and its save button still
+   * works — so the write has to refuse too.
+   */
+  it('cannot be edited by a screen that was already open', async () => {
+    const id = await createPatient({ firstName: 'زهرا', lastName: 'نوری' });
+    await deletePatient(id);
+
+    await expect(updatePatient(id, { firstName: 'تغییر' })).rejects.toThrow();
+
+    const [row] = await t.db.select().from(patients);
+    expect(row?.firstName).toBe('زهرا');
+  });
+
+  it('comes back through restore, which is its own path', async () => {
+    const id = await createPatient({ firstName: 'زهرا', lastName: 'نوری' });
+    await deletePatient(id);
+
+    await restorePatient(id);
+
+    expect(await patientListQuery()).toHaveLength(1);
+    await updatePatient(id, { firstName: 'زهرای' });
+    expect((await t.db.select().from(patients))[0]?.firstName).toBe('زهرای');
+  });
+});

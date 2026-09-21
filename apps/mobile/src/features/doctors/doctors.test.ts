@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { occasions } from '@/db/schema';
+import { doctors, occasions } from '@/db/schema';
 import { fromJalali, toJalali } from '@/lib/jalali';
 import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications, scheduled } from '@/test/mocks/notifications';
@@ -25,7 +25,7 @@ import {
   rescheduleOccasionReminders,
   updateOccasion,
 } from './occasions-queries';
-import { createDoctor, doctorsQuery, quickCreateDoctor } from './queries';
+import { createDoctor, deleteDoctor, doctorsQuery, quickCreateDoctor } from './queries';
 import { addDoctorRating, doctorProfileQuery, doctorRatingsQuery, saveDoctorProfile } from './ratings-queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -174,7 +174,14 @@ describe('occasion reminders', () => {
   it('rebuilds every enabled reminder from the rows', async () => {
     const doctorId = await createDoctor({ firstName: 'پریسا', lastName: 'نادری', relationship: 'colleague' });
     const later = toJalali(new Date(Date.now() + 60 * 86_400_000));
-    await createOccasion({ doctorId, ...birthday({ jalaliMonth: later.jm, jalaliDay: later.jd }) });
+    await createOccasion({
+      doctorId,
+      kind: 'birthday',
+      title: 'تولد',
+      jalaliMonth: later.jm,
+      jalaliDay: later.jd,
+      remindDaysBefore: 3,
+    });
     await createOccasion({
       doctorId,
       ...birthday({ title: 'سالگرد', kind: 'anniversary', jalaliMonth: later.jm, jalaliDay: later.jd }),
@@ -249,5 +256,34 @@ describe('the directory', () => {
     expect(rows[0]?.lastName).toBe('یوسفی');
     // Persian search normalises the ی/ي the name was typed with.
     expect((await doctorsQuery({ search: 'احمدي' })).map((d) => d.id)).toEqual([quick.id]);
+  });
+});
+
+describe('removing a doctor', () => {
+  /*
+   * The occasions and the doctor go together or not at all: a directory that
+   * still lists someone whose occasions are gone, or occasions pointing at a
+   * doctor who is not there, are both states nothing else in the app expects.
+   */
+  it('takes the occasions with it, in one step', async () => {
+    const doctorId = await createDoctor({ firstName: 'حسن', lastName: 'مرادی' });
+    const later = toJalali(new Date(Date.now() + 60 * 86_400_000));
+    await createOccasion({
+      doctorId,
+      kind: 'birthday',
+      title: 'تولد',
+      jalaliMonth: later.jm,
+      jalaliDay: later.jd,
+      remindDaysBefore: 3,
+    });
+    expect(await doctorOccasionsQuery(doctorId)).toHaveLength(1);
+    expect(scheduled.size).toBe(1);
+
+    await deleteDoctor(doctorId);
+
+    expect(await doctorOccasionsQuery(doctorId)).toHaveLength(0);
+    expect((await t.db.select().from(doctors)).find((d) => d.id === doctorId)?.deletedAt).toBeInstanceOf(Date);
+    // And the alarm Android was holding is gone with it.
+    expect(scheduled.size).toBe(0);
   });
 });

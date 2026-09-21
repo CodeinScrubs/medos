@@ -78,7 +78,7 @@ export async function updateIdea(id: string, patch: Partial<IdeaInput>): Promise
   await db
     .update(ideas)
     .set({ ...row, searchText: ideaSearchText(row), ...touch() })
-    .where(eq(ideas.id, id));
+    .where(and(alive, eq(ideas.id, id)));
 }
 
 export async function setIdeaStatus(id: string, status: Idea['status']): Promise<void> {

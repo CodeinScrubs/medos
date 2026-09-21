@@ -36,6 +36,13 @@
       "when": 1789929423995,
       "tag": "0004_true_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789983216540,
+      "tag": "0005_nappy_alex_power",
+      "breakpoints": true
     }
   ]
 }

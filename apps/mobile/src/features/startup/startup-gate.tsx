@@ -3,8 +3,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui';
+import { audit } from '@/db/audit';
 import { startDatabase } from '@/db/startup';
 import { recoverInterruptedRestore } from '@/features/backup/engine';
+import { reconcileAllPatientStatuses } from '@/features/encounters/status';
 import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { redactErrorText } from '@/lib/redact';
@@ -23,6 +25,7 @@ type State = { status: 'starting' } | { status: 'ready' } | { status: 'error'; e
  *    file that belongs to a dataset this phone did not keep.
  * 3. Search indexes rebuilt if the rules that build them changed.
  * 4. Stored lab flags worked out again if the rule that sets them changed.
+ * 5. Patient statuses reconciled with their episodes.
  *
  * A failure is shown, never swallowed. If the schema is not what the code
  * expects, every screen below would fail in a more confusing way, and carrying
@@ -38,6 +41,11 @@ async function startApp(): Promise<void> {
   await recoverInterruptedRestore();
   await reindexSearchIfNeeded();
   await reflagLabValuesIfNeeded();
+  // Two tables describe whether a patient is on a ward. This is where they are
+  // made to agree again — after a restore, or after any build that let them
+  // drift apart.
+  const fixed = await reconcileAllPatientStatuses();
+  if (fixed > 0) await audit('patient.statusReconciled', { detail: { fixed } });
 }
 
 export function StartupGate({ children }: { children: ReactNode }) {
