@@ -221,6 +221,59 @@ export const notes = sqliteTable(
   ],
 );
 
+/**
+ * Every version a note has had.
+ *
+ * The owner chose to remember everything: nothing here is ever pruned, and a
+ * note's history outlives the note itself — deleting a note soft-deletes the
+ * note, not the record of what it said.
+ *
+ * A version is a whole copy of the note's fields rather than a diff. Diffs are
+ * smaller and are the wrong shape for this: reading "what did I write about
+ * this patient on Tuesday" must not depend on replaying every edit since, and
+ * a single corrupt step must not cost the whole chain. A note is a few
+ * kilobytes of text.
+ *
+ * `contentHash` is what stops the table filling with identical rows: saving a
+ * note twice without changing anything writes one version, not two.
+ */
+export const noteVersions = sqliteTable(
+  'note_versions',
+  {
+    ...baseColumns,
+    noteId: text('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'cascade' }),
+
+    /** Why this version exists: the first save, an edit, or a restore of an older one. */
+    reason: text('reason', { enum: ['created', 'edited', 'restored', 'baseline'] })
+      .notNull()
+      .$default(() => 'edited' as const),
+    /** Which version this one was restored from, when that is how it came about. */
+    restoredFromId: text('restored_from_id'),
+
+    type: text('type', { enum: NOTE_TYPES }).notNull(),
+    title: text('title'),
+    body: text('body'),
+    subjective: text('subjective'),
+    objective: text('objective'),
+    assessment: text('assessment'),
+    plan: text('plan'),
+    noteDate: integer('note_date', { mode: 'timestamp_ms' }),
+    doctorId: text('doctor_id'),
+    specialty: text('specialty'),
+    isPinned: bool('is_pinned'),
+    isDraft: bool('is_draft'),
+
+    /** Of the text fields, so an unchanged save does not become a version. */
+    contentHash: text('content_hash').notNull(),
+  },
+  (t) => [index('note_versions_note_idx').on(t.noteId, t.createdAt)],
+);
+
 /** A recording already moved into storage, waiting for its note to exist. */
 export type DraftVoice = { relativePath: string; durationMs: number | null; sizeBytes: number | null };
 
@@ -519,6 +572,7 @@ export type Encounter = typeof encounters.$inferSelect;
 export type Diagnosis = typeof diagnoses.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type NoteDraft = typeof noteDrafts.$inferSelect;
+export type NoteVersion = typeof noteVersions.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type Vital = typeof vitals.$inferSelect;
 export type LabPanel = typeof labPanels.$inferSelect;

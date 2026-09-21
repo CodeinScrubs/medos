@@ -10,6 +10,7 @@ import {
   Button,
   ChipSelect,
   Column,
+  IconButton,
   Input,
   Row,
   Screen,
@@ -335,7 +336,25 @@ function NoteEditor({
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: isEdit ? 'ویرایش نوت' : 'نوت جدید' }} />
+      <Stack.Screen
+        options={{
+          title: isEdit ? 'ویرایش نوت' : 'نوت جدید',
+          headerRight: isEdit
+            ? () => (
+                <IconButton
+                  icon="time-outline"
+                  label="تاریخچه"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/patient/[id]/note-history',
+                      params: { id: patientId, noteId: note!.id },
+                    })
+                  }
+                />
+              )
+            : undefined,
+        }}
+      />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {recovered ? (
           <Text variant="caption" color="textMuted">

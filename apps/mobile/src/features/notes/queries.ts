@@ -6,6 +6,7 @@ import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { noteSearchText } from './logic';
+import { noteVersionQuery, writeNoteVersion } from './version-queries';
 
 const alive = isNull(notes.deletedAt);
 
@@ -64,6 +65,9 @@ export async function createNote(input: NoteInput): Promise<string> {
     isDraft: input.isDraft ?? false,
     searchText: noteSearchText(input),
   });
+  // The first version is what the note said when it entered the chart.
+  const [written] = await noteQuery(id);
+  if (written) await writeNoteVersion(written, 'created');
   return id;
 }
 
@@ -81,6 +85,48 @@ export async function updateNote(id: string, input: Partial<NoteInput>): Promise
     .update(notes)
     .set({ ...input, ...touch(), searchText: noteSearchText({ ...current, ...input }) })
     .where(and(alive, eq(notes.id, id)));
+
+  // After the write, from the row itself: a version has to say what the note
+  // says, not what this call meant to change.
+  const [updated] = await noteQuery(id);
+  if (updated) await writeNoteVersion(updated, 'edited');
+}
+
+/**
+ * Put an older version back.
+ *
+ * The current text is not thrown away — it is already a version, and the
+ * restore adds another one on top saying where it came from. Nothing in this
+ * table is ever removed, so "undo the restore" is just another restore.
+ */
+export async function restoreNoteVersion(versionId: string): Promise<void> {
+  const [version] = await noteVersionQuery(versionId);
+  if (!version) throw new Error(`Note version ${versionId} not found`);
+  const [current] = await noteQuery(version.noteId);
+  if (!current) throw new Error(`Note ${version.noteId} not found`);
+
+  const fields = {
+    type: version.type,
+    title: version.title,
+    body: version.body,
+    subjective: version.subjective,
+    objective: version.objective,
+    assessment: version.assessment,
+    plan: version.plan,
+    noteDate: version.noteDate ?? current.noteDate,
+    doctorId: version.doctorId,
+    specialty: version.specialty,
+    isPinned: version.isPinned ?? current.isPinned,
+    isDraft: version.isDraft ?? current.isDraft,
+  };
+
+  await db
+    .update(notes)
+    .set({ ...fields, ...touch(), searchText: noteSearchText(fields) })
+    .where(and(alive, eq(notes.id, version.noteId)));
+
+  const [restored] = await noteQuery(version.noteId);
+  if (restored) await writeNoteVersion(restored, 'restored', versionId);
 }
 
 export async function setNotePinned(id: string, isPinned: boolean): Promise<void> {

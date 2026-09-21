@@ -33,6 +33,62 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-21 (M1 + note history) — Working from the owner's plan
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last two commits
+
+The owner supplied a full plan (M0–M7). This covers M0, M1 and the note-history P0.
+The plan's own description of the repository was stale — it said the working tree was
+dirty and `npm run check` was failing on formatting, which was a snapshot taken during the
+previous session. Both were already clean.
+
+**M1 — one source of truth**
+
+- `features/encounters/status.ts`: the episode decides whether a patient is on a ward.
+  `admitted` is no longer a chip on the patient form; create and update coerce it away when
+  no episode backs it; startup reconciles every patient and audits how many it corrected.
+- `deleteEncounter` works only on a live episode (so a second delete cannot rewrite the
+  status of a patient who has moved on) and re-derives the status from what remains.
+- `deleteDoctor` is one transaction for the database, with the alarm cancelling after the
+  commit.
+- `doctor_profiles` has a partial unique index: one live profile per doctor.
+- Ordinary edits across notes, orders, imaging, places, doctors, knowledge, occasions and
+  lab panels require the row to be alive; restore keeps its own path.
+- `media.keepOriginals` now defaults to `always`, per the plan.
+
+**Note history**
+
+- `note_versions`: a whole copy of the note's fields per save, never pruned, with a
+  `contentHash` so an unchanged save is not a version. Deleting a note does not touch them.
+- Written by `createNote` and `updateNote` from the row *after* the write, so a version says
+  what the note says rather than what the call meant to change. Autosave does not make
+  versions — drafts are a different thing.
+- `restoreNoteVersion` puts an older text back and writes a new version on top saying where
+  it came from. Nothing is lost by restoring, so "undo the restore" is another restore.
+- Notes written before the table get a `baseline` version stamped with their own creation
+  time, once, on the `SEARCH_INDEX_VERSION` pattern.
+- Reachable from the note editor's header; `/patient/[id]/note-history`.
+
+**Verified**
+
+- `npm run check` green: 25 suites / 393 tests (378 at the start of this session).
+
+**Not verified**
+
+- None of it on the phone. Note history in particular has never been opened on a device.
+
+**Not done from the plan, and why**
+
+- **M2 (shifts, general tasks, consultations, timeline, round mode, capture inbox)** is the
+  largest part of the plan and is untouched. It is four new tables and six screens; doing it
+  in the same pass as M1 would have meant shipping it untested next to a data-integrity
+  change that needed to be reviewable on its own.
+- **M3 (vitals and diagnoses UI)**, **M5 (trash for every entity)** and **M6 (vault
+  passphrase change — now moot, and the backup round-trip on a second phone)** are likewise
+  untouched.
+- **M7 device acceptance** is blocked on the phone being connected.
+
 ## 2026-09-21 (later) — A fifteen-bug report, checked one by one
 
 **Agent:** claude-opus-5 via Claude Code

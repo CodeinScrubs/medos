@@ -7,6 +7,7 @@ import m0002 from './0002_high_the_leader.sql';
 import m0003 from './0003_sweet_squadron_sinister.sql';
 import m0004 from './0004_true_dragon_man.sql';
 import m0005 from './0005_nappy_alex_power.sql';
+import m0006 from './0006_keen_genesis.sql';
 
   export default {
     journal,
@@ -16,7 +17,8 @@ m0001,
 m0002,
 m0003,
 m0004,
-m0005
+m0005,
+m0006
     }
   }
   

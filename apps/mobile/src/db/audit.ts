@@ -24,6 +24,8 @@ export type AuditAction =
   | 'labs.reflagged'
   // A patient's status put back in step with their episodes.
   | 'patient.statusReconciled'
+  // Notes written before the history table got their first version.
+  | 'note.versionsBackfilled'
   // The vault records that a credential was written or read, never its value.
   | 'vault.created'
   | 'vault.updated'

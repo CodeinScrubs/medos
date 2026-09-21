@@ -43,6 +43,13 @@
       "when": 1789983216540,
       "tag": "0005_nappy_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789983896800,
+      "tag": "0006_keen_genesis",
+      "breakpoints": true
     }
   ]
 }

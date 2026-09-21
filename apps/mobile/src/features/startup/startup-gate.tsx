@@ -8,6 +8,7 @@ import { startDatabase } from '@/db/startup';
 import { recoverInterruptedRestore } from '@/features/backup/engine';
 import { reconcileAllPatientStatuses } from '@/features/encounters/status';
 import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
+import { backfillNoteVersionsIfNeeded } from '@/features/notes/version-queries';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { redactErrorText } from '@/lib/redact';
 import { prepareAudioForPlayback } from '@/platform/audio';
@@ -41,6 +42,7 @@ async function startApp(): Promise<void> {
   await recoverInterruptedRestore();
   await reindexSearchIfNeeded();
   await reflagLabValuesIfNeeded();
+  await backfillNoteVersionsIfNeeded();
   // Two tables describe whether a patient is on a ward. This is where they are
   // made to agree again — after a restore, or after any build that let them
   // drift apart.
