@@ -9,7 +9,11 @@ export function therapyDay(order: Pick<Order, 'startAt' | 'endAt'>, now: Date = 
   if (!order.startAt) return null;
   const until = order.endAt ?? now;
   const diff = daysBetween(until, order.startAt);
-  return diff == null ? null : diff + 1;
+  // A start date in the future would count down — "D0", then "D-1". The date
+  // field does not allow one today, but a day number is a fact about a course
+  // that has begun, and nothing else should be able to produce one.
+  if (diff == null || diff < 0) return null;
+  return diff + 1;
 }
 
 /** `1 g IV Q12H` — the one-line sig, in the order it is written on a kardex. */

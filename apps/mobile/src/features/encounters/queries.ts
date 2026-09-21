@@ -45,7 +45,11 @@ export function currentEncounterQuery(patientId: string) {
 }
 
 export function encounterQuery(id: string) {
-  return db.select().from(encounters).where(eq(encounters.id, id)).limit(1);
+  return db
+    .select()
+    .from(encounters)
+    .where(and(alive, eq(encounters.id, id)))
+    .limit(1);
 }
 
 /**
@@ -188,6 +192,30 @@ export async function dischargeEncounter(id: string, input: DischargeInput): Pro
   });
 }
 
+/**
+ * Delete an episode that should not be in the record.
+ *
+ * If it was the active one, the patient is not on a ward any more — leaving
+ * the status at "admitted" would keep a bed on the admitted list that nothing
+ * points at. There is no history of what they were before, so they become
+ * outpatient: a patient with a file and no admission, which is the one thing
+ * that is certainly true afterwards and is a single tap to correct.
+ */
 export async function deleteEncounter(id: string): Promise<void> {
-  await db.update(encounters).set(softDelete()).where(eq(encounters.id, id));
+  const current = (await db.select().from(encounters).where(eq(encounters.id, id)).limit(1))[0];
+  if (!current) return;
+  const now = new Date();
+
+  db.transaction((tx) => {
+    tx.update(encounters)
+      .set({ ...softDelete(now), isActive: false })
+      .where(eq(encounters.id, id))
+      .run();
+    if (current.isActive) {
+      tx.update(patients)
+        .set({ status: 'outpatient', ...touch(now) })
+        .where(eq(patients.id, current.patientId))
+        .run();
+    }
+  });
 }

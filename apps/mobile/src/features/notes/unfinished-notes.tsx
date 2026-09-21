@@ -4,6 +4,7 @@ import { Pressable } from 'react-native';
 import { Card, Column, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { formatJalaliDateTime } from '@/lib/jalali';
+import { fullName } from '@/lib/persian';
 
 import { draftHasContent, openNoteDraftsQuery } from './draft-queries';
 import { notePreview } from './logic';
@@ -18,7 +19,7 @@ import { notePreview } from './logic';
 export function UnfinishedNotes() {
   const router = useRouter();
   const { data } = useLive(openNoteDraftsQuery());
-  const drafts = (data ?? []).filter(draftHasContent);
+  const drafts = (data ?? []).filter((row) => draftHasContent(row.draft));
 
   if (drafts.length === 0) return null;
 
@@ -26,7 +27,7 @@ export function UnfinishedNotes() {
     <>
       <SectionHeader title="نوت‌های ناتمام" count={drafts.length} />
       <Column gap="sm">
-        {drafts.map((draft) => (
+        {drafts.map(({ draft, patient }) => (
           <Pressable
             key={draft.id}
             accessibilityRole="button"
@@ -41,14 +42,21 @@ export function UnfinishedNotes() {
             }
           >
             <Card>
-              <Row justify="space-between">
-                <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>
+              <Column gap="xxs">
+                <Row justify="space-between">
+                  {/* Whose it is comes first: the point of the list is to be
+                      able to pick the right one without opening them all. */}
+                  <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
+                    {fullName(patient.firstName, patient.lastName)}
+                  </Text>
+                  <Text variant="tiny" color="textFaint">
+                    {formatJalaliDateTime(draft.updatedAt)}
+                  </Text>
+                </Row>
+                <Text variant="caption" color="textMuted" numberOfLines={1}>
                   {notePreview(draft) || 'بدون متن'}
                 </Text>
-                <Text variant="tiny" color="textFaint">
-                  {formatJalaliDateTime(draft.updatedAt)}
-                </Text>
-              </Row>
+              </Column>
             </Card>
           </Pressable>
         ))}

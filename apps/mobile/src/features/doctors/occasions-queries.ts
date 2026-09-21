@@ -47,7 +47,11 @@ export function upcomingOccasionsQuery() {
 }
 
 export function occasionQuery(id: string) {
-  return db.select().from(occasions).where(eq(occasions.id, id)).limit(1);
+  return db
+    .select()
+    .from(occasions)
+    .where(and(alive, eq(occasions.id, id)))
+    .limit(1);
 }
 
 export type OccasionInput = {
@@ -176,6 +180,23 @@ export async function rescheduleOccasionReminders(): Promise<number> {
 }
 
 /** Silence a doctor's reminders without forgetting the occasions themselves. */
+/**
+ * Everything that belongs to a doctor being deleted: the alarms Android is
+ * holding, and the occasions themselves.
+ *
+ * This lives next to the occasions rather than in the delete screen, because a
+ * reminder cancelled by a button is a reminder that rings whenever the doctor
+ * is deleted from anywhere else — and a birthday greeting for someone removed
+ * from the directory is the kind of thing that is noticed at 8 a.m.
+ */
+export async function removeDoctorOccasions(doctorId: string): Promise<void> {
+  await cancelDoctorOccasionReminders(doctorId);
+  await db
+    .update(occasions)
+    .set(softDelete())
+    .where(and(alive, eq(occasions.doctorId, doctorId)));
+}
+
 export async function cancelDoctorOccasionReminders(doctorId: string): Promise<void> {
   const rows = await db
     .select()

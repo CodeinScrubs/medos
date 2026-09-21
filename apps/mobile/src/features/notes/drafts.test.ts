@@ -9,10 +9,11 @@ import {
   draftHasContent,
   noteDraftQuery,
   openNoteDraftsQuery,
+  retargetNoteDraft,
   writeNoteDraft,
 } from './draft-queries';
 import { createNote } from './queries';
-import { createPatient } from '../patients/queries';
+import { createPatient, deletePatient } from '../patients/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -94,5 +95,32 @@ describe('note drafts', () => {
     expect(draftHasContent({ ...blank, voices: [{ relativePath: 'a', durationMs: null, sizeBytes: null }] })).toBe(
       true,
     );
+  });
+});
+
+describe('a draft that became a note', () => {
+  /*
+   * The note is written first and its voices are attached after. If attaching
+   * fails and the editor is left, the draft must already belong to the note —
+   * otherwise it still looks like "a new note for this patient", and saving it
+   * next time writes the note a second time.
+   */
+  it('stops offering itself as a new note', async () => {
+    await writeNoteDraft('d-1', { patientId, noteId: null }, { ...blank, body: 'admission note' });
+    const noteId = await createNote({ patientId, type: 'progress', body: 'admission note' });
+
+    await retargetNoteDraft('d-1', noteId);
+
+    expect(await noteDraftQuery(patientId, null)).toHaveLength(0);
+    expect((await noteDraftQuery(patientId, noteId))[0]?.body).toBe('admission note');
+  });
+
+  it('is not listed once its patient is gone', async () => {
+    await writeNoteDraft('d-1', { patientId, noteId: null }, { ...blank, body: 'typed before the delete' });
+    expect(await openNoteDraftsQuery()).toHaveLength(1);
+
+    await deletePatient(patientId);
+
+    expect(await openNoteDraftsQuery()).toHaveLength(0);
   });
 });

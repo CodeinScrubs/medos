@@ -90,10 +90,14 @@ function NoteCard({ note, patientId, voices }: { note: Note; patientId: string; 
           text: 'حذف',
           style: 'destructive',
           onPress: () =>
-            Alert.alert('حذف نوت؟', 'نوت به حذف‌شده‌ها می‌رود و قابل برگرداندن است.', [
-              { text: 'انصراف', style: 'cancel' },
-              { text: 'حذف', style: 'destructive', onPress: () => void deleteNote(note.id) },
-            ]),
+            Alert.alert(
+              'حذف نوت؟',
+              'از پرونده‌ی بیمار برداشته می‌شود. در خود اپ راهی برای برگرداندنش نیست؛ فقط از بکاپ برمی‌گردد.',
+              [
+                { text: 'انصراف', style: 'cancel' },
+                { text: 'حذف', style: 'destructive', onPress: () => void deleteNote(note.id) },
+              ],
+            ),
         },
         { text: 'انصراف', style: 'cancel' },
       ],

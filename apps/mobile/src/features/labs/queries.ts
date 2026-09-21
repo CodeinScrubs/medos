@@ -19,7 +19,11 @@ export function patientLabPanelsQuery(patientId: string) {
 }
 
 export function labPanelQuery(panelId: string) {
-  return db.select().from(labPanels).where(eq(labPanels.id, panelId)).limit(1);
+  return db
+    .select()
+    .from(labPanels)
+    .where(and(panelAlive, eq(labPanels.id, panelId)))
+    .limit(1);
 }
 
 export function panelValuesQuery(panelId: string) {

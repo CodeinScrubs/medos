@@ -6,7 +6,7 @@ import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { dischargeEncounter, openEncounter, updateEncounter } from './encounters/queries';
+import { deleteEncounter, dischargeEncounter, openEncounter, updateEncounter } from './encounters/queries';
 import { createOrder, patientOrdersQuery, setOrderStatus, suggestOrderNames } from './kardex/queries';
 import { analyteSeriesQuery, createLabPanel, updateLabPanel } from './labs/queries';
 import { reflagLabValuesIfNeeded } from './labs/reflag';
@@ -244,5 +244,35 @@ describe('places and extensions', () => {
     await updatePlace(central, { name: 'بیمارستان امید' });
     expect((await extensionsQuery({ search: 'امید سونو' })).map((r) => r.extension.extension)).toEqual(['2345']);
     expect(await extensionsQuery({ search: 'مرکزی سونو' })).toEqual([]);
+  });
+});
+
+describe('deleting an episode', () => {
+  /*
+   * A deleted admission that leaves the patient "admitted" keeps a bed on the
+   * ward list that nothing points at.
+   */
+  it('takes the patient off the ward when the active one is deleted', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission' });
+    expect(await patientStatus()).toBe('admitted');
+
+    await deleteEncounter(id);
+
+    expect(await patientStatus()).toBe('outpatient');
+    const row = (await t.db.select().from(encounters)).find((e) => e.id === id);
+    expect(row?.deletedAt).toBeInstanceOf(Date);
+    expect(row?.isActive).toBe(false);
+  });
+
+  it('leaves the status alone when a closed episode is deleted', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission' });
+    await dischargeEncounter(id, { dischargedAt: new Date(), dischargeType: 'improved', nextStatus: 'followup' });
+    const second = await openEncounter({ patientId, kind: 'admission' });
+
+    await deleteEncounter(id);
+
+    // The one the patient is actually in still decides.
+    expect(await patientStatus()).toBe('admitted');
+    expect((await t.db.select().from(encounters)).find((e) => e.id === second)?.isActive).toBe(true);
   });
 });

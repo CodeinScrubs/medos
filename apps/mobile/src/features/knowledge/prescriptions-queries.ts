@@ -40,7 +40,11 @@ export function prescriptionsQuery(filter: PrescriptionFilter = {}) {
 }
 
 export function prescriptionQuery(id: string) {
-  return db.select().from(prescriptionTemplates).where(eq(prescriptionTemplates.id, id)).limit(1);
+  return db
+    .select()
+    .from(prescriptionTemplates)
+    .where(and(alive, eq(prescriptionTemplates.id, id)))
+    .limit(1);
 }
 
 export type PrescriptionInput = {

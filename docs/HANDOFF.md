@@ -33,6 +33,78 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-21 (later) — A fifteen-bug report, checked one by one
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's later commits
+
+An external "deep investigation" reported fifteen defects. Eleven are real, two are wrong
+about this code, and two are true statements about a risk that is not reachable or not a
+bug. Checked against source, not taken on trust.
+
+**Fixed**
+
+- **Fourteen single-record queries ignored `deletedAt`** (`patientQuery`, `noteQuery`,
+  `doctorQuery`, `encounterQuery`, `labPanelQuery`, `orderQuery`, `imagingStudyQuery`,
+  `attachmentQuery`, `placeQuery`, `extensionQuery`, `topicQuery`, `prescriptionQuery`,
+  `specialtyProfileQuery`, `ideaQuery`, `occasionQuery`). `EditGate` shows "پیدا نشد" for a
+  missing row, but a deleted one loaded normally and saving it wrote an edited, invisible
+  record. Same class as the credentials fix in `70195fc`; the whole family is now filtered.
+- **A failed voice attachment could duplicate a note.** The note is written first and its
+  voices attached after. On failure the editor stays open (right), but the draft still said
+  "a new note for this patient" — leaving and coming back offered it again, and saving
+  wrote the note twice. `retargetNoteDraft` points the draft at the note the moment it
+  exists.
+- **The note delete dialog promised a trash that does not hold notes.** `/trash` lists
+  deleted patients only. The text now says plainly that it can only come back from a backup.
+- **A deleted episode left the patient admitted.** `deleteEncounter` soft-deleted the row
+  and nothing else: `isActive` stayed true and the patient kept a bed on the ward list. It
+  now clears `isActive` and puts the patient back to outpatient when the deleted episode was
+  the active one, in one transaction, with tests.
+- **Deleting a doctor left their alarms armed.** The cancellation lived in the delete
+  button. It is now in `deleteDoctor`, which also soft-deletes that doctor's occasions.
+- **Unfinished notes listed drafts of deleted patients and did not say whose they were.**
+  The query joins patients and filters them; the card leads with the patient's name.
+- **A non-scrolling screen had no bottom inset**, so its last row sat under Android's
+  navigation bar. The scrolling branch had this; the other one did not.
+- **The backup screen said "other screens are usable" during a restore**, while the import
+  replaces the database in one transaction. It now says the right thing per phase.
+- **`therapyDay` counted down for a future start** (`D0`, `D-1`). Not reachable — the date
+  field refuses future dates there — but a day number is a fact about a course that has
+  begun, so it returns null instead.
+- **Future migrations can no longer break old backups.** `migration-safety.test.ts` fails on
+  any `ADD COLUMN ... NOT NULL` without a `DEFAULT`: a restore copies only shared columns,
+  so such a column has nothing to fill it and the whole restore rolls back. This is the real
+  form of the report's claim about `.$default()`.
+
+**Rejected, with reasons**
+
+- **"Deleted lab panels still appear in trends."** False. Both `patientLabValuesQuery` and
+  `analyteSeriesQuery` inner-join `lab_panels` and filter `panelAlive`. Deleting a panel
+  hides its values everywhere they are read.
+- **"Clearing a Jalali date field silently keeps the old value."** False: clearing calls
+  `onChange(null)`. What is true is that a non-empty unparseable string is ignored without
+  an error, deliberately, because that is what half-typed input looks like.
+- **"Convert 50+ `.$default()` columns to `.default()`."** The mechanism is right and the
+  remedy is wrong: every one of those columns is in `0000_init`, so every backup has it.
+  Rewriting them would mean rebuilding tables in a migration — the risky operation the rules
+  forbid — to fix nothing. The guard above covers the case that actually bites.
+- **"`diagnoses` and `vitals` are dead schema."** They are declared and unused on purpose;
+  `db/schema/index.ts` says so.
+- **Android back gesture bypassing the leave dialog.** True, and harmless: the draft is
+  already written, so leaving keeps the text. Discarded drafts do leave their `.m4a` files
+  on disk; deleting a recording the user may have discarded by accident is the worse choice,
+  so they stay and the row stays soft-deleted beside them.
+
+**Verified**
+
+- `npm run check` green: 24 suites / 378 tests (369 before).
+
+**Not verified**
+
+- Nothing on the phone. The A52s has been disconnected since 0.7.0 was built; 0.7.1 (with
+  the voice playback fix) and all of the above are waiting for it.
+
 ## 2026-09-21 — A voice note that would not play, and review 018
 
 **Agent:** claude-opus-5 via Claude Code

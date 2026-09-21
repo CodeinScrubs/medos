@@ -55,7 +55,13 @@ export function Screen({
   }
 
   return (
-    <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor: colors.background }, pad, style]}>
+    <SafeAreaView
+      edges={edges}
+      // Same reason as the scrolling branch: with three-button navigation the
+      // last row of a screen that does not scroll sits under the system bar,
+      // where it cannot be tapped at all.
+      style={[styles.flex, { backgroundColor: colors.background, paddingBottom: bottomInset }, pad, style]}
+    >
       {children}
     </SafeAreaView>
   );

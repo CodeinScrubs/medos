@@ -35,7 +35,11 @@ export function ideasQuery(filter: IdeaFilter = {}) {
 }
 
 export function ideaQuery(id: string) {
-  return db.select().from(ideas).where(eq(ideas.id, id)).limit(1);
+  return db
+    .select()
+    .from(ideas)
+    .where(and(alive, eq(ideas.id, id)))
+    .limit(1);
 }
 
 export type IdeaInput = {

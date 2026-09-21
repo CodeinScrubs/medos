@@ -31,7 +31,11 @@ export function patientOrdersQuery(patientId: string, encounterId: string | null
 }
 
 export function orderQuery(id: string) {
-  return db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  return db
+    .select()
+    .from(orders)
+    .where(and(alive, eq(orders.id, id)))
+    .limit(1);
 }
 
 export type OrderInput = {

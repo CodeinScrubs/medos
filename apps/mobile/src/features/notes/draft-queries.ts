@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { noteDrafts, type DraftVoice, type NoteDraft, type NoteType } from '@/db/schema';
+import { noteDrafts, patients, type DraftVoice, type NoteDraft, type NoteType } from '@/db/schema';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
 /*
@@ -52,9 +52,36 @@ export function noteDraftQuery(patientId: string, noteId: string | null) {
     .limit(1);
 }
 
-/** Every draft still waiting, newest first — what the user has not finished. */
+/**
+ * Every draft still waiting, newest first, with the patient it belongs to.
+ *
+ * The join is not decoration: a draft for a deleted patient would otherwise
+ * sit on Today for ever, and a card with no name on it makes the owner open
+ * each one to find out whose it is.
+ */
 export function openNoteDraftsQuery(limit = 20) {
-  return db.select().from(noteDrafts).where(alive).orderBy(desc(noteDrafts.updatedAt)).limit(limit);
+  return db
+    .select({ draft: noteDrafts, patient: patients })
+    .from(noteDrafts)
+    .innerJoin(patients, eq(noteDrafts.patientId, patients.id))
+    .where(and(alive, isNull(patients.deletedAt)))
+    .orderBy(desc(noteDrafts.updatedAt))
+    .limit(limit);
+}
+
+/**
+ * Point a draft at the note it became.
+ *
+ * Called the moment the note is created, before its voice notes are attached.
+ * If that attaching fails and the editor is left, the draft must not still
+ * look like "a new note for this patient" — coming back and saving it would
+ * write the note a second time.
+ */
+export async function retargetNoteDraft(id: string, noteId: string): Promise<void> {
+  await db
+    .update(noteDrafts)
+    .set({ noteId, ...touch() })
+    .where(eq(noteDrafts.id, id));
 }
 
 /**

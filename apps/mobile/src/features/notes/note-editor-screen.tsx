@@ -35,6 +35,7 @@ import {
   discardNoteDraft,
   draftHasContent,
   noteDraftQuery,
+  retargetNoteDraft,
   writeNoteDraft,
   type NoteDraftFields,
 } from './draft-queries';
@@ -247,6 +248,10 @@ function NoteEditor({
       } else {
         id = await createNote({ patientId, ...payload });
         savedId.current = id;
+        // From here the draft is an unsaved edit of *that* note. If attaching a
+        // voice fails below and the screen is left, coming back must not offer
+        // it again as a new note and write the note twice.
+        await retargetNoteDraft(draftId, id);
       }
       written = true;
 
@@ -285,34 +290,38 @@ function NoteEditor({
       router.back();
       return;
     }
-    Alert.alert('این نوت هنوز در پرونده ثبت نشده', 'می‌خواهید متنش نگه داشته شود؟', [
-      { text: 'ادامه‌ی نوشتن', style: 'cancel' },
-      {
-        text: 'نگه دار',
-        onPress: () => {
-          // Only leave if the text actually reached storage. `flush` resolves
-          // either way; treating that as success would close the screen on the
-          // one copy of the note that exists.
-          void saver.flush().then((stored) => {
-            if (stored) router.back();
-            else {
-              Alert.alert(
-                'هنوز ذخیره نشد',
-                'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
-              );
-            }
-          });
+    Alert.alert(
+      isEdit ? 'این تغییرها هنوز ذخیره نشده' : 'این نوت هنوز در پرونده ثبت نشده',
+      'می‌خواهید متنش نگه داشته شود؟',
+      [
+        { text: 'ادامه‌ی نوشتن', style: 'cancel' },
+        {
+          text: 'نگه دار',
+          onPress: () => {
+            // Only leave if the text actually reached storage. `flush` resolves
+            // either way; treating that as success would close the screen on the
+            // one copy of the note that exists.
+            void saver.flush().then((stored) => {
+              if (stored) router.back();
+              else {
+                Alert.alert(
+                  'هنوز ذخیره نشد',
+                  'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
+                );
+              }
+            });
+          },
         },
-      },
-      {
-        text: 'دور بریز',
-        style: 'destructive',
-        onPress: () => {
-          saver.cancel();
-          void discardNoteDraft(draftId).finally(() => router.back());
+        {
+          text: 'دور بریز',
+          style: 'destructive',
+          onPress: () => {
+            saver.cancel();
+            void discardNoteDraft(draftId).finally(() => router.back());
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   const autosaveLine =

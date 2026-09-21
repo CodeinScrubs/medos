@@ -16,7 +16,11 @@ export function patientNotesQuery(patientId: string) {
 }
 
 export function noteQuery(id: string) {
-  return db.select().from(notes).where(eq(notes.id, id)).limit(1);
+  return db
+    .select()
+    .from(notes)
+    .where(and(isNull(notes.deletedAt), eq(notes.id, id)))
+    .limit(1);
 }
 
 export type NoteInput = {

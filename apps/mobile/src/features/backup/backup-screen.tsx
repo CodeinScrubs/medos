@@ -107,6 +107,9 @@ function useHasBackupKey(): { keyReady: boolean | null; recheck: () => void } {
   return { keyReady, recheck: () => setChecks((n) => n + 1) };
 }
 
+/** The phases of a restore, where the database is being replaced underneath. */
+const RESTORE_PHASES = new Set(['key', 'files', 'database']);
+
 const PHASE_LABEL: Record<string, string> = {
   snapshot: 'آماده‌سازی دیتابیس…',
   encrypt: 'رمزنگاری…',
@@ -272,7 +275,9 @@ export function BackupScreen() {
                 />
               </View>
               <Text variant="tiny" color="textFaint">
-                اپ را نبندید. بقیه‌ی صفحه‌ها قابل استفاده‌اند.
+                {RESTORE_PHASES.has(progress.phase)
+                  ? 'اپ را نبندید و تا تمام شدن صبر کنید؛ اطلاعات در حال جایگزینی است.'
+                  : 'اپ را نبندید. بقیه‌ی صفحه‌ها قابل استفاده‌اند.'}
               </Text>
             </Column>
           </Card>

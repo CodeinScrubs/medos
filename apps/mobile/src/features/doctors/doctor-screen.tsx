@@ -40,7 +40,7 @@ import {
   ratingAverage,
 } from './logic';
 import { confirmGreetingSent, doctorMessagesQuery, logGreetingPrepared } from './messages-queries';
-import { cancelDoctorOccasionReminders, deleteOccasion, doctorOccasionsQuery } from './occasions-queries';
+import { deleteOccasion, doctorOccasionsQuery } from './occasions-queries';
 import { deleteDoctor, doctorQuery, setDoctorStarred } from './queries';
 import { doctorProfileQuery, doctorRatingsQuery } from './ratings-queries';
 
@@ -125,11 +125,8 @@ export function DoctorScreen() {
                 text: 'حذف',
                 style: 'destructive',
                 onPress: () => {
-                  void (async () => {
-                    await cancelDoctorOccasionReminders(doctor.id);
-                    await deleteDoctor(doctor.id);
-                    router.back();
-                  })();
+                  // `deleteDoctor` cancels the alarms and takes the occasions.
+                  void deleteDoctor(doctor.id).then(() => router.back());
                 },
               },
             ])

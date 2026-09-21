@@ -48,7 +48,7 @@ export function topicQuery(id: string) {
     .from(topics)
     .leftJoin(doctors, eq(topics.taughtById, doctors.id))
     .leftJoin(specialties, eq(topics.specialtyId, specialties.id))
-    .where(eq(topics.id, id))
+    .where(and(alive, eq(topics.id, id)))
     .limit(1);
 }
 

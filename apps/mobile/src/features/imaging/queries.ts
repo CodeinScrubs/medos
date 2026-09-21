@@ -16,7 +16,11 @@ export function patientImagingQuery(patientId: string) {
 }
 
 export function imagingStudyQuery(id: string) {
-  return db.select().from(imagingStudies).where(eq(imagingStudies.id, id)).limit(1);
+  return db
+    .select()
+    .from(imagingStudies)
+    .where(and(alive, eq(imagingStudies.id, id)))
+    .limit(1);
 }
 
 /**

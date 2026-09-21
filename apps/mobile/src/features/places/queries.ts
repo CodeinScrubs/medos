@@ -26,7 +26,11 @@ export function placesQuery(filter: { search?: string; kind?: Place['kind'] } = 
 }
 
 export function placeQuery(id: string) {
-  return db.select().from(places).where(eq(places.id, id)).limit(1);
+  return db
+    .select()
+    .from(places)
+    .where(and(alivePlace, eq(places.id, id)))
+    .limit(1);
 }
 
 export type PlaceInput = Omit<NewPlace, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'searchText'>;
@@ -85,7 +89,11 @@ export function extensionsQuery(filter: { search?: string; placeId?: string } = 
 }
 
 export function extensionQuery(id: string) {
-  return db.select().from(extensions).where(eq(extensions.id, id)).limit(1);
+  return db
+    .select()
+    .from(extensions)
+    .where(and(aliveExt, eq(extensions.id, id)))
+    .limit(1);
 }
 
 export type ExtensionInput = {

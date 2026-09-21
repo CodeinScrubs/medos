@@ -60,7 +60,11 @@ export function patientListQuery(filter: PatientFilter = {}) {
 }
 
 export function patientQuery(id: string) {
-  return db.select().from(patients).where(eq(patients.id, id)).limit(1);
+  return db
+    .select()
+    .from(patients)
+    .where(and(alive, eq(patients.id, id)))
+    .limit(1);
 }
 
 /** The trash: deleted patients, most recently deleted first. */

@@ -32,7 +32,7 @@ export function specialtyProfileQuery(id: string) {
     .select({ profile: specialtyProfiles, specialty: specialties })
     .from(specialtyProfiles)
     .leftJoin(specialties, eq(specialtyProfiles.specialtyId, specialties.id))
-    .where(eq(specialtyProfiles.id, id))
+    .where(and(alive, eq(specialtyProfiles.id, id)))
     .limit(1);
 }
 

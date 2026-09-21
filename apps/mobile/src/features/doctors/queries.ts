@@ -7,6 +7,7 @@ import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { normalizePhone } from '@/lib/persian';
 
 import { doctorDisplayName, doctorSearchText, parseDoctorName } from './logic';
+import { removeDoctorOccasions } from './occasions-queries';
 
 const alive = isNull(doctors.deletedAt);
 
@@ -36,7 +37,11 @@ export function doctorsQuery(filter: DoctorFilter = {}) {
 }
 
 export function doctorQuery(id: string) {
-  return db.select().from(doctors).where(eq(doctors.id, id)).limit(1);
+  return db
+    .select()
+    .from(doctors)
+    .where(and(alive, eq(doctors.id, id)))
+    .limit(1);
 }
 
 export function specialtiesQuery() {
@@ -91,6 +96,9 @@ export async function setDoctorStarred(id: string, starred: boolean): Promise<vo
 }
 
 export async function deleteDoctor(id: string): Promise<void> {
+  // The occasions and their alarms go with the doctor, wherever the delete
+  // was pressed. Doing this in a screen only covers the screen.
+  await removeDoctorOccasions(id);
   await db.update(doctors).set(softDelete()).where(eq(doctors.id, id));
 }
 

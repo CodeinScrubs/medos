@@ -8,7 +8,11 @@ import { newId, softDelete, stamps, touch } from '@/lib/ids';
 const alive = isNull(attachments.deletedAt);
 
 export function attachmentQuery(id: string) {
-  return db.select().from(attachments).where(eq(attachments.id, id)).limit(1);
+  return db
+    .select()
+    .from(attachments)
+    .where(and(alive, eq(attachments.id, id)))
+    .limit(1);
 }
 
 export function entityAttachmentsQuery(entityType: AttachmentEntity, entityId: string) {
