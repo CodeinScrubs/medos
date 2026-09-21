@@ -13,12 +13,14 @@ import { NotesTab } from '@/features/notes/notes-tab';
 import { OverviewTab } from '@/features/patients/overview-tab';
 import { PatientHeader } from '@/features/patients/patient-header';
 import { deletePatient, patientQuery } from '@/features/patients/queries';
+import { TimelineTab } from '@/features/timeline/timeline-tab';
 import { useTheme } from '@/theme';
 
-type Tab = 'overview' | 'notes' | 'kardex' | 'labs' | 'imaging' | 'media';
+type Tab = 'overview' | 'timeline' | 'notes' | 'kardex' | 'labs' | 'imaging' | 'media';
 
 const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'overview', label: 'خلاصه', icon: 'person-outline' },
+  { key: 'timeline', label: 'روند', icon: 'time-outline' },
   { key: 'notes', label: 'نوت‌ها', icon: 'document-text-outline' },
   { key: 'kardex', label: 'کاردکس', icon: 'medical-outline' },
   { key: 'labs', label: 'آزمایش', icon: 'flask-outline' },
@@ -128,6 +130,7 @@ export function PatientRecordScreen() {
           </ScrollView>
 
           {tab === 'overview' && <OverviewTab patient={patient} />}
+          {tab === 'timeline' && <TimelineTab patientId={id} />}
           {tab === 'notes' && <NotesTab patientId={id} />}
           {tab === 'kardex' && <KardexTab patientId={id} />}
           {tab === 'labs' && <LabsTab patientId={id} />}

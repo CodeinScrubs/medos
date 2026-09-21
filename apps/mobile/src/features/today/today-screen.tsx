@@ -8,15 +8,16 @@ import { Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/co
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { RestoreTrouble } from '@/features/backup/restore-trouble';
-import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
-import { ShiftCard } from '@/features/shifts/shift-card';
-import { TasksSection } from '@/features/tasks/tasks-section';
+import { OpenConsults } from '@/features/consults/open-consults';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
+import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { dueFollowUpsQuery, pendingFollowUpsQuery } from '@/features/followups/queries';
 import { UnfinishedNotes } from '@/features/notes/unfinished-notes';
 import { PatientCard } from '@/features/patients/patient-card';
 import { patientListQuery } from '@/features/patients/queries';
+import { ShiftCard } from '@/features/shifts/shift-card';
+import { TasksSection } from '@/features/tasks/tasks-section';
 import { daysBetween, formatJalaliWithWeekday, toIsoDate, toJalali } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
 import { endOfDay } from '@/lib/time';
@@ -103,6 +104,8 @@ export function TodayScreen() {
         <ShiftCard />
 
         <TasksSection patientId={null} title="کارهای بدون بیمار" />
+
+        <OpenConsults />
 
         <UnfinishedNotes />
 

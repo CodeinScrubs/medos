@@ -518,6 +518,62 @@ export const followUps = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Consultations                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A question asked of another service, and its answer.
+ *
+ * A consult note records what the specialist wrote. This records the thing the
+ * note cannot: that an answer is still owed. Until now "did cardiology ever
+ * get back to us?" could only be answered by reading the notes and noticing an
+ * absence — and an absence is exactly what nobody notices at 2 a.m.
+ *
+ * `status` moves by hand, because every transition is a real-world event the
+ * app cannot observe: writing it down, actually asking, and being answered.
+ * Nothing here infers that a consult was requested because a note exists.
+ */
+export const consultations = sqliteTable(
+  'consultations',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'cascade' }),
+    encounterId: text('encounter_id').references(() => encounters.id, { onDelete: 'cascade' }),
+
+    /** The service asked, as it is said on a ward: "قلب", "عفونی". */
+    specialty: text('specialty'),
+    /** The specific person, when it is a specific person. */
+    doctorId: text('doctor_id').references(() => doctors.id),
+
+    /** The question. Not the diagnosis, and not a summary of the patient. */
+    reason: text('reason').notNull(),
+    urgency: text('urgency', { enum: ['routine', 'urgent', 'emergency'] })
+      .notNull()
+      .$default(() => 'routine' as const),
+
+    status: text('status', { enum: ['pending', 'requested', 'answered', 'cancelled'] })
+      .notNull()
+      .$default(() => 'pending' as const),
+    requestedAt: integer('requested_at', { mode: 'timestamp_ms' }),
+    respondedAt: integer('responded_at', { mode: 'timestamp_ms' }),
+    /** What they said, in whatever detail was written down. */
+    response: text('response'),
+    /** What to do about it, kept apart from the answer itself. */
+    followUpInstruction: text('follow_up_instruction'),
+    /** The consult note, when one was written. */
+    noteId: text('note_id').references(() => notes.id, { onDelete: 'set null' }),
+    searchText: text('search_text'),
+  },
+  (t) => [
+    index('consultations_patient_idx').on(t.patientId, t.requestedAt),
+    index('consultations_status_idx').on(t.status),
+    index('consultations_search_idx').on(t.searchText),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Shifts: the unit of the owner's working day                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -704,6 +760,7 @@ export type LabPanel = typeof labPanels.$inferSelect;
 export type LabValue = typeof labValues.$inferSelect;
 export type ImagingStudy = typeof imagingStudies.$inferSelect;
 export type FollowUp = typeof followUps.$inferSelect;
+export type Consultation = typeof consultations.$inferSelect;
 export type Shift = typeof shifts.$inferSelect;
 export type ShiftPatient = typeof shiftPatients.$inferSelect;
 export type Task = typeof tasks.$inferSelect;

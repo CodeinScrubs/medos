@@ -4,10 +4,10 @@ import { noteVersions } from '@/db/schema';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { createPatient } from '../patients/queries';
-import { createNote, deleteNote, noteQuery, restoreNoteVersion, updateNote } from './queries';
 import { noteDraftQuery, writeNoteDraft } from './draft-queries';
+import { createNote, deleteNote, noteQuery, restoreNoteVersion, updateNote } from './queries';
 import { backfillNoteVersionsIfNeeded, contentHashOf, noteVersionsQuery } from './version-queries';
+import { createPatient } from '../patients/queries';
 
 const blankDraft = {
   type: 'progress' as const,

@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-21 (M2, second half) — Consults that can be outstanding, and a timeline
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last commit
+
+**Changed**
+
+- **Consultations** (`consultations`). A consult note records what the specialist wrote; it
+  cannot record that an answer is still owed, because that is an absence — and an absence
+  is what nobody notices at 2 a.m. The request is now its own row with its own state:
+  written down, actually asked, answered, or called off. Every transition is a button
+  someone presses; nothing infers that a consult was requested because a note exists. The
+  reply and the instruction that follows from it are separate fields, because "EF 35%" and
+  "start an ACE inhibitor tomorrow" are different sentences.
+- **Open consults on Today**, across all patients, so what is owed is visible without
+  opening anybody's record.
+- **A timeline tab** on the patient record: notes, lab panels, imaging with a date,
+  consults and admissions/discharges, newest first. Deliberately a projection over the
+  existing tables rather than an events table — every row already has an owner that
+  validates it, and a copy would be a second place to keep in step. Orders are left out (a
+  kardex line is a standing instruction, not a moment) and so are tasks (a task is about
+  the future).
+- Consults and tasks joined the search index registry.
+
+**Verified**
+
+- `npm run check` green: 27 suites / 414 tests (408 before).
+
+**Not verified**
+
+- Nothing on the phone.
+
+**Still open from the owner's plan**
+
+- M2: round mode as a dedicated one-patient-at-a-time flow (the shift screen covers much of
+  it), and the capture inbox.
+- M3 (vitals and diagnoses UI), M5 (trash for every entity), M6, M7.
+
 ## 2026-09-21 (M2, first half) — Shifts and tasks
 
 **Agent:** claude-opus-5 via Claude Code

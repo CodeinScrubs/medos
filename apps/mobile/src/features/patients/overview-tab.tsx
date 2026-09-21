@@ -5,15 +5,16 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Badge, Button, Card, Column, DataRow, Divider, Row, SectionHeader, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { ConsultsSection } from '@/features/consults/consults-section';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { ENCOUNTER_KIND_LABELS } from '@/features/encounters/labels';
 import { admissionElapsed, formatAdmissionElapsed, isInpatient } from '@/features/encounters/logic';
-import { TasksSection } from '@/features/tasks/tasks-section';
 import { activeEncounterDetailQuery } from '@/features/encounters/queries';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { patientFollowUpsQuery } from '@/features/followups/queries';
 import { isHighlighted } from '@/features/notes/logic';
 import { patientNotesQuery } from '@/features/notes/queries';
+import { TasksSection } from '@/features/tasks/tasks-section';
 import { formatJalali, formatJalaliDateTime, formatJalaliLong, formatRelative } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -45,6 +46,8 @@ export function OverviewTab({ patient }: { patient: Patient }) {
       <AdmissionCard patientId={patientId} />
 
       <TasksSection patientId={patientId} title="کارهای این بیمار" limit={8} />
+
+      <ConsultsSection patientId={patientId} />
 
       <SectionHeader
         title="پیگیری‌ها"

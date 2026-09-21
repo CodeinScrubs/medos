@@ -4,9 +4,6 @@ import { shiftPatients, shifts } from '@/db/schema';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { openEncounter } from '../encounters/queries';
-import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
-import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 import {
   addPatientToShift,
   activeShiftQuery,
@@ -18,6 +15,9 @@ import {
   shiftProgress,
   startShift,
 } from './queries';
+import { openEncounter } from '../encounters/queries';
+import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
+import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));

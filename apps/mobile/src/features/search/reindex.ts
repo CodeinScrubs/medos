@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { audit } from '@/db/audit';
 import { defineSetting, readSetting, writeSetting } from '@/db/settings';
+import { reindexConsults } from '@/features/consults/queries';
 import { reindexDoctors } from '@/features/doctors/queries';
 import { reindexIdeas } from '@/features/knowledge/ideas-queries';
 import { reindexPrescriptions } from '@/features/knowledge/prescriptions-queries';
@@ -43,6 +44,7 @@ export async function reindexSearchIfNeeded(): Promise<void> {
     ideas: await reindexIdeas(),
     credentials: await reindexCredentials(),
     tasks: await reindexTasks(),
+    consults: await reindexConsults(),
   };
   await writeSetting(indexedVersion, SEARCH_INDEX_VERSION);
 

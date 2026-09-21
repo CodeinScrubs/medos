@@ -5,8 +5,8 @@ import { notes, type NoteType } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
-import { noteSearchText } from './logic';
 import { discardNoteDraftFor } from './draft-queries';
+import { noteSearchText } from './logic';
 import { noteVersionQuery, writeNoteVersion } from './version-queries';
 
 const alive = isNull(notes.deletedAt);
