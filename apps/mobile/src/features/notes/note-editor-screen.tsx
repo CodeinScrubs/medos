@@ -418,7 +418,8 @@ function NoteEditor({
             {fields.voices.map((v, i) => (
               <VoiceNotePlayer
                 key={v.relativePath}
-                uri={mediaUri(v.relativePath) ?? ''}
+                uri={mediaUri(v.relativePath)}
+                relativePath={v.relativePath}
                 durationMs={v.durationMs}
                 onLongPress={() => update({ voices: fields.voices.filter((_, j) => j !== i) })}
               />

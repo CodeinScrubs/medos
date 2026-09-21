@@ -42,8 +42,18 @@ export function credentialsQuery(filter: CredentialFilter = {}) {
     .orderBy(desc(credentials.starred), asc(credentials.systemName));
 }
 
+/**
+ * One entry, by id — and only while it is still there.
+ *
+ * Without the `deletedAt` filter a stale screen, a back gesture or an old deep
+ * link would happily show, and let you edit, a password that was deleted.
+ */
 export function credentialQuery(id: string) {
-  return db.select().from(credentials).where(eq(credentials.id, id)).limit(1);
+  return db
+    .select()
+    .from(credentials)
+    .where(and(alive, eq(credentials.id, id)))
+    .limit(1);
 }
 
 export type CredentialInput = {

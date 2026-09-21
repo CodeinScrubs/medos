@@ -46,12 +46,11 @@ export function VoiceNotesSection({
   return (
     <Column gap="sm">
       {voices.map((v) => {
-        const uri = mediaUri(v.relativePath);
-        if (!uri) return null;
         return (
           <VoiceNotePlayer
             key={v.id}
-            uri={uri}
+            uri={mediaUri(v.relativePath)}
+            relativePath={v.relativePath}
             durationMs={v.durationMs}
             caption={v.caption ?? formatJalaliDateTime(v.capturedAt)}
             onLongPress={() =>

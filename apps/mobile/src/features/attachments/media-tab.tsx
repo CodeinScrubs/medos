@@ -126,11 +126,11 @@ export function MediaTab({ patientId }: { patientId: string }) {
 
       <SectionHeader title="وویس‌ها" count={voices.length} />
       {voices.map((v) => {
-        const uri = mediaUri(v.relativePath);
-        return uri ? (
+        return (
           <VoiceNotePlayer
             key={v.id}
-            uri={uri}
+            uri={mediaUri(v.relativePath)}
+            relativePath={v.relativePath}
             durationMs={v.durationMs}
             caption={v.caption ?? formatJalaliDateTime(v.capturedAt)}
             onLongPress={() =>
@@ -140,7 +140,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
               ])
             }
           />
-        ) : null;
+        );
       })}
       <VoiceRecorder
         label="ضبط وویس برای این بیمار"

@@ -8,6 +8,7 @@ import { recoverInterruptedRestore } from '@/features/backup/engine';
 import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { redactErrorText } from '@/lib/redact';
+import { prepareAudioForPlayback } from '@/platform/audio';
 import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
 
@@ -28,6 +29,11 @@ type State = { status: 'starting' } | { status: 'ready' } | { status: 'error'; e
  * on risks writing into a half-migrated database.
  */
 async function startApp(): Promise<void> {
+  // Audio never blocks the app: a phone that will not let the session be set
+  // can still show every record it has.
+  void prepareAudioForPlayback().catch((e: unknown) =>
+    logError(e, { source: 'handled', context: 'startup: audio mode' }),
+  );
   await startDatabase();
   await recoverInterruptedRestore();
   await reindexSearchIfNeeded();

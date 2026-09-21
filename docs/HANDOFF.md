@@ -33,6 +33,61 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-21 — A voice note that would not play, and review 018
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's commits
+
+**The owner's report:** record a voice note, press play, nothing happens.
+
+**Changed — playback**
+
+Not reproduced on a phone (the A52s was disconnected), so this is a fix for the causes the
+code actually contains, plus an end to the silence around them:
+
+- **The audio session is set for playback again.** Recording switches the session to
+  record; nothing switched it back. The very next thing anyone does after recording is
+  press play on the same screen. `platform/audio.ts` now holds one playback mode
+  (`playsInSilentMode`, not routed through the earpiece, ducking others), applied at
+  startup, when a recording stops, and before every play.
+- **The press reads `player.playing` rather than the status snapshot.** The status arrives
+  by event; a missed one left the button toggling against a stale idea of the player, which
+  looks exactly like a dead button.
+- **A player whose source never loaded gets it again** (`replace`) instead of doing nothing.
+- **Failures are visible.** A missing file says "فایل صدا پیدا نشد" and a thrown play says
+  "پخش نشد" in the row, and the error reaches the diagnostics log. Whatever is wrong next
+  time, the screen will say something.
+- **A short recording is less likely to be thrown away**: the length is taken as the larger
+  of the polled state and the recorder's own clock, because the poll can be a quarter of a
+  second behind and 0 ms means "discard as an accidental tap".
+
+**Changed — review 018**
+
+- **C1 (P2, real):** `credentialQuery` filtered by id only, so a deleted password could
+  still be read and edited through a stale screen or an old link. It now filters
+  `deletedAt`, with a test.
+- **C2 (P2, real):** the form could not clear a stored password — an empty box means "leave
+  it alone", by design, and there was no other way. There is now an explicit
+  "رمز ذخیره‌شده پاک شود" switch, shown only when editing and only when the box is empty.
+- **Version metadata (real):** `app.json` said 0.7.0 while both `package.json` files said
+  0.5.0, which is what `npm run brief` reads. Aligned, and `app-version.test.ts` now fails
+  if they drift again.
+- **C3** (should deleting a password purge it rather than soft-delete) is an owner decision
+  and is left as one. **C4** (internal `vault` naming) is deliberately not renamed. **C5**
+  (pre-0.7 ciphertext rows) was already handled and documented.
+
+**Verified**
+
+- `npm run check` green: 23 suites / 369 tests.
+
+**Not verified**
+
+- The playback fix. It needs the phone: record, press play, and watch whether the timer
+  moves. A moving timer with no sound is a routing problem; a still timer is a loading
+  problem, and the row will now name which.
+- Everything else in 0.7.0 is still device-untested: the notebook screens, the permissions
+  card, and migration 0004 on an existing install.
+
 ## 2026-09-20 (0.7.0) — The vault becomes a notebook, permissions get a home
 
 **Agent:** claude-opus-5 via Claude Code

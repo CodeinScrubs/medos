@@ -56,6 +56,7 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
    * screen. Left empty, the stored one is kept untouched.
    */
   const [secret, setSecret] = useState('');
+  const [clearSecret, setClearSecret] = useState(false);
   const [secondFactorNotes, setSecondFactorNotes] = useState(credential?.secondFactorNotes ?? '');
   const [ownerKind, setOwnerKind] = useState<Credential['ownerKind']>(credential?.ownerKind ?? 'self');
   const [ownerName, setOwnerName] = useState(credential?.ownerName ?? '');
@@ -92,9 +93,14 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
     };
     try {
       if (credential) {
-        // Only send `secret` when something was typed, so an edit of the
-        // username cannot wipe the stored password.
-        await updateCredential(credential.id, secret ? { ...payload, secret } : payload);
+        /*
+         * `secret` goes only when there is something to say about it. An empty
+         * box means "leave the stored password alone", because editing a
+         * username must not wipe it — clearing it on purpose is the button
+         * below the field, which says so.
+         */
+        const secretChange = clearSecret ? { secret: '' } : secret ? { secret } : {};
+        await updateCredential(credential.id, { ...payload, ...secretChange });
       } else {
         await createCredential({ ...payload, secret });
       }
@@ -122,12 +128,27 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
         <Input
           label={credential ? 'رمز جدید' : 'رمز'}
           value={secret}
-          onChangeText={setSecret}
+          onChangeText={(v) => {
+            setSecret(v);
+            if (v) setClearSecret(false);
+          }}
           secureTextEntry
           ltr
           autoCapitalize="none"
-          hint={hint ?? (credential ? 'خالی بگذارید تا رمز فعلی دست نخورد' : 'همان‌طور که می‌نویسید ذخیره می‌شود')}
+          hint={
+            clearSecret
+              ? 'با ذخیره، رمز ذخیره‌شده پاک می‌شود'
+              : (hint ?? (credential ? 'خالی بگذارید تا رمز فعلی دست نخورد' : 'همان‌طور که می‌نویسید ذخیره می‌شود'))
+          }
         />
+        {credential && !secret ? (
+          <Toggle
+            label="رمز ذخیره‌شده پاک شود"
+            description="فقط خود رمز؛ بقیه‌ی اطلاعات این سامانه می‌ماند"
+            value={clearSecret}
+            onChange={setClearSecret}
+          />
+        ) : null}
         <Input label="آدرس سامانه" value={url} onChangeText={setUrl} ltr autoCapitalize="none" keyboardType="url" />
 
         <CollapsibleSection

@@ -13,6 +13,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { alertError } from '@/components/feedback';
 import { Row, Text } from '@/components/ui';
 import { toPersianDigits } from '@/lib/persian';
+import { prepareAudioForPlayback } from '@/platform/audio';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
 export type Recording = { uri: string; durationMs: number };
@@ -51,7 +52,7 @@ export function VoiceRecorder({
   // repeat when nothing was being recorded.
   useEffect(
     () => () => {
-      void setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+      void prepareAudioForPlayback().catch(() => undefined);
     },
     [],
   );
@@ -77,13 +78,20 @@ export function VoiceRecorder({
 
   async function finish(keep: boolean) {
     setBusy(true);
-    const durationMs = state.durationMillis;
+    // The polled state can be up to one interval behind the recorder itself,
+    // and a length read too early is how a real recording gets thrown away as
+    // an accidental tap.
+    const durationMs = Math.max(state.durationMillis, Math.round(recorder.currentTime * 1000));
     try {
       await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false });
+      // Back to a session that can play: the next thing anyone does after
+      // recording is press play on what they just recorded.
+      await prepareAudioForPlayback();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Anything under half a second is an accidental tap, not a note.
       if (keep && recorder.uri && durationMs >= 500) onRecorded({ uri: recorder.uri, durationMs });
+    } catch (e) {
+      alertError('ضبط تمام نشد', e);
     } finally {
       setBusy(false);
     }

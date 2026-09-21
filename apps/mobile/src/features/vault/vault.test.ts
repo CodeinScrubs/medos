@@ -6,7 +6,14 @@ import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { credentialSearchText, daysUntilExpiry, secretHint } from './logic';
-import { createCredential, credentialSecret, credentialsQuery, deleteCredential, updateCredential } from './queries';
+import {
+  createCredential,
+  credentialQuery,
+  credentialSecret,
+  credentialsQuery,
+  deleteCredential,
+  updateCredential,
+} from './queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 
@@ -106,5 +113,20 @@ describe('helpers', () => {
     const now = new Date('2026-01-01T10:00:00');
     expect(daysUntilExpiry(new Date('2026-01-08T10:00:00'), now)).toBe(7);
     expect(daysUntilExpiry(null, now)).toBeNull();
+  });
+});
+
+describe('after deletion', () => {
+  /*
+   * The list filters deleted rows, but a direct read did not. A back gesture
+   * onto a screen that is still mounted, or an old link, could show and edit a
+   * password that was deleted.
+   */
+  it('cannot be read or edited through its own id', async () => {
+    const id = await createCredential({ systemName: 'رفته', secret: SECRET });
+    await deleteCredential(id);
+
+    expect(await credentialQuery(id)).toHaveLength(0);
+    await expect(updateCredential(id, { username: 'x' })).rejects.toThrow();
   });
 });
