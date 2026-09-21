@@ -3,10 +3,11 @@ import { Stack, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { AutosaveField } from '@/components/autosave-field';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
-import { Badge, Button, Card, Column, EmptyState, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { Badge, Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { locationLabel } from '@/features/encounters/status';
 import { patientListQuery } from '@/features/patients/queries';
@@ -120,10 +121,23 @@ export function ShiftScreen() {
 
               <Row gap="sm">
                 <View style={styles.grow}>
-                  <Button label="افزودن بیمار" icon="person-add-outline" onPress={() => setPicking(true)} full />
+                  <Button
+                    label="شروع راند"
+                    icon="walk-outline"
+                    onPress={() => router.push('/round')}
+                    disabled={rows.length === 0}
+                    full
+                  />
                 </View>
-                <Button label="پایان شیفت" variant="ghost" onPress={finish} haptic={false} />
+                <Button
+                  label="افزودن بیمار"
+                  icon="person-add-outline"
+                  variant="secondary"
+                  onPress={() => setPicking(true)}
+                />
               </Row>
+
+              <Button label="پایان شیفت" variant="ghost" onPress={finish} haptic={false} />
             </Column>
           </Card>
         ) : null}
@@ -181,10 +195,10 @@ export function ShiftScreen() {
                   </Pressable>
                 </Row>
 
-                <Input
+                <AutosaveField
                   label="یادداشت تحویل شیفت"
-                  value={member.handoffNote ?? ''}
-                  onChangeText={(v) => void updateShiftPatient(member.id, { handoffNote: v })}
+                  initialValue={member.handoffNote}
+                  onSave={(value) => updateShiftPatient(member.id, { handoffNote: value })}
                   placeholder="چیزی که نفر بعد باید بداند"
                   multiline
                 />

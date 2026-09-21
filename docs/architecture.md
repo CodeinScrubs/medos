@@ -244,6 +244,14 @@ whichever comes first — and hands the same id to the other two. Leaving the sc
 what is waiting and then drops the row again if it turned out to be empty, so opening quick
 capture by accident costs nothing and recording into it costs nothing either.
 
+`components/autosave-field.tsx` applies the same rule to a single field on a row that
+already exists — the shift summary, the handoff note. Writing those on every keystroke is
+the obvious implementation and the wrong one: the row is being watched by a live query, so
+each write pushes its own value back at the input, and a write that lands slower than the
+next keypress makes the field snap back and the cursor jump. The field owns its text while
+it is being edited and writes on a timer. Because it reads both its starting value and its
+target once, it has to sit inside something keyed per row.
+
 ---
 
 ## Forced RTL at build time

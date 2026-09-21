@@ -33,6 +33,62 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-21 (M2, finished) — The round, one patient at a time
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last commit
+
+**Changed**
+
+- **Round mode** (`/round`): one patient filling the screen, in the shift's order. A list is
+  the wrong shape for a ward round — reading one means looking away from the person in
+  front of you and then finding your place again, and the place you find is rarely the one
+  you left. The card carries what actually gets asked at a bedside: where they are, what
+  day of the admission it is, the allergy banner, the last note, consults still owed, that
+  patient's open tasks, and the two notes fields.
+- **It stores nothing of its own.** The only durable fact a round produces — that somebody
+  has been seen — already belongs to the shift, so round mode is arithmetic over
+  `shift_patients` and nothing else. `features/shifts/round.ts` holds that arithmetic, away
+  from the screen, with 12 tests.
+- **The cursor follows a person, not a position.** Somebody can be added to or taken off
+  the shift from another screen while the round is open; following the index would quietly
+  move the round onto a patient nobody looked at.
+- **"Seen" and "skip" are genuinely different.** Skipping the only person left unseen keeps
+  you on them, because moving on would mean the round declared itself finished while
+  somebody was still owed a visit. Marking seen excludes them explicitly, because the list
+  in hand was read a moment before that write landed.
+- **`components/autosave-field.tsx`**, and the shift screen's handoff note now uses it. It
+  was writing on every keystroke into a field whose value came from a live query — each
+  write pushes its own value back at the input, and on a phone a write that lands slower
+  than the next keypress makes the field snap back and the cursor jump. Not observed on
+  hardware; it is a latent bug in the code, and the shape of the fix is the one the note
+  editor already uses.
+- Entry points: a round button on the shift screen and on Today's shift card (with how many
+  are left), plus shift and inbox rows in «بیشتر».
+
+**Verified**
+
+- `npm run check` green: 29 suites / 444 tests (430 before).
+
+**Not verified**
+
+- Nothing on the phone. Round mode in particular has only been reasoned about: the counter,
+  the allergy banner and the two autosaving fields have never been rendered.
+
+**Still open from the owner's plan**
+
+- M3 (vitals and diagnoses UI, encounter history, Kardex lifecycle, labs import, imaging
+  follow-up), M5 (trash for the remaining entities), M6, M7.
+- M2 is now complete as written: shifts, tasks, consults, timeline, round mode, capture
+  inbox. None of it has run on hardware.
+
+**Gotchas**
+
+- `react-hooks/immutability` rejects assigning to a property of a value returned by
+  `useState`, so the "mutable box" trick for keeping a callback fresh is not available
+  here. Capturing the callback once in the `useState` initialiser is what works — at the
+  cost of needing a `key` per row, which is documented on the component.
+
 ## 2026-09-21 (M2, third part) — A place to put a thing before you know where it goes
 
 **Agent:** claude-opus-5 via Claude Code

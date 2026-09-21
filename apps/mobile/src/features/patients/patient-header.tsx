@@ -86,7 +86,7 @@ export function PatientHeader({ patient }: { patient: Patient }) {
  * It is the one piece of the record that has to be impossible to miss before
  * anything is prescribed.
  */
-function AllergyBanner({ text }: { text: string }) {
+export function AllergyBanner({ text }: { text: string }) {
   const { colors, radii, spacing } = useTheme();
   const isNone = /^\s*(nkda|nkfa|none|ندارد|هیچ)\s*$/i.test(text.trim());
 

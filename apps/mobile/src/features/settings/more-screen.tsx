@@ -26,6 +26,18 @@ export function MoreScreen() {
 
   const ready: Item[] = [
     {
+      icon: 'time-outline',
+      title: 'شیفت و راند',
+      subtitle: 'بیمارهای امشب، و راند یکی‌یکی',
+      href: '/shift',
+    },
+    {
+      icon: 'file-tray-outline',
+      title: 'ثبت‌های نشده',
+      subtitle: 'هرچه سریع ثبت کرده‌اید و هنوز جایش مشخص نیست',
+      href: '/inbox',
+    },
+    {
       icon: 'cloud-upload-outline',
       title: 'پشتیبان‌گیری',
       subtitle: lastBackup ? `آخرین بکاپ ${formatRelativeTime(lastBackup, new Date(now))}` : 'هنوز بکاپی گرفته نشده',

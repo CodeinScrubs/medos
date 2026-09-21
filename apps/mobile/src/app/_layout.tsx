@@ -111,6 +111,7 @@ function AppStack() {
 
         <Stack.Screen name="patient/new" options={modal('بیمار جدید')} />
         <Stack.Screen name="shift" options={{ title: 'شیفت' }} />
+        <Stack.Screen name="round" options={{ title: 'راند' }} />
         <Stack.Screen name="capture" options={modal('ثبت سریع')} />
         <Stack.Screen name="inbox" options={{ title: 'ثبت‌های نشده' }} />
         <Stack.Screen name="patient/[id]/index" options={{ title: 'پرونده بیمار' }} />

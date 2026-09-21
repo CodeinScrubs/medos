@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Pressable } from 'react-native';
 
-import { Badge, Card, Column, Row, Text } from '@/components/ui';
+import { Badge, Button, Card, Column, Row, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
@@ -24,6 +24,7 @@ export function ShiftCard() {
   const shift = shifts?.[0] ?? null;
   const { data: members } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
   const progress = shiftProgress(members ?? []);
+  const remaining = progress.total - progress.seen;
 
   return (
     <Pressable accessibilityRole="button" onPress={() => router.push('/shift')}>
@@ -45,6 +46,17 @@ export function ShiftCard() {
           ) : null}
           <Ionicons name="chevron-back" size={18} color={colors.textFaint} />
         </Row>
+
+        {shift && remaining > 0 ? (
+          <Button
+            label={`راند — ${toPersianDigits(remaining)} نفر مانده`}
+            icon="walk-outline"
+            variant="secondary"
+            size="sm"
+            onPress={() => router.push('/round')}
+            style={{ marginTop: spacing.sm }}
+          />
+        ) : null}
       </Card>
     </Pressable>
   );
