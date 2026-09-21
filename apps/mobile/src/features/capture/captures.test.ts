@@ -1,0 +1,220 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+import { captureInbox } from '@/db/schema';
+import { useTestDatabase } from '@/test/db-client';
+import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
+
+import {
+  captureQuery,
+  createCapture,
+  deletedCapturesQuery,
+  discardCapture,
+  discardCaptureIfEmpty,
+  fileCaptureAsNote,
+  fileCaptureAsTask,
+  filedCapturesQuery,
+  inboxQuery,
+  restoreCapture,
+  updateCapture,
+} from './queries';
+import { CaptureWriter } from './writer';
+import { addAttachment, entityAttachmentsQuery } from '../attachments/queries';
+import { patientNotesQuery } from '../notes/queries';
+import { createPatient, deletePatient } from '../patients/queries';
+import { startShift } from '../shifts/queries';
+import { tasksQuery } from '../tasks/queries';
+
+jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
+jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
+
+let t: TestDatabase;
+let patientId: string;
+
+beforeEach(async () => {
+  t = useTestDatabase(await createTestDatabase());
+  patientId = await createPatient({ firstName: 'سارا', lastName: 'احمدی', status: 'outpatient' });
+});
+
+/** A voice capture, without touching the filesystem. */
+async function attachVoice(captureId: string): Promise<string> {
+  return addAttachment({
+    entityType: 'capture',
+    entityId: captureId,
+    kind: 'voice',
+    relativePath: 'media/test/rec.m4a',
+    durationMs: 4200,
+  });
+}
+
+describe('a capture', () => {
+  /*
+   * The whole point: it demands nothing. No patient, no type, no title — the
+   * questions are what stop a thing from being written down at all.
+   */
+  it('needs nothing but the words, and waits in the inbox', async () => {
+    const id = await createCapture({ text: 'خانواده‌ی تخت ۱۲ دنبال جواب پاتولوژی' });
+
+    const [row] = await captureQuery(id);
+    expect(row?.patientId).toBeNull();
+    expect(row?.filedAt).toBeNull();
+    expect(await inboxQuery()).toHaveLength(1);
+    expect(await filedCapturesQuery()).toHaveLength(0);
+  });
+
+  it('remembers which shift it was caught on, and keeps that answer afterwards', async () => {
+    const shiftId = await startShift({ ward: 'داخلی ۲' });
+    const id = await createCapture({ text: 'سونوگرافی فردا صبح' });
+
+    expect((await captureQuery(id))[0]?.shiftId).toBe(shiftId);
+
+    // A later shift does not rewrite an earlier night.
+    await startShift({ ward: 'اورژانس' });
+    expect((await captureQuery(id))[0]?.shiftId).toBe(shiftId);
+  });
+
+  it('is not filed by being read, only by being filed', async () => {
+    const id = await createCapture({ text: 'تماس با رادیولوژی' });
+    await inboxQuery();
+    await updateCapture(id, { text: 'تماس با رادیولوژی بابت سی‌تی' });
+    expect((await captureQuery(id))[0]?.filedAt).toBeNull();
+  });
+});
+
+describe('filing a capture', () => {
+  it('as a task takes it out of the inbox without destroying it', async () => {
+    const id = await createCapture({ text: 'تماس با رادیولوژی' });
+    const taskId = await fileCaptureAsTask(id);
+
+    const tasks = await tasksQuery({ status: 'open' });
+    expect(tasks.map((r) => r.task.id)).toContain(taskId);
+    expect(tasks.find((r) => r.task.id === taskId)?.task.title).toBe('تماس با رادیولوژی');
+
+    expect(await inboxQuery()).toHaveLength(0);
+    const [row] = await captureQuery(id);
+    expect(row?.filedAs).toBe('task');
+    expect(row?.filedId).toBe(taskId);
+    expect(row?.deletedAt).toBeNull();
+    expect(await filedCapturesQuery()).toHaveLength(1);
+  });
+
+  /*
+   * A note under the wrong person is worse than a capture still waiting, so
+   * the guess is never made.
+   */
+  it('as a note refuses when nobody knows whose it is', async () => {
+    const id = await createCapture({ text: 'فشارش افتاد بعد از دیالیز' });
+    await expect(fileCaptureAsNote(id)).rejects.toThrow();
+    expect(await inboxQuery()).toHaveLength(1);
+  });
+
+  it('as a note carries the recording over to the note', async () => {
+    const id = await createCapture({ text: 'حرف‌های همراه بیمار', patientId });
+    await attachVoice(id);
+
+    const noteId = await fileCaptureAsNote(id);
+
+    const notes = await patientNotesQuery(patientId);
+    expect(notes.map((n) => n.id)).toContain(noteId);
+    expect(notes.find((n) => n.id === noteId)?.body).toBe('حرف‌های همراه بیمار');
+
+    // One file, one home: it moved rather than being copied.
+    expect(await entityAttachmentsQuery('capture', id)).toHaveLength(0);
+    const moved = await entityAttachmentsQuery('note', noteId);
+    expect(moved).toHaveLength(1);
+    expect(moved[0]?.patientId).toBe(patientId);
+  });
+
+  it('happens once; a filed capture cannot be filed again', async () => {
+    const id = await createCapture({ text: 'تماس با آزمایشگاه' });
+    await fileCaptureAsTask(id);
+    await expect(fileCaptureAsTask(id)).rejects.toThrow();
+    await expect(fileCaptureAsNote(id, { patientId })).rejects.toThrow();
+  });
+
+  it('as a task needs words, because a task with no title is nothing', async () => {
+    const id = await createCapture({ kind: 'voice' });
+    await attachVoice(id);
+    await expect(fileCaptureAsTask(id)).rejects.toThrow();
+    expect(await inboxQuery()).toHaveLength(1);
+  });
+});
+
+describe('throwing a capture away', () => {
+  it('is a soft delete, like everything else in the record', async () => {
+    const id = await createCapture({ text: 'بی‌اهمیت' });
+    await discardCapture(id);
+
+    expect(await inboxQuery()).toHaveLength(0);
+    expect(t.db.select().from(captureInbox).all()).toHaveLength(1);
+  });
+
+  it('can be undone from the trash', async () => {
+    const id = await createCapture({ text: 'اشتباهی پاک شد' });
+    await discardCapture(id);
+    expect((await deletedCapturesQuery()).map((c) => c.id)).toContain(id);
+
+    await restoreCapture(id);
+    expect(await deletedCapturesQuery()).toHaveLength(0);
+    expect((await inboxQuery()).map((r) => r.capture.id)).toContain(id);
+  });
+
+  it('happens by itself only when the row is truly empty', async () => {
+    const blank = await createCapture({});
+    expect(await discardCaptureIfEmpty(blank)).toBe(true);
+    expect(await inboxQuery()).toHaveLength(0);
+
+    const withVoice = await createCapture({ kind: 'voice' });
+    await attachVoice(withVoice);
+    expect(await discardCaptureIfEmpty(withVoice)).toBe(false);
+
+    const withWords = await createCapture({ text: 'چیزی' });
+    expect(await discardCaptureIfEmpty(withWords)).toBe(false);
+  });
+});
+
+describe('the inbox', () => {
+  it('keeps a capture whose patient was deleted, without naming them', async () => {
+    const id = await createCapture({ text: 'پیگیری جواب', patientId });
+    await deletePatient(patientId);
+
+    const rows = await inboxQuery();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.capture.id).toBe(id);
+    expect(rows[0]?.patient).toBeNull();
+  });
+
+  it('shows what has waited longest first', async () => {
+    const older = await createCapture({ text: 'اول', capturedAt: new Date('2026-09-20T08:00:00Z') });
+    const newer = await createCapture({ text: 'دوم', capturedAt: new Date('2026-09-21T08:00:00Z') });
+
+    const rows = await inboxQuery();
+    expect(rows.map((r) => r.capture.id)).toEqual([older, newer]);
+  });
+});
+
+describe('the capture writer', () => {
+  /*
+   * Three things on the capture screen can be first to produce something worth
+   * keeping, and all three ask for the row. Two rows would mean a recording
+   * and the words that go with it ending up in different places.
+   */
+  it('creates one row however many things ask for it at once', async () => {
+    const writer = new CaptureWriter();
+    writer.set({ text: 'یک بار', patientId: null });
+
+    const ids = await Promise.all([
+      writer.ensure(),
+      writer.ensure({ kind: 'voice' }),
+      writer.write({ text: 'یک بار', patientId: null }),
+    ]);
+    expect(ids[0]).toBe(ids[1]);
+    expect(t.db.select().from(captureInbox).all()).toHaveLength(1);
+  });
+
+  it('leaves nothing behind when the screen was opened and abandoned', async () => {
+    const writer = new CaptureWriter();
+    expect(writer.started).toBe(false);
+    expect(await writer.discardIfEmpty()).toBe(false);
+    expect(t.db.select().from(captureInbox).all()).toHaveLength(0);
+  });
+});

@@ -4,10 +4,11 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { Card, Column, EmptyState, Fab, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { RestoreTrouble } from '@/features/backup/restore-trouble';
+import { InboxSection } from '@/features/capture/inbox-section';
 import { OpenConsults } from '@/features/consults/open-consults';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
 import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
@@ -103,6 +104,8 @@ export function TodayScreen() {
 
         <ShiftCard />
 
+        <InboxSection />
+
         <TasksSection patientId={null} title="کارهای بدون بیمار" />
 
         <OpenConsults />
@@ -138,6 +141,8 @@ export function TodayScreen() {
           </Card>
         ) : null}
       </Column>
+
+      <Fab icon="create-outline" label="ثبت سریع" onPress={() => router.push('/capture')} />
     </Screen>
   );
 }

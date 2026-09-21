@@ -29,6 +29,7 @@ export const ATTACHMENT_ENTITIES = [
   'place',
   'credential',
   'follow_up',
+  'capture',
 ] as const;
 
 export type AttachmentEntity = (typeof ATTACHMENT_ENTITIES)[number];

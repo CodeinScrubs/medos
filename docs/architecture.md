@@ -237,6 +237,13 @@ This is why the editor's own live query is read only at mount: it is watching a 
 screen is writing, and feeding those writes back into the fields would fight the keyboard.
 Drafts nobody finished are surfaced on Today rather than left to be found by accident.
 
+The capture screen uses the same machinery for a different reason. Its row **is** the
+draft: `CaptureWriter` creates one `capture_inbox` row the first time anything on that
+screen produces something worth keeping — the keyboard, the recorder or the camera,
+whichever comes first — and hands the same id to the other two. Leaving the screen flushes
+what is waiting and then drops the row again if it turned out to be empty, so opening quick
+capture by accident costs nothing and recording into it costs nothing either.
+
 ---
 
 ## Forced RTL at build time

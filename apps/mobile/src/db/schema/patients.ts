@@ -699,6 +699,62 @@ export const tasks = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Capture inbox: what was heard before there was time to file it              */
+/* -------------------------------------------------------------------------- */
+
+export const CAPTURE_KINDS = ['text', 'voice', 'photo'] as const;
+
+/**
+ * A thought, caught before it is sorted.
+ *
+ * Every other table in MedOS asks a question first — which patient, which
+ * episode, is this a note or a task. In a corridor those questions cost more
+ * than the thing being remembered, so the thing is not written at all. This
+ * table asks nothing: type it, say it, photograph it, and decide later.
+ *
+ * Two columns hold the whole lifecycle. `filedAt` null means it is still in
+ * the inbox; `deletedAt` means it was thrown away, and the trash can bring it
+ * back. There is deliberately no `status` column: a second way to say the same
+ * thing is a second thing to keep in step.
+ *
+ * A filed capture is kept, never deleted — it is what the note or the task was
+ * made from, and for a voice capture it is where the recording still lives.
+ */
+export const captureInbox = sqliteTable(
+  'capture_inbox',
+  {
+    ...baseColumns,
+    /**
+     * What this was when it was made, for the icon in the list.
+     *
+     * Not a claim about files: the recording and the photo are attachment rows
+     * like everywhere else, and deleting one does not rewrite this. Anything
+     * that needs to know whether a file is there reads the attachments.
+     */
+    kind: text('kind', { enum: CAPTURE_KINDS })
+      .notNull()
+      .$default(() => 'text' as const),
+    /** The typed words, or what was written down about a recording or photo. */
+    text: text('text'),
+    /** Known at capture time only when it happened to be obvious. */
+    patientId: text('patient_id').references(() => patients.id, { onDelete: 'set null' }),
+    shiftId: text('shift_id').references(() => shifts.id, { onDelete: 'set null' }),
+    capturedAt: integer('captured_at', { mode: 'timestamp_ms' }).notNull(),
+
+    /** What it turned into, once someone filed it. */
+    filedAs: text('filed_as', { enum: ['note', 'task'] }),
+    filedId: text('filed_id'),
+    filedAt: integer('filed_at', { mode: 'timestamp_ms' }),
+    searchText: text('search_text'),
+  },
+  (t) => [
+    index('capture_inbox_open_idx').on(t.filedAt, t.capturedAt),
+    index('capture_inbox_patient_idx').on(t.patientId),
+    index('capture_inbox_search_idx').on(t.searchText),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Relations                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -764,4 +820,6 @@ export type Consultation = typeof consultations.$inferSelect;
 export type Shift = typeof shifts.$inferSelect;
 export type ShiftPatient = typeof shiftPatients.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
+export type Capture = typeof captureInbox.$inferSelect;
+export type CaptureKind = (typeof CAPTURE_KINDS)[number];
 export type TaskKind = (typeof TASK_KINDS)[number];

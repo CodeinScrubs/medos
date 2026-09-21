@@ -33,6 +33,60 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-21 (M2, third part) — A place to put a thing before you know where it goes
+
+**Agent:** claude-opus-5 via Claude Code
+**Commits:** this date's last commit
+
+**Changed**
+
+- **The capture inbox** (`capture_inbox`, migration 0009). Every other screen asks a
+  question first — which patient, which episode, note or task — and in a corridor those
+  questions cost more than the thing being remembered, so it does not get written at all.
+  A capture asks nothing: text, a recording, a photo, and a patient only if it happens to
+  be obvious. Filing is a separate act, done sitting down.
+- **Two columns hold the whole lifecycle**: `filedAt` null means it is still waiting,
+  `deletedAt` means it was thrown away. Deliberately no `status` column — a second way of
+  saying the same thing is a second thing to keep in step.
+- **Filing never destroys the capture.** As a task it becomes a task and the capture keeps
+  its recording (a task has nowhere to play audio); as a note the attachments *move* to the
+  note, because one file should have one home and the note's own media list is where
+  someone will look for it. Filing as a note refuses without a patient rather than
+  guessing.
+- **`CaptureWriter`**: the capture screen's row, created at the last useful moment and
+  shared by the keyboard, the recorder and the camera. One promise, so three callers in the
+  same tick get one row; and an empty row is dropped again on the way out.
+- **Quick capture** is a FAB on Today, the inbox is a section on Today (oldest first — an
+  inbox sorted newest-first buries what has waited longest) and a full screen at `/inbox`
+  with the filed ones underneath.
+- **The trash now restores captures too.** The discard alert promises the trash, and that
+  promise had to be true before it was written. Patients and captures only; the rest of M5
+  is still open.
+- `capture` joined `ATTACHMENT_ENTITIES`; captures joined the search index registry.
+
+**Verified**
+
+- `npm run check` green: 28 suites / 430 tests (414 before). 15 of the new ones cover the
+  inbox: that filing is the only thing that files, that a recording moves with its note,
+  that a deleted patient loses their name but not the capture, and that the writer creates
+  exactly one row under concurrent callers.
+
+**Not verified**
+
+- Nothing on the phone. The recorder and camera paths in particular have only been reasoned
+  about — the tests attach media rows directly rather than through the device.
+
+**Still open from the owner's plan**
+
+- M2: round mode as a dedicated one-patient-at-a-time flow.
+- M3 (vitals and diagnoses UI), M5 (trash for the remaining entities), M6, M7.
+
+**Gotchas**
+
+- `react-hooks/refs` rejects a `useMemo` that calls a `useCallback` which reads a ref — it
+  flags the construction, not the call. Holding that state in a class instance created with
+  `useState(() => ...)` is what the rest of the codebase does and what the rule accepts.
+
 ## 2026-09-21 (M2, second half) — Consults that can be outstanding, and a timeline
 
 **Agent:** claude-opus-5 via Claude Code

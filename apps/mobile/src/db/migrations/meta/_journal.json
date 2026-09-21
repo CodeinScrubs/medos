@@ -64,6 +64,13 @@
       "when": 1789987177420,
       "tag": "0008_natural_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789998879075,
+      "tag": "0009_dazzling_caretaker",
+      "breakpoints": true
     }
   ]
 }
