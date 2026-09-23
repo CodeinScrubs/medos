@@ -15,6 +15,7 @@ import {
   shiftPatientsQuery,
   shiftProgress,
   startShift,
+  updateShiftPatient,
 } from './queries';
 import { deleteEncounter, openEncounter } from '../encounters/queries';
 import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
@@ -173,6 +174,15 @@ describe('a shift', () => {
 
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
     expect(await activeShiftQuery()).toHaveLength(1);
+  });
+
+  it('does not claim autosave succeeded after membership was removed', async () => {
+    const shiftId = await startShift();
+    const memberId = await addPatientToShift(shiftId, patientId);
+    await updateShiftPatient(memberId, { handoffNote: 'stored' });
+    await removePatientFromShift(memberId);
+    await expect(updateShiftPatient(memberId, { handoffNote: 'not stored' })).rejects.toThrow();
+    expect(t.db.select().from(shiftPatients).all()[0]?.handoffNote).toBe('stored');
   });
 });
 

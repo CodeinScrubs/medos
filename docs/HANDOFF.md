@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Keep editors open when autosave fails
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous round correction `66d942e`
+
+**Changed**
+
+- Note/capture route removal checks the boolean flush result through the public Expo
+  Router navigation hook. A failed write retains the screen/text instead of navigating.
+- Shift/round fields register in one screen-level save group. Moving to the next patient,
+  opening another editor, removing membership, ending the shift and route removal wait
+  for all registered fields. Failed fields expose a retry button; normal typing only
+  shows a short pending label. No new dependency or schema.
+- In-flight writes count as unsaved. The group rechecks every field after slower writes
+  to catch input arriving meanwhile, and serializes repeated action taps. Updating a
+  removed membership now throws instead of falsely reporting successful autosave.
+- Note voice flush checks failure. Explicit draft discard waits for outstanding writes
+  and reports failed deletion without exiting; capture cleanup does not discard after a
+  failed flush.
+
+**Verified**
+
+- `npm run check`: 37 suites / 533 app tests + 3 workflow tests, all checks passed.
+- New tests cover false/rejected flushes, newest-text retry, writes in flight, edits while
+  waiting, grouped fields, repeated navigation actions and removed membership writes.
+- Android bundle succeeded: 2,500 modules, 6.6 MB, `entry-6873b4f781e6d7a8202276d781080fed.hbc`.
+- `66d942e` pushed; exact-SHA CI run 35871888015 succeeded, including migration check/bundle.
+
+**Not verified**
+
+- This commit's CI is checked after pushing. No APK/device test: native back/gesture,
+  process termination, media-operation interruption and simultaneous editors remain open.
+- Software guards cannot recover keystrokes that never reached persistent storage.
+
+**Open threads**
+
+- Continue W01/W02 retrieval: full task lists/history/editor and all inbox items; past
+  shifts need an actual browse route. Then the remaining execution ledger.
+- D05 remains partial: persistent consult drafts, native exit acceptance, external record
+  changes and concurrent editors. D10 real SAF/restore/device acceptance is still open.
+
 ## 2026-09-23 — Correct round context and serialize shift membership
 
 **Agent:** GPT-6 via Codex

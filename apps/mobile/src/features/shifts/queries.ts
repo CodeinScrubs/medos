@@ -218,7 +218,7 @@ export async function updateShiftPatient(
   memberId: string,
   patch: { shiftSummary?: string | null; handoffNote?: string | null; sortOrder?: number },
 ): Promise<void> {
-  await db
+  const result = await db
     .update(shiftPatients)
     .set({
       ...patch,
@@ -226,7 +226,9 @@ export async function updateShiftPatient(
       handoffNote: patch.handoffNote === undefined ? undefined : patch.handoffNote?.trim() || null,
       ...touch(),
     })
-    .where(and(memberAlive, eq(shiftPatients.id, memberId)));
+    .where(and(memberAlive, eq(shiftPatients.id, memberId)))
+    .returning({ id: shiftPatients.id });
+  if (result.length === 0) throw new Error('این بیمار دیگر روی شیفت نیست؛ نوشته ذخیره نشد.');
 }
 
 /** How far through the round this shift is. */

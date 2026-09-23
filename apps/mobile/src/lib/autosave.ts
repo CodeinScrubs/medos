@@ -47,6 +47,7 @@ export class Autosave<T> {
   private pending: { value: T } | null = null;
   private firstChangeAt: number | null = null;
   private stopped = false;
+  private writing = false;
 
   constructor(options: AutosaveOptions<T>) {
     this.write = options.write;
@@ -95,7 +96,7 @@ export class Autosave<T> {
 
   /** Is there a change that has not reached storage? */
   get unsaved(): boolean {
-    return this.pending != null;
+    return this.pending != null || this.writing;
   }
 
   private arm(delay: number): void {
@@ -120,6 +121,7 @@ export class Autosave<T> {
     const item = this.pending;
     if (!item) return;
     this.pending = null;
+    this.writing = true;
     this.onState({ status: 'writing' });
     try {
       await this.write(item.value);
@@ -137,6 +139,8 @@ export class Autosave<T> {
       if (this.pending == null) this.pending = item;
       this.onState({ status: 'failed', error, at: this.now() });
       if (!this.stopped) this.arm(this.delayMs);
+    } finally {
+      this.writing = false;
     }
   }
 }

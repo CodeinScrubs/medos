@@ -228,6 +228,17 @@ JSON manifest, the database snapshot, and media files.
 
 ## Forms: load, then initialise
 
+Autosave completion is a boolean result, not merely a resolved promise. Note/capture
+route removal uses the public Expo Router `usePreventRemove` hook to flush and resume the
+original action only on success. Shift and round fields register with a screen-level
+`SaveGroup`: every field must finish and still be clean before changing the current
+patient, removing membership or ending the shift. This adds one shared exit check rather
+than a separate navigation listener on each field. Failed saves leave the editor open
+with a retry action; an in-flight write counts as unsaved. Explicit draft discard waits
+for outstanding writes and only exits after the discard succeeds. Native back/gesture,
+process termination and overlapping editors remain separate verification/recovery work;
+no UI guard can preserve data the OS kills before it reaches storage.
+
 Edit screens are split in two: `EditGate` loads the record (spinner while loading, a clear
 message if it was deleted), then the form component initialises its state from it once.
 Copying a loaded record into form state with an effect shows an empty form for a moment,

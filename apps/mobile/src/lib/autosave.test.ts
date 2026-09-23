@@ -37,6 +37,23 @@ function build(write: (v: string) => Promise<void>) {
 }
 
 describe('Autosave', () => {
+  it('remains unsaved while a write is in flight, even with no pending value', async () => {
+    let finish!: () => void;
+    const { saver } = build(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    saver.change('pending');
+    const flushed = saver.flush();
+    await Promise.resolve();
+    expect(saver.unsaved).toBe(true);
+    finish();
+    expect(await flushed).toBe(true);
+    expect(saver.unsaved).toBe(false);
+  });
+
   it('writes once, after the typing stops', async () => {
     const written: string[] = [];
     const { saver, states } = build(async (v) => void written.push(v));

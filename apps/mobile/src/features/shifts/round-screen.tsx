@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AutosaveField } from '@/components/autosave-field';
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Screen, Text } from '@/components/ui';
@@ -37,6 +38,15 @@ import { indexOfMember, nextIndex, roundProgress, startIndex } from './round';
  * somebody has been seen — already belongs to the shift.
  */
 export function RoundScreen() {
+  return (
+    <AutosaveScope>
+      <RoundScreenContent />
+    </AutosaveScope>
+  );
+}
+
+function RoundScreenContent() {
+  const scope = useAutosaveScope()!;
   const router = useRouter();
   const { spacing } = useTheme();
 
@@ -150,11 +160,17 @@ export function RoundScreen() {
             <Button
               label="دیدم و بعدی"
               icon="checkmark-circle-outline"
-              onPress={() => void seen(current.member.id, index)}
+              onPress={() => void scope.perform(() => seen(current.member.id, index))}
               full
             />
           </View>
-          <Button label="بعدی" icon="arrow-back" variant="secondary" haptic={false} onPress={() => skip(index)} />
+          <Button
+            label="بعدی"
+            icon="arrow-back"
+            variant="secondary"
+            haptic={false}
+            onPress={() => void scope.perform(() => skip(index))}
+          />
         </Row>
 
         <Text variant="tiny" color="textFaint" style={{ marginBottom: spacing.xl }}>
@@ -176,6 +192,7 @@ type RoundRow = { member: ShiftPatient; patient: Patient; encounter: Encounter |
  * deliberately not inlined — a round card that scrolls is a list again.
  */
 function RoundCard({ row }: { row: RoundRow }) {
+  const scope = useAutosaveScope()!;
   const router = useRouter();
   const { colors, spacing } = useTheme();
   const { member, patient, encounter } = row;
@@ -216,7 +233,9 @@ function RoundCard({ row }: { row: RoundRow }) {
               variant="ghost"
               size="sm"
               haptic={false}
-              onPress={() => router.push({ pathname: '/patient/[id]', params: { id: patient.id } })}
+              onPress={() =>
+                void scope.perform(() => router.push({ pathname: '/patient/[id]', params: { id: patient.id } }))
+              }
             />
           </Row>
 
@@ -267,14 +286,20 @@ function RoundCard({ row }: { row: RoundRow }) {
           icon="document-text-outline"
           variant="secondary"
           size="sm"
-          onPress={() => router.push({ pathname: '/patient/[id]/note', params: { id: patient.id, type: 'progress' } })}
+          onPress={() =>
+            void scope.perform(() =>
+              router.push({ pathname: '/patient/[id]/note', params: { id: patient.id, type: 'progress' } }),
+            )
+          }
         />
         <Button
           label="ثبت سریع"
           icon="create-outline"
           variant="secondary"
           size="sm"
-          onPress={() => router.push({ pathname: '/capture', params: { patientId: patient.id } })}
+          onPress={() =>
+            void scope.perform(() => router.push({ pathname: '/capture', params: { patientId: patient.id } }))
+          }
         />
       </Row>
 

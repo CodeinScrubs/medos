@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AutosaveField } from '@/components/autosave-field';
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
@@ -37,6 +38,15 @@ import {
  * patient's record.
  */
 export function ShiftScreen() {
+  return (
+    <AutosaveScope>
+      <ShiftScreenContent />
+    </AutosaveScope>
+  );
+}
+
+function ShiftScreenContent() {
+  const scope = useAutosaveScope()!;
   const router = useRouter();
   const { colors, spacing } = useTheme();
   const { data: shifts, error } = useLive(activeShiftQuery());
@@ -76,7 +86,7 @@ export function ShiftScreen() {
     if (!shift) return;
     Alert.alert('پایان شیفت؟', 'لیست بیماران این شیفت می‌ماند و بعداً هم می‌توانید ببینیدش.', [
       { text: 'انصراف', style: 'cancel' },
-      { text: 'پایان شیفت', onPress: () => void endShift(shift.id).catch((e) => alertError('پایان شیفت ثبت نشد', e)) },
+      { text: 'پایان شیفت', onPress: () => void scope.perform(() => endShift(shift.id)) },
     ]);
   }
 
@@ -124,7 +134,7 @@ export function ShiftScreen() {
                   <Button
                     label="شروع راند"
                     icon="walk-outline"
-                    onPress={() => router.push('/round')}
+                    onPress={() => void scope.perform(() => router.push('/round'))}
                     disabled={rows.length === 0}
                     full
                   />
@@ -177,7 +187,9 @@ export function ShiftScreen() {
 
                   <Pressable
                     style={styles.grow}
-                    onPress={() => router.push({ pathname: '/patient/[id]', params: { id: patient.id } })}
+                    onPress={() =>
+                      void scope.perform(() => router.push({ pathname: '/patient/[id]', params: { id: patient.id } }))
+                    }
                   >
                     <Column gap="xxs">
                       <Text variant="bodyStrong" numberOfLines={1}>
@@ -212,7 +224,9 @@ export function ShiftScreen() {
                     variant="secondary"
                     size="sm"
                     onPress={() =>
-                      router.push({ pathname: '/patient/[id]/note', params: { id: patient.id, type: 'progress' } })
+                      void scope.perform(() =>
+                        router.push({ pathname: '/patient/[id]/note', params: { id: patient.id, type: 'progress' } }),
+                      )
                     }
                   />
                   <Button
@@ -220,7 +234,7 @@ export function ShiftScreen() {
                     variant="ghost"
                     size="sm"
                     haptic={false}
-                    onPress={() => void removePatientFromShift(member.id).catch((e) => alertError('برداشته نشد', e))}
+                    onPress={() => void scope.perform(() => removePatientFromShift(member.id))}
                   />
                 </Row>
               </Column>

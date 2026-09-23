@@ -5,6 +5,7 @@ import { AppState, StyleSheet, View } from 'react-native';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { Button, Column, Input, Row, Screen, SelectField, Text } from '@/components/ui';
+import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, attachPhotos } from '@/features/attachments/capture';
@@ -51,6 +52,11 @@ export function CaptureScreen() {
     [writer],
   );
 
+  useSaveBeforeLeave(
+    autosave.status === 'pending' || autosave.status === 'writing' || autosave.status === 'failed',
+    () => saver.flush(),
+  );
+
   function update(patch: Partial<CaptureFields>) {
     const next = { ...writer.current, ...patch };
     writer.set(next);
@@ -68,7 +74,10 @@ export function CaptureScreen() {
     });
     return () => {
       sub.remove();
-      void saver.flush().then(() => writer.discardIfEmpty());
+      void saver
+        .flush()
+        .then((saved) => (saved ? writer.discardIfEmpty() : undefined))
+        .catch((e) => alertError('ثبت نشد', e));
     };
   }, [saver, writer]);
 

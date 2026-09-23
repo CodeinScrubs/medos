@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { Input, type InputProps } from '@/components/ui';
-import { Autosave } from '@/lib/autosave';
+import { Button, Column, Input, Text, type InputProps } from '@/components/ui';
+import { Autosave, type AutosaveState } from '@/lib/autosave';
+
+import { useAutosaveScope } from './autosave-scope';
 
 /**
  * A field that writes itself, a second or two behind the keyboard.
@@ -34,11 +36,15 @@ export function AutosaveField({
   onSave: (value: string) => Promise<void>;
 }) {
   const [text, setText] = useState(initialValue ?? '');
+  const scope = useAutosaveScope();
+  const [state, setState] = useState<AutosaveState>({ status: 'idle' });
 
   // Built once, from the first `onSave`. It cannot depend on the prop: that is
   // usually an inline arrow, and rebuilding the scheduler every render would
   // throw away whatever it was waiting to write.
-  const [saver] = useState(() => new Autosave<string>({ write: onSave }));
+  const [saver] = useState(() => new Autosave<string>({ write: onSave, onState: setState }));
+
+  useEffect(() => scope?.group.register(saver), [scope, saver]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -51,13 +57,22 @@ export function AutosaveField({
   }, [saver]);
 
   return (
-    <Input
-      {...input}
-      value={text}
-      onChangeText={(value) => {
-        setText(value);
-        saver.change(value);
-      }}
-    />
+    <Column gap="xs">
+      <Input
+        {...input}
+        value={text}
+        onChangeText={(value) => {
+          setText(value);
+          saver.change(value);
+        }}
+      />
+      {state.status === 'failed' ? (
+        <Button label="ذخیره نشد؛ تلاش دوباره" variant="ghost" size="sm" onPress={() => void saver.flush()} />
+      ) : state.status === 'pending' || state.status === 'writing' ? (
+        <Text variant="tiny" color="textMuted">
+          در حال ذخیره…
+        </Text>
+      ) : null}
+    </Column>
   );
 }

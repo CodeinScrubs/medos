@@ -19,6 +19,7 @@ import {
   Text,
   Toggle,
 } from '@/components/ui';
+import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { NOTE_TYPES, type Note, type NoteDraft, type NoteType } from '@/db/schema';
@@ -148,6 +149,11 @@ function NoteEditor({
     [draftId, patientId, note?.id],
   );
 
+  useSaveBeforeLeave(
+    autosave.status === 'pending' || autosave.status === 'writing' || autosave.status === 'failed',
+    () => saver.flush(),
+  );
+
   function update(patch: Partial<NoteDraftFields>) {
     const next = { ...latest.current, ...patch };
     latest.current = next;
@@ -197,7 +203,7 @@ function NoteEditor({
           { relativePath: stored.relativePath, durationMs: recording.durationMs, sizeBytes: stored.sizeBytes },
         ],
       });
-      await saver.flush();
+      if (!(await saver.flush())) Alert.alert('وویس هنوز ثبت نشد', 'وویس روی صفحه باقی مانده؛ دوباره ذخیره کنید.');
     } catch (e) {
       alertError('وویس ذخیره نشد', e);
     }
@@ -229,12 +235,28 @@ function NoteEditor({
     }
   }
 
+  async function discardAndLeave() {
+    if (committing.current) return;
+    committing.current = true;
+    setSaving(true);
+    try {
+      // Wait for in-flight writes before retiring the draft; failed deletion stays visible.
+      await saver.flush();
+      await discardNoteDraft(draftId);
+      saver.cancel();
+      router.back();
+    } catch (e) {
+      alertError('پیش‌نویس حذف نشد', e);
+    } finally {
+      committing.current = false;
+      setSaving(false);
+    }
+  }
+
   function leave() {
     if (committing.current) return;
     if (!draftHasContent(latest.current)) {
-      saver.cancel();
-      void discardNoteDraft(draftId);
-      router.back();
+      void discardAndLeave();
       return;
     }
     Alert.alert(
@@ -262,10 +284,7 @@ function NoteEditor({
         {
           text: 'دور بریز',
           style: 'destructive',
-          onPress: () => {
-            saver.cancel();
-            void discardNoteDraft(draftId).finally(() => router.back());
-          },
+          onPress: () => void discardAndLeave(),
         },
       ],
     );
