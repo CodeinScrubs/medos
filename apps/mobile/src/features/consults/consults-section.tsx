@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useReducer, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, Input, Row, SectionHeader, Text } from '@/components/ui';
 import type { Consultation } from '@/db/schema';
@@ -9,6 +10,7 @@ import { doctorDisplayName } from '@/features/doctors/logic';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
+import { answerDraftsReducer, EMPTY_ANSWER } from './answer-drafts';
 import { answerConsult, cancelConsult, createConsult, markConsultRequested, patientConsultsQuery } from './queries';
 
 const STATUS: Record<Consultation['status'], { label: string; tone: 'warning' | 'info' | 'success' | 'neutral' }> = {
@@ -28,15 +30,15 @@ const STATUS: Record<Consultation['status'], { label: string; tone: 'warning' | 
  */
 export function ConsultsSection({ patientId }: { patientId: string }) {
   const { spacing } = useTheme();
-  const { data } = useLive(patientConsultsQuery(patientId), [patientId]);
+  const { data, error } = useLive(patientConsultsQuery(patientId), [patientId]);
   const rows = data ?? [];
 
   const [specialty, setSpecialty] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
-  const [answering, setAnswering] = useState<string | null>(null);
-  const [response, setResponse] = useState('');
-  const [instruction, setInstruction] = useState('');
+  const [drafts, dispatch] = useReducer(answerDraftsReducer, { activeId: null, entries: {} });
+  const answering = drafts.activeId;
+  const { response, instruction } = (answering ? drafts.entries[answering] : undefined) ?? EMPTY_ANSWER;
 
   async function add() {
     if (!reason.trim()) {
@@ -56,13 +58,12 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
   }
 
   async function submitAnswer(id: string) {
-    if (!response.trim()) return;
+    const answer = drafts.entries[id];
+    if (!answer?.response.trim() || busy) return;
     setBusy(true);
     try {
-      await answerConsult(id, { response, followUpInstruction: instruction || null });
-      setAnswering(null);
-      setResponse('');
-      setInstruction('');
+      await answerConsult(id, { response: answer.response, followUpInstruction: answer.instruction || null });
+      dispatch({ type: 'submitted', id });
     } catch (e) {
       alertError('ثبت نشد', e);
     } finally {
@@ -72,6 +73,7 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
 
   return (
     <>
+      <ErrorNotice error={error} what="کانسالت‌ها" />
       <SectionHeader title="کانسالت‌ها" count={rows.length} />
       <Column gap="sm">
         <Card tone="alt">
@@ -127,8 +129,20 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
 
               {answering === consult.id ? (
                 <Column gap="sm">
-                  <Input label="پاسخ" value={response} onChangeText={setResponse} multiline />
-                  <Input label="دستور پیگیری" value={instruction} onChangeText={setInstruction} multiline />
+                  <Input
+                    label="پاسخ"
+                    value={response}
+                    onChangeText={(response) => dispatch({ type: 'edit', id: consult.id, patch: { response } })}
+                    multiline
+                    editable={!busy}
+                  />
+                  <Input
+                    label="دستور پیگیری"
+                    value={instruction}
+                    onChangeText={(instruction) => dispatch({ type: 'edit', id: consult.id, patch: { instruction } })}
+                    multiline
+                    editable={!busy}
+                  />
                   <Row gap="sm">
                     <Button
                       label="ثبت پاسخ"
@@ -136,7 +150,13 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
                       onPress={() => void submitAnswer(consult.id)}
                       loading={busy}
                     />
-                    <Button label="انصراف" variant="ghost" haptic={false} onPress={() => setAnswering(null)} />
+                    <Button
+                      label="بستن"
+                      variant="ghost"
+                      haptic={false}
+                      disabled={busy}
+                      onPress={() => dispatch({ type: 'close' })}
+                    />
                   </Row>
                 </Column>
               ) : (
@@ -147,7 +167,7 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
                       icon="send-outline"
                       variant="secondary"
                       size="sm"
-                      onPress={() => void markConsultRequested(consult.id)}
+                      onPress={() => void markConsultRequested(consult.id).catch((e) => alertError('تغییر ثبت نشد', e))}
                     />
                   ) : null}
                   {consult.status === 'pending' || consult.status === 'requested' ? (
@@ -157,14 +177,16 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
                         icon="chatbox-outline"
                         variant="secondary"
                         size="sm"
-                        onPress={() => setAnswering(consult.id)}
+                        disabled={busy}
+                        onPress={() => dispatch({ type: 'open', id: consult.id })}
                       />
                       <Button
                         label="لغو"
                         variant="ghost"
                         size="sm"
                         haptic={false}
-                        onPress={() => void cancelConsult(consult.id)}
+                        disabled={busy}
+                        onPress={() => void cancelConsult(consult.id).catch((e) => alertError('تغییر ثبت نشد', e))}
                       />
                     </>
                   ) : null}

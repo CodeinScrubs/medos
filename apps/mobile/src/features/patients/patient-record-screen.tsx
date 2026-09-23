@@ -3,6 +3,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Button, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { MediaTab } from '@/features/attachments/media-tab';
@@ -14,15 +16,17 @@ import { OverviewTab } from '@/features/patients/overview-tab';
 import { PatientHeader } from '@/features/patients/patient-header';
 import { deletePatient, patientQuery } from '@/features/patients/queries';
 import { TimelineTab } from '@/features/timeline/timeline-tab';
+import { VitalsTab } from '@/features/vitals/vitals-tab';
 import { useTheme } from '@/theme';
 
-type Tab = 'overview' | 'timeline' | 'notes' | 'kardex' | 'labs' | 'imaging' | 'media';
+type Tab = 'overview' | 'timeline' | 'notes' | 'kardex' | 'vitals' | 'labs' | 'imaging' | 'media';
 
 const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'overview', label: 'خلاصه', icon: 'person-outline' },
   { key: 'timeline', label: 'روند', icon: 'time-outline' },
   { key: 'notes', label: 'نوت‌ها', icon: 'document-text-outline' },
   { key: 'kardex', label: 'کاردکس', icon: 'medical-outline' },
+  { key: 'vitals', label: 'علائم', icon: 'pulse-outline' },
   { key: 'labs', label: 'آزمایش', icon: 'flask-outline' },
   { key: 'imaging', label: 'تصویربرداری', icon: 'scan-outline' },
   { key: 'media', label: 'عکس و صدا', icon: 'images-outline' },
@@ -39,7 +43,14 @@ export function PatientRecordScreen() {
   const { colors, spacing, radii } = useTheme();
   const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : 'overview');
 
-  const { data: rows } = useLive(patientQuery(id), [id]);
+  const { data: rows, error } = useLive(patientQuery(id), [id]);
+
+  if (error)
+    return (
+      <Screen>
+        <ErrorNotice error={error} what="پرونده" />
+      </Screen>
+    );
 
   if (!rows) {
     return (
@@ -73,7 +84,9 @@ export function PatientRecordScreen() {
           text: 'حذف',
           style: 'destructive',
           onPress: () => {
-            void deletePatient(patient.id).then(() => router.back());
+            void deletePatient(patient.id)
+              .then(() => router.back())
+              .catch((e) => alertError('حذف نشد', e));
           },
         },
       ],
@@ -133,6 +146,7 @@ export function PatientRecordScreen() {
           {tab === 'timeline' && <TimelineTab patientId={id} />}
           {tab === 'notes' && <NotesTab patientId={id} />}
           {tab === 'kardex' && <KardexTab patientId={id} />}
+          {tab === 'vitals' && <VitalsTab patientId={id} />}
           {tab === 'labs' && <LabsTab patientId={id} />}
           {tab === 'imaging' && <ImagingTab patientId={id} />}
           {tab === 'media' && <MediaTab patientId={id} />}

@@ -33,6 +33,57 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Validate observations and isolate consult replies
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous atomic-write change `f8913ce`
+
+**Changed**
+
+- Integrated the inherited Vitals/Diagnoses work and its patient-screen links after
+  reviewing it. Preserved its feature structure, added field-level invalid-number errors,
+  query-level finite/date checks, partial BP preservation/display, measured-time entry and
+  chart selection independent of the default BP series. Removed the automatic BMI badge
+  from this unshipped work; a clinical-tool UI belongs behind the new validation gate.
+- Patient read failure now shows an error instead of endless loading. Diagnosis/vital
+  mutations report failures and audit changes without clinical contents. Empty diagnosis
+  titles are rejected. Full diagnosis edit/recovery remains part of the wider backlog.
+- Consult reply state is keyed by consult ID. Closing A and opening B cannot carry text
+  across; returning to A retains its in-screen text. This is not persistent draft storage.
+- Updated execution ledger and roadmap; no dependency, schema or backup format change.
+
+**Verified**
+
+- `npm run check` green, no warnings: 33 suites / 491 app tests + 3 workflow tests.
+- `f8913ce` pushed; hosted CI run 35847160850 succeeded for that exact SHA, including
+  schema check and Android bundle. Local earlier bundle succeeded with inherited UI too.
+- `adb devices`: no device connected.
+- Android bundle succeeded (2,493 modules, 6.6 MB); this is not an APK/device test.
+
+**Not verified**
+
+- This entry's new form/chart/consult UI has not run on hardware. Hosted CI for this
+  entry's commit is checked after pushing; inspect actual run status.
+- No process-death, call/voice/camera or second-device restore acceptance in this session.
+
+**Open threads**
+
+- Continue `IMPLEMENTATION.md`, especially D05 (autosave failure visibility and navigation
+  recovery), D09 (round queries/membership), and D10 (backup copy verification/pruning).
+- A newly confirmed D10 hazard: `verifyCopy` returns `size` on unknown size or exceptions,
+  and the caller rotates old backups after that result. Require real evidence before any
+  pruning; test missing/unreadable/unknown-size/short/corrupt destination paths.
+- W01/W02 retrieval gaps, broader clinical flow, rich text, validated clinical library,
+  AI and device acceptance are still open. Completing these commits does not finish MedOS.
+
+**Gotchas**
+
+- All pre-session Vitals/Diagnoses files are now included in this change with their
+  provenance recorded above. The old comparison count (484) included those uncommitted tests.
+- A single BP component is retained as `120/` or `/80`; an Arabic decimal separator is
+  not accepted as a BP slash. Invalid nonempty form values never become silent null writes.
+- No subagents ran.
+
 ## 2026-09-23 — Atomic notes and capture filing; current execution ledger
 
 **Agent:** GPT-6 via Codex

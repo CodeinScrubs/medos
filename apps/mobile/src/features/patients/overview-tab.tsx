@@ -6,6 +6,7 @@ import { Badge, Button, Card, Column, DataRow, Divider, Row, SectionHeader, Text
 import type { Patient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { ConsultsSection } from '@/features/consults/consults-section';
+import { DiagnosesSection } from '@/features/diagnoses/diagnoses-section';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { ENCOUNTER_KIND_LABELS } from '@/features/encounters/labels';
 import { admissionElapsed, formatAdmissionElapsed, isInpatient } from '@/features/encounters/logic';
@@ -44,6 +45,8 @@ export function OverviewTab({ patient }: { patient: Patient }) {
   return (
     <Column gap="none">
       <AdmissionCard patientId={patientId} />
+
+      <DiagnosesSection patientId={patientId} />
 
       <TasksSection patientId={patientId} title="کارهای این بیمار" limit={8} />
 

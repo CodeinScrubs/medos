@@ -12,6 +12,10 @@ export type AuditAction =
   | 'patient.deleted'
   | 'patient.restored'
   | 'attachment.deleted'
+  | 'vital.updated'
+  | 'vital.deleted'
+  | 'diagnosis.updated'
+  | 'diagnosis.deleted'
   | 'backup.created'
   | 'backup.restored'
   // A restore that was cut short and had its files put back.

@@ -41,11 +41,11 @@ order; do not treat a successful test suite as acceptance of the entire product.
 | D03 | Publish persisted draft + note + versions + voice attachment metadata together; retry without duplicate note/audio | Implemented; `commit-draft.test.ts`. Files must already exist before transaction. Native recording remains unverified. |
 | D04 | Failed initial capture can retry; simultaneous filing creates one destination; attachment metadata and selected patient commit with filing | Implemented; `capture/captures.test.ts`. Conflicting destination/patient is refused. |
 | D05 | All autosave fields show failure, retain latest text, offer retry and safe exit/recovery | Open. `AutosaveField`, route exits, round navigation, recording callbacks. Test failed writes and process termination separately. |
-| D06 | Consult reply never inherits another consult's text | Open. Bind editor/draft to consult ID; test A -> cancel -> B, including navigation. |
-| D07 | Vitals distinguish blank from invalid, preserve partial BP and old values, record actual measured time | Open; inherited Vitals/Diagnoses UI still in progress. Validate UI and query boundaries; no silent null conversion. |
-| D08 | Read/write errors are visible without dropping input; sensitive deletes are audited | Open; patient record, edit gates, diagnoses, vitals and task/status actions. |
+| D06 | Consult reply never inherits another consult's text | Implemented keyed in-screen drafts; `answer-drafts.test.ts` covers closing A, editing B and late submission. Native UI unverified; persistent recovery remains D05. |
+| D07 | Vitals distinguish blank from invalid, preserve partial BP and old values, record actual measured time | Implemented input/query guards and measured-time picker; `vitals.test.ts`. Available chart series no longer depend on default BP data. Native form/chart unverified. |
+| D08 | Read/write errors are visible without dropping input; sensitive deletes are audited | Partial: patient read/delete, diagnoses/vitals and consult status errors surfaced; vitals/diagnosis mutations audited. Edit gates, other task/status actions and end-to-end recovery remain open. |
 | D09 | Rounds use newest note rather than pinned-first; deleted encounters do not appear current; one active membership per patient/shift | Open; query tests for duplicates, deleted encounters and older pinned notes. |
-| D10 | Backup/restore remains compatible and verifies copy strength honestly | Open end-to-end audit. Recheck unknown-size destinations, pruning conditions, interrupted restore, old backup fixtures, original media, low disk and second-device recovery. |
+| D10 | Backup/restore remains compatible and verifies copy strength honestly | Open, priority next: `verifyCopy` returns `size` for unknown destination size and exceptions, then `createBackup` rotates older backups. Never prune on unknown/unreadable content. Also verify interrupted restore, old fixtures, original media, low disk and second-device recovery. |
 
 ## Priority 1: complete everyday flows
 
