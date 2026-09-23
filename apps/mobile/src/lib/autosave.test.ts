@@ -37,6 +37,22 @@ function build(write: (v: string) => Promise<void>) {
 }
 
 describe('Autosave', () => {
+  it('retains a conflict without repeated background retries, then retries explicitly', async () => {
+    let conflict = true;
+    const write = jest.fn(async (_value: string) => {
+      if (conflict) throw new Error('conflict');
+    });
+    const saver = new Autosave({ write, shouldRetry: () => false });
+    saver.change('keep this text');
+    expect(await saver.flush()).toBe(false);
+    tick(10000);
+    await Promise.resolve();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(saver.unsaved).toBe(true);
+    conflict = false;
+    expect(await saver.flush()).toBe(true);
+    expect(write).toHaveBeenLastCalledWith('keep this text');
+  });
   it('remains unsaved while a write is in flight, even with no pending value', async () => {
     let finish!: () => void;
     const { saver } = build(

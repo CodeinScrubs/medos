@@ -11,6 +11,7 @@ import m0006 from './0006_keen_genesis.sql';
 import m0007 from './0007_ordinary_zaladane.sql';
 import m0008 from './0008_natural_jack_power.sql';
 import m0009 from './0009_dazzling_caretaker.sql';
+import m0010 from './0010_confused_zarda.sql';
 
   export default {
     journal,
@@ -24,7 +25,8 @@ m0005,
 m0006,
 m0007,
 m0008,
-m0009
+m0009,
+m0010
     }
   }
   

@@ -284,6 +284,25 @@ This is why the editor's own live query is read only at mount: it is watching a 
 screen is writing, and feeding those writes back into the fields would fight the keyboard.
 Drafts nobody finished are surfaced on Today rather than left to be found by accident.
 
+Consult answers have a narrower lifecycle: one recoverable response/instruction draft
+on their existing consultation row, separate from the published response and status.
+Three additive, SQL-defaulted columns avoid a generic draft framework or a duplicate
+consult entity. The editor owns both fields and uses one autosave scheduler; background
+and route exit flush it. Publishing checks the persisted draft revision, writes the
+answer/search/status and retires the draft in one synchronous transaction. Retrying the
+same publish cannot alter the original response timestamp. Cancelled drafts remain
+readable from the consult card. Drafts do not enter clinical search as confirmed answers.
+
+The draft revision is an optimistic concurrency token, not a history table: stale editors
+cannot overwrite newer saved text. On conflict the local text stays visible; comparison
+shows the stored version and replacement requires an explicit choice of that revision.
+Background conflict retries stop until another edit or explicit retry. The dedicated
+answer route avoids losing an inline editor when changing a patient tab; its seed stays
+mounted through later query changes. Other edit flows do not yet share this conflict
+protection. Full consult correction/history, quick-add request drafts and native
+process-death/back testing remain separate work. The autosave delay is still an exposure
+window for text not yet committed to SQLite.
+
 The capture screen uses the same machinery for a different reason. Its row **is** the
 draft: `CaptureWriter` creates one `capture_inbox` row the first time anything on that
 screen produces something worth keeping — the keyboard, the recorder or the camera,

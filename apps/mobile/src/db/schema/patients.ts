@@ -562,6 +562,11 @@ export const consultations = sqliteTable(
     response: text('response'),
     /** What to do about it, kept apart from the answer itself. */
     followUpInstruction: text('follow_up_instruction'),
+    /** Recoverable working text; never an answered consult until explicitly committed. */
+    draftResponse: text('draft_response').notNull().default(''),
+    draftInstruction: text('draft_instruction').notNull().default(''),
+    /** Optimistic concurrency token for the whole answer draft. */
+    draftRevision: integer('draft_revision').notNull().default(0),
     /** The consult note, when one was written. */
     noteId: text('note_id').references(() => notes.id, { onDelete: 'set null' }),
     searchText: text('search_text'),

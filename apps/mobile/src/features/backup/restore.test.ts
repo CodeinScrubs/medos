@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { auditLog, backupRuns, imagingStudies, notes, patients, settings } from '@/db/schema';
+import { auditLog, backupRuns, consultations, imagingStudies, notes, patients, settings } from '@/db/schema';
 import { newId, stamps } from '@/lib/ids';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -57,6 +57,44 @@ describe('importTables', () => {
   beforeEach(async () => {
     live = await createTestDatabase();
     backup = await createTestDatabase();
+  });
+
+  it('restores consult drafts and their concurrency token with their patient', async () => {
+    const patientId = await addPatient(backup, 'Consult');
+    await backup.db.insert(consultations).values({
+      id: 'consult',
+      ...stamps(),
+      patientId,
+      reason: 'Question',
+      draftResponse: 'Draft',
+      draftInstruction: 'Later',
+      draftRevision: 7,
+    });
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(consultations).get()).toMatchObject({
+      draftResponse: 'Draft',
+      draftInstruction: 'Later',
+      draftRevision: 7,
+      status: 'pending',
+    });
+  });
+
+  it('restores a pre-draft consult backup using SQL defaults without inventing a response', async () => {
+    const patientId = await addPatient(backup, 'Legacy');
+    await backup.db.insert(consultations).values({ id: 'legacy', ...stamps(), patientId, reason: 'Question' });
+    backup.conn.execSync(
+      'ALTER TABLE consultations DROP COLUMN draft_response; ALTER TABLE consultations DROP COLUMN draft_instruction; ALTER TABLE consultations DROP COLUMN draft_revision;',
+    );
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(consultations).get()).toMatchObject({
+      draftResponse: '',
+      draftInstruction: '',
+      draftRevision: 0,
+      response: null,
+      status: 'pending',
+    });
   });
 
   it('replaces the clinical record with the backup’s', async () => {

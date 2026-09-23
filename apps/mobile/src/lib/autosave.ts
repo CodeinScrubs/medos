@@ -31,6 +31,8 @@ export type AutosaveOptions<T> = {
   /** Longest a change may wait, however fast the typing. */
   maxWaitMs?: number;
   onState?: (state: AutosaveState) => void;
+  /** Conflicts need a user decision, not a background retry loop. Pending text is retained. */
+  shouldRetry?: (error: unknown) => boolean;
   now?: () => number;
 };
 
@@ -39,6 +41,7 @@ export class Autosave<T> {
   private readonly delayMs: number;
   private readonly maxWaitMs: number;
   private readonly onState: (state: AutosaveState) => void;
+  private readonly shouldRetry: (error: unknown) => boolean;
   private readonly now: () => number;
 
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -54,6 +57,7 @@ export class Autosave<T> {
     this.delayMs = options.delayMs ?? 800;
     this.maxWaitMs = options.maxWaitMs ?? 3000;
     this.onState = options.onState ?? (() => {});
+    this.shouldRetry = options.shouldRetry ?? (() => true);
     this.now = options.now ?? Date.now;
   }
 
@@ -138,7 +142,7 @@ export class Autosave<T> {
       // Keep the newer value if one arrived meanwhile; never overwrite it.
       if (this.pending == null) this.pending = item;
       this.onState({ status: 'failed', error, at: this.now() });
-      if (!this.stopped) this.arm(this.delayMs);
+      if (!this.stopped && this.shouldRetry(error)) this.arm(this.delayMs);
     } finally {
       this.writing = false;
     }

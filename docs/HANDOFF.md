@@ -33,6 +33,57 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Recover consult reply drafts without silently publishing them
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous date validation `b10a56d`
+
+**Changed**
+
+- Consult replies use a dedicated keyed editor with one autosave scheduler for
+  response/instruction. Drafts persist, flush on background/exit and reopen from
+  their consult card. Failure keeps the text visible and offers retry.
+- Migration `0010_confused_zarda` adds three SQL-defaulted columns to consultations:
+  draft response, instruction and revision. Draft text is not a published response,
+  does not close the consult, and is not indexed as confirmed clinical information.
+- Publishing checks the draft revision and atomically writes answer/time/search/
+  status while retiring the draft. Repeating the publish preserves the original time.
+  Closed/deleted consults and deleted patients reject late edits. Cancelled drafts
+  stay readable; request/answer/cancel/delete actions audit identifiers/status only.
+- Concurrent edits require comparing versions and an explicit replacement choice.
+  The displayed revision is checked again at write time. Conflict retries stop in
+  the background; ordinary transient failures retain the existing retry behavior.
+- Removed the obsolete in-memory reply reducer and unused unguarded update helper.
+  No dependency, new table, clinical formula or backup envelope change.
+
+**Verified**
+
+- `npm run check`: 41 suites / 561 app tests + 3 workflow tests, all checks passed.
+- Targeted SQLite and component-handler tests cover both-field recovery, failed
+  autosave/publish, duplicate submissions, stale edits/comparisons, closed-record
+  writes and exact draft preservation. UI primitives/navigation are mocked.
+- Restore tests cover new drafts/revisions and backups lacking the new columns.
+- `npm run db:generate` reports no further schema changes; `git diff --check` passed.
+- Android bundle: 2,512 modules, 6.7 MB, `entry-1d835b3e98b9d4ca129230485cefaa0e.hbc`.
+- Previous `b10a56d` exact-SHA CI run 35907619485 succeeded.
+- `node apps/mobile/scripts/android-env.js adb devices`: no attached device.
+- No subagents used.
+
+**Not verified**
+
+- This commit's CI is checked after pushing. No APK/native UI or forced-process-death
+  run. Autosave has a delay before persistence; unwritten keystrokes cannot be
+  guaranteed through an OS kill. This token prevents conflicts, not a full history.
+
+**Open threads**
+
+- D05: quick-add task and consult-request draft recovery; raw invalid date drafts;
+  native back/process-death, media interruption and concurrent edits in other flows.
+- W03: task deadline editing/reminders. W02: persistent accessible reorder.
+- W05/W07: full consult correction/history and broader clinical-record restore.
+- Continue all remaining IMPLEMENTATION entries, including patient context, complete
+  record workflows, sourced physician-reviewed clinical tools, AI and device gates.
+
 ## 2026-09-23 — Reject invalid visible dates instead of saving old values
 
 **Agent:** GPT-6 via Codex

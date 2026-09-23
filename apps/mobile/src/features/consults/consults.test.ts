@@ -4,7 +4,8 @@ import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase } from '@/test/sqljs';
 
 import {
-  answerConsult,
+  commitConsultAnswerDraft,
+  saveConsultAnswerDraft,
   cancelConsult,
   consultQuery,
   createConsult,
@@ -60,7 +61,8 @@ describe('a consult', () => {
     expect((await consultQuery(id))[0]?.requestedAt).toBeInstanceOf(Date);
     expect(await openConsultsQuery()).toHaveLength(1);
 
-    await answerConsult(id, { response: 'شروع مروپنم', followUpInstruction: 'کشت خون تکرار شود' });
+    const revision = await saveConsultAnswerDraft(id, { response: 'شروع مروپنم', instruction: 'کشت خون تکرار شود' }, 0);
+    await commitConsultAnswerDraft(id, revision);
     const [answered] = await consultQuery(id);
     expect(answered?.status).toBe('answered');
     expect(answered?.response).toBe('شروع مروپنم');
@@ -82,7 +84,8 @@ describe('a consult', () => {
 
   it('indexes the question and the answer, so both can be found later', async () => {
     const id = await createConsult({ patientId, specialty: 'نفرولوژی', reason: 'کراتینین بالا' });
-    await answerConsult(id, { response: 'دیالیز لازم نیست' });
+    const revision = await saveConsultAnswerDraft(id, { response: 'دیالیز لازم نیست', instruction: '' }, 0);
+    await commitConsultAnswerDraft(id, revision);
 
     const [row] = await consultQuery(id);
     expect(row?.searchText).toContain('دیالیز');

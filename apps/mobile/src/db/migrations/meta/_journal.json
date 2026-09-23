@@ -71,6 +71,13 @@
       "when": 1789998879075,
       "tag": "0009_dazzling_caretaker",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790190711434,
+      "tag": "0010_confused_zarda",
+      "breakpoints": true
     }
   ]
 }
