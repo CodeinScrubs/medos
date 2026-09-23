@@ -16,8 +16,16 @@ export function isBackupDue(lastSuccessAt: number | null, intervalHours: number,
 
 export type BackupFreshness = 'never' | 'stale' | 'fresh';
 
+export type BackupDelivery = { at: number; strength: 'bytes' | 'size' | 'confirmed' };
+
+/** Do not attach old evidence to a timestamp written by another app version. */
+export function deliveryStrength(lastSuccessAt: number | null, delivery: BackupDelivery | null) {
+  return delivery && delivery.at === lastSuccessAt ? delivery.strength : null;
+}
+
 /** For the status lines: never backed up, backed up too long ago, or fine. */
 export function backupFreshness(lastSuccessAt: number | null, now: number): BackupFreshness {
   if (lastSuccessAt == null) return 'never';
-  return now - lastSuccessAt > BACKUP_STALE_AFTER_MS ? 'stale' : 'fresh';
+  const age = now - lastSuccessAt;
+  return age < 0 || age > BACKUP_STALE_AFTER_MS ? 'stale' : 'fresh';
 }

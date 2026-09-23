@@ -5,8 +5,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Card, Column, Divider, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useSetting } from '@/db/use-setting';
-import { backupFreshness } from '@/features/backup/logic';
-import { backupLastSuccessAt } from '@/features/backup/settings';
+import { backupFreshness, deliveryStrength } from '@/features/backup/logic';
+import { backupLastDelivery, backupLastSuccessAt } from '@/features/backup/settings';
 import { formatRelativeTime } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -21,6 +21,8 @@ type Item = {
 export function MoreScreen() {
   const { spacing } = useTheme();
   const lastBackup = useSetting(backupLastSuccessAt).value;
+  const lastDelivery = useSetting(backupLastDelivery).value;
+  const strength = deliveryStrength(lastBackup, lastDelivery);
   const now = useNow();
   const freshness = backupFreshness(lastBackup, now);
 
@@ -42,7 +44,12 @@ export function MoreScreen() {
       title: 'پشتیبان‌گیری',
       subtitle: lastBackup ? `آخرین بکاپ ${formatRelativeTime(lastBackup, new Date(now))}` : 'هنوز بکاپی گرفته نشده',
       href: '/backup',
-      tone: freshness === 'never' ? 'danger' : freshness === 'stale' ? 'warning' : 'success',
+      tone:
+        freshness === 'never'
+          ? 'danger'
+          : freshness === 'stale' || strength === 'size' || strength == null
+            ? 'warning'
+            : 'success',
     },
     { icon: 'trash-outline', title: 'حذف‌شده‌ها', subtitle: 'برگرداندن پرونده‌های حذف‌شده', href: '/trash' },
     {

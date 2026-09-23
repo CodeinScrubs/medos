@@ -25,5 +25,6 @@ describe('backupFreshness', () => {
     expect(backupFreshness(null, NOW)).toBe('never');
     expect(backupFreshness(NOW - HOUR, NOW)).toBe('fresh');
     expect(backupFreshness(NOW - BACKUP_STALE_AFTER_MS - 1, NOW)).toBe('stale');
+    expect(backupFreshness(NOW + HOUR, NOW)).toBe('stale');
   });
 });

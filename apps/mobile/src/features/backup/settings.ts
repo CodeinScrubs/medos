@@ -19,8 +19,15 @@ export const backupIntervalHours = defineSetting(
   24,
 );
 
-/** Unix ms of the last backup that completed. */
+/** Unix ms of the last delivered copy (not proof of a successful restore). */
 export const backupLastSuccessAt = defineSetting('backup.lastSuccessAt', z.number().nullable(), null);
+
+/** Evidence for that delivery. Older versions have no recorded strength. */
+export const backupLastDelivery = defineSetting(
+  'backup.lastDelivery',
+  z.object({ at: z.number(), strength: z.enum(['bytes', 'size', 'confirmed']) }).nullable(),
+  null,
+);
 
 /**
  * A restore that has replaced the media files but not yet the database.

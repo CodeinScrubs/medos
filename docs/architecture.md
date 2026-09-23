@@ -212,6 +212,17 @@ JSON manifest, the database snapshot, and media files.
   on every exit path.
 - The audit log is merged on restore rather than replaced, and the OS's reminders are
   cancelled and rebuilt from the restored rows.
+- **Destination evidence and retention:** after copying, locate the provider's returned
+  document and compare its bytes with the source through EOF. Only that result permits
+  pruning old backups. A known equal size with no readable destination handle is retained
+  as `size` evidence, visibly weaker; unknown size needs a successful read-back. Missing
+  metadata/files, read errors and mismatches fail without pruning. This deliberately uses
+  more storage on providers that cannot be read back. Delivery time and evidence are
+  stored atomically; legacy deliveries have unknown strength. New file names include the
+  run UUID and copies refuse overwrite; retention protects the just-verified name even
+  after a clock rollback. Archive bytes, passphrase schemes and old-file restore support
+  are unchanged. Provider/device behavior and actual restore remain separate acceptance
+  checks; equality to the source does not validate every record inside an archive.
 
 ---
 

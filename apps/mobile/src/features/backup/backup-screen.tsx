@@ -42,13 +42,14 @@ import {
 } from './engine';
 import { WrongPassphraseError } from './format';
 import { checkBackupPassphrase, hasBackupKey, setBackupPassphrase } from './keys';
-import { backupFreshness } from './logic';
+import { backupFreshness, deliveryStrength } from './logic';
 import {
   backupAutoEnabled,
   backupAutoIncludeMedia,
   backupFolderUri,
   backupIntervalHours,
   backupLastSuccessAt,
+  backupLastDelivery,
 } from './settings';
 
 /** `content://…/tree/primary%3ADocuments%2FMedOS` -> `Documents/MedOS`. */
@@ -76,7 +77,8 @@ function useBackupConfig(): BackupConfig | null {
   const autoIncludeMedia = useSetting(backupAutoIncludeMedia);
   const intervalHours = useSetting(backupIntervalHours);
   const lastSuccessAt = useSetting(backupLastSuccessAt);
-  const all = [folderUri, autoEnabled, autoIncludeMedia, intervalHours, lastSuccessAt];
+  const lastDelivery = useSetting(backupLastDelivery);
+  const all = [folderUri, autoEnabled, autoIncludeMedia, intervalHours, lastSuccessAt, lastDelivery];
   if (!all.every((s) => s.loaded)) return null;
   return {
     folderUri: folderUri.value,
@@ -84,6 +86,7 @@ function useBackupConfig(): BackupConfig | null {
     autoIncludeMedia: autoIncludeMedia.value,
     intervalHours: intervalHours.value,
     lastSuccessAt: lastSuccessAt.value,
+    lastDelivery: lastDelivery.value,
   };
 }
 
@@ -163,7 +166,7 @@ export function BackupScreen() {
          */
         Alert.alert('فرستاده شد؟', 'اگر فایل را واقعاً جایی ذخیره یا ارسال کردید، «بله» را بزنید.', [
           { text: 'نه', style: 'cancel' },
-          { text: 'بله', onPress: () => void markBackupDelivered() },
+          { text: 'بله', onPress: () => void markBackupDelivered().catch((e) => alertError('تأیید ثبت نشد', e)) },
         ]);
       } else if (!result.savedTo) {
         Alert.alert(
@@ -421,7 +424,15 @@ export function BackupScreen() {
                       ) : null}
                     </Column>
                     <Badge
-                      label={run.status === 'success' ? 'موفق' : run.status === 'running' ? 'در حال انجام' : 'ناموفق'}
+                      label={
+                        run.status === 'success'
+                          ? run.destination === 'cache'
+                            ? 'ساخته شد'
+                            : 'کپی شد'
+                          : run.status === 'running'
+                            ? 'در حال انجام'
+                            : 'ناموفق'
+                      }
                       tone={run.status === 'success' ? 'success' : run.status === 'running' ? 'info' : 'danger'}
                     />
                   </Row>
@@ -476,6 +487,7 @@ function StatusCard({
   const { colors } = useTheme();
   const last = config.lastSuccessAt;
   const stale = backupFreshness(last, now) !== 'fresh';
+  const strength = deliveryStrength(last, config.lastDelivery);
 
   let title: string;
   let detail: string;
@@ -491,8 +503,16 @@ function StatusCard({
     tone = 'danger';
   } else {
     title = `آخرین بکاپ: ${formatRelativeTime(last, new Date(now))}`;
-    detail = stale ? 'بیش از سه روز از آخرین بکاپ گذشته.' : 'اطلاعات شما پشتیبان دارد.';
-    tone = stale ? 'warning' : 'success';
+    detail = stale
+      ? 'زمان بکاپ تازه رسیده است.'
+      : strength === 'bytes'
+        ? 'محتوای فایل مقصد بررسی شد.'
+        : strength === 'size'
+          ? 'فقط اندازهٔ کپی تأیید شد؛ بکاپ‌های قبلی نگه داشته شدند.'
+          : strength === 'confirmed'
+            ? 'ذخیره یا ارسال فایل را تأیید کرده‌اید.'
+            : 'بررسی محتوای این نسخه ثبت نشده است.';
+    tone = stale || strength === 'size' || strength == null ? 'warning' : 'success';
   }
 
   const bg = tone === 'danger' ? colors.dangerSoft : tone === 'warning' ? colors.warningSoft : colors.successSoft;

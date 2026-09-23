@@ -33,6 +33,50 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Preserve older backups unless the new copy is verified
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous observations/consult change `95b840b`
+
+**Changed**
+
+- Extracted backup destination verification with injectable file readers. Only exact
+  byte/EOF equality permits pruning. A known equal size with an unavailable destination
+  handle is recorded as weaker evidence; unknown metadata, missing files, read interruption
+  or mismatches never prune. Reader cleanup and retention failures preserve the result.
+- New backup filenames include a run UUID; copying refuses overwrite. Retention preserves
+  the just-verified copy even if the clock moved backwards and keeps full/DB counts separate.
+- Delivery timestamp/evidence commit together. The backup page distinguishes content
+  verification, size-only copies and user-confirmed sharing; old evidence stays unknown.
+  Removed a misleading universal success label from creation history. No new dependency,
+  schema change, archive format change, or extra user confirmation.
+
+**Verified**
+
+- `npm run check`: 36 suites / 518 app tests + 3 workflow tests; typecheck/lint/format pass.
+- Backup suite: 92 tests, including corruption, missing/unknown metadata, read/close errors,
+  equal-size unreadable providers, clock rollback and SQLite transaction rollback/retry.
+- Installed Expo native copy implementation checks `overwrite: false` for SAF children.
+- `95b840b` is on GitHub; CI run 35848457929 succeeded for that exact SHA.
+
+**Not verified**
+
+- This commit's hosted CI is checked after pushing. No phone is connected; real SAF
+  providers, low disk, process death and second-device restore remain device gates.
+- Byte equality proves a copied file matches its source, not clinical/data completeness.
+
+**Open threads**
+
+- Continue D09 round query/membership correctness, D05 recoverable autosave/navigation,
+  then the full `IMPLEMENTATION.md` backlog. D10 device/restore acceptance remains open.
+
+**Gotchas**
+
+- Providers that cannot be read back now retain old copies instead of rotating. This can
+  increase storage use; do not restore pruning merely to hide the limitation.
+- Old names remain recognized; restore does not depend on the filename. Archive/key
+  compatibility is unchanged.
+
 ## 2026-09-23 — Validate observations and isolate consult replies
 
 **Agent:** GPT-6 via Codex

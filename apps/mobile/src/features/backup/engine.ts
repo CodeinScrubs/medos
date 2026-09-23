@@ -20,6 +20,8 @@ import { newId, stamps, touch } from '@/lib/ids';
 import { logError } from '@/platform/error-log';
 import { MEDIA_ROOT } from '@/platform/media';
 
+import { checkBackupCopy, type CopyCheck, type CopyFile } from './copy-check';
+import { recordBackupDelivery } from './delivery-queries';
 import {
   archiveEnd,
   archiveStart,
@@ -37,11 +39,10 @@ import {
   parseHeader,
   readArchiveStart,
   readEntryHeader,
-  streamsMatch,
 } from './format';
 import { importTables } from './import';
 import { hasBackupKey, loadBackupKey, storeBackupKey } from './keys';
-import { isBackupDue } from './logic';
+import { isBackupDue, type BackupDelivery } from './logic';
 import { parseManifest, type BackupManifest } from './manifest';
 import {
   MediaRestoreError,
@@ -51,13 +52,14 @@ import {
   type MediaFileSystem,
   type MediaPaths,
 } from './media-swap';
-import { BACKUP_FILE_RE, backupFileName, restoreTargetPath } from './paths';
+import { backupFileName, backupNamesToPrune, restoreTargetPath } from './paths';
 import {
   backupAutoEnabled,
   backupAutoIncludeMedia,
   backupFolderUri,
   backupIntervalHours,
   backupLastSuccessAt,
+  backupLastDelivery,
   restoreInFlight,
   restoreMediaUnresolved,
 } from './settings';
@@ -65,10 +67,6 @@ import {
 /* -------------------------------------------------------------------------- */
 /*  Configuration                                                               */
 /* -------------------------------------------------------------------------- */
-
-/** How many of each kind to keep in the backup folder. */
-const KEEP_FULL = 3;
-const KEEP_DB_ONLY = 7;
 
 /** Where a restore keeps the files it replaces, under the document folder. */
 const DISPLACED_ROOT = 'restore-displaced';
@@ -79,6 +77,7 @@ export type BackupConfig = {
   autoIncludeMedia: boolean;
   intervalHours: number;
   lastSuccessAt: number | null;
+  lastDelivery: BackupDelivery | null;
 };
 
 export async function getBackupConfig(): Promise<BackupConfig> {
@@ -88,6 +87,7 @@ export async function getBackupConfig(): Promise<BackupConfig> {
     autoIncludeMedia: await readSetting(backupAutoIncludeMedia),
     intervalHours: await readSetting(backupIntervalHours),
     lastSuccessAt: await readSetting(backupLastSuccessAt),
+    lastDelivery: await readSetting(backupLastDelivery),
   };
 }
 
@@ -206,6 +206,7 @@ export type BackupResult = {
   fileName: string;
   sizeBytes: number;
   savedTo: string | null;
+  copyCheck: CopyCheck | null;
   manifest: BackupManifest;
 };
 
@@ -273,7 +274,7 @@ export async function createBackup({
       device: Device.modelName ?? null,
     };
 
-    const fileName = backupFileName(startedAt, includeMedia);
+    const fileName = backupFileName(startedAt, includeMedia, runId);
     const out = new File(work, fileName);
     out.create({ overwrite: true });
     const handle = out.open(FileMode.Truncate);
@@ -311,27 +312,35 @@ export async function createBackup({
       const folder = openBackupFolder(await readSetting(backupFolderUri));
       if (folder) {
         onProgress?.({ phase: 'copy', fraction: 0 });
-        await out.copy(folder, { overwrite: true });
+        await out.copy(folder, { overwrite: false });
         /*
          * Read the destination back before anything is deleted. A copy onto a
          * storage provider can come back without throwing and still leave a
          * short, missing or wrong file; rotating on that word alone would
          * delete good older backups to make room for a broken one.
          */
-        checked = verifyCopy(out, folder, (f) => onProgress?.({ phase: 'copy', fraction: f }));
+        checked = checkBackupCopy(
+          copyFile(out),
+          () => {
+            // SAF document URIs must come from the provider, not a composed path.
+            const copied = folder
+              .list()
+              .find((entry): entry is File => entry instanceof File && entry.name === out.name);
+            return copied ? copyFile(copied) : undefined;
+          },
+          () => rotateBackups(folder, fileName),
+          (f) => onProgress?.({ phase: 'copy', fraction: f }),
+        );
         if (checked === 'failed') {
           // Sizes only — no file names, no data. Without this the owner's
           // report is "it says the backup failed" and nothing else.
           logError(new Error(`backup copy check failed (source ${out.size ?? -1} bytes)`), {
             source: 'handled',
-            context: `backup: verifying the copy in ${folder.uri.slice(0, 40)}`,
+            context: 'backup: verifying destination copy',
           });
-          throw new Error('بکاپ در پوشه‌ی مقصد کامل نوشته نشد. پوشه را دوباره انتخاب کنید.');
+          throw new Error('بررسی فایل بکاپ در مقصد کامل نشد. بکاپ‌های قبلی نگه داشته شدند؛ دوباره تلاش کنید.');
         }
         savedTo = folder.uri;
-        // Rotation deletes older backups, so it runs only once this one is
-        // known to be there and the right size at the very least.
-        rotateBackups(folder);
       } else if (trigger === 'auto') {
         throw new Error('پوشه‌ی بکاپ در دسترس نیست. از صفحه‌ی بکاپ دوباره انتخابش کنید.');
       }
@@ -354,7 +363,7 @@ export async function createBackup({
     // "Last backup" means a copy that left the app. A file sitting in the
     // cache is not a backup: Android clears that folder, and the phone it is
     // on is the thing being backed up. Sharing it marks it delivered.
-    if (savedTo) await writeSetting(backupLastSuccessAt, Date.now());
+    if (savedTo && checked != null) recordBackupDelivery(checked, Date.now());
     await audit('backup.created', {
       summary: fileName,
       // `checked` says how far the copy could be proved, not how it went.
@@ -362,7 +371,7 @@ export async function createBackup({
     });
 
     onProgress?.({ phase: 'done', fraction: 1 });
-    return { file: out, fileName, sizeBytes, savedTo, manifest };
+    return { file: out, fileName, sizeBytes, savedTo, copyCheck: checked, manifest };
   } catch (e) {
     await db
       .update(backupRuns)
@@ -477,91 +486,27 @@ export async function recoverInterruptedRestore(): Promise<{ putBack: number; fa
  * the file was sent or the sheet was dismissed, so only the user can say.
  */
 export async function markBackupDelivered(): Promise<void> {
-  await writeSetting(backupLastSuccessAt, Date.now());
+  recordBackupDelivery('confirmed', Date.now());
 }
 
-/**
- * How well the copy in the backup folder could be checked.
- *
- * - `bytes`: opened and compared with the source, byte for byte.
- * - `size`: it is there and the right length, and the provider would not let
- *   it be read back. Android's storage-access-framework folders are like this
- *   — a `content://` document has no file handle to open.
- * - `failed`: missing, empty, the wrong length, or different where it could
- *   be read. Nothing is deleted after this.
- */
-type CopyCheck = 'bytes' | 'size' | 'failed';
-
-/**
- * Is the copy really there, with the same bytes in it?
- *
- * `copy` resolving is the provider's word; this asks the destination. Size is
- * the provider's word too — a cloud-backed or USB folder can report the length
- * it was asked to write while holding something else — so the file is read
- * back and compared where that is possible at all.
- *
- * It is not always possible, which the first version of this got wrong: it
- * treated "cannot open the destination" as "the backup failed", and on a phone
- * whose backup folder is a SAF tree that is every backup. A check that refuses
- * good data is not a stricter check, it is a broken one. What the weaker
- * answer must never do is be reported as the stronger one.
- */
-function verifyCopy(source: File, folder: Directory, onProgress?: (fraction: number) => void): CopyCheck {
-  let read: FileHandle | null = null;
-  let written: FileHandle | null = null;
-  try {
-    /*
-     * The copy is found by listing the folder, not by building a path inside
-     * it. A storage-access-framework folder is a tree of documents whose URIs
-     * the provider hands out; `new File(folder, name)` composes a path that
-     * looks right and resolves to nothing, so the file that was just written
-     * reads as missing. Listing returns the provider's own handles.
-     */
-    const copied = folder.list().find((entry): entry is File => entry instanceof File && entry.name === source.name);
-    if (!copied) return 'failed';
-    const expected = source.size ?? 0;
-    // We wrote this file a moment ago; a source we cannot measure is a bug,
-    // not a backup.
-    if (expected === 0) return 'failed';
-    const size = copied.size;
-    if (size != null && size !== expected) return 'failed';
-    if (size == null) return 'size';
-
-    try {
-      read = source.open(FileMode.ReadOnly);
-      written = copied.open(FileMode.ReadOnly);
-    } catch {
-      // The provider does not hand out a handle. Length is all there is.
-      return 'size';
-    }
-    return streamsMatch(
-      { read: (n) => read!.readBytes(n) },
-      { read: (n) => written!.readBytes(n) },
-      expected,
-      CHUNK_BYTES,
-      onProgress,
-    )
-      ? 'bytes'
-      : 'failed';
-  } catch {
-    // Reading stopped partway: not proof of a bad copy, not proof of a good one.
-    return 'size';
-  } finally {
-    read?.close();
-    written?.close();
-  }
+/** Adapt native handles without assuming a provider supports open/read-back. */
+function copyFile(file: File): CopyFile {
+  return {
+    get size() {
+      return file.size;
+    },
+    open: () => file.open(FileMode.ReadOnly),
+  };
 }
 
 /** Keep the newest few of each kind; never let daily DB-only backups push out the last full one. */
-function rotateBackups(folder: Directory): void {
-  const ours = folder
-    .list()
-    .filter((e): e is File => e instanceof File && BACKUP_FILE_RE.test(e.name))
-    .sort((a, b) => b.name.localeCompare(a.name));
-
-  const full = ours.filter((f) => f.name.endsWith('-full.medosbak'));
-  const dbOnly = ours.filter((f) => f.name.endsWith('-db.medosbak'));
-  for (const f of [...full.slice(KEEP_FULL), ...dbOnly.slice(KEEP_DB_ONLY)]) {
+function rotateBackups(folder: Directory, verifiedName: string): void {
+  const files = folder.list().filter((entry): entry is File => entry instanceof File);
+  const obsolete = backupNamesToPrune(
+    files.map((file) => file.name),
+    verifiedName,
+  );
+  for (const f of files.filter((file) => obsolete.has(file.name))) {
     try {
       f.delete();
     } catch {
