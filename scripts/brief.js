@@ -9,6 +9,7 @@
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { latestHandoff } = require('./handoff');
 
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -62,11 +63,9 @@ if (log) {
 
 try {
   const handoff = read('docs/HANDOFF.md');
-  const entry = handoff.slice(handoff.indexOf('\n## ', handoff.indexOf('---')));
-  const open = /\*\*Open threads\*\*[^\n]*\n([\s\S]*?)(\n\*\*|\n## |$)/.exec(entry);
-  const title = /## (.+)/.exec(entry);
-  console.log(heading('Last handoff'), title ? title[1] : '');
-  if (open) console.log(open[1].trim());
+  const latest = latestHandoff(handoff);
+  console.log(heading('Last handoff'), latest?.title ?? 'No entry found');
+  console.log(latest?.openThreads ?? 'Newest entry has no Open threads section; read it before proceeding.');
 } catch {
   console.log(heading('Last handoff'), 'docs/HANDOFF.md not found');
 }

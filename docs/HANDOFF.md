@@ -33,6 +33,54 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Atomic notes and capture filing; current execution ledger
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit
+
+**Changed**
+
+- Exact note snapshot comparison replaces search-text equality; all version fields
+  participate, rapid saves have stable ordering, and legacy hashes remain readable.
+- Note creation/edit/restore and versions commit together. Publishing a persisted draft
+  commits its note, history and voice metadata before retiring the draft. Failed writes
+  retain retryable drafts; delayed autosaves cannot detach/overwrite retired drafts.
+- Capture creation retries after transient failure. Filing uses synchronous transaction
+  helpers, keeps the selected patient, and repeated/concurrent requests return one
+  destination. Conflicting conversion targets are refused.
+- Fixed `brief` mixing current titles with historical open work. Added three Node tests
+  to the root check. Added `IMPLEMENTATION.md` to preserve the owner's complete scope,
+  priorities, per-item evidence and remaining work across models.
+- Owner explicitly authorized code changes/pushes and requested no subagents. The new
+  clinical-tools request is recorded with per-tool source/test/physician-review gates;
+  no clinical engine or formula was enabled. Removed absolute completion/durability claims.
+
+**Verified**
+
+- Local `npm run check`: 32 suites / 484 tests plus 3 workflow tests; no test failures.
+  This working-copy count includes 22 inherited Vitals/Diagnoses tests not in this commit.
+- SQLite tests cover version-insert/attachment/filing failures, rollback and retry,
+  concurrent filing, exact SOAP/doctor fields, rapid saves and delayed draft writes.
+
+**Not verified**
+
+- No device UI, process-death/power-loss, recording, or second-device restore test.
+- Hosted CI and Android bundle for this commit are not yet recorded here.
+
+**Open threads**
+
+- Continue `docs/IMPLEMENTATION.md` Priority 0, starting D05–D10, then complete retrieval
+  flows and remaining product scope. Do not declare M2 finished solely from screen count.
+- Inherited uncommitted work: patient overview/record integration plus diagnoses/ and
+  vitals/. This session only normalized the two initially failing Vitals formatting files;
+  the functional input/error/UI defects remain to be fixed before committing those features.
+
+**Gotchas**
+
+- `DbTransaction` helpers must use synchronous `.run/.get/.all`. Files must already be
+  stored before their metadata is committed. No dependency, migration or backup format change.
+- No subagents ran. Previously omitted history cannot be recovered from existing snapshots.
+
 ## 2026-09-21 (M2, finished) — The round, one patient at a time
 
 **Agent:** claude-opus-5 via Claude Code

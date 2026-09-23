@@ -150,12 +150,13 @@ export function CaptureCard({
               icon="checkbox-outline"
               variant="secondary"
               size="sm"
-              disabled={!capture.text}
+              disabled={busy || !capture.text}
               onPress={() => void toTask()}
               loading={busy}
             />
             <Button
               label="نوت"
+              disabled={busy}
               icon="document-text-outline"
               variant="secondary"
               size="sm"
@@ -163,6 +164,7 @@ export function CaptureCard({
             />
             <Button
               label={patient ? 'تغییر بیمار' : 'بیمار'}
+              disabled={busy}
               icon="person-outline"
               variant="ghost"
               size="sm"
@@ -171,6 +173,7 @@ export function CaptureCard({
             />
             <Button
               label="دور انداختن"
+              disabled={busy}
               variant="ghost"
               size="sm"
               haptic={false}

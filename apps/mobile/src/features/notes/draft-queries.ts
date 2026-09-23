@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { noteDrafts, patients, type DraftVoice, type NoteDraft, type NoteType } from '@/db/schema';
@@ -98,7 +98,13 @@ export async function writeNoteDraft(
   await db
     .insert(noteDrafts)
     .values({ id, ...stamps(now), ...values })
-    .onConflictDoUpdate({ target: noteDrafts.id, set: { ...values, ...touch(now) } });
+    .onConflictDoUpdate({
+      target: noteDrafts.id,
+      // A stale autosave must not detach a linked draft or rewrite one that
+      // has already been committed/discarded.
+      set: { ...values, noteId: sql`coalesce(${noteDrafts.noteId}, ${target.noteId})`, ...touch(now) },
+      setWhere: and(alive, eq(noteDrafts.patientId, target.patientId)),
+    });
 }
 
 /** Drop whatever unsaved edit exists for a note, whichever draft row it is. */

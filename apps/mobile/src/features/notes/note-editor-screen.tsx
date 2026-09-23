@@ -23,7 +23,6 @@ import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { NOTE_TYPES, type Note, type NoteDraft, type NoteType } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { addAttachment } from '@/features/attachments/queries';
 import { VoiceNotesSection } from '@/features/attachments/voice-notes';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
@@ -32,17 +31,17 @@ import { newId } from '@/lib/ids';
 import { extensionOf, mediaUri, storeFile } from '@/platform/media';
 import { useTheme } from '@/theme';
 
+import { commitNoteDraft } from './commit-queries';
 import {
   discardNoteDraft,
   draftHasContent,
   noteDraftQuery,
-  retargetNoteDraft,
   writeNoteDraft,
   type NoteDraftFields,
 } from './draft-queries';
 import { NOTE_TYPE_LABELS } from './labels';
 import { CONSULT_NOTE_TYPES, SOAP_NOTE_TYPES } from './logic';
-import { createNote, noteQuery, updateNote } from './queries';
+import { noteQuery } from './queries';
 
 /**
  * SOAP fields for the note types actually written that way; a single body for
@@ -185,8 +184,7 @@ function NoteEditor({
   const useSoap = SOAP_NOTE_TYPES.includes(fields.type);
   const isConsult = CONSULT_NOTE_TYPES.includes(fields.type);
 
-  /** Set once the note exists, so a retry after a failed voice save updates it. */
-  const savedId = useRef<string | null>(null);
+  const committing = useRef(false);
 
   async function onRecorded(recording: Recording) {
     try {
@@ -206,85 +204,33 @@ function NoteEditor({
   }
 
   async function save() {
-    const f = latest.current;
-    const hasText = useSoap
-      ? [f.subjective, f.objective, f.assessment, f.plan].some((v) => (v ?? '').trim())
-      : (f.body ?? '').trim().length > 0;
-    if (!hasText && !(f.title ?? '').trim() && f.voices.length === 0) {
+    if (committing.current) return;
+    if (!draftHasContent(latest.current)) {
       Alert.alert('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
       return;
     }
-
+    committing.current = true;
     setSaving(true);
-    // When the type switches between SOAP and free text, keep whatever was
-    // written in the other shape rather than silently dropping it.
-    const payload = {
-      type: f.type,
-      title: (f.title ?? '').trim() || null,
-      body: (f.body ?? '').trim() || null,
-      subjective: (f.subjective ?? '').trim() || null,
-      objective: (f.objective ?? '').trim() || null,
-      assessment: (f.assessment ?? '').trim() || null,
-      plan: (f.plan ?? '').trim() || null,
-      noteDate: f.noteDate ?? new Date(),
-      specialty: isConsult ? (f.specialty ?? '').trim() || null : null,
-      doctorId: isConsult ? f.doctorId : null,
-      isPinned: f.isPinned,
-      isDraft: f.isDraft,
-    };
-
-    /*
-     * The note is written once. If a voice note fails to attach afterwards,
-     * pressing save again must not write a second copy of the note, so the new
-     * id is remembered and the retry becomes an update. Voices already
-     * attached leave the list for the same reason.
-     */
-    let written = false;
     try {
-      const existingId = note?.id ?? savedId.current;
-      let id: string;
-      if (existingId) {
-        id = existingId;
-        await updateNote(id, payload);
-      } else {
-        id = await createNote({ patientId, ...payload });
-        savedId.current = id;
-        // From here the draft is an unsaved edit of *that* note. If attaching a
-        // voice fails below and the screen is left, coming back must not offer
-        // it again as a new note and write the note twice.
-        await retargetNoteDraft(draftId, id);
+      // Even an unchanged existing note may not have a draft yet.
+      saver.change(latest.current);
+      if (!(await saver.flush())) {
+        Alert.alert('ذخیره نشد', 'نوشته روی صفحه باقی مانده؛ دوباره تلاش کنید.');
+        return;
       }
-      written = true;
-
-      const remaining = [...f.voices];
-      while (remaining.length > 0) {
-        const voice = remaining[0]!;
-        await addAttachment({
-          entityType: 'note',
-          entityId: id,
-          patientId,
-          kind: 'voice',
-          relativePath: voice.relativePath,
-          sizeBytes: voice.sizeBytes,
-          mimeType: 'audio/mp4',
-          durationMs: voice.durationMs,
-        });
-        remaining.shift();
-        update({ voices: [...remaining] });
-      }
-
-      // In the record now, so the draft has nothing left to protect.
+      await commitNoteDraft(draftId);
       saver.cancel();
-      await discardNoteDraft(draftId);
       router.back();
     } catch (e) {
-      alertError(written ? 'نوت ذخیره شد، ولی وویس نه' : 'ذخیره نشد', e);
+      alertError('ذخیره نشد', e);
     } finally {
+      committing.current = false;
       setSaving(false);
     }
   }
 
   function leave() {
+    if (committing.current) return;
     if (!draftHasContent(latest.current)) {
       saver.cancel();
       void discardNoteDraft(draftId);
@@ -476,7 +422,7 @@ function NoteEditor({
           <View style={{ flex: 1 }}>
             <Button label="ذخیره" icon="checkmark" onPress={() => void save()} loading={saving} full />
           </View>
-          <Button label="انصراف" variant="ghost" onPress={leave} haptic={false} />
+          <Button label="انصراف" variant="ghost" onPress={leave} haptic={false} disabled={saving} />
         </Row>
         {autosaveLine ? (
           <Text variant="tiny" style={{ color: autosave.status === 'failed' ? colors.danger : colors.textFaint }}>

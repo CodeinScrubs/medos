@@ -234,8 +234,8 @@ export const notes = sqliteTable(
  * a single corrupt step must not cost the whole chain. A note is a few
  * kilobytes of text.
  *
- * `contentHash` is what stops the table filling with identical rows: saving a
- * note twice without changing anything writes one version, not two.
+ * Exact snapshot comparison avoids duplicate versions. `contentHash` is a
+ * diagnostic fingerprint; it is not authoritative for equality.
  */
 export const noteVersions = sqliteTable(
   'note_versions',
@@ -268,7 +268,7 @@ export const noteVersions = sqliteTable(
     isPinned: bool('is_pinned'),
     isDraft: bool('is_draft'),
 
-    /** Of the text fields, so an unchanged save does not become a version. */
+    /** Diagnostic only; compare the actual snapshot to detect changes. */
     contentHash: text('content_hash').notNull(),
   },
   (t) => [index('note_versions_note_idx').on(t.noteId, t.createdAt)],

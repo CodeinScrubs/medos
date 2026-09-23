@@ -1,13 +1,12 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
-import { db } from '@/db/client';
-import { notes, type NoteType } from '@/db/schema';
+import { db, type DbTransaction } from '@/db/client';
+import { noteDrafts, noteVersions, notes, type NoteType } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
-import { discardNoteDraftFor } from './draft-queries';
 import { noteSearchText } from './logic';
-import { noteVersionQuery, writeNoteVersion } from './version-queries';
+import { writeNoteVersion } from './version-queries';
 
 const alive = isNull(notes.deletedAt);
 
@@ -45,52 +44,61 @@ export type NoteInput = {
 };
 
 export async function createNote(input: NoteInput): Promise<string> {
+  return db.transaction((tx) => createNoteInTransaction(tx, input));
+}
+
+/** Also used when a capture and its new note must commit together. */
+export function createNoteInTransaction(tx: DbTransaction, input: NoteInput): string {
   const id = newId();
-  await db.insert(notes).values({
-    id,
-    ...stamps(),
-    patientId: input.patientId,
-    // Undefined means "whatever admission is active"; null means explicitly none.
-    encounterId: input.encounterId !== undefined ? input.encounterId : await resolveActiveEncounterId(input.patientId),
-    type: input.type,
-    title: input.title ?? null,
-    body: input.body ?? null,
-    subjective: input.subjective ?? null,
-    objective: input.objective ?? null,
-    assessment: input.assessment ?? null,
-    plan: input.plan ?? null,
-    noteDate: input.noteDate ?? new Date(),
-    doctorId: input.doctorId ?? null,
-    specialty: input.specialty ?? null,
-    isPinned: input.isPinned ?? false,
-    isDraft: input.isDraft ?? false,
-    searchText: noteSearchText(input),
-  });
+  tx.insert(notes)
+    .values({
+      id,
+      ...stamps(),
+      patientId: input.patientId,
+      // Undefined means "whatever admission is active"; null means explicitly none.
+      encounterId: input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx),
+      type: input.type,
+      title: input.title ?? null,
+      body: input.body ?? null,
+      subjective: input.subjective ?? null,
+      objective: input.objective ?? null,
+      assessment: input.assessment ?? null,
+      plan: input.plan ?? null,
+      noteDate: input.noteDate ?? new Date(),
+      doctorId: input.doctorId ?? null,
+      specialty: input.specialty ?? null,
+      isPinned: input.isPinned ?? false,
+      isDraft: input.isDraft ?? false,
+      searchText: noteSearchText(input),
+    })
+    .run();
   // The first version is what the note said when it entered the chart.
-  const [written] = await noteQuery(id);
-  if (written) await writeNoteVersion(written, 'created');
+  const written = tx.select().from(notes).where(eq(notes.id, id)).get()!;
+  writeNoteVersion(tx, written, 'created');
   return id;
 }
 
 export async function updateNote(id: string, input: Partial<NoteInput>): Promise<void> {
-  const current = (
-    await db
-      .select()
-      .from(notes)
-      .where(and(alive, eq(notes.id, id)))
-      .limit(1)
-  )[0];
+  db.transaction((tx) => updateNoteInTransaction(tx, id, input));
+}
+
+export function updateNoteInTransaction(tx: DbTransaction, id: string, input: Partial<NoteInput>): void {
+  const current = tx
+    .select()
+    .from(notes)
+    .where(and(alive, eq(notes.id, id)))
+    .get();
   if (!current) throw new Error(`Note ${id} not found`);
 
-  await db
-    .update(notes)
+  tx.update(notes)
     .set({ ...input, ...touch(), searchText: noteSearchText({ ...current, ...input }) })
-    .where(and(alive, eq(notes.id, id)));
+    .where(and(alive, eq(notes.id, id)))
+    .run();
 
   // After the write, from the row itself: a version has to say what the note
   // says, not what this call meant to change.
-  const [updated] = await noteQuery(id);
-  if (updated) await writeNoteVersion(updated, 'edited');
+  const updated = tx.select().from(notes).where(eq(notes.id, id)).get()!;
+  writeNoteVersion(tx, updated, 'edited');
 }
 
 /**
@@ -101,49 +109,59 @@ export async function updateNote(id: string, input: Partial<NoteInput>): Promise
  * table is ever removed, so "undo the restore" is just another restore.
  */
 export async function restoreNoteVersion(versionId: string): Promise<void> {
-  const [version] = await noteVersionQuery(versionId);
-  if (!version) throw new Error(`Note version ${versionId} not found`);
-  const [current] = await noteQuery(version.noteId);
-  if (!current) throw new Error(`Note ${version.noteId} not found`);
+  db.transaction((tx) => {
+    const version = tx
+      .select()
+      .from(noteVersions)
+      .where(and(isNull(noteVersions.deletedAt), eq(noteVersions.id, versionId)))
+      .get();
+    if (!version) throw new Error(`Note version ${versionId} not found`);
+    const current = tx
+      .select()
+      .from(notes)
+      .where(and(alive, eq(notes.id, version.noteId)))
+      .get();
+    if (!current) throw new Error(`Note ${version.noteId} not found`);
 
-  const fields = {
-    type: version.type,
-    title: version.title,
-    body: version.body,
-    subjective: version.subjective,
-    objective: version.objective,
-    assessment: version.assessment,
-    plan: version.plan,
-    noteDate: version.noteDate ?? current.noteDate,
-    doctorId: version.doctorId,
-    specialty: version.specialty,
-    isPinned: version.isPinned ?? current.isPinned,
-    isDraft: version.isDraft ?? current.isDraft,
-  };
+    const fields = {
+      type: version.type,
+      title: version.title,
+      body: version.body,
+      subjective: version.subjective,
+      objective: version.objective,
+      assessment: version.assessment,
+      plan: version.plan,
+      noteDate: version.noteDate ?? current.noteDate,
+      doctorId: version.doctorId,
+      specialty: version.specialty,
+      isPinned: version.isPinned ?? current.isPinned,
+      isDraft: version.isDraft ?? current.isDraft,
+    };
 
-  await db
-    .update(notes)
-    .set({ ...fields, ...touch(), searchText: noteSearchText(fields) })
-    .where(and(alive, eq(notes.id, version.noteId)));
+    tx.update(notes)
+      .set({ ...fields, ...touch(), searchText: noteSearchText(fields) })
+      .where(and(alive, eq(notes.id, version.noteId)))
+      .run();
 
-  /*
-   * Any unsaved edit of this note is now older than what the note says, and
-   * the editor reads the draft first — reopening it would show the text the
-   * restore was meant to replace, and saving would put it back. The restored
-   * text is in the history either way, but showing someone the opposite of
-   * what they just asked for is its own kind of wrong.
-   */
-  await discardNoteDraftFor(version.noteId);
+    /*
+     * Any unsaved edit of this note is now older than what the note says, and
+     * the editor reads the draft first — reopening it would show the text the
+     * restore was meant to replace, and saving would put it back. The restored
+     * text is in the history either way, but showing someone the opposite of
+     * what they just asked for is its own kind of wrong.
+     */
+    tx.update(noteDrafts)
+      .set(softDelete())
+      .where(and(isNull(noteDrafts.deletedAt), eq(noteDrafts.noteId, version.noteId)))
+      .run();
 
-  const [restored] = await noteQuery(version.noteId);
-  if (restored) await writeNoteVersion(restored, 'restored', versionId);
+    const restored = tx.select().from(notes).where(eq(notes.id, version.noteId)).get()!;
+    writeNoteVersion(tx, restored, 'restored', versionId);
+  });
 }
 
 export async function setNotePinned(id: string, isPinned: boolean): Promise<void> {
-  await db
-    .update(notes)
-    .set({ isPinned, ...touch() })
-    .where(and(alive, eq(notes.id, id)));
+  await updateNote(id, { isPinned });
 }
 
 export async function deleteNote(id: string): Promise<void> {

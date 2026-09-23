@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, isNull, lte, or, type SQL } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { patients, tasks, type Task, type TaskKind } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -77,6 +77,11 @@ export type TaskInput = {
 };
 
 export async function createTask(input: TaskInput): Promise<string> {
+  return db.transaction((tx) => createTaskInTransaction(tx, input));
+}
+
+/** Compose with capture filing without committing a half-finished operation. */
+export function createTaskInTransaction(tx: DbTransaction, input: TaskInput): string {
   const id = newId();
   const row = {
     title: input.title.trim(),
@@ -91,7 +96,10 @@ export async function createTask(input: TaskInput): Promise<string> {
     source: input.source ?? null,
     notes: input.notes ?? null,
   };
-  await db.insert(tasks).values({ id, ...stamps(), ...row, searchText: taskSearchText(row) });
+  if (!row.title) throw new Error('A task needs a title');
+  tx.insert(tasks)
+    .values({ id, ...stamps(), ...row, searchText: taskSearchText(row) })
+    .run();
   return id;
 }
 

@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { attachments, type Attachment, type AttachmentEntity, type AttachmentKind } from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -54,26 +54,33 @@ export type AttachmentInput = {
 };
 
 export async function addAttachment(input: AttachmentInput): Promise<string> {
+  return db.transaction((tx) => addAttachmentInTransaction(tx, input));
+}
+
+/** Metadata only; file copying must finish before entering a transaction. */
+export function addAttachmentInTransaction(tx: DbTransaction, input: AttachmentInput): string {
   const id = newId();
-  await db.insert(attachments).values({
-    id,
-    ...stamps(),
-    entityType: input.entityType,
-    entityId: input.entityId,
-    patientId: input.patientId ?? null,
-    kind: input.kind,
-    relativePath: input.relativePath,
-    thumbnailPath: input.thumbnailPath ?? null,
-    originalPath: input.originalPath ?? null,
-    mimeType: input.mimeType ?? null,
-    sizeBytes: input.sizeBytes ?? null,
-    width: input.width ?? null,
-    height: input.height ?? null,
-    durationMs: input.durationMs ?? null,
-    caption: input.caption ?? null,
-    bodySite: input.bodySite ?? null,
-    capturedAt: input.capturedAt ?? new Date(),
-  });
+  tx.insert(attachments)
+    .values({
+      id,
+      ...stamps(),
+      entityType: input.entityType,
+      entityId: input.entityId,
+      patientId: input.patientId ?? null,
+      kind: input.kind,
+      relativePath: input.relativePath,
+      thumbnailPath: input.thumbnailPath ?? null,
+      originalPath: input.originalPath ?? null,
+      mimeType: input.mimeType ?? null,
+      sizeBytes: input.sizeBytes ?? null,
+      width: input.width ?? null,
+      height: input.height ?? null,
+      durationMs: input.durationMs ?? null,
+      caption: input.caption ?? null,
+      bodySite: input.bodySite ?? null,
+      capturedAt: input.capturedAt ?? new Date(),
+    })
+    .run();
   return id;
 }
 

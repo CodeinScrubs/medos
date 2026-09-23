@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { captureInbox } from '@/db/schema';
+import { captureInbox, notes, noteVersions, tasks } from '@/db/schema';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -124,11 +124,65 @@ describe('filing a capture', () => {
     expect(moved[0]?.patientId).toBe(patientId);
   });
 
-  it('happens once; a filed capture cannot be filed again', async () => {
+  it('returns the same destination on retry and refuses a conflicting conversion', async () => {
     const id = await createCapture({ text: 'تماس با آزمایشگاه' });
-    await fileCaptureAsTask(id);
-    await expect(fileCaptureAsTask(id)).rejects.toThrow();
+    const taskId = await fileCaptureAsTask(id);
+    await expect(fileCaptureAsTask(id)).resolves.toBe(taskId);
     await expect(fileCaptureAsNote(id, { patientId })).rejects.toThrow();
+  });
+
+  it('creates one task under concurrent requests', async () => {
+    const id = await createCapture({ text: 'Call lab' });
+    const ids = await Promise.all([fileCaptureAsTask(id), fileCaptureAsTask(id)]);
+    expect(ids[0]).toBe(ids[1]);
+    expect(t.db.select().from(tasks).all()).toHaveLength(1);
+  });
+
+  it('creates one note and keeps its selected patient and attachments under concurrent requests', async () => {
+    const id = await createCapture({ text: 'Progress' });
+    await attachVoice(id);
+    const ids = await Promise.all([fileCaptureAsNote(id, { patientId }), fileCaptureAsNote(id, { patientId })]);
+    expect(ids[0]).toBe(ids[1]);
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+    expect(t.db.select().from(noteVersions).all()).toHaveLength(1);
+    expect((await captureQuery(id))[0]?.patientId).toBe(patientId);
+    expect(await entityAttachmentsQuery('note', ids[0]!)).toHaveLength(1);
+  });
+
+  it('rolls back a task if marking the capture filed fails', async () => {
+    const id = await createCapture({ text: 'Call lab' });
+    failFiling();
+    await expect(fileCaptureAsTask(id)).rejects.toThrow();
+    expect(t.db.select().from(tasks).all()).toHaveLength(0);
+    expect((await captureQuery(id))[0]?.filedAt).toBeNull();
+    t.sqlite.exec('DROP TRIGGER fail_filing');
+    await fileCaptureAsTask(id);
+    expect(t.db.select().from(tasks).all()).toHaveLength(1);
+  });
+
+  it('rolls back the note, history and attachment move if filing fails', async () => {
+    const id = await createCapture({ text: 'Progress' });
+    await attachVoice(id);
+    failFiling();
+    await expect(fileCaptureAsNote(id, { patientId })).rejects.toThrow();
+    expect(t.db.select().from(notes).all()).toHaveLength(0);
+    expect(t.db.select().from(noteVersions).all()).toHaveLength(0);
+    expect(await entityAttachmentsQuery('capture', id)).toHaveLength(1);
+    expect((await captureQuery(id))[0]?.patientId).toBeNull();
+    t.sqlite.exec('DROP TRIGGER fail_filing');
+    await fileCaptureAsNote(id, { patientId });
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+  });
+
+  it('refuses to file under a deleted patient or silently switch the filed patient', async () => {
+    const id = await createCapture({ text: 'Progress', patientId });
+    await fileCaptureAsNote(id);
+    const otherId = await createPatient({ firstName: 'Test', lastName: 'Other', status: 'outpatient' });
+    await expect(fileCaptureAsNote(id, { patientId: otherId })).rejects.toThrow();
+    await deletePatient(patientId);
+    const unfiled = await createCapture({ text: 'Another', patientId });
+    await expect(fileCaptureAsNote(unfiled)).rejects.toThrow();
+    expect((await captureQuery(unfiled))[0]?.filedAt).toBeNull();
   });
 
   it('as a task needs words, because a task with no title is nothing', async () => {
@@ -138,6 +192,12 @@ describe('filing a capture', () => {
     expect(await inboxQuery()).toHaveLength(1);
   });
 });
+
+function failFiling() {
+  t.sqlite.exec(
+    "CREATE TRIGGER fail_filing BEFORE UPDATE OF filed_at ON capture_inbox BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+  );
+}
 
 describe('throwing a capture away', () => {
   it('is a soft delete, like everything else in the record', async () => {
@@ -193,6 +253,20 @@ describe('the inbox', () => {
 });
 
 describe('the capture writer', () => {
+  it('retries failed creation with the newest text after a transient database error', async () => {
+    const writer = new CaptureWriter();
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_capture BEFORE INSERT ON capture_inbox BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+    );
+    await expect(writer.write({ text: 'first', patientId: null })).rejects.toThrow();
+    expect(writer.started).toBe(false);
+    t.sqlite.exec('DROP TRIGGER fail_capture');
+    await writer.write({ text: 'latest', patientId });
+    const rows = t.db.select().from(captureInbox).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.text).toBe('latest');
+    expect(rows[0]?.patientId).toBe(patientId);
+  });
   /*
    * Three things on the capture screen can be first to produce something worth
    * keeping, and all three ask for the row. Two rows would mean a recording

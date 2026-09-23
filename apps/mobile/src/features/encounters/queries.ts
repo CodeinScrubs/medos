@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type Database } from '@/db/client';
 import { doctors, encounters, orders, patients, places, type Encounter, type PatientStatus } from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -58,14 +58,14 @@ export function encounterQuery(id: string) {
  * if any. Returning null is normal — an outpatient's note belongs to no
  * admission.
  */
-export async function resolveActiveEncounterId(patientId: string): Promise<string | null> {
-  const rows = await db
+export function resolveActiveEncounterId(patientId: string, reader: Pick<Database, 'select'> = db): string | null {
+  const row = reader
     .select({ id: encounters.id })
     .from(encounters)
     .where(and(alive, eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
     .orderBy(desc(encounters.admittedAt))
-    .limit(1);
-  return rows[0]?.id ?? null;
+    .get();
+  return row?.id ?? null;
 }
 
 export type EncounterInput = {

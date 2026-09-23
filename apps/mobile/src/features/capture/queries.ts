@@ -1,9 +1,19 @@
 import { and, asc, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 
-import { db } from '@/db/client';
-import { attachments, captureInbox, patients, shifts, type Capture, type CaptureKind } from '@/db/schema';
-import { createNote } from '@/features/notes/queries';
-import { createTask } from '@/features/tasks/queries';
+import { db, type DbTransaction } from '@/db/client';
+import {
+  attachments,
+  captureInbox,
+  notes,
+  patients,
+  shifts,
+  tasks,
+  type Capture,
+  type CaptureKind,
+  type NoteType,
+} from '@/db/schema';
+import { createNoteInTransaction } from '@/features/notes/queries';
+import { createTaskInTransaction } from '@/features/tasks/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText } from '@/lib/persian';
 
@@ -127,21 +137,59 @@ export async function updateCapture(
  * the disk — an attachment is a path plus a parent, and only the parent
  * changes.
  */
-async function moveAttachmentsToNote(captureId: string, to: { noteId: string; patientId: string }): Promise<void> {
-  await db
-    .update(attachments)
+function moveAttachmentsToNote(tx: DbTransaction, captureId: string, to: { noteId: string; patientId: string }): void {
+  tx.update(attachments)
     .set({ entityType: 'note', entityId: to.noteId, patientId: to.patientId, ...touch() })
     .where(
       and(isNull(attachments.deletedAt), eq(attachments.entityType, 'capture'), eq(attachments.entityId, captureId)),
-    );
+    )
+    .run();
 }
 
-function markFiled(id: string, filedAs: 'note' | 'task', filedId: string) {
+function markFiled(tx: DbTransaction, id: string, filedAs: 'note' | 'task', filedId: string, patientId: string | null) {
   const now = new Date();
-  return db
-    .update(captureInbox)
-    .set({ filedAs, filedId, filedAt: now, ...touch(now) })
-    .where(and(alive, eq(captureInbox.id, id)));
+  tx.update(captureInbox)
+    .set({ filedAs, filedId, patientId, filedAt: now, ...touch(now) })
+    .where(and(alive, eq(captureInbox.id, id)))
+    .run();
+}
+
+function captureForFiling(tx: DbTransaction, id: string, patientId: string | null | undefined): Capture {
+  const capture = tx
+    .select()
+    .from(captureInbox)
+    .where(and(alive, eq(captureInbox.id, id)))
+    .get();
+  if (!capture) throw new Error('Capture not found');
+  const target = patientId !== undefined ? patientId : capture.patientId;
+  if (
+    target &&
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(isNull(patients.deletedAt), eq(patients.id, target)))
+      .get()
+  ) {
+    throw new Error('Patient not found; choose an active patient before filing');
+  }
+  if (capture.filedAt && patientId !== undefined && patientId !== capture.patientId) {
+    throw new Error('This capture was already filed under a different patient');
+  }
+  return capture;
+}
+
+/** A retry returns its original destination; a conflicting conversion is refused. */
+function filedDestination(tx: DbTransaction, capture: Capture, kind: 'note' | 'task'): string | null {
+  if (!capture.filedAt) return null;
+  if (capture.filedAs !== kind || !capture.filedId) throw new Error('This capture has already been filed');
+  const table = kind === 'note' ? notes : tasks;
+  const target = tx
+    .select({ id: table.id })
+    .from(table)
+    .where(and(eq(table.id, capture.filedId), isNull(table.deletedAt)))
+    .get();
+  if (!target) throw new Error('The filed destination is unavailable; restore it instead of filing again');
+  return target.id;
 }
 
 /**
@@ -155,22 +203,25 @@ export async function fileCaptureAsTask(
   id: string,
   options: { patientId?: string | null; title?: string; dueAt?: Date | null } = {},
 ): Promise<string> {
-  const capture = (await captureQuery(id))[0];
-  if (!capture) throw new Error(`Capture ${id} not found`);
-  if (capture.filedAt) throw new Error('This capture has already been filed');
+  return db.transaction((tx) => {
+    const capture = captureForFiling(tx, id, options.patientId);
+    const existing = filedDestination(tx, capture, 'task');
+    if (existing) return existing;
 
-  const title = (options.title ?? capture.text ?? '').trim();
-  if (!title) throw new Error('A task needs a title; this capture has no text');
+    const title = (options.title ?? capture.text ?? '').trim();
+    if (!title) throw new Error('A task needs a title; this capture has no text');
 
-  const taskId = await createTask({
-    title,
-    patientId: options.patientId !== undefined ? options.patientId : capture.patientId,
-    shiftId: capture.shiftId,
-    dueAt: options.dueAt ?? null,
-    source: 'capture',
+    const patientId = options.patientId !== undefined ? options.patientId : capture.patientId;
+    const taskId = createTaskInTransaction(tx, {
+      title,
+      patientId,
+      shiftId: capture.shiftId,
+      dueAt: options.dueAt ?? null,
+      source: 'capture',
+    });
+    markFiled(tx, id, 'task', taskId, patientId);
+    return taskId;
   });
-  await markFiled(id, 'task', taskId);
-  return taskId;
 }
 
 /**
@@ -182,28 +233,28 @@ export async function fileCaptureAsTask(
  */
 export async function fileCaptureAsNote(
   id: string,
-  options: { patientId?: string | null; type?: NoteTypeArg; title?: string | null } = {},
+  options: { patientId?: string | null; type?: NoteType; title?: string | null } = {},
 ): Promise<string> {
-  const capture = (await captureQuery(id))[0];
-  if (!capture) throw new Error(`Capture ${id} not found`);
-  if (capture.filedAt) throw new Error('This capture has already been filed');
+  return db.transaction((tx) => {
+    const capture = captureForFiling(tx, id, options.patientId);
+    const existing = filedDestination(tx, capture, 'note');
+    if (existing) return existing;
 
-  const patientId = options.patientId ?? capture.patientId;
-  if (!patientId) throw new Error('A note needs a patient');
+    const patientId = options.patientId !== undefined ? options.patientId : capture.patientId;
+    if (!patientId) throw new Error('A note needs a patient');
 
-  const noteId = await createNote({
-    patientId,
-    type: options.type ?? 'general',
-    title: options.title ?? null,
-    body: capture.text,
-    noteDate: capture.capturedAt,
+    const noteId = createNoteInTransaction(tx, {
+      patientId,
+      type: options.type ?? 'general',
+      title: options.title ?? null,
+      body: capture.text,
+      noteDate: capture.capturedAt,
+    });
+    moveAttachmentsToNote(tx, id, { noteId, patientId });
+    markFiled(tx, id, 'note', noteId, patientId);
+    return noteId;
   });
-  await moveAttachmentsToNote(id, { noteId, patientId });
-  await markFiled(id, 'note', noteId);
-  return noteId;
 }
-
-type NoteTypeArg = Parameters<typeof createNote>[0]['type'];
 
 /** Throw a capture away. It goes to the trash like everything else. */
 export async function discardCapture(id: string): Promise<void> {

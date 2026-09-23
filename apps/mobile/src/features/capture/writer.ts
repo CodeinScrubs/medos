@@ -39,7 +39,15 @@ export class CaptureWriter {
 
   /** The row id, creating it the first time somebody needs one. */
   ensure(seed: CaptureInput = {}): Promise<string> {
-    this.id ??= createCapture({ text: this.fields.text, patientId: this.fields.patientId, ...seed });
+    if (!this.id) {
+      const pending = createCapture({ text: this.fields.text, patientId: this.fields.patientId, ...seed });
+      this.id = pending;
+      // Share an in-flight creation, but do not cache a transient failure.
+      // The next attempt reads the newest fields, not the failed snapshot.
+      void pending.catch(() => {
+        if (this.id === pending) this.id = null;
+      });
+    }
     return this.id;
   }
 

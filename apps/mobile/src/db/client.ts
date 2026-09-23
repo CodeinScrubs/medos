@@ -42,5 +42,7 @@ sqlite.execSync('PRAGMA busy_timeout = 5000;');
 export const db = drizzle(sqlite, { schema });
 
 export type Database = typeof db;
+/** Synchronous write context, shared by operations that must commit together. */
+export type DbTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
 export { schema };

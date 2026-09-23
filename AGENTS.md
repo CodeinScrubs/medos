@@ -87,7 +87,7 @@ say so explicitly and let the owner decide.
 | 7 | **Schema changes are additive.** New tables/columns only; NOT NULL needs an **SQL-level** `.default()`, not drizzle's `$default()`. Never edit an existing migration. | The app holds real data, and restore copies the columns old and new schemas share. | CI regenerates migrations and fails on a diff |
 | 8 | **Backup compatibility is forever.** The `.medosbak` format and the passphrase schemes in `lib/crypto.ts` are frozen; add a new scheme number instead of changing one. | A changed rule makes every existing backup unopenable. | `crypto.test.ts` golden keys |
 | 9 | **No patient data in logs, errors or anything that leaves the app.** Everything goes through `redactErrorText`. | A failed query carries its parameters — names, national ids. | `redactErrorText` test; review |
-| 10 | **MedOS records; it does not advise.** No dose calculators, interaction checkers, differential suggestions. | It would become a decision-support system, a different bar entirely. | review |
+| 10 | **Clinical tools need explicit validation.** The owner expanded scope on 2026-09-23 to sourced, deterministic scores/algorithms with physician review. Each enabled tool needs source/version, population/exclusions, units, visible inputs, reference/boundary tests and clinical review. Never infer missing inputs or automatically issue diagnoses/orders/treatment. AI output stays a draft. | A chat-generated formula or green software tests do not validate a clinical tool. | per-tool evidence; review |
 | 11 | **Ratings and personal profiles about colleagues are private working notes.** Never shared or exported by default. | They are about real, named people. | review |
 
 ---
@@ -192,8 +192,8 @@ Paste this at the start of the conversation, then paste the files it asks for:
 > `docs/HANDOFF.md` from the repo and read them. Hard rules: never hard-delete clinical
 > data (soft delete with `deletedAt`), clinical numbers stay in Latin digits, `db.transaction()`
 > callbacks are synchronous, schema changes are additive with SQL-level defaults, backup
-> format and passphrase schemes are frozen, no patient data in logs, no clinical advice
-> features. Give me complete files or exact diffs, and tell me plainly what you could not
+> format and passphrase schemes are frozen, no patient data in logs; clinical tools require
+> the validation and physician-review gates in invariant 10. Give me complete files or exact diffs, and tell me plainly what you could not
 > verify.
 
 Whatever comes back still has to pass `npm run check` in the repository before it counts.
@@ -203,4 +203,6 @@ Whatever comes back still has to pass `npm run check` in the repository before i
 ## 9. Current state
 
 See `docs/HANDOFF.md` for the live picture, `docs/roadmap.md` for what is built and what is
-next, and `README.md` for how the owner installs and uses it.
+next, `docs/IMPLEMENTATION.md` for the current prioritized execution and acceptance gates,
+and `README.md` for how the owner installs and uses it. The owner authorized implementation
+and pushes on 2026-09-23, and requested no subagents for that work.

@@ -2,12 +2,10 @@ import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { noteVersions, notes, type Note, type NoteVersion } from '@/db/schema';
 import { defineSetting, readSetting, writeSetting } from '@/db/settings';
 import { newId, stamps } from '@/lib/ids';
-
-import { noteSearchText } from './logic';
 
 /*
  * What a note said, every time it said something different.
@@ -39,20 +37,19 @@ export type VersionedFields = Pick<
   | 'isDraft'
 >;
 
-/**
- * A stable fingerprint of what the note says.
- *
- * Not a cryptographic hash: nothing here defends against a forged note, it
- * only answers "is this the same text as last time". Built from the same
- * normalisation the search index uses, so a note that differs only in Arabic
- * versus Persian ی does not count as a new version.
- */
-export function contentHashOf(fields: VersionedFields): string {
-  const text = noteSearchText(fields);
-  const stamp = `${fields.type}|${fields.noteDate?.getTime() ?? 0}|${fields.isPinned ? 1 : 0}|${fields.isDraft ? 1 : 0}`;
-  const source = `${stamp}|${text}`;
-  // FNV-1a, 32 bits, written out as hex with the length beside it. Two texts
-  // that collide on the hash are unlikely to also share a length.
+type VersionSnapshot = Pick<NoteVersion, keyof VersionedFields>;
+
+/** Preserve field boundaries and exact text; search normalisation loses both. */
+function versionContent(fields: VersionSnapshot): string {
+  return JSON.stringify({
+    ...fieldsOf(fields),
+    noteDate: fields.noteDate?.getTime() ?? null,
+  });
+}
+
+/** A diagnostic fingerprint only. Equality is checked against the snapshot itself. */
+export function contentHashOf(fields: VersionSnapshot): string {
+  const source = versionContent(fields);
   let hash = 0x811c9dc5;
   for (let i = 0; i < source.length; i += 1) {
     hash ^= source.charCodeAt(i);
@@ -61,7 +58,7 @@ export function contentHashOf(fields: VersionedFields): string {
   return `${hash.toString(16).padStart(8, '0')}-${source.length}`;
 }
 
-const fieldsOf = (note: VersionedFields): VersionedFields => ({
+const fieldsOf = (note: VersionSnapshot): VersionSnapshot => ({
   type: note.type,
   title: note.title,
   body: note.body,
@@ -100,33 +97,41 @@ export function noteVersionQuery(id: string) {
  * exactly this — saving a note twice without changing anything is not a new
  * version of anything.
  */
-export async function writeNoteVersion(
+export function writeNoteVersion(
+  tx: DbTransaction,
   note: { id: string; patientId: string } & VersionedFields,
   reason: NoteVersion['reason'],
   restoredFromId?: string,
-): Promise<string | null> {
+): string | null {
   const fields = fieldsOf(note);
   const contentHash = contentHashOf(fields);
 
-  const [latest] = await db
-    .select({ contentHash: noteVersions.contentHash })
+  const latest = tx
+    .select()
     .from(noteVersions)
     .where(and(isNull(noteVersions.deletedAt), eq(noteVersions.noteId, note.id)))
     .orderBy(desc(noteVersions.createdAt))
-    .limit(1);
-  if (latest?.contentHash === contentHash) return null;
+    .get();
+  // Read old snapshots too: legacy hashes used lossy search text. A hash
+  // collision or an old hash must never suppress an actual clinical edit.
+  if (latest && versionContent(latest) === versionContent(fields)) return null;
 
   const id = newId();
-  await db.insert(noteVersions).values({
-    id,
-    ...stamps(),
-    noteId: note.id,
-    patientId: note.patientId,
-    reason,
-    restoredFromId: restoredFromId ?? null,
-    ...fields,
-    contentHash,
-  });
+  // Multiple saves can share a wall-clock millisecond. Keep a strict local
+  // order without changing the clinical noteDate or rewriting old history.
+  const now = new Date(Math.max(Date.now(), (latest?.createdAt.getTime() ?? 0) + 1));
+  tx.insert(noteVersions)
+    .values({
+      id,
+      ...stamps(now),
+      noteId: note.id,
+      patientId: note.patientId,
+      reason,
+      restoredFromId: restoredFromId ?? null,
+      ...fields,
+      contentHash,
+    })
+    .run();
   return id;
 }
 

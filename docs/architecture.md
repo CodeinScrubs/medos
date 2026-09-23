@@ -233,6 +233,11 @@ write for ever), and a voice recording is moved into media storage the moment it
 note itself is still written once, when the user saves — a chart entry is a decision, not a
 side effect of typing — and the draft is dropped at that point.
 
+The save path now flushes the draft and publishes it in one synchronous transaction:
+note, exact-content version, voice attachment metadata and retiring the draft. Any failure
+rolls them all back, keeping the draft retryable. Media bytes must already be stored before
+this transaction. A late autosave cannot detach a linked draft or overwrite a retired one.
+
 This is why the editor's own live query is read only at mount: it is watching a row the same
 screen is writing, and feeding those writes back into the fields would fight the keyboard.
 Drafts nobody finished are surfaced on Today rather than left to be found by accident.
@@ -251,6 +256,27 @@ each write pushes its own value back at the input, and a write that lands slower
 next keypress makes the field snap back and the cursor jump. The field owns its text while
 it is being edited and writes on a timer. Because it reads both its starting value and its
 target once, it has to sit inside something keyed per row.
+
+### Atomic writes and exact note versions (2026-09-23)
+
+Feature write helpers accept `DbTransaction` when multiple entities must commit together.
+The public async wrappers open a synchronous transaction; helpers never await, open their
+own transaction, or perform file/network work. This makes capture filing atomic across
+the destination, its version, attachment ownership and the capture's filed state. Repeating
+the same filing returns the existing destination; a different kind/patient is refused.
+Failed capture creation clears its cached promise so a retry can use the newest input.
+
+Note version equality compares each exact stored field, including doctor and SOAP section.
+Search-normalized text is unsuitable: moving "pain" from Subjective to Plan previously
+looked identical. Stored legacy hashes remain readable but are not used to decide equality.
+New version timestamps are monotonically ordered per note even within one clock tick;
+the clinical observation time (`noteDate`) is unchanged. Existing history is never pruned.
+Previously missed versions cannot be reconstructed from the current note.
+
+Rejected: a new persistence framework or event-sourcing subsystem. Small composable
+transaction helpers close these failure windows without a schema change or dependency.
+Failure-injection and concurrent-call tests run on SQLite with shipped migrations; native
+process-death and filesystem durability require separate device evidence.
 
 ---
 
@@ -324,13 +350,22 @@ requiring `semver` is the case that surfaced it.
 
 ---
 
-## Scope boundary: records, not advice
+## Scope boundary: records and validated physician-reviewed tools
 
-MedOS stores and retrieves what the physician wrote. It does not calculate doses, check
-interactions, or suggest differentials. That line is architectural, not incidental: the
-moment the app produces clinical recommendations it becomes a decision-support system, with
-a completely different bar for validation and liability, for a tool built by one person for
-their own use. The seeded reference data (specialties, adult lab reference ranges) are
-editable defaults for faster typing, never authority — which is also why there is no
-automatic "critical" lab flag, and no reference range for children or for method-dependent
-analytes.
+The original records-only boundary excluded clinical calculators. On 2026-09-23 the owner
+expanded the requested scope to clinical scores, precautions, screening and algorithms.
+This is recorded in `AGENTS.md` invariant 10 and `IMPLEMENTATION.md`; it does not make an
+AI-proposed formula validated or authorize automatic clinical action.
+
+Implement deterministic offline tools only with primary source/version, intended population,
+exclusions, explicit units, visible inputs, missing/stale-data handling, reference examples,
+boundary tests and clinical review. Store confirmed calculations with immutable inputs,
+output and tool version. Physician confirmation is required before adding output to a
+record or plan. Do not auto-order treatment or convert an AI suggestion into a diagnosis.
+Broad library coverage is a goal, delivered tool by tool; no clinical engine was added by
+the scope update itself.
+
+Tradeoff: this permits the owner's intended workflow, but adds source maintenance and
+per-tool validation work. Personal notes/templates remain distinct from validated tools.
+Seeded specialties and adult lab ranges remain editable defaults, not clinical authority;
+no inferred critical flags or adult-to-child extrapolation.
