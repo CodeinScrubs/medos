@@ -42,13 +42,13 @@ export function ShiftScreen() {
   const { data: shifts, error } = useLive(activeShiftQuery());
   const shift = shifts?.[0] ?? null;
 
-  const { data: members } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
-  const rows = useMemo(() => members ?? [], [members]);
+  const { data: members, error: membersError } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
+  const rows = useMemo(() => (members ?? []).filter((row) => row.member.shiftId === shift?.id), [members, shift?.id]);
   const progress = shiftProgress(rows);
 
   const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { data: patientRows } = useLive(patientListQuery());
+  const { data: patientRows, error: patientsError } = useLive(patientListQuery());
 
   const patientItems: PickerItem[] = useMemo(
     () =>
@@ -76,7 +76,7 @@ export function ShiftScreen() {
     if (!shift) return;
     Alert.alert('پایان شیفت؟', 'لیست بیماران این شیفت می‌ماند و بعداً هم می‌توانید ببینیدش.', [
       { text: 'انصراف', style: 'cancel' },
-      { text: 'پایان شیفت', onPress: () => void endShift(shift.id) },
+      { text: 'پایان شیفت', onPress: () => void endShift(shift.id).catch((e) => alertError('پایان شیفت ثبت نشد', e)) },
     ]);
   }
 
@@ -101,7 +101,7 @@ export function ShiftScreen() {
     <Screen scroll>
       <Stack.Screen options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error} what="شیفت" />
+        <ErrorNotice error={error ?? membersError ?? patientsError} what="شیفت" />
 
         {shift ? (
           <Card style={{ borderColor: colors.primary, borderWidth: 1 }}>
@@ -164,7 +164,9 @@ export function ShiftScreen() {
                     accessibilityState={{ checked: seen }}
                     accessibilityLabel={seen ? 'برگرداندن به دیده‌نشده' : 'دیدم'}
                     hitSlop={8}
-                    onPress={() => void setShiftPatientReviewed(member.id, !seen)}
+                    onPress={() =>
+                      void setShiftPatientReviewed(member.id, !seen).catch((e) => alertError('ثبت نشد', e))
+                    }
                   >
                     <Ionicons
                       name={seen ? 'checkmark-circle' : 'ellipse-outline'}
@@ -218,7 +220,7 @@ export function ShiftScreen() {
                     variant="ghost"
                     size="sm"
                     haptic={false}
-                    onPress={() => void removePatientFromShift(member.id)}
+                    onPress={() => void removePatientFromShift(member.id).catch((e) => alertError('برداشته نشد', e))}
                   />
                 </Row>
               </Column>
@@ -235,7 +237,7 @@ export function ShiftScreen() {
         onClose={() => setPicking(false)}
         onSelect={(item) => {
           setPicking(false);
-          if (shift) void addPatientToShift(shift.id, item.id);
+          if (shift) void addPatientToShift(shift.id, item.id).catch((e) => alertError('اضافه نشد', e));
         }}
       />
     </Screen>

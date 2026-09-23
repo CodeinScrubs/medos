@@ -5,7 +5,9 @@ import { StyleSheet, View } from 'react-native';
 
 import { AutosaveField } from '@/components/autosave-field';
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Screen, Text } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import type { Encounter, Patient, ShiftPatient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { ConsultsBrief } from '@/features/consults/consults-brief';
@@ -13,7 +15,7 @@ import { patientConsultsQuery } from '@/features/consults/queries';
 import { admissionElapsed, formatAdmissionElapsed } from '@/features/encounters/logic';
 import { locationLabel } from '@/features/encounters/status';
 import { notePreview } from '@/features/notes/logic';
-import { patientNotesQuery } from '@/features/notes/queries';
+import { latestPatientNoteQuery } from '@/features/notes/queries';
 import { AllergyBanner } from '@/features/patients/patient-header';
 import { TasksSection } from '@/features/tasks/tasks-section';
 import { formatJalaliDateTime } from '@/lib/jalali';
@@ -40,8 +42,8 @@ export function RoundScreen() {
 
   const { data: shifts, error } = useLive(activeShiftQuery());
   const shift = shifts?.[0] ?? null;
-  const { data: members } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
-  const rows = useMemo(() => members ?? [], [members]);
+  const { data: members, error: membersError } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
+  const rows = useMemo(() => (members ?? []).filter((row) => row.member.shiftId === shift?.id), [members, shift?.id]);
 
   // The cursor follows a person, not a position: somebody can be added to or
   // taken off the shift from another screen while this one is open, and
@@ -58,13 +60,26 @@ export function RoundScreen() {
 
   /** Seen: they are done, so the round moves past them or ends. */
   async function seen(memberId: string, at: number) {
-    await setShiftPatientReviewed(memberId, true);
-    goTo(nextIndex(rows, at));
+    try {
+      await setShiftPatientReviewed(memberId, true);
+      goTo(nextIndex(rows, at));
+    } catch (e) {
+      alertError('ثبت نشد', e);
+    }
   }
 
   /** Skipped: still owed a visit, so the round can come back to them. */
   function skip(at: number) {
     goTo(nextIndex(rows, at, { includeCurrent: true }));
+  }
+
+  if (error || membersError) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: 'راند' }} />
+        <ErrorNotice error={error ?? membersError} what="راند" />
+      </Screen>
+    );
   }
 
   if (members !== undefined && rows.length === 0) {
@@ -164,13 +179,18 @@ function RoundCard({ row }: { row: RoundRow }) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
   const { member, patient, encounter } = row;
+  const now = useNow();
 
-  const { data: notes } = useLive(patientNotesQuery(patient.id), [patient.id]);
-  const { data: consults } = useLive(patientConsultsQuery(patient.id), [patient.id]);
+  const { data: notes, error: notesError } = useLive(latestPatientNoteQuery(patient.id), [patient.id]);
+  const { data: consults, error: consultsError } = useLive(patientConsultsQuery(patient.id), [patient.id]);
   const lastNote = (notes ?? [])[0] ?? null;
   const where = locationLabel(encounter ?? undefined);
   const elapsed = formatAdmissionElapsed(
-    admissionElapsed(encounter?.admittedAt, encounter?.admittedAtHasTime ?? false),
+    admissionElapsed(
+      encounter?.admittedAt,
+      encounter?.admittedAtHasTime ?? false,
+      encounter?.dischargedAt ?? new Date(now),
+    ),
   );
 
   return (
@@ -186,7 +206,7 @@ function RoundCard({ row }: { row: RoundRow }) {
                     {where}
                   </Text>
                 ) : null}
-                {elapsed ? <Badge label={`روز ${elapsed}`} /> : null}
+                {elapsed ? <Badge label={elapsed} /> : null}
                 {member.reviewedAt ? <Badge label="دیده شد" tone="success" /> : null}
               </Row>
             </Column>
@@ -212,7 +232,8 @@ function RoundCard({ row }: { row: RoundRow }) {
         </Column>
       </Card>
 
-      {lastNote ? (
+      <ErrorNotice error={notesError} what="آخرین نوت" />
+      {notesError || notes === undefined ? null : lastNote ? (
         <Card tone="alt">
           <Column gap="xxs">
             <Row justify="space-between" gap="sm">
@@ -235,7 +256,8 @@ function RoundCard({ row }: { row: RoundRow }) {
         </Row>
       )}
 
-      <ConsultsBrief rows={consults ?? []} />
+      <ErrorNotice error={consultsError} what="کانسالت‌ها" />
+      {!consultsError && consults !== undefined ? <ConsultsBrief rows={consults} /> : null}
 
       <TasksSection patientId={patient.id} shiftId={member.shiftId} title="کارهای این بیمار" limit={6} />
 

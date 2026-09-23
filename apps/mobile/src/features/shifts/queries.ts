@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { encounters, patients, shiftPatients, shifts, type Shift } from '@/db/schema';
+import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 /*
@@ -47,7 +48,14 @@ export function shiftPatientsQuery(shiftId: string) {
     .select({ member: shiftPatients, patient: patients, encounter: encounters })
     .from(shiftPatients)
     .innerJoin(patients, eq(shiftPatients.patientId, patients.id))
-    .leftJoin(encounters, eq(shiftPatients.encounterId, encounters.id))
+    .leftJoin(
+      encounters,
+      and(
+        eq(shiftPatients.encounterId, encounters.id),
+        eq(encounters.patientId, shiftPatients.patientId),
+        isNull(encounters.deletedAt),
+      ),
+    )
     .where(and(memberAlive, isNull(patients.deletedAt), eq(shiftPatients.shiftId, shiftId)))
     .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt));
 }
@@ -134,48 +142,61 @@ export async function addPatientToShift(
   patientId: string,
   options: { encounterId?: string | null; shiftSummary?: string | null } = {},
 ): Promise<string> {
-  const existing = (
-    await db
+  return db.transaction((tx) => {
+    const shift = tx
+      .select({ id: shifts.id })
+      .from(shifts)
+      .where(and(alive, eq(shifts.id, shiftId)))
+      .get();
+    const patient = tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(isNull(patients.deletedAt), eq(patients.id, patientId)))
+      .get();
+    if (!shift || !patient) throw new Error('بیمار یا شیفت در دسترس نیست.');
+
+    const existing = tx
       .select()
       .from(shiftPatients)
       .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId), eq(shiftPatients.patientId, patientId)))
-      .limit(1)
-  )[0];
-  if (existing) return existing.id;
+      .orderBy(asc(shiftPatients.createdAt), asc(shiftPatients.id))
+      .get();
+    if (existing) return existing.id;
 
-  const [last] = await db
-    .select({ sortOrder: shiftPatients.sortOrder })
-    .from(shiftPatients)
-    .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
-    .orderBy(desc(shiftPatients.sortOrder))
-    .limit(1);
+    const last = tx
+      .select({ sortOrder: shiftPatients.sortOrder })
+      .from(shiftPatients)
+      .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
+      .orderBy(desc(shiftPatients.sortOrder))
+      .get();
 
-  const encounterId =
-    options.encounterId !== undefined
-      ? options.encounterId
-      : ((
-          await db
-            .select({ id: encounters.id })
-            .from(encounters)
-            .where(
-              and(isNull(encounters.deletedAt), eq(encounters.patientId, patientId), eq(encounters.isActive, true)),
-            )
-            .limit(1)
-        )[0]?.id ?? null);
+    const encounterId =
+      options.encounterId !== undefined ? options.encounterId : resolveActiveEncounterId(patientId, tx);
+    if (encounterId != null) {
+      const encounter = tx
+        .select({ id: encounters.id })
+        .from(encounters)
+        .where(and(eq(encounters.id, encounterId), eq(encounters.patientId, patientId), isNull(encounters.deletedAt)))
+        .get();
+      if (!encounter) throw new Error('این نوبت مراجعه متعلق به بیمار نیست یا حذف شده است.');
+    }
 
-  const id = newId();
-  await db.insert(shiftPatients).values({
-    id,
-    ...stamps(),
-    shiftId,
-    patientId,
-    encounterId,
-    sortOrder: (last?.sortOrder ?? 0) + 1,
-    shiftSummary: options.shiftSummary?.trim() || null,
-    handoffNote: null,
-    reviewedAt: null,
+    const id = newId();
+    tx.insert(shiftPatients)
+      .values({
+        id,
+        ...stamps(),
+        shiftId,
+        patientId,
+        encounterId,
+        sortOrder: (last?.sortOrder ?? 0) + 1,
+        shiftSummary: options.shiftSummary?.trim() || null,
+        handoffNote: null,
+        reviewedAt: null,
+      })
+      .run();
+    return id;
   });
-  return id;
 }
 
 export async function removePatientFromShift(memberId: string): Promise<void> {

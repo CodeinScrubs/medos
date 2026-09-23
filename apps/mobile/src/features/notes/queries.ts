@@ -18,6 +18,16 @@ export function patientNotesQuery(patientId: string) {
     .orderBy(desc(notes.isPinned), desc(notes.noteDate));
 }
 
+/** Bedside recency is clinical time, independent of pins in the full notes list. */
+export function latestPatientNoteQuery(patientId: string) {
+  return db
+    .select()
+    .from(notes)
+    .where(and(alive, eq(notes.patientId, patientId), eq(notes.isDraft, false)))
+    .orderBy(desc(notes.noteDate), desc(notes.createdAt), desc(notes.id))
+    .limit(1);
+}
+
 export function noteQuery(id: string) {
   return db
     .select()

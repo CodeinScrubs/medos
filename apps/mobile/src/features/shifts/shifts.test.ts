@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { shiftPatients, shifts } from '@/db/schema';
+import { encounters, shiftPatients, shifts } from '@/db/schema';
+import { createNote, deleteNote, latestPatientNoteQuery, patientNotesQuery } from '@/features/notes/queries';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -15,7 +16,7 @@ import {
   shiftProgress,
   startShift,
 } from './queries';
-import { openEncounter } from '../encounters/queries';
+import { deleteEncounter, openEncounter } from '../encounters/queries';
 import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
 import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 
@@ -76,6 +77,58 @@ describe('a shift', () => {
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(1);
   });
 
+  it('serializes simultaneous additions without duplicate membership', async () => {
+    const shiftId = await startShift();
+    const ids = await Promise.all(Array.from({ length: 5 }, () => addPatientToShift(shiftId, patientId)));
+    expect(new Set(ids).size).toBe(1);
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(1);
+  });
+
+  it('keeps membership when its encounter is deleted, but hides the deleted location', async () => {
+    const encounterId = await openEncounter({ patientId, kind: 'admission', ward: 'OLD' });
+    const shiftId = await startShift();
+    await addPatientToShift(shiftId, patientId);
+    await deleteEncounter(encounterId);
+    const rows = await shiftPatientsQuery(shiftId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.encounter).toBeNull();
+    expect(rows[0]?.member.encounterId).toBe(encounterId);
+  });
+
+  it('refuses linking another patient encounter, including legacy mismatched joins', async () => {
+    const other = await createPatient({ firstName: 'Other', lastName: 'Patient' });
+    const encounterId = await openEncounter({ patientId: other, kind: 'admission', ward: 'OTHER' });
+    const shiftId = await startShift();
+    await expect(addPatientToShift(shiftId, patientId, { encounterId })).rejects.toThrow();
+    const memberId = await addPatientToShift(shiftId, patientId, { encounterId: null });
+    t.sqlite.run('UPDATE shift_patients SET encounter_id = ? WHERE id = ?', [encounterId, memberId]);
+    expect((await shiftPatientsQuery(shiftId))[0]?.encounter).toBeNull();
+    expect(t.db.select().from(encounters).all()).toHaveLength(1);
+  });
+
+  it('refuses new membership for deleted records without inserting a row', async () => {
+    const shiftId = await startShift();
+    await deleteShift(shiftId);
+    await expect(addPatientToShift(shiftId, patientId)).rejects.toThrow();
+    const activeId = await startShift();
+    await deletePatient(patientId);
+    await expect(addPatientToShift(activeId, patientId)).rejects.toThrow();
+    expect(t.db.select().from(shiftPatients).all()).toHaveLength(0);
+  });
+
+  it('readding a removed patient preserves the old handoff and creates one new membership', async () => {
+    const shiftId = await startShift();
+    const old = await addPatientToShift(shiftId, patientId, { shiftSummary: 'previous shift summary' });
+    await removePatientFromShift(old);
+    const ids = await Promise.all([addPatientToShift(shiftId, patientId), addPatientToShift(shiftId, patientId)]);
+    expect(ids[0]).toBe(ids[1]);
+    expect(ids[0]).not.toBe(old);
+    const all = t.db.select().from(shiftPatients).all();
+    expect(all).toHaveLength(2);
+    expect(all.find((row) => row.id === old)?.shiftSummary).toBe('previous shift summary');
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(1);
+  });
+
   it('tracks who has been seen', async () => {
     const shiftId = await startShift();
     const memberId = await addPatientToShift(shiftId, patientId);
@@ -120,6 +173,25 @@ describe('a shift', () => {
 
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
     expect(await activeShiftQuery()).toHaveLength(1);
+  });
+});
+
+describe('latest note on a round', () => {
+  it('uses clinical note date, not pin order, excluding drafts and deleted notes', async () => {
+    const base = { patientId, type: 'progress' as const };
+    const pinned = await createNote({
+      ...base,
+      body: 'older pinned',
+      isPinned: true,
+      noteDate: new Date('2026-01-01'),
+    });
+    const latest = await createNote({ ...base, body: 'latest', noteDate: new Date('2026-01-02') });
+    await createNote({ ...base, body: 'unfinished', isDraft: true, noteDate: new Date('2026-01-04') });
+    const deleted = await createNote({ ...base, body: 'removed', noteDate: new Date('2026-01-05') });
+    await deleteNote(deleted);
+    expect((await patientNotesQuery(patientId))[0]?.id).toBe(pinned);
+    expect((await latestPatientNoteQuery(patientId)).map((row) => row.id)).toEqual([latest]);
+    expect(await latestPatientNoteQuery('missing')).toEqual([]);
   });
 });
 

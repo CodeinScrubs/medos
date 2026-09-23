@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Correct round context and serialize shift membership
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous backup change `1e7172f`
+
+**Changed**
+
+- Membership lookup, encounter resolution and insertion share one synchronous transaction.
+  Deleted parents and deleted/wrong-patient encounter links are rejected. Removed membership
+  history is preserved when re-adding. Existing/imported duplicate rows are not silently merged.
+- Shift joins hide deleted/wrong-patient encounters without dropping the membership itself.
+  Round previews use latest published note date, ignoring pin order and drafts. Full notes
+  retain their intentional pin sorting. Round read failures no longer masquerade as an
+  empty record, and relevant shift/status write failures are surfaced.
+- Membership rows from a previous live-query dependency are filtered during shift changes.
+  Admission elapsed text no longer repeats "day" before hours and refreshes through `useNow`;
+  known discharge time stops the duration. No dependency or schema change.
+
+**Verified**
+
+- `npm run check`: 36 suites / 524 app tests + 3 workflow tests; all checks passed.
+- Regression reproduction before the fix: five concurrent adds produced five memberships.
+  Query tests now cover concurrency, re-add history, missing/deleted parents, deleted and
+  wrong-patient encounter links, and latest-note selection with old pins/drafts/deletions.
+- `1e7172f` pushed; hosted CI run 35871087112 succeeded for that exact SHA, including bundle.
+- `adb devices`: no phone connected.
+
+**Not verified**
+
+- This commit's hosted CI is checked after pushing. Native round navigation and rendering
+  were not exercised. D05 still covers failed autosave on next-patient/route/shift exit.
+
+**Open threads**
+
+- D05 autosave failures/navigation is next, then the rest of `IMPLEMENTATION.md`.
+- Existing duplicate memberships, if present in old/imported data, need a lossless review
+  path; never discard separate summaries/handoff notes to make the count look right.
+- Real SAF/restore/device acceptance and the broader requested features remain open.
+
 ## 2026-09-23 — Preserve older backups unless the new copy is verified
 
 **Agent:** GPT-6 via Codex
