@@ -46,6 +46,15 @@ tool that opens backups — can reuse them unchanged.
 TypeScript project for a consumer that does not exist yet. The lint rules keep the
 boundary clean at no cost; moving the folder later is mechanical.
 
+Icon imports also have a measured packaging boundary: import the family directly
+(`@expo/vector-icons/Ionicons`) rather than the package barrel. The installed barrel
+re-exports every family, bringing unrelated fonts and glyph maps into the Android export.
+Changing the 42 Ionicons imports removed 18 fonts and 54 Metro modules on 2026-09-23:
+font assets fell from 5,043,384 to 1,356,268 bytes, and Hermes bytecode from 6,697,101 to
+6,366,270 bytes. These are uncompressed export measurements, not APK size or startup
+timings. The same Ionicons implementation/font remains; the router's Material Symbols
+font and configured Persian fonts remain untouched. ESLint blocks barrel imports.
+
 ---
 
 ## SQLite + Drizzle, local-first

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Badge, Card, Column, Row, Text } from '@/components/ui';
 import type { Consultation, Doctor } from '@/db/schema';

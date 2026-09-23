@@ -81,6 +81,9 @@ and device behavior. Another AI's statement or a successful build is insufficien
 
 ## Priority 3: usability and release evidence
 
+- Packaging cleanup verified: direct Ionicons imports removed 18 unrelated fonts and
+  4,017,947 combined font/bytecode bytes from the Android export. ESLint blocks the old
+  barrel import. APK size, startup improvement and visual/device acceptance are unmeasured.
 - Today leads with current shift/patients and due actions. Secondary sections use
   short previews and view-all; empty-state wording reflects all actual work.
 - Collapse optional add forms; keep a fast single action for capture. Replace long

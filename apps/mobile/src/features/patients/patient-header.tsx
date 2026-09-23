@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';

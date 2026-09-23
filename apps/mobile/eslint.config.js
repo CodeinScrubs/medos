@@ -34,7 +34,18 @@ const DB_CLIENT_IN_UI = layer(
   '@/db/client',
 );
 
-const restrict = (...patterns) => ['error', { patterns }];
+const restrict = (...patterns) => [
+  'error',
+  {
+    paths: [
+      {
+        name: '@expo/vector-icons',
+        message: 'Import the icon family directly, e.g. @expo/vector-icons/Ionicons, to avoid bundling unused fonts.',
+      },
+    ],
+    patterns,
+  },
+];
 
 module.exports = defineConfig([
   expoConfig,
@@ -56,6 +67,7 @@ module.exports = defineConfig([
         },
       ],
       'import/no-duplicates': 'error',
+      'no-restricted-imports': restrict(),
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },

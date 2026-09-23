@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Remove unused icon fonts from the Android export
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous consult draft recovery `0ca6937`
+
+**Changed**
+
+- All 42 Ionicons imports use the existing direct family entry point. Each source
+  change is one import line; the icon implementation, names and UI behavior are unchanged.
+- ESLint rejects the package barrel; AGENTS/architecture record the rule and measured
+  reason. No dependency, database, backup or extra product feature introduced.
+
+**Verified**
+
+- `npm run check`: 41 suites / 561 app tests + 3 workflow tests, all checks passed.
+- Previous `0ca6937` exact-SHA CI run 35915972593 succeeded.
+- Android export: 2,512 -> 2,458 modules; assets 46 -> 28; font files 20 -> 2.
+  Font bytes 5,043,384 -> 1,356,268; bytecode 6,697,101 -> 6,366,270.
+  Combined reduction: 4,017,947 uncompressed bytes. These are manifest-referenced files,
+  not a sum over possibly stale files left in the dist directory.
+- Bundle `entry-7153fa7cbe60243b31b89249f7dadf14.hbc`. Ionicons and the router's
+  Material Symbols remain in the export; native Persian font configuration is unchanged.
+- An in-memory ESLint probe correctly rejected a barrel import with
+  `no-restricted-imports`. No probe source file added. `git diff --check` passed.
+- No subagents used.
+
+**Not verified**
+
+- No APK size comparison, startup benchmark or native visual test. Do not translate
+  the export-size saving into a claimed download-size or speed improvement.
+- This commit's CI is checked after pushing.
+
+**Open threads**
+
+- D05: quick-add task and consult-request draft recovery; raw invalid date drafts;
+  native exit/process death, media interruptions and other concurrent editors.
+- W03: task deadline editing/reminders. W02: persistent accessible reorder.
+- W05/W07: record correction/history and clinical-record restore.
+- Continue the full IMPLEMENTATION ledger; patient context, record workflows,
+  sourced physician-reviewed tools, AI and device/release gates remain open.
+
 ## 2026-09-23 — Recover consult reply drafts without silently publishing them
 
 **Agent:** GPT-6 via Codex
