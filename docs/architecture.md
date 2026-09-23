@@ -228,6 +228,14 @@ JSON manifest, the database snapshot, and media files.
 
 ## Forms: load, then initialise
 
+Date/time fields report validity separately from their last parsed value. Invalid or
+incomplete text must never authorize saving that older value. Every consumer passes
+`useDateValidation().setValid` and checks `check()` before its explicit write. This uses
+a ref so a text event followed immediately by Save cannot observe stale React state.
+Day and clock validity stay independent; presets repair the day only, and an explicitly
+unknown admission hour removes only clock validation. The raw unfinished date text is
+still screen-local: this guard is not crash recovery for invalid date drafts.
+
 Task previews stay short, with separate searchable/paged lists and a detail route shared
 by patient/global tasks and capture destinations. Counts use the same WHERE conditions as
 their lists. Priorities have explicit ranks: lexical order is not clinical urgency. Text

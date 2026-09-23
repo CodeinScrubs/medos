@@ -8,6 +8,7 @@ import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Toggle } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { Specialty } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
@@ -56,6 +57,7 @@ function TopicForm({ row }: { row: TopicRow | null }) {
   const [needsReview, setNeedsReview] = useState(topic?.needsReview ?? false);
   const [picker, setPicker] = useState<'specialty' | 'teacher' | null>(null);
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   const { data: specialtyRows } = useLive(specialtiesQuery());
   const { data: doctorRows } = useLive(doctorsQuery());
@@ -79,6 +81,7 @@ function TopicForm({ row }: { row: TopicRow | null }) {
   const teacherName = doctorRows?.find((d) => d.id === taughtById);
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (!title.trim()) {
       Alert.alert('عنوان لازم است');
       return;
@@ -147,7 +150,13 @@ function TopicForm({ row }: { row: TopicRow | null }) {
           allowDeselect
         />
         <Input label="یا خودتان بنویسید" value={context} onChangeText={setContext} />
-        <QuickDateField label="تاریخ" value={taughtAt} onChange={setTaughtAt} direction="past" />
+        <QuickDateField
+          onValidityChange={dateValidation.setValid}
+          label="تاریخ"
+          value={taughtAt}
+          onChange={setTaughtAt}
+          direction="past"
+        />
 
         <CollapsibleSection
           title="متن کامل و نکته‌ها"

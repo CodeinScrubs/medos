@@ -19,6 +19,7 @@ import {
   Text,
   Toggle,
 } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
@@ -139,6 +140,7 @@ function NoteEditor({
 
   const [pickingDoctor, setPickingDoctor] = useState(false);
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   const saver = useMemo(
     () =>
@@ -210,6 +212,7 @@ function NoteEditor({
   }
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (committing.current) return;
     if (!draftHasContent(latest.current)) {
       Alert.alert('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
@@ -396,6 +399,7 @@ function NoteEditor({
         )}
 
         <QuickDateField
+          onValidityChange={dateValidation.setValid}
           label="زمان"
           value={fields.noteDate ?? new Date()}
           onChange={(v) => update({ noteDate: v })}

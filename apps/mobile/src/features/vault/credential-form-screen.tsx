@@ -7,6 +7,7 @@ import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, Text, Toggle } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { Credential } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { fromIsoDate, toIsoDate } from '@/lib/jalali';
@@ -68,10 +69,12 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
   );
   const [starred, setStarred] = useState(credential?.starred ?? false);
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   const hint = secretHint(secret);
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (!systemName.trim()) {
       Alert.alert('نام سامانه لازم است');
       return;
@@ -164,7 +167,13 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
               multiline
               hint="شماره‌ی بازیابی، سؤال امنیتی، اپ توکن"
             />
-            <JalaliDateField label="تاریخ انقضا" value={expiresIso} onChange={setExpiresIso} allowFuture />
+            <JalaliDateField
+              onValidityChange={dateValidation.setValid}
+              label="تاریخ انقضا"
+              value={expiresIso}
+              onChange={setExpiresIso}
+              allowFuture
+            />
             <Input label="یادداشت" value={notes} onChangeText={setNotes} multiline />
             <Input label="برچسب‌ها" value={tags} onChangeText={setTags} hint="با ویرگول جدا کنید" />
           </Column>

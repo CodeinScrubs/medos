@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Screen, Segmented, Text } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { FollowUp } from '@/db/schema';
 import { createFollowUp } from '@/features/followups/queries';
 import { useTheme } from '@/theme';
@@ -42,8 +43,10 @@ export function FollowUpFormScreen() {
   const [channel, setChannel] = useState<FollowUp['channel']>('call');
   const [priority, setPriority] = useState<FollowUp['priority']>('normal');
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (!reason.trim()) {
       Alert.alert('دلیل پیگیری را بنویسید');
       return;
@@ -77,7 +80,14 @@ export function FollowUpFormScreen() {
           allowDeselect
         />
 
-        <QuickDateField label="کِی؟" value={dueAt} onChange={setDueAt} direction="future" withTime />
+        <QuickDateField
+          onValidityChange={dateValidation.setValid}
+          label="کِی؟"
+          value={dueAt}
+          onChange={setDueAt}
+          direction="future"
+          withTime
+        />
 
         <ChipSelect label="چطور؟" options={CHANNEL_OPTIONS} value={channel} onChange={(v) => v && setChannel(v)} />
 

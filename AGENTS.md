@@ -122,6 +122,9 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
 - Destructive or sensitive actions call `audit(...)`; user-facing failures call
   `alertError(title, error)`.
 - Anything time-dependent takes `now` as a parameter; screens get it from `useNow()`.
+- Date fields report validity separately from their parsed value. Wire `onValidityChange`
+  to `useDateValidation().setValid`, and call `check()` before saving; never save an old
+  parsed date while the visible date/time text is invalid.
 - Every `IconButton` needs a `label` (the type requires it) — it is all a screen reader gets.
 - **The app draws edge to edge.** Anything anchored to the bottom of the window — a tab
   bar, a fixed footer, the last row of a scroll view — must add `useSafeAreaInsets().bottom`

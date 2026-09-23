@@ -33,6 +33,49 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Reject invalid visible dates instead of saving old values
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous retrieval work `1a7f13a`
+
+**Changed**
+
+- JalaliDateField and QuickDateField report validity separately from the last
+  parsed value. All 13 existing consumer forms check it before explicit saves.
+  Invalid/incomplete dates and clocks hide the stale preview and block saving;
+  correcting the day does not silently repair an invalid clock or vice versa.
+- Validation refs close the gap between an input event and React's next render.
+  External clock replacement refreshes the field. Today's date uses useNow.
+- Editing an admission day no longer changes an unknown admission hour to known.
+  The unknown-hour hint matches the existing 12:01 noon calculation.
+- Documented the form contract in AGENTS/architecture and remaining W03 work.
+  No dependency, schema or backup-format change.
+
+**Verified**
+
+- `npm run check`: 40 suites / 549 app tests + 3 workflow tests, all checks passed.
+- Six new tests cover invalid/incomplete/future dates, independent day/clock
+  validity, same-batch input/save, optional clearing and external clock updates.
+  Component tests exercise real handlers with UI primitives mocked; no snapshots.
+- Android bundle: 2,510 modules, 6.7 MB, `entry-9715c8b060ae9de302366bcb6fcb2d19.hbc`.
+- Previous `1a7f13a` exact-SHA CI run 35882343483 succeeded. `git diff --check` passed.
+- No subagents used.
+
+**Not verified**
+
+- This commit's CI is checked after pushing. No APK/device or native keyboard test.
+- Raw invalid date text remains screen-local; crash recovery retains the last
+  valid parsed date. This change blocks explicit saves, not every interrupted draft.
+
+**Open threads**
+
+- D05: durable consult reply and quick-add task drafts; concurrent editors and
+  media interruptions; native exit/process-death acceptance.
+- W03: task deadline editing/reminders and durable raw date input recovery.
+- W02: persistent accessible reorder. W07: restore other clinical records.
+- Continue the full IMPLEMENTATION ledger; clinical context, record completion,
+  sourced physician-reviewed tools, AI and release/device gates remain open.
+
 ## 2026-09-23 — Retrieve older captures, tasks and shift handoffs
 
 **Agent:** GPT-6 via Codex

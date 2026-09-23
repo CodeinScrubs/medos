@@ -6,6 +6,7 @@ import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Row, Screen, Text, Toggle } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { useTheme } from '@/theme';
@@ -58,6 +59,7 @@ function OrderForm({ patientId, order }: { patientId: string; order: Order | nul
   const [notes, setNotes] = useState(order?.notes ?? '');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   // Suggestions from this user's own past orders, not a drug database.
   useEffect(() => {
@@ -87,6 +89,7 @@ function OrderForm({ patientId, order }: { patientId: string; order: Order | nul
   const isMedication = kind === 'drug' || kind === 'fluid';
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (!name.trim()) {
       Alert.alert('نام دستور لازم است');
       return;
@@ -200,7 +203,13 @@ function OrderForm({ patientId, order }: { patientId: string; order: Order | nul
           </>
         )}
 
-        <QuickDateField label="شروع" value={startAt} onChange={setStartAt} direction="past" />
+        <QuickDateField
+          onValidityChange={dateValidation.setValid}
+          label="شروع"
+          value={startAt}
+          onChange={setStartAt}
+          direction="past"
+        />
 
         <Input label="اندیکاسیون" value={indication} onChangeText={setIndication} placeholder="مثلاً CAP" ltr />
         <Input label="یادداشت" value={notes} onChangeText={setNotes} multiline />

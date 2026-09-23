@@ -7,6 +7,7 @@ import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { ImagingStudy } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, attachPhotos } from '@/features/attachments/capture';
@@ -56,6 +57,7 @@ function ImagingForm({ patientId, study }: { patientId: string; study: ImagingSt
   const [impression, setImpression] = useState(study?.impression ?? '');
   const [reportText, setReportText] = useState(study?.reportText ?? '');
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
   const [recent, setRecent] = useState<{ locations: string[]; platforms: string[] }>({ locations: [], platforms: [] });
 
   const { data: photos } = useLive(entityAttachmentsQuery('imaging_study', study?.id ?? ''), [study?.id]);
@@ -67,6 +69,7 @@ function ImagingForm({ patientId, study }: { patientId: string; study: ImagingSt
   const locationOptions = [...new Set([...recent.locations, ...DEFAULT_LOCATIONS])].slice(0, 8);
 
   async function save() {
+    if (!dateValidation.check()) return;
     setSaving(true);
     const payload = {
       modality,
@@ -97,7 +100,13 @@ function ImagingForm({ patientId, study }: { patientId: string; study: ImagingSt
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ChipSelect label="نوع" options={MODALITY_OPTIONS} value={modality} onChange={(v) => v && setModality(v)} />
         <Input label="ناحیه / شرح" value={region} onChangeText={setRegion} placeholder="مثلاً Brain w/o contrast" ltr />
-        <QuickDateField label="تاریخ" value={studyDate} onChange={setStudyDate} direction="past" />
+        <QuickDateField
+          onValidityChange={dateValidation.setValid}
+          label="تاریخ"
+          value={studyDate}
+          onChange={setStudyDate}
+          direction="past"
+        />
         <ChipSelect label="وضعیت" options={STATUS_OPTIONS} value={status} onChange={(v) => v && setStatus(v)} />
 
         <SectionHeader title="کجاست و چطور ببینمش؟" />

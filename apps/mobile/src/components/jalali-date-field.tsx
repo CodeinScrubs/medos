@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Input, Text } from '@/components/ui';
+import { validateDateInput } from '@/lib/date-input';
 import { formatJalaliLong, fromIsoDate, parseJalaliInput, toIsoDate, toJalali } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
+
+import { useNow } from './use-now';
 
 /**
  * A Jalali date typed as free text rather than picked from a calendar.
@@ -16,6 +19,7 @@ export function JalaliDateField({
   label,
   value,
   onChange,
+  onValidityChange,
   hint,
   required,
   allowFuture = false,
@@ -24,13 +28,24 @@ export function JalaliDateField({
   /** Gregorian ISO `YYYY-MM-DD`, or null. */
   value: string | null;
   onChange: (iso: string | null) => void;
+  onValidityChange: (valid: boolean) => void;
   hint?: string;
   required?: boolean;
   /** Birth dates cannot be in the future; follow-up dates usually are. */
   allowFuture?: boolean;
 }) {
   const [text, setText] = useState(() => isoToJalaliText(value));
-  const [error, setError] = useState<string | undefined>();
+  const [blurred, setBlurred] = useState(false);
+  const now = useNow();
+  const result = validateDateInput(text, { required: !!required, allowFuture, now: new Date(now) });
+  const valid = result.valid;
+  useEffect(() => {
+    onValidityChange(valid);
+  }, [valid, onValidityChange]);
+  const error =
+    !result.valid && (blurred || result.reason === 'future')
+      ? { required: 'تاریخ لازم است', invalid: 'تاریخ معتبر نیست', future: 'تاریخ در آینده است' }[result.reason]
+      : undefined;
 
   // Keep the field in step when the value is replaced from outside — but not
   // when the change came from this field's own typing. Without that check,
@@ -46,29 +61,13 @@ export function JalaliDateField({
 
   function handleChange(next: string) {
     setText(next);
-    const trimmed = next.trim();
-
-    if (!trimmed) {
-      setError(undefined);
-      onChange(null);
-      return;
-    }
-
-    const parsed = parseJalaliInput(trimmed);
-    if (!parsed) {
-      // Not an error yet: the user is probably mid-way through typing.
-      setError(undefined);
-      return;
-    }
-    if (!allowFuture && parsed.getTime() > Date.now()) {
-      setError('تاریخ در آینده است');
-      return;
-    }
-    setError(undefined);
-    onChange(toIsoDate(parsed));
+    setBlurred(false);
+    const nextResult = validateDateInput(next, { required: !!required, allowFuture, now: new Date(now) });
+    onValidityChange(nextResult.valid);
+    if (nextResult.valid) onChange(nextResult.iso);
   }
 
-  const preview = value ? formatJalaliLong(value) : null;
+  const preview = result.valid && result.iso ? formatJalaliLong(result.iso) : null;
 
   return (
     <>
@@ -76,9 +75,7 @@ export function JalaliDateField({
         label={label}
         value={text}
         onChangeText={handleChange}
-        onBlur={() => {
-          if (text.trim() && !parseJalaliInput(text)) setError('تاریخ معتبر نیست');
-        }}
+        onBlur={() => setBlurred(true)}
         placeholder={toPersianDigits('1370/05/12')}
         keyboardType="numbers-and-punctuation"
         numericFold

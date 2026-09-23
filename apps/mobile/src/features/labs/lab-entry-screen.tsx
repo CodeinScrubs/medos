@@ -10,6 +10,7 @@ import { alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, Card, Column, Divider, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { LabPanel, LabValue } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { entityAttachmentsQuery } from '@/features/attachments/queries';
@@ -78,6 +79,7 @@ function LabEntry({ patientId, panel, values }: { patientId: string; panel: LabP
   const [labName, setLabName] = useState(panel?.labName ?? '');
   const [notes, setNotes] = useState(panel?.notes ?? '');
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
   const [editingRange, setEditingRange] = useState<EntryRow | null>(null);
 
   const { data: patientRows } = useLive(patientQuery(patientId), [patientId]);
@@ -188,6 +190,7 @@ function LabEntry({ patientId, panel, values }: { patientId: string; panel: LabP
   const filledCount = rows.filter((r) => r.analyte.trim() && r.value.trim()).length;
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (filledCount === 0 && !(sheetPhotos && sheetPhotos.length > 0)) {
       Alert.alert('هیچ مقداری وارد نشده');
       return;
@@ -245,6 +248,7 @@ function LabEntry({ patientId, panel, values }: { patientId: string; panel: LabP
         )}
 
         <QuickDateField
+          onValidityChange={dateValidation.setValid}
           label="زمان نمونه‌گیری"
           value={collectedAt}
           onChange={setCollectedAt}

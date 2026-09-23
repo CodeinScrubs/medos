@@ -6,6 +6,7 @@ import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, ChipSelect, Column, Input, Screen, Text, Toggle } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { Occasion } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { formatJalaliLong, fromJalali, toIsoDate, toJalali } from '@/lib/jalali';
@@ -62,6 +63,7 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
   const [remindDaysBefore, setRemindDaysBefore] = useState(String(occasion?.remindDaysBefore ?? 1));
   const [messageTemplate, setMessageTemplate] = useState(occasion?.messageTemplate ?? '');
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   /*
    * Both shapes of date are edited as one Jalali field. For a recurring
@@ -93,6 +95,7 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
   const remindAt = preview ? occasionReminderAt(preview) : null;
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (!dateIso || !jalali) {
       Alert.alert('تاریخ لازم است', 'تاریخ مناسبت را بنویسید.');
       return;
@@ -135,6 +138,7 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
         />
 
         <JalaliDateField
+          onValidityChange={dateValidation.setValid}
           label="تاریخ"
           value={dateIso}
           onChange={setDateIso}

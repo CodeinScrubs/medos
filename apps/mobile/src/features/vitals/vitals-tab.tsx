@@ -6,6 +6,7 @@ import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { TrendChart } from '@/components/trend-chart';
 import { Button, Card, ChipSelect, Column, EmptyState, Input, Row, SectionHeader, Text } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import { useLive } from '@/db/use-live';
 import { formatJalali, formatJalaliDateTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
@@ -59,6 +60,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const dateValidation = useDateValidation();
   const [errors, setErrors] = useState<Partial<Record<keyof VitalForm, string>>>({});
   const [measuredAt, setMeasuredAt] = useState(() => new Date());
   const [series, setSeries] = useState<VitalSeriesKey>('systolic');
@@ -96,6 +98,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
   }
 
   async function save() {
+    if (!dateValidation.check()) return;
     const parsed = parseVitalForm(form);
     setErrors(parsed.ok ? {} : parsed.errors);
     if (!parsed.ok) return;
@@ -132,6 +135,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
         <Card tone="alt">
           <Column gap="sm">
             <QuickDateField
+              onValidityChange={dateValidation.setValid}
               label="زمان اندازه‌گیری"
               value={measuredAt}
               onChange={setMeasuredAt}

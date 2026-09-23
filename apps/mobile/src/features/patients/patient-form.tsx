@@ -6,6 +6,7 @@ import { CollapsibleSection } from '@/components/collapsible-section';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, Column, Input, Row, Screen, Segmented, Text } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { Patient, PatientStatus } from '@/db/schema';
 import { CHOOSABLE_STATUSES, isChoosableStatus } from '@/features/encounters/status';
 import { isValidNationalId, toLatinDigits } from '@/lib/persian';
@@ -72,6 +73,7 @@ export function PatientForm({ patient }: { patient?: Patient }) {
 
   const [form, setForm] = useState<FormState>(() => initialState(patient));
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -111,6 +113,7 @@ export function PatientForm({ patient }: { patient?: Patient }) {
   }
 
   async function save() {
+    if (!dateValidation.check()) return;
     if (!validate()) return;
     setSaving(true);
     try {
@@ -205,6 +208,7 @@ export function PatientForm({ patient }: { patient?: Patient }) {
         <Row gap="md" align="flex-start">
           <View style={{ flex: 1.4 }}>
             <JalaliDateField
+              onValidityChange={dateValidation.setValid}
               label="تاریخ تولد"
               value={form.birthDate}
               onChange={(iso) => set('birthDate', iso)}

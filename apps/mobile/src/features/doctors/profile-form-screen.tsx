@@ -5,6 +5,7 @@ import { ActivityIndicator } from 'react-native';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, Column, Input, Screen, SectionHeader, Text } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { DoctorProfile } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { useTheme } from '@/theme';
@@ -64,8 +65,10 @@ function ProfileForm({ doctorId, profile }: { doctorId: string; profile: DoctorP
   const [communicationStyle, setCommunicationStyle] = useState(profile?.communicationStyle ?? '');
   const [personalNotes, setPersonalNotes] = useState(profile?.personalNotes ?? '');
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   async function save() {
+    if (!dateValidation.check()) return;
     setSaving(true);
     try {
       await saveDoctorProfile(doctorId, {
@@ -99,7 +102,12 @@ function ProfileForm({ doctorId, profile }: { doctorId: string; profile: DoctorP
           کنید.
         </Text>
 
-        <JalaliDateField label="تاریخ تولد" value={birthDate} onChange={setBirthDate} />
+        <JalaliDateField
+          onValidityChange={dateValidation.setValid}
+          label="تاریخ تولد"
+          value={birthDate}
+          onChange={setBirthDate}
+        />
         <Input label="زادگاه" value={hometown} onChangeText={setHometown} />
         <Input label="دانشگاه" value={almaMater} onChangeText={setAlmaMater} />
         <Input label="سال فارغ‌التحصیلی" value={graduationYear} onChangeText={setGraduationYear} numericFold />

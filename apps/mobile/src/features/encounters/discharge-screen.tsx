@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Screen, Text } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { Encounter, PatientStatus } from '@/db/schema';
 import { dischargeEncounter } from '@/features/encounters/queries';
 import { useTheme } from '@/theme';
@@ -34,8 +35,10 @@ export function DischargeScreen() {
   const [dischargedAt, setDischargedAt] = useState(() => new Date());
   const [outcomeNotes, setOutcomeNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
 
   async function save() {
+    if (!dateValidation.check()) return;
     setSaving(true);
     try {
       await dischargeEncounter(encounterId, {
@@ -73,7 +76,14 @@ export function DischargeScreen() {
           />
         )}
 
-        <QuickDateField label="تاریخ ترخیص" value={dischargedAt} onChange={setDischargedAt} direction="past" withTime />
+        <QuickDateField
+          onValidityChange={dateValidation.setValid}
+          label="تاریخ ترخیص"
+          value={dischargedAt}
+          onChange={setDischargedAt}
+          direction="past"
+          withTime
+        />
 
         <Input
           label="خلاصه‌ی نتیجه"

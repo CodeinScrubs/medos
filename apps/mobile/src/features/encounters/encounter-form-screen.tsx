@@ -7,6 +7,7 @@ import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Row, Screen, SelectField, Toggle } from '@/components/ui';
+import { useDateValidation } from '@/components/use-date-validation';
 import type { Encounter } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
@@ -59,6 +60,7 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
   // to assume 12:01 PM and say so rather than to pick a plausible-looking time.
   const [hourKnown, setHourKnown] = useState(encounter?.admittedAtHasTime ?? true);
   const [saving, setSaving] = useState(false);
+  const dateValidation = useDateValidation();
   const [picker, setPicker] = useState<'place' | 'attending' | null>(null);
 
   const { data: placeRows } = useLive(placesQuery());
@@ -83,6 +85,7 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
   const attendingLabel = doctorItems.find((d) => d.id === attendingId)?.label ?? null;
 
   async function save() {
+    if (!dateValidation.check()) return;
     setSaving(true);
     try {
       const payload = {
@@ -155,13 +158,10 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
         />
 
         <QuickDateField
+          onValidityChange={dateValidation.setValid}
           label={kind === 'outpatient' ? 'تاریخ ویزیت' : 'تاریخ بستری'}
           value={admittedAt}
-          onChange={(v) => {
-            setAdmittedAt(v);
-            // Touching the field is how a real time gets in.
-            setHourKnown(true);
-          }}
+          onChange={setAdmittedAt}
           direction="past"
           withTime={hourKnown}
         />
@@ -169,7 +169,7 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
         {isInpatient(kind) ? (
           <Toggle
             label="ساعت بستری را نمی‌دانم"
-            description="مدت بستری فقط به روز نشان داده می‌شود"
+            description="ساعت ۱۲:۰۱ ظهر فرض می‌شود"
             value={!hourKnown}
             onChange={(v) => setHourKnown(!v)}
           />
