@@ -1,67 +1,84 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { View } from 'react-native';
 
+import { useAutosaveScope } from '@/components/autosave-scope';
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
-import { Badge, Button, Card, Column, Input, Row, SectionHeader, Text } from '@/components/ui';
+import { Button, Column, Input, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
-import { formatJalali } from '@/lib/jalali';
-import { fullName } from '@/lib/persian';
-import { useTheme } from '@/theme';
 
-import { createTask, deleteTask, setTaskStatus, tasksQuery } from './queries';
+import { createTask, taskCountQuery, tasksQuery } from './queries';
+import { TaskRow } from './task-row';
 
-/**
- * Open tasks, with a one-line way to add another.
- *
- * Used twice: on Today for the ones with no patient — "ring radiology" — and
- * on a patient's own screen. The add box is a single field on purpose. A task
- * that takes a form to create is a task that gets written on paper instead.
- */
+/** A short open-task preview; history and editing live in the full list. */
 export function TasksSection({
   patientId,
   shiftId,
   title = 'کارها',
   limit = 20,
 }: {
-  /** `null` for the global list, an id for one patient's. */
   patientId: string | null;
   shiftId?: string | null;
   title?: string;
   limit?: number;
 }) {
   const router = useRouter();
-  const { colors, spacing } = useTheme();
-  const { data } = useLive(tasksQuery({ patientId, status: 'open' }), [patientId]);
+  const scope = useAutosaveScope();
+  const { data, error } = useLive(tasksQuery({ patientId, status: 'open' }, limit), [patientId, limit]);
+  const { data: count, error: countError } = useLive(taskCountQuery({ patientId, status: 'open' }), [patientId]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-
-  const rows = (data ?? []).slice(0, limit);
+  const adding = useRef(false);
+  const rows = data?.filter(({ task }) => task.patientId === patientId && task.status === 'open' && !task.deletedAt);
 
   async function add() {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || adding.current) return;
+    adding.current = true;
     setBusy(true);
     try {
       await createTask({ title: text, patientId, shiftId: shiftId ?? null, source: 'typed' });
-      setDraft('');
+      setDraft((current) => (current === draft ? '' : current));
     } catch (e) {
       alertError('اضافه نشد', e);
     } finally {
+      adding.current = false;
       setBusy(false);
     }
   }
 
+  function navigate(action: () => void) {
+    if (scope) void scope.perform(action);
+    else action();
+  }
+
   return (
     <>
-      <SectionHeader title={title} count={rows.length} />
+      <SectionHeader
+        title={title}
+        count={count?.[0]?.total}
+        action={
+          <Button
+            label="همه و تاریخچه"
+            variant="ghost"
+            size="sm"
+            onPress={() =>
+              navigate(() =>
+                router.push({ pathname: '/tasks', params: patientId ? { patientId } : { scope: 'global' } }),
+              )
+            }
+          />
+        }
+      />
       <Column gap="sm">
+        <ErrorNotice error={error ?? countError} what="کارها" />
         <Row gap="sm">
-          <View style={styles.grow}>
+          <View style={{ flex: 1 }}>
             <Input
               value={draft}
               onChangeText={setDraft}
+              editable={!busy}
               placeholder={patientId ? 'کاری برای این بیمار…' : 'مثلاً تماس با رادیولوژی'}
               onSubmitEditing={() => void add()}
               returnKeyType="done"
@@ -69,60 +86,21 @@ export function TasksSection({
           </View>
           <Button label="افزودن" icon="add" onPress={() => void add()} loading={busy} />
         </Row>
-
-        {rows.map(({ task, patient }) => (
-          <Card key={task.id}>
-            <Row gap="sm" align="flex-start">
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: false }}
-                accessibilityLabel="انجام شد"
-                hitSlop={8}
-                onPress={() => void setTaskStatus(task.id, 'done')}
-              >
-                <Ionicons name="ellipse-outline" size={24} color={colors.textFaint} />
-              </Pressable>
-
-              <Pressable
-                style={styles.grow}
-                onLongPress={() =>
-                  Alert.alert('حذف این کار؟', task.title, [
-                    { text: 'انصراف', style: 'cancel' },
-                    { text: 'حذف', style: 'destructive', onPress: () => void deleteTask(task.id) },
-                  ])
-                }
-                onPress={() =>
-                  patient ? router.push({ pathname: '/patient/[id]', params: { id: patient.id } }) : undefined
-                }
-              >
-                <Column gap="xxs">
-                  <Text variant="body" numberOfLines={2}>
-                    {task.title}
-                  </Text>
-                  <Row gap="xs" wrap>
-                    {patient && !patientId ? <Badge label={fullName(patient.firstName, patient.lastName)} /> : null}
-                    {task.dueAt ? (
-                      <Text variant="tiny" color="textFaint">
-                        {formatJalali(task.dueAt)}
-                      </Text>
-                    ) : null}
-                  </Row>
-                </Column>
-              </Pressable>
-            </Row>
-          </Card>
+        {rows?.map(({ task, patient }) => (
+          <TaskRow
+            key={task.id}
+            task={task}
+            patient={patient}
+            showPatient={!patientId}
+            onOpen={() => navigate(() => router.push({ pathname: '/task', params: { taskId: task.id } }))}
+          />
         ))}
-
-        {rows.length === 0 && data !== undefined ? (
-          <Text variant="tiny" color="textFaint" style={{ marginBottom: spacing.xs }}>
-            {patientId ? 'کاری برای این بیمار باز نیست.' : 'کار بازی نیست.'}
+        {!error && rows?.length === 0 ? (
+          <Text variant="tiny" color="textFaint">
+            کاری باز نیست.
           </Text>
         ) : null}
       </Column>
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  grow: { flex: 1 },
-});

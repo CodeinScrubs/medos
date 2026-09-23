@@ -16,6 +16,9 @@ export type AuditAction =
   | 'vital.deleted'
   | 'diagnosis.updated'
   | 'diagnosis.deleted'
+  | 'task.deleted'
+  | 'task.restored'
+  | 'task.statusChanged'
   | 'backup.created'
   | 'backup.restored'
   // A restore that was cut short and had its files put back.

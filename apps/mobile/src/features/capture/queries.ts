@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import { db, type DbTransaction } from '@/db/client';
 import {
@@ -12,6 +12,7 @@ import {
   type CaptureKind,
   type NoteType,
 } from '@/db/schema';
+import { matchesSearch } from '@/db/search';
 import { createNoteInTransaction } from '@/features/notes/queries';
 import { createTaskInTransaction } from '@/features/tasks/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -42,25 +43,38 @@ export function captureSearchText(capture: Pick<Capture, 'text'>): string {
 const livePatient = and(eq(captureInbox.patientId, patients.id), isNull(patients.deletedAt));
 
 /** Still unfiled: the actual inbox, oldest first so nothing rots at the bottom. */
-export function inboxQuery(limit = 50) {
+export function inboxQuery(limit = 50, search = '') {
   return db
     .select({ capture: captureInbox, patient: patients })
     .from(captureInbox)
     .leftJoin(patients, livePatient)
-    .where(and(alive, isNull(captureInbox.filedAt)))
-    .orderBy(asc(captureInbox.capturedAt))
+    .where(and(alive, isNull(captureInbox.filedAt), ...matchesSearch(captureInbox.searchText, search)))
+    .orderBy(asc(captureInbox.capturedAt), asc(captureInbox.id))
     .limit(limit);
 }
 
 /** Already filed, newest first — where a voice capture's audio still lives. */
-export function filedCapturesQuery(limit = 20) {
+export function filedCapturesQuery(limit = 20, search = '') {
   return db
     .select({ capture: captureInbox, patient: patients })
     .from(captureInbox)
     .leftJoin(patients, livePatient)
-    .where(and(alive, isNotNull(captureInbox.filedAt)))
-    .orderBy(desc(captureInbox.filedAt))
+    .where(and(alive, isNotNull(captureInbox.filedAt), ...matchesSearch(captureInbox.searchText, search)))
+    .orderBy(desc(captureInbox.filedAt), desc(captureInbox.id))
     .limit(limit);
+}
+
+export function captureCountQuery(filed: boolean, search = '') {
+  return db
+    .select({ total: count() })
+    .from(captureInbox)
+    .where(
+      and(
+        alive,
+        filed ? isNotNull(captureInbox.filedAt) : isNull(captureInbox.filedAt),
+        ...matchesSearch(captureInbox.searchText, search),
+      ),
+    );
 }
 
 export function captureQuery(id: string) {

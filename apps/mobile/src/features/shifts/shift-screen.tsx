@@ -96,6 +96,7 @@ function ShiftScreenContent() {
         <Stack.Screen options={{ title: 'شیفت' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="شیفت" />
+          <Button label="شیفت‌های قبلی" variant="ghost" onPress={() => router.push('/shift-history')} />
           <EmptyState
             icon="time-outline"
             title="شیفتی باز نیست"
@@ -112,6 +113,11 @@ function ShiftScreenContent() {
       <Stack.Screen options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ErrorNotice error={error ?? membersError ?? patientsError} what="شیفت" />
+        <Button
+          label="شیفت‌های قبلی"
+          variant="ghost"
+          onPress={() => void scope.perform(() => router.push('/shift-history'))}
+        />
 
         {shift ? (
           <Card style={{ borderColor: colors.primary, borderWidth: 1 }}>

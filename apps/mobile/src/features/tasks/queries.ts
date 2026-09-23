@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, isNull, lte, or, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 
+import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import { patients, tasks, type Task, type TaskKind } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
@@ -31,34 +32,58 @@ export type TaskFilter = {
   patientId?: string | null;
   shiftId?: string | null;
   status?: Task['status'];
+  deleted?: boolean;
   /** Only tasks that are due, or overdue, at this moment. */
   dueBy?: Date;
 };
 
-export function tasksQuery(filter: TaskFilter = {}) {
-  const clauses: (SQL | undefined)[] = [alive];
+function taskConditions(filter: TaskFilter) {
+  const clauses: (SQL | undefined)[] = [filter.deleted ? isNotNull(tasks.deletedAt) : alive];
   if (filter.patientId !== undefined) {
     clauses.push(filter.patientId === null ? isNull(tasks.patientId) : eq(tasks.patientId, filter.patientId));
   }
-  if (filter.shiftId) clauses.push(eq(tasks.shiftId, filter.shiftId));
+  if (filter.shiftId !== undefined) {
+    clauses.push(filter.shiftId === null ? isNull(tasks.shiftId) : eq(tasks.shiftId, filter.shiftId));
+  }
   if (filter.status) clauses.push(eq(tasks.status, filter.status));
   // A task with no due date is always "now": it is not waiting for anything.
   if (filter.dueBy) clauses.push(or(isNull(tasks.dueAt), lte(tasks.dueAt, filter.dueBy)));
   clauses.push(...matchesSearch(tasks.searchText, filter.search));
+  return and(...clauses);
+}
 
+export function tasksQuery(filter: TaskFilter = {}, limit?: number) {
   return db
     .select({ task: tasks, patient: patients })
     .from(tasks)
-    .leftJoin(patients, eq(tasks.patientId, patients.id))
-    .where(and(...clauses))
-    .orderBy(asc(tasks.status), desc(tasks.priority), asc(tasks.dueAt), desc(tasks.createdAt));
+    .leftJoin(patients, and(eq(tasks.patientId, patients.id), isNull(patients.deletedAt)))
+    .where(taskConditions(filter))
+    .orderBy(
+      ...(filter.deleted
+        ? [desc(tasks.deletedAt)]
+        : filter.status && filter.status !== 'open'
+          ? [desc(tasks.completedAt)]
+          : [
+              asc(sql`CASE ${tasks.status} WHEN 'open' THEN 0 WHEN 'done' THEN 1 ELSE 2 END`),
+              asc(sql`CASE ${tasks.priority} WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END`),
+              asc(sql`CASE WHEN ${tasks.dueAt} IS NULL THEN 1 ELSE 0 END`),
+              asc(tasks.dueAt),
+            ]),
+      desc(tasks.createdAt),
+      desc(tasks.id),
+    )
+    .limit(limit ?? -1);
 }
 
-export function taskQuery(id: string) {
+export function taskCountQuery(filter: TaskFilter = {}) {
+  return db.select({ total: count() }).from(tasks).where(taskConditions(filter));
+}
+
+export function taskQuery(id: string, includeDeleted = false) {
   return db
     .select()
     .from(tasks)
-    .where(and(alive, eq(tasks.id, id)))
+    .where(and(includeDeleted ? undefined : alive, eq(tasks.id, id)))
     .limit(1);
 }
 
@@ -97,20 +122,30 @@ export function createTaskInTransaction(tx: DbTransaction, input: TaskInput): st
     notes: input.notes ?? null,
   };
   if (!row.title) throw new Error('A task needs a title');
+  if (row.dueAt && !Number.isFinite(row.dueAt.getTime())) throw new Error('Invalid task date');
   tx.insert(tasks)
     .values({ id, ...stamps(), ...row, searchText: taskSearchText(row) })
     .run();
   return id;
 }
 
-export async function updateTask(id: string, patch: Partial<TaskInput>): Promise<void> {
-  const current = (await taskQuery(id))[0];
-  if (!current) throw new Error(`Task ${id} not found`);
-  const merged = { ...current, ...patch, title: (patch.title ?? current.title).trim() };
-  await db
-    .update(tasks)
-    .set({ ...patch, title: merged.title, searchText: taskSearchText(merged), ...touch() })
-    .where(and(alive, eq(tasks.id, id)));
+export async function updateTask(id: string, patch: Partial<TaskInput> & { outcome?: string | null }): Promise<void> {
+  db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(tasks)
+      .where(and(alive, eq(tasks.id, id)))
+      .get();
+    if (!current) throw new Error('Task not found');
+    const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+    const merged = { ...current, ...defined, title: (patch.title ?? current.title).trim() };
+    if (!merged.title) throw new Error('A task needs a title');
+    if (patch.dueAt && !Number.isFinite(patch.dueAt.getTime())) throw new Error('Invalid task date');
+    tx.update(tasks)
+      .set({ ...defined, title: merged.title, searchText: taskSearchText(merged), ...touch() })
+      .where(and(alive, eq(tasks.id, id)))
+      .run();
+  });
 }
 
 /**
@@ -122,7 +157,7 @@ export async function updateTask(id: string, patch: Partial<TaskInput>): Promise
  */
 export async function setTaskStatus(id: string, status: Task['status'], outcome?: string | null): Promise<void> {
   const now = new Date();
-  await db
+  const changed = await db
     .update(tasks)
     .set({
       status,
@@ -130,14 +165,30 @@ export async function setTaskStatus(id: string, status: Task['status'], outcome?
       outcome: outcome === undefined ? undefined : (outcome?.trim() ?? null),
       ...touch(now),
     })
-    .where(and(alive, eq(tasks.id, id)));
+    .where(and(alive, eq(tasks.id, id)))
+    .returning({ id: tasks.id });
+  if (!changed.length) throw new Error('Task not found');
+  await audit('task.statusChanged', { entityType: 'task', entityId: id, detail: { status } });
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  await db
+  const changed = await db
     .update(tasks)
     .set(softDelete())
-    .where(and(alive, eq(tasks.id, id)));
+    .where(and(alive, eq(tasks.id, id)))
+    .returning({ id: tasks.id });
+  if (!changed.length) throw new Error('Task not found');
+  await audit('task.deleted', { entityType: 'task', entityId: id });
+}
+
+export async function restoreTask(id: string): Promise<void> {
+  const changed = await db
+    .update(tasks)
+    .set({ deletedAt: null, ...touch() })
+    .where(and(isNotNull(tasks.deletedAt), eq(tasks.id, id)))
+    .returning({ id: tasks.id });
+  if (!changed.length) throw new Error('Deleted task not found');
+  await audit('task.restored', { entityType: 'task', entityId: id });
 }
 
 export async function reindexTasks(): Promise<number> {

@@ -5,6 +5,7 @@ import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import {
+  captureCountQuery,
   captureQuery,
   createCapture,
   deletedCapturesQuery,
@@ -233,6 +234,33 @@ describe('throwing a capture away', () => {
 });
 
 describe('the inbox', () => {
+  it('retrieves items past both preview limits and counts the full search result', async () => {
+    for (let i = 0; i < 76; i += 1) {
+      const id = await createCapture({ text: `پیگیری ${i}` });
+      if (i < 23) await fileCaptureAsTask(id);
+    }
+    const deleted = await createCapture({ text: 'پیگیری حذف‌شده' });
+    await discardCapture(deleted);
+    await createCapture({ text: 'Unrelated' });
+
+    const first = await inboxQuery();
+    const all = await inboxQuery(100);
+    expect(first).toHaveLength(50);
+    expect(all).toHaveLength(54);
+    expect(all.slice(0, 50)).toEqual(first);
+    expect((await captureCountQuery(false))[0]?.total).toBe(54);
+    expect((await captureCountQuery(false, 'پيگيري'))[0]?.total).toBe(53);
+    expect(await inboxQuery(100, 'پيگيري')).toHaveLength(53);
+
+    const filedPreview = await filedCapturesQuery();
+    const filedAll = await filedCapturesQuery(40, 'پيگيري');
+    expect(filedPreview).toHaveLength(20);
+    expect(filedAll).toHaveLength(23);
+    expect(filedAll.slice(0, 20)).toEqual(filedPreview);
+    expect((await captureCountQuery(true, 'پيگيري'))[0]?.total).toBe(23);
+    expect((await captureCountQuery(true, 'absent'))[0]?.total).toBe(0);
+  });
+
   it('keeps a capture whose patient was deleted, without naming them', async () => {
     const id = await createCapture({ text: 'پیگیری جواب', patientId });
     await deletePatient(patientId);

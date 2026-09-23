@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { consultations, doctors, patients, type Consultation } from '@/db/schema';
@@ -44,7 +44,11 @@ export function openConsultsQuery(limit = 20) {
     .innerJoin(patients, eq(consultations.patientId, patients.id))
     .leftJoin(doctors, eq(consultations.doctorId, doctors.id))
     .where(and(alive, isNull(patients.deletedAt), inArray(consultations.status, OPEN_STATUSES)))
-    .orderBy(desc(consultations.urgency), asc(consultations.createdAt))
+    .orderBy(
+      asc(sql`CASE ${consultations.urgency} WHEN 'emergency' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END`),
+      asc(consultations.createdAt),
+      asc(consultations.id),
+    )
     .limit(limit);
 }
 

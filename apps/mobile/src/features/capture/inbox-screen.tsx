@@ -4,14 +4,21 @@ import { useMemo, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
-import { Button, Column, EmptyState, Screen, SectionHeader } from '@/components/ui';
+import { Button, Column, EmptyState, Input, Screen, SectionHeader } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { patientListQuery } from '@/features/patients/queries';
 import { fullName } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { CaptureCard, groupMedia, NO_MEDIA, type PatientAsk } from './capture-card';
-import { captureMediaQuery, fileCaptureAsNote, filedCapturesQuery, inboxQuery, updateCapture } from './queries';
+import {
+  captureCountQuery,
+  captureMediaQuery,
+  fileCaptureAsNote,
+  filedCapturesQuery,
+  inboxQuery,
+  updateCapture,
+} from './queries';
 
 /**
  * Everything caught and not yet filed, oldest first.
@@ -26,9 +33,14 @@ import { captureMediaQuery, fileCaptureAsNote, filedCapturesQuery, inboxQuery, u
 export function InboxScreen() {
   const router = useRouter();
   const { spacing } = useTheme();
-  const { data: open, error } = useLive(inboxQuery());
-  const { data: filed } = useLive(filedCapturesQuery());
-  const { data: media } = useLive(captureMediaQuery());
+  const [search, setSearch] = useState('');
+  const [openLimit, setOpenLimit] = useState(50);
+  const [filedLimit, setFiledLimit] = useState(20);
+  const { data: open, error } = useLive(inboxQuery(openLimit, search), [openLimit, search]);
+  const { data: filed, error: filedError } = useLive(filedCapturesQuery(filedLimit, search), [filedLimit, search]);
+  const { data: openCount, error: openCountError } = useLive(captureCountQuery(false, search), [search]);
+  const { data: filedCount, error: filedCountError } = useLive(captureCountQuery(true, search), [search]);
+  const { data: media, error: mediaError } = useLive(captureMediaQuery());
   const [ask, setAsk] = useState<PatientAsk | null>(null);
 
   const byCapture = useMemo(() => groupMedia(media), [media]);
@@ -65,23 +77,35 @@ export function InboxScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'ثبت‌های نشده' }} />
+      <Stack.Screen options={{ title: 'صندوق ثبت سریع' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error} what="ثبت‌های سریع" />
+        <ErrorNotice
+          error={error ?? filedError ?? openCountError ?? filedCountError ?? mediaError}
+          what="ثبت‌های سریع"
+        />
+        <Input
+          placeholder="جستجو در متن ثبت‌ها"
+          value={search}
+          onChangeText={(value) => {
+            setSearch(value);
+            setOpenLimit(50);
+            setFiledLimit(20);
+          }}
+        />
 
         <Button label="ثبت سریع تازه" icon="add" onPress={() => router.push('/capture')} full />
 
-        {openRows.length === 0 && open !== undefined ? (
+        {!error && openRows.length === 0 && open !== undefined ? (
           <EmptyState
             icon="file-tray-outline"
-            title="چیزی در انتظار نیست"
+            title={search.trim() ? 'ثبت منتظری با این جستجو پیدا نشد' : 'چیزی در انتظار نیست'}
             description="هرچه سریع ثبت کنید اینجا می‌ماند تا سر فرصت تبدیلش کنید به نوت یا کار."
           />
         ) : null}
 
         {openRows.length > 0 ? (
           <>
-            <SectionHeader title="در انتظار" count={openRows.length} />
+            <SectionHeader title="در انتظار" count={openCount?.[0]?.total ?? openRows.length} />
             <Column gap="sm">
               {openRows.map(({ capture, patient }) => (
                 <CaptureCard
@@ -96,9 +120,13 @@ export function InboxScreen() {
           </>
         ) : null}
 
+        {(openCount?.[0]?.total ?? 0) > openRows.length ? (
+          <Button label="ثبت‌های بیشتر" variant="ghost" onPress={() => setOpenLimit((n) => n + 50)} />
+        ) : null}
+
         {filedRows.length > 0 ? (
           <>
-            <SectionHeader title="تبدیل‌شده‌ها" count={filedRows.length} />
+            <SectionHeader title="تبدیل‌شده‌ها" count={filedCount?.[0]?.total ?? filedRows.length} />
             <Column gap="sm">
               {filedRows.map(({ capture, patient }) => (
                 <CaptureCard
@@ -111,6 +139,9 @@ export function InboxScreen() {
               ))}
             </Column>
           </>
+        ) : null}
+        {(filedCount?.[0]?.total ?? 0) > filedRows.length ? (
+          <Button label="تبدیل‌شده‌های بیشتر" variant="ghost" onPress={() => setFiledLimit((n) => n + 20)} />
         ) : null}
       </Column>
 

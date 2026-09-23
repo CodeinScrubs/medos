@@ -31,7 +31,7 @@ export function activeShiftQuery() {
 }
 
 export function shiftsQuery(limit = 30) {
-  return db.select().from(shifts).where(alive).orderBy(desc(shifts.startAt)).limit(limit);
+  return db.select().from(shifts).where(alive).orderBy(desc(shifts.startAt), desc(shifts.id)).limit(limit);
 }
 
 export function shiftQuery(id: string) {
@@ -58,6 +58,17 @@ export function shiftPatientsQuery(shiftId: string) {
     )
     .where(and(memberAlive, isNull(patients.deletedAt), eq(shiftPatients.shiftId, shiftId)))
     .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt));
+}
+
+/** Removed memberships still carry handoff notes; history reads them without reviving them. */
+export function shiftHistoryPatientsQuery(shiftId: string) {
+  return db
+    .select({ member: shiftPatients, patient: patients })
+    .from(shiftPatients)
+    .innerJoin(shifts, and(eq(shiftPatients.shiftId, shifts.id), alive))
+    .leftJoin(patients, and(eq(shiftPatients.patientId, patients.id), isNull(patients.deletedAt)))
+    .where(eq(shiftPatients.shiftId, shiftId))
+    .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt), asc(shiftPatients.id));
 }
 
 export type ShiftInput = {

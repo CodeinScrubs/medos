@@ -228,6 +228,18 @@ JSON manifest, the database snapshot, and media files.
 
 ## Forms: load, then initialise
 
+Task previews stay short, with separate searchable/paged lists and a detail route shared
+by patient/global tasks and capture destinations. Counts use the same WHERE conditions as
+their lists. Priorities have explicit ranks: lexical order is not clinical urgency. Text
+edits use the existing autosave group; partial task writes read/merge/index/write within
+one synchronous transaction so overlapping field saves cannot drop search terms.
+
+Past shifts use read-only queries and never become active when viewed. Their history
+includes removed memberships, because those can still hold a handoff, with a removal
+label and without joining deleted patient identities. It does not present the encounter's
+current ward/bed as where the patient was at that historical time: that needs actual
+location snapshots/events. No new schema, storage framework or dependency was needed.
+
 Autosave completion is a boolean result, not merely a resolved promise. Note/capture
 route removal uses the public Expo Router `usePreventRemove` hook to flush and resume the
 original action only on success. Shift and round fields register with a screen-level

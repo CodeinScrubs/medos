@@ -12,6 +12,9 @@ import {
   endShift,
   removePatientFromShift,
   setShiftPatientReviewed,
+  shiftHistoryPatientsQuery,
+  shiftQuery,
+  shiftsQuery,
   shiftPatientsQuery,
   shiftProgress,
   startShift,
@@ -33,6 +36,37 @@ beforeEach(async () => {
 });
 
 describe('a shift', () => {
+  it('can browse past the first 30 shifts without reopening any of them', async () => {
+    for (let i = 0; i < 32; i += 1) await startShift();
+    const active = await activeShiftQuery();
+    const preview = await shiftsQuery();
+    const all = await shiftsQuery(60);
+    expect(preview).toHaveLength(30);
+    expect(all).toHaveLength(32);
+    expect(all.slice(0, 30)).toEqual(preview);
+    expect(await activeShiftQuery()).toEqual(active);
+  });
+
+  it('keeps removed handoffs readable without reviving membership or exposing a deleted patient', async () => {
+    const id = await startShift({ notes: 'shift note' });
+    const memberId = await addPatientToShift(id, patientId);
+    await updateShiftPatient(memberId, { shiftSummary: 'summary', handoffNote: 'handoff' });
+    await removePatientFromShift(memberId);
+    await endShift(id);
+    const current = await startShift();
+    const [row] = await shiftHistoryPatientsQuery(id);
+    expect(row?.member.handoffNote).toBe('handoff');
+    expect(row?.member.shiftSummary).toBe('summary');
+    expect(row?.member.deletedAt).toBeInstanceOf(Date);
+    expect((await shiftQuery(id))[0]?.notes).toBe('shift note');
+    expect(await shiftPatientsQuery(id)).toHaveLength(0);
+    expect((await activeShiftQuery())[0]?.id).toBe(current);
+    await deletePatient(patientId);
+    expect((await shiftHistoryPatientsQuery(id))[0]?.patient).toBeNull();
+    await deleteShift(id);
+    expect(await shiftHistoryPatientsQuery(id)).toHaveLength(0);
+  });
+
   it('is the only open one; starting another closes it', async () => {
     const first = await startShift({ ward: 'داخلی ۲' });
     const second = await startShift({ ward: 'اورژانس' });

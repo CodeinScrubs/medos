@@ -85,8 +85,8 @@ export function CaptureCard({
     if (!capture.filedId) return;
     if (capture.filedAs === 'note' && capture.patientId) {
       router.push({ pathname: '/patient/[id]/note', params: { id: capture.patientId, noteId: capture.filedId } });
-    } else if (capture.patientId) {
-      router.push({ pathname: '/patient/[id]', params: { id: capture.patientId } });
+    } else if (capture.filedAs === 'task') {
+      router.push({ pathname: '/task', params: { taskId: capture.filedId } });
     }
   }
 
@@ -180,7 +180,13 @@ export function CaptureCard({
               onPress={() =>
                 Alert.alert('دور انداخته شود؟', 'به سطل زباله می‌رود و برگرداندنی است.', [
                   { text: 'انصراف', style: 'cancel' },
-                  { text: 'دور انداختن', style: 'destructive', onPress: () => void discardCapture(capture.id) },
+                  {
+                    text: 'دور انداختن',
+                    style: 'destructive',
+                    onPress: () => {
+                      void discardCapture(capture.id).catch((e: unknown) => alertError('حذف نشد', e));
+                    },
+                  },
                 ])
               }
             />

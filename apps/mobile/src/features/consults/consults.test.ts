@@ -26,6 +26,17 @@ beforeEach(async () => {
 });
 
 describe('a consult', () => {
+  it('puts emergency before urgent before routine instead of alphabetic urgency order', async () => {
+    await createConsult({ patientId, reason: 'Routine', urgency: 'routine' });
+    await createConsult({ patientId, reason: 'Urgent', urgency: 'urgent' });
+    await createConsult({ patientId, reason: 'Emergency', urgency: 'emergency' });
+    expect((await openConsultsQuery()).map(({ consult }) => consult.urgency)).toEqual([
+      'emergency',
+      'urgent',
+      'routine',
+    ]);
+  });
+
   it('starts owed, and attaches itself to the open admission', async () => {
     const encounterId = await openEncounter({ patientId, kind: 'admission' });
     const id = await createConsult({ patientId, specialty: 'قلب', reason: 'افت فشار بعد از دیالیز' });

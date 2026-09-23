@@ -33,6 +33,55 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-23 — Retrieve older captures, tasks and shift handoffs
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous autosave guard `9f8201e`
+
+**Changed**
+
+- Inbox/filed captures now have normalized text search, full counts, stable ordering
+  and load-more instead of inaccessible 51st/21st items. Capture-to-task links open
+  the actual task, including tasks with no patient. Capture deletion errors surface.
+- Patient/global task previews link to searchable full lists with open, done, cancelled
+  and deleted tabs. The global view can include all patients. Task details autosave
+  title/notes/outcome, edit priority, reopen and restore; exit/actions flush first.
+- Task partial edits merge/index/write synchronously, reject blank titles/invalid dates
+  and ignore undefined patch fields. Status/delete failures are no longer silent.
+  Delete/restore/status audit stores identifiers/status only, never task text.
+- Priority ranks now explicitly order task high/normal/low and consult
+  emergency/urgent/routine. Closed task history sorts by completion time.
+- Past shifts are browsable with load-more and read-only summaries/handoffs, including
+  removed memberships. Opening history never reactivates a shift. Deleted patient
+  identities stay hidden; current encounter location is not shown as historical fact.
+- Existing components/layers reused; no dependency, schema or backup-format change.
+
+**Verified**
+
+- `npm run check`: 38 suites / 543 app tests + 3 workflow tests, all checks passed.
+- SQLite regressions exercise preview overflow/search/counts, priority ranks, concurrent
+  partial task edits, failed writes, delete/restore evidence, hidden deleted identity,
+  and reading historical handoffs without changing the active shift.
+- Android bundle: 2,508 modules, 6.7 MB, `entry-7be5177707b7c3b846102565a1392e8c.hbc`.
+- Previous `9f8201e` exact-SHA CI run 35879764469 succeeded. `git diff --check` passed.
+- `adb devices` returned no attached device. No subagents used.
+
+**Not verified**
+
+- This commit's CI is checked after pushing. No APK/device interaction test. Large-list
+  performance, keyboard/back/RTL rendering, native restore and process death remain open.
+- New list/detail flows have query tests and bundle checks, not end-to-end UI proof.
+
+**Open threads**
+
+- W03: deadline editing/reminders. First fix invalid text in QuickDateField and
+  JalaliDateField leaving the caller's older valid date silently intact.
+- D05: quick-add task drafts still require Add; consult reply drafts need durable
+  recovery. Continue media interruption, concurrent-editor and native exit acceptance.
+- W02: persistent accessible reorder. W07: trash recovery beyond tasks/captures/patients.
+- Continue the full `IMPLEMENTATION.md` ledger, including clinical context, record flows,
+  sourced physician-reviewed tools and AI. This delivery does not complete that scope.
+
 ## 2026-09-23 — Keep editors open when autosave fails
 
 **Agent:** GPT-6 via Codex
