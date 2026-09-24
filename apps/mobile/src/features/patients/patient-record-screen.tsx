@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
@@ -39,13 +40,22 @@ function isTab(value: unknown): value is Tab {
 
 export function PatientRecordScreen() {
   const { id, tab: initialTab } = useLocalSearchParams<{ id: string; tab?: Tab }>();
+  return (
+    <AutosaveScope key={id}>
+      <PatientRecord id={id} initialTab={initialTab} />
+    </AutosaveScope>
+  );
+}
+
+function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
+  const scope = useAutosaveScope()!;
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
   const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : 'overview');
 
   const { data: rows, error } = useLive(patientQuery(id), [id]);
 
-  if (error)
+  if (error && !rows)
     return (
       <Screen>
         <ErrorNotice error={error} what="پرونده" />
@@ -84,9 +94,11 @@ export function PatientRecordScreen() {
           text: 'حذف',
           style: 'destructive',
           onPress: () => {
-            void deletePatient(patient.id)
-              .then(() => router.back())
-              .catch((e) => alertError('حذف نشد', e));
+            void scope.perform(() =>
+              deletePatient(patient.id)
+                .then(() => router.back())
+                .catch((e) => alertError('حذف نشد', e)),
+            );
           },
         },
       ],
@@ -103,7 +115,9 @@ export function PatientRecordScreen() {
               <IconButton
                 icon="create-outline"
                 label="ویرایش"
-                onPress={() => router.push({ pathname: '/patient/[id]/edit', params: { id } })}
+                onPress={() =>
+                  void scope.perform(() => router.push({ pathname: '/patient/[id]/edit', params: { id } }))
+                }
               />
               <IconButton icon="trash-outline" label="حذف" onPress={confirmDelete} />
             </Row>
@@ -113,6 +127,7 @@ export function PatientRecordScreen() {
 
       <Screen scroll padded>
         <Column gap="md" style={{ paddingTop: spacing.md }}>
+          <ErrorNotice error={error} what="پرونده" />
           <PatientHeader patient={patient} />
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
@@ -123,7 +138,7 @@ export function PatientRecordScreen() {
                   key={t.key}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
-                  onPress={() => setTab(t.key)}
+                  onPress={() => void scope.perform(() => setTab(t.key))}
                   style={[
                     styles.tab,
                     {

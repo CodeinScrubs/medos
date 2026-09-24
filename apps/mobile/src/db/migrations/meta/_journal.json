@@ -78,6 +78,13 @@
       "when": 1790190711434,
       "tag": "0010_confused_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790209017131,
+      "tag": "0011_stale_power_pack",
+      "breakpoints": true
     }
   ]
 }

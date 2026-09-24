@@ -1,5 +1,5 @@
-import { relations } from 'drizzle-orm';
-import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { relations, sql } from 'drizzle-orm';
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import { baseColumns, bool, isoDate, jsonList } from './_shared';
 import { doctors } from './people';
@@ -706,6 +706,27 @@ export const tasks = sqliteTable(
 /* -------------------------------------------------------------------------- */
 /*  Capture inbox: what was heard before there was time to file it              */
 /* -------------------------------------------------------------------------- */
+
+/** A quick-add task stays a draft until the owner presses Add. One open draft per patient/global scope. */
+export const taskDrafts = sqliteTable(
+  'task_drafts',
+  {
+    ...baseColumns,
+    scopeKey: text('scope_key').notNull(),
+    patientId: text('patient_id').references(() => patients.id),
+    shiftId: text('shift_id').references(() => shifts.id),
+    title: text('title').notNull().default(''),
+    revision: integer('revision').notNull().default(0),
+    /** Set with soft deletion when committed; retry returns this same task. */
+    taskId: text('task_id').references(() => tasks.id),
+  },
+  (t) => [
+    uniqueIndex('task_drafts_open_scope_idx')
+      .on(t.scopeKey)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type TaskDraft = typeof taskDrafts.$inferSelect;
 
 export const CAPTURE_KINDS = ['text', 'voice', 'photo'] as const;
 

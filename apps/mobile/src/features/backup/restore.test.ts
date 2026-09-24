@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { auditLog, backupRuns, consultations, imagingStudies, notes, patients, settings } from '@/db/schema';
+import {
+  auditLog,
+  backupRuns,
+  consultations,
+  imagingStudies,
+  notes,
+  patients,
+  settings,
+  taskDrafts,
+} from '@/db/schema';
 import { newId, stamps } from '@/lib/ids';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -57,6 +66,31 @@ describe('importTables', () => {
   beforeEach(async () => {
     live = await createTestDatabase();
     backup = await createTestDatabase();
+  });
+
+  it('restores quick-add task drafts without turning them into tasks', async () => {
+    const patientId = await addPatient(backup, 'Draft');
+    await backup.db.insert(taskDrafts).values({
+      id: 'draft',
+      ...stamps(),
+      scopeKey: `patient:${patientId}`,
+      patientId,
+      title: 'Recover me',
+      revision: 3,
+    });
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(taskDrafts).get()).toMatchObject({ title: 'Recover me', revision: 3, taskId: null });
+  });
+
+  it('accepts backups predating task drafts and removes drafts absent from that backup', async () => {
+    await live.db
+      .insert(taskDrafts)
+      .values({ id: 'live', ...stamps(), scopeKey: 'global', title: 'Newer than backup' });
+    backup.conn.execSync('DROP TABLE task_drafts');
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(taskDrafts).all()).toHaveLength(0);
   });
 
   it('restores consult drafts and their concurrency token with their patient', async () => {

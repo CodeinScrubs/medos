@@ -312,6 +312,22 @@ protection. Full consult correction/history, quick-add request drafts and native
 process-death/back testing remain separate work. The autosave delay is still an exposure
 window for text not yet committed to SQLite.
 
+Quick-add tasks use a separate `task_drafts` table rather than a new `tasks.status`:
+unconfirmed text must not appear in open work, Today counts or task history. A partial
+unique index allows one open draft per patient, plus one global draft. The patient's
+draft can be resumed from either the record or a round; its original shift association
+is preserved, including an explicit null. The editor owns one id/revision and rejects
+stale writes. Publication creates the task and soft-deletes/links the source draft in
+one transaction, retaining the original title and making retries idempotent. A new draft
+can then be started in that same scope. Empty form mounts write nothing.
+
+The inline task editor registers with its screen's SaveGroup; patient tab changes and
+record edit/delete actions flush that group, as existing round transitions already do.
+A standalone tasks preview creates a scope only when none exists. Recovery is inline,
+not another dashboard section. Later patient-query errors display above the last loaded
+record instead of unmounting the editor. These guards still require native navigation
+and process-death acceptance; uncommitted keystrokes are not an independent backup.
+
 The capture screen uses the same machinery for a different reason. Its row **is** the
 draft: `CaptureWriter` creates one `capture_inbox` row the first time anything on that
 screen produces something worth keeping — the keyboard, the recorder or the camera,

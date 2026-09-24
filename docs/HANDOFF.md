@@ -33,6 +33,60 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-24 — Recover quick-add task text before it becomes a task
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; previous packaging cleanup `70523ab`
+
+**Changed**
+
+- Added separate task drafts (migration 0011), one active draft per patient or
+  global scope. Opening an empty field creates nothing; typing persists exact text.
+  Add creates the task and retires its source draft in one transaction, with
+  idempotent retry. Unfinished text never appears as active clinical work.
+- Inline recovery keeps the original shift, including an explicit null shift.
+  Revision checks refuse concurrent overwrite; a conflict can be compared and
+  explicitly resolved against the displayed version. No new ordinary-screen controls.
+- Patient tab/edit/delete transitions flush the shared save group. Later patient
+  read errors retain the loaded editor. Existing round/global guards cover quick-add.
+- Updated architecture and execution ledger; no dependencies or subagents.
+
+**Verified**
+
+- `npm run check`: 43 suites / 572 app tests + 3 workflow tests, all checks passed.
+  Regression cases exercise rollback, retries, concurrent edits, guarded departure,
+  inline recovery and restoring both current and pre-task-draft backups.
+- `db:generate` reports no schema changes after generation; `git diff --check` passed.
+- Android export: 2,460 modules, bundle `entry-a2b026d2df380fccc15092552abbdd0d.hbc`.
+- Signed release APK built successfully, 54,566,949 bytes; apksigner verify passed
+  (v2). Local artifact: `dist/MedOS-0.7.1.apk`, SHA-256
+  `5727ed4d6be598f25126f04f6c9802a50af2a4a1c081e0e97f3aa52b8e0a2174`.
+  Source stayed unchanged throughout this build. No APK size comparison claimed.
+- Previous `70523ab` exact-SHA CI run 35916455315 succeeded.
+
+**Not verified**
+
+- `adb devices` has no connected device. APK installation, native keyboard/back,
+  process death, SAF/second-device restore and on-device performance remain open.
+- Component tests invoke handlers with stand-in UI/navigation; they do not prove
+  native navigation or persistence of a keystroke not yet committed to SQLite.
+
+**Open threads**
+
+- D05: consult-request drafts, raw invalid date drafts, media interruptions and
+  other concurrent editors; native exit/process-death acceptance.
+- W03: task deadline editing/reminders. W02: persistent accessible reorder.
+- W05/W07: record correction/history and clinical-record restore.
+- Continue the full IMPLEMENTATION ledger, including patient context, clinical
+  workflows, sourced physician-reviewed tools, AI and device/release gates.
+
+**Gotchas**
+
+- Task draft scope is patient/global, not shift. Keep the recovered shift as
+  provenance; opening another round must not silently reassign it.
+- Build warned about Gradle 10 deprecations and Windows CMake path length, but
+  completed successfully. Do not present those warnings as current build failures.
+
 ## 2026-09-23 — Remove unused icon fonts from the Android export
 
 **Agent:** GPT-6 via Codex
