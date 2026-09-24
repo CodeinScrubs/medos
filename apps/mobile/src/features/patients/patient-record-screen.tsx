@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
@@ -52,6 +52,25 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
   const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : 'overview');
+  useEffect(() => {
+    if (!isTab(initialTab)) return;
+    let current = true;
+    // Route-parameter changes do not remove this screen, so the navigation exit
+    // guard cannot protect its fields. Keep the old tab until they are durable.
+    void scope.group
+      .flush()
+      .then((saved) => {
+        if (!current) return;
+        if (saved) setTab(initialTab);
+        else Alert.alert('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');
+      })
+      .catch((error: unknown) => {
+        if (current) alertError('تب باز نشد', error);
+      });
+    return () => {
+      current = false;
+    };
+  }, [initialTab, scope]);
 
   const { data: rows, error } = useLive(patientQuery(id), [id]);
 
@@ -138,7 +157,12 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
                   key={t.key}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
-                  onPress={() => void scope.perform(() => setTab(t.key))}
+                  onPress={() =>
+                    void scope.perform(() => {
+                      setTab(t.key);
+                      router.setParams({ tab: t.key });
+                    })
+                  }
                   style={[
                     styles.tab,
                     {

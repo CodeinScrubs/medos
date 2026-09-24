@@ -685,6 +685,15 @@ export const shiftPatients = sqliteTable(
 
 export const TASK_KINDS = ['lab', 'imaging', 'consult', 'procedure', 'call', 'general'] as const;
 
+export type TaskScheduleDraft = {
+  hasDue: boolean;
+  dateText: string;
+  clockText: string;
+  reminderEnabled: boolean;
+  /** The applied schedule against which this draft was started. */
+  baseSchedule: string;
+};
+
 /**
  * Something to do.
  *
@@ -711,6 +720,12 @@ export const tasks = sqliteTable(
       .notNull()
       .$default(() => 'general' as const),
     dueAt: integer('due_at', { mode: 'timestamp_ms' }),
+    reminderEnabled: integer('reminder_enabled', { mode: 'boolean' }).notNull().default(false),
+    notificationId: text('notification_id'),
+    reminderRevision: integer('reminder_revision').notNull().default(0),
+    reminderAppliedRevision: integer('reminder_applied_revision').notNull().default(-1),
+    scheduleDraft: text('schedule_draft', { mode: 'json' }).$type<TaskScheduleDraft>(),
+    scheduleDraftRevision: integer('schedule_draft_revision').notNull().default(0),
     priority: text('priority', { enum: ['low', 'normal', 'high'] })
       .notNull()
       .$default(() => 'normal' as const),

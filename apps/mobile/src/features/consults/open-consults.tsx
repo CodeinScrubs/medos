@@ -44,10 +44,18 @@ export function OpenConsults() {
                   </Text>
                 </Column>
                 <Column gap="xxs" style={{ alignItems: 'flex-end' }}>
-                  <Badge
-                    label={consult.status === 'pending' ? 'درخواست نشده' : 'منتظر پاسخ'}
-                    tone={consult.status === 'pending' ? 'warning' : 'info'}
-                  />
+                  <Row gap="xs">
+                    {consult.urgency !== 'routine' ? (
+                      <Badge
+                        label={consult.urgency === 'emergency' ? 'اورژانسی' : 'فوری'}
+                        tone={consult.urgency === 'emergency' ? 'danger' : 'warning'}
+                      />
+                    ) : null}
+                    <Badge
+                      label={consult.status === 'pending' ? 'درخواست نشده' : 'منتظر پاسخ'}
+                      tone={consult.status === 'pending' ? 'warning' : 'info'}
+                    />
+                  </Row>
                   <Text variant="tiny" color="textFaint">
                     {formatRelativeTime(consult.requestedAt ?? consult.createdAt)}
                   </Text>

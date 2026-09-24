@@ -15,6 +15,7 @@ import { useTheme } from '@/theme';
 
 import { TASK_PRIORITY_OPTIONS, TASK_STATUS_LABEL } from './labels';
 import { deleteTask, restoreTask, setTaskStatus, taskQuery, updateTask } from './queries';
+import { TaskSchedule } from './schedule-editor';
 
 export function TaskScreen() {
   const { taskId = '' } = useLocalSearchParams<{ taskId?: string }>();
@@ -90,7 +91,7 @@ function TaskDetail({ task, readError }: { task: Task; readError?: Error }) {
                 if (priority) void scope.perform(() => updateTask(task.id, { priority }));
               }}
             />
-            {task.dueAt ? <Text variant="caption">موعد: {formatJalaliDateTime(task.dueAt)}</Text> : null}
+            <TaskSchedule task={task} />
             <AutosaveField
               label="نتیجه"
               multiline

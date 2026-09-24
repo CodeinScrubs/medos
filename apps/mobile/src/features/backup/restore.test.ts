@@ -11,6 +11,7 @@ import {
   patients,
   settings,
   taskDrafts,
+  tasks,
 } from '@/db/schema';
 import { newId, stamps } from '@/lib/ids';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -68,6 +69,47 @@ describe('importTables', () => {
   beforeEach(async () => {
     live = await createTestDatabase();
     backup = await createTestDatabase();
+  });
+
+  it('imports task backups predating optional reminders without enabling any alarm', async () => {
+    await backup.db
+      .insert(tasks)
+      .values({ id: 'legacy-task', ...stamps(), title: 'Review', dueAt: new Date('2030-01-02T12:00:00Z') });
+    backup.conn.execSync(
+      'ALTER TABLE tasks DROP COLUMN reminder_enabled; ALTER TABLE tasks DROP COLUMN notification_id; ALTER TABLE tasks DROP COLUMN reminder_revision; ALTER TABLE tasks DROP COLUMN reminder_applied_revision; ALTER TABLE tasks DROP COLUMN schedule_draft; ALTER TABLE tasks DROP COLUMN schedule_draft_revision;',
+    );
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(tasks).get()).toMatchObject({
+      title: 'Review',
+      reminderEnabled: false,
+      notificationId: null,
+      reminderRevision: 0,
+      reminderAppliedRevision: -1,
+      scheduleDraft: null,
+      scheduleDraftRevision: 0,
+    });
+  });
+
+  it('restores raw unfinished task schedule text and reminder intent together', async () => {
+    const draft = {
+      hasDue: true,
+      dateText: '۱۴۰',
+      clockText: '۱:',
+      reminderEnabled: true,
+      baseSchedule: '[null,false]',
+    };
+    await backup.db
+      .insert(tasks)
+      .values({ id: 'draft-task', ...stamps(), title: 'Review', scheduleDraft: draft, scheduleDraftRevision: 4 });
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(tasks).get()).toMatchObject({
+      scheduleDraft: draft,
+      scheduleDraftRevision: 4,
+      dueAt: null,
+      reminderEnabled: false,
+    });
   });
 
   it('restores legacy follow-ups with SQL defaults that request reminder reconciliation', async () => {

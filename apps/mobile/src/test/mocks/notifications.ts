@@ -9,7 +9,7 @@ import type { ChannelId } from '@/platform/notifications';
  * which reminders exist rather than which functions were called.
  */
 
-export const CHANNELS = { followUps: 'follow-ups.v2', occasions: 'occasions.v2' } as const;
+export const CHANNELS = { followUps: 'follow-ups.v2', occasions: 'occasions.v2', tasks: 'tasks.v1' } as const;
 
 export type ScheduledReminder = {
   at: Date;

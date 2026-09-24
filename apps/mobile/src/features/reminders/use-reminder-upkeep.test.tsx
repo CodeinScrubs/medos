@@ -4,12 +4,14 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
 import { repairFollowUpReminders } from '@/features/followups/reminder-queries';
+import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { logError } from '@/platform/error-log';
 
 import { useReminderUpkeep } from './use-reminder-upkeep';
 
 jest.mock('@/features/doctors/occasions-queries', () => ({ rescheduleOccasionReminders: jest.fn() }));
 jest.mock('@/features/followups/reminder-queries', () => ({ repairFollowUpReminders: jest.fn() }));
+jest.mock('@/features/tasks/reminder-queries', () => ({ repairTaskReminders: jest.fn() }));
 jest.mock('@/platform/error-log', () => ({ logError: jest.fn() }));
 let tree: ReactTestRenderer;
 let change: (state: AppStateStatus) => void;
@@ -26,6 +28,7 @@ beforeEach(async () => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   jest.mocked(repairFollowUpReminders).mockResolvedValue(0);
+  jest.mocked(repairTaskReminders).mockResolvedValue(0);
   jest.mocked(rescheduleOccasionReminders).mockResolvedValue(0);
   jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
     change = listener;
@@ -51,6 +54,7 @@ describe('reminder upkeep', () => {
       await settle();
     });
     expect(repairFollowUpReminders).toHaveBeenCalledTimes(1);
+    expect(repairTaskReminders).toHaveBeenCalledTimes(1);
     expect(rescheduleOccasionReminders).toHaveBeenCalledTimes(1);
     await act(async () => {
       change('background');
@@ -58,6 +62,8 @@ describe('reminder upkeep', () => {
       await settle();
     });
     expect(repairFollowUpReminders).toHaveBeenCalledTimes(2);
+    expect(repairTaskReminders).toHaveBeenCalledTimes(2);
+    expect(repairTaskReminders).toHaveBeenLastCalledWith();
     expect(repairFollowUpReminders).toHaveBeenLastCalledWith();
     await act(async () => {
       tree.unmount();
@@ -89,5 +95,32 @@ describe('reminder upkeep', () => {
       await settle();
     });
     expect(repairFollowUpReminders).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for task repair when follow-up repair fails before accepting another foreground event', async () => {
+    let finish!: (value: number) => void;
+    jest.mocked(repairTaskReminders).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    jest.mocked(repairFollowUpReminders).mockRejectedValueOnce(new Error('temporary failure'));
+    await act(async () => {
+      change('active');
+      await settle();
+    });
+    await act(async () => {
+      change('active');
+      await settle();
+    });
+    expect(repairTaskReminders).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish(0);
+      await settle();
+      change('active');
+      await settle();
+    });
+    expect(repairTaskReminders).toHaveBeenCalledTimes(2);
   });
 });

@@ -7,6 +7,8 @@ import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText } from '@/lib/persian';
 
+import { reconcileTaskReminder } from './reminder-queries';
+
 /*
  * Things to do, with or without a patient.
  *
@@ -15,9 +17,9 @@ import { buildSearchText } from '@/lib/persian';
  * form, ask the lab to repeat a sample. Those lived on paper because the app
  * had nowhere to put them.
  *
- * Deliberately not merged with follow-ups. A follow-up carries a reminder, a
- * channel and an outcome for a named patient; a task carries a title and a
- * state. Merging them would mean every quick "ring radiology" had to answer
+ * Deliberately not merged with follow-ups. A follow-up carries a contact
+ * channel and an outcome for a named patient; a task can be global and its
+ * deadline/reminder is optional. Merging them would mean every quick "ring radiology" had to answer
  * which patient it was about.
  */
 
@@ -96,13 +98,16 @@ export type TaskInput = {
   doctorId?: string | null;
   placeId?: string | null;
   dueAt?: Date | null;
+  reminderEnabled?: boolean;
   priority?: Task['priority'];
   source?: string | null;
   notes?: string | null;
 };
 
 export async function createTask(input: TaskInput): Promise<string> {
-  return db.transaction((tx) => createTaskInTransaction(tx, input));
+  const id = db.transaction((tx) => createTaskInTransaction(tx, input));
+  if (input.reminderEnabled) await reconcileTaskReminder(id, true);
+  return id;
 }
 
 /** Compose with capture filing without committing a half-finished operation. */
@@ -117,20 +122,28 @@ export function createTaskInTransaction(tx: DbTransaction, input: TaskInput): st
     doctorId: input.doctorId ?? null,
     placeId: input.placeId ?? null,
     dueAt: input.dueAt ?? null,
+    reminderEnabled: input.reminderEnabled ?? false,
     priority: input.priority ?? ('normal' as const),
     source: input.source ?? null,
     notes: input.notes ?? null,
   };
   if (!row.title) throw new Error('A task needs a title');
   if (row.dueAt && !Number.isFinite(row.dueAt.getTime())) throw new Error('Invalid task date');
+  if (row.reminderEnabled && !row.dueAt) throw new Error('A reminder needs a deadline');
   tx.insert(tasks)
-    .values({ id, ...stamps(), ...row, searchText: taskSearchText(row) })
+    .values({
+      id,
+      ...stamps(),
+      ...row,
+      reminderAppliedRevision: row.reminderEnabled ? -1 : 0,
+      searchText: taskSearchText(row),
+    })
     .run();
   return id;
 }
 
 export async function updateTask(id: string, patch: Partial<TaskInput> & { outcome?: string | null }): Promise<void> {
-  db.transaction((tx) => {
+  const reminderChanged = db.transaction((tx) => {
     const current = tx
       .select()
       .from(tasks)
@@ -141,11 +154,26 @@ export async function updateTask(id: string, patch: Partial<TaskInput> & { outco
     const merged = { ...current, ...defined, title: (patch.title ?? current.title).trim() };
     if (!merged.title) throw new Error('A task needs a title');
     if (patch.dueAt && !Number.isFinite(patch.dueAt.getTime())) throw new Error('Invalid task date');
+    if (!merged.dueAt) merged.reminderEnabled = false;
+    const changed =
+      current.title !== merged.title ||
+      current.dueAt?.getTime() !== merged.dueAt?.getTime() ||
+      current.reminderEnabled !== merged.reminderEnabled ||
+      current.patientId !== merged.patientId;
     tx.update(tasks)
-      .set({ ...defined, title: merged.title, searchText: taskSearchText(merged), ...touch() })
+      .set({
+        ...defined,
+        title: merged.title,
+        reminderEnabled: merged.reminderEnabled,
+        ...(changed ? { reminderRevision: current.reminderRevision + 1 } : {}),
+        searchText: taskSearchText(merged),
+        ...touch(),
+      })
       .where(and(alive, eq(tasks.id, id)))
       .run();
+    return changed;
   });
+  if (reminderChanged) await reconcileTaskReminder(id);
 }
 
 /**
@@ -163,32 +191,36 @@ export async function setTaskStatus(id: string, status: Task['status'], outcome?
       status,
       completedAt: status === 'open' ? null : now,
       outcome: outcome === undefined ? undefined : (outcome?.trim() ?? null),
+      reminderRevision: sql`${tasks.reminderRevision} + 1`,
       ...touch(now),
     })
     .where(and(alive, eq(tasks.id, id)))
     .returning({ id: tasks.id });
   if (!changed.length) throw new Error('Task not found');
   await audit('task.statusChanged', { entityType: 'task', entityId: id, detail: { status } });
+  await reconcileTaskReminder(id);
 }
 
 export async function deleteTask(id: string): Promise<void> {
   const changed = await db
     .update(tasks)
-    .set(softDelete())
+    .set({ ...softDelete(), reminderRevision: sql`${tasks.reminderRevision} + 1` })
     .where(and(alive, eq(tasks.id, id)))
     .returning({ id: tasks.id });
   if (!changed.length) throw new Error('Task not found');
   await audit('task.deleted', { entityType: 'task', entityId: id });
+  await reconcileTaskReminder(id);
 }
 
 export async function restoreTask(id: string): Promise<void> {
   const changed = await db
     .update(tasks)
-    .set({ deletedAt: null, ...touch() })
+    .set({ deletedAt: null, reminderRevision: sql`${tasks.reminderRevision} + 1`, ...touch() })
     .where(and(isNotNull(tasks.deletedAt), eq(tasks.id, id)))
     .returning({ id: tasks.id });
   if (!changed.length) throw new Error('Deleted task not found');
   await audit('task.restored', { entityType: 'task', entityId: id });
+  await reconcileTaskReminder(id);
 }
 
 export async function reindexTasks(): Promise<number> {

@@ -36,7 +36,14 @@ export function patientConsultsQuery(patientId: string) {
     .from(consultations)
     .leftJoin(doctors, and(eq(consultations.doctorId, doctors.id), isNull(doctors.deletedAt)))
     .where(and(alive, eq(consultations.patientId, patientId)))
-    .orderBy(asc(consultations.status), desc(consultations.createdAt));
+    .orderBy(
+      asc(
+        sql`CASE WHEN ${consultations.status} IN ('pending', 'requested') THEN 0 WHEN ${consultations.status} = 'answered' THEN 1 ELSE 2 END`,
+      ),
+      asc(sql`CASE ${consultations.urgency} WHEN 'emergency' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END`),
+      desc(consultations.createdAt),
+      desc(consultations.id),
+    );
 }
 
 /** Everything still owed an answer, across patients — for Today. */

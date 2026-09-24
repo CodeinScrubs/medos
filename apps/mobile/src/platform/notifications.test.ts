@@ -64,7 +64,7 @@ describe('native notification boundary', () => {
     jest.mocked(Native.setNotificationChannelAsync).mockRejectedValueOnce(new Error('temporary failure'));
     await expect(api.scheduleReminder(request())).rejects.toThrow('temporary failure');
     expect(await api.scheduleReminder(request())).toBe('random');
-    expect(Native.setNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(Native.setNotificationChannelAsync).toHaveBeenCalledTimes(4);
   });
 
   it('does not swallow strict cancellation errors', async () => {

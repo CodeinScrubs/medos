@@ -14,7 +14,8 @@ import { parseReminderPayload } from '@/features/followups/logic';
 import { LockGate } from '@/features/lock/lock-gate';
 import { useReminderUpkeep } from '@/features/reminders/use-reminder-upkeep';
 import { StartupGate } from '@/features/startup/startup-gate';
-import { installGlobalErrorLogging } from '@/platform/error-log';
+import { parseTaskReminder } from '@/features/tasks/schedule-logic';
+import { installGlobalErrorLogging, logError } from '@/platform/error-log';
 import { setupNotifications } from '@/platform/notifications';
 import { ThemeProvider, useTheme } from '@/theme';
 
@@ -59,13 +60,18 @@ export default function RootLayout() {
   );
 }
 
-/** Tapping a reminder opens what it is about: a patient's record, or a doctor. */
+/** Tapping a reminder opens its task, patient's record, or doctor. */
 function useNotificationNavigation() {
   const router = useRouter();
   const response = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     const data = response?.notification.request.content.data;
+    const task = parseTaskReminder(data);
+    if (task) {
+      router.push({ pathname: '/task', params: { taskId: task.taskId } });
+      return;
+    }
     const followUp = parseReminderPayload(data);
     if (followUp) {
       router.push({ pathname: '/patient/[id]', params: { id: followUp.patientId } });
@@ -82,7 +88,9 @@ function AppStack() {
   useEffect(() => {
     // The splash screen is taken down by StartupGate, which also covers the
     // case where startup fails and this never renders.
-    void setupNotifications();
+    void setupNotifications().catch((error: unknown) =>
+      logError(error, { source: 'handled', context: 'notification setup' }),
+    );
   }, []);
 
   useNotificationNavigation();
@@ -152,6 +160,10 @@ function AppStack() {
         <Stack.Screen name="diagnostics" options={{ title: 'گزارش خطاها' }} />
         <Stack.Screen name="extensions/index" options={{ title: 'شماره‌های داخلی' }} />
         <Stack.Screen name="extensions/edit" options={modal('داخلی')} />
+        <Stack.Screen name="consult-answer" options={modal('پاسخ کانسالت')} />
+        <Stack.Screen name="shift-history" options={{ title: 'شیفت‌های قبلی' }} />
+        <Stack.Screen name="task" options={{ title: 'کار' }} />
+        <Stack.Screen name="tasks" options={{ title: 'کارها' }} />
         <Stack.Screen name="places/index" options={{ title: 'مکان‌ها' }} />
         <Stack.Screen name="places/edit" options={modal('مکان')} />
       </Stack>

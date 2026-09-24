@@ -2,14 +2,17 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { createCapture } from '@/features/capture/queries';
+import { createConsult } from '@/features/consults/queries';
 import { createPatient } from '@/features/patients/queries';
 import { reindexSearchIfNeeded, SEARCH_INDEX_VERSION } from '@/features/search/reindex';
+import { createTask } from '@/features/tasks/queries';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { audit } from './audit';
 import { tablesOf } from './query-tables';
-import { auditLog, followUps, patients, settings, specialties } from './schema';
+import { auditLog, followUps, patients, settings, specialties, tasks, consultations, captureInbox } from './schema';
 import { contains, matchesSearch } from './search';
 import { runSeeds } from './seed';
 import { SPECIALTY_SEED } from './seed-specialties';
@@ -114,6 +117,24 @@ describe('tablesOf', () => {
 });
 
 describe('reindexSearchIfNeeded', () => {
+  it('repairs stale task, consult and capture indexes on upgrade from version one', async () => {
+    const patientId = await createPatient({ firstName: 'Test', lastName: 'Patient' });
+    await createTask({ title: 'Task needle' });
+    await createConsult({ patientId, reason: 'Consult needle' });
+    await createCapture({ text: 'Capture needle' });
+    t.conn.execSync(
+      "UPDATE tasks SET search_text = 'stale'; UPDATE consultations SET search_text = 'stale'; UPDATE capture_inbox SET search_text = 'stale';",
+    );
+    await t.db.insert(settings).values({ key: 'search.indexVersion', value: '1', updatedAt: new Date() });
+    await reindexSearchIfNeeded();
+    expect(t.db.select().from(tasks).get()!.searchText).toContain('task needle');
+    expect(t.db.select().from(consultations).get()!.searchText).toContain('consult needle');
+    expect(t.db.select().from(captureInbox).get()!.searchText).toContain('capture needle');
+    expect(t.db.select().from(settings).where(eq(settings.key, 'search.indexVersion')).get()!.value).toBe(
+      String(SEARCH_INDEX_VERSION),
+    );
+  });
+
   it('rebuilds stale indexes once, records the version, and audits what changed', async () => {
     await createPatient({ firstName: 'مریم', lastName: 'کریمی' });
     t.conn.execSync("UPDATE patients SET search_text = 'stale'");

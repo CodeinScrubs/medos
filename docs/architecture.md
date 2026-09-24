@@ -112,7 +112,7 @@ Startup and foreground upkeep repair interrupted work and re-arm future reminder
 without permission prompts. Explicit creation/retry can request permission. Cards
 show a short retry action when repair is pending or a future reminder is unavailable.
 The completion dialog retains its input on failed clinical save. Restore attempts
-both follow-up and occasion repair, and reports failed repair as housekeeping rather
+follow-up, task and occasion repair, and reports failed repair as housekeeping rather
 than pretending the already-imported clinical data was untouched.
 
 Trade-off: an old alarm can still fire between a committed edit and successful repair,
@@ -120,8 +120,37 @@ especially while the app is stopped. OS permission, channel settings, battery po
 force-stop and exact delivery time are separate from successful scheduling. Tests
 cover SQL/native failures, overlapping edits, older schemas and component handlers;
 they do not prove Android delivery. Occasion reminder mutations still use their older
-ordering and need a separate review. Task deadlines/reminders remain a separate slice.
+ordering and need a separate review. Task reminders use the same ordering contract below.
 No generic job framework or new dependency is introduced for these two counters.
+
+---
+
+## Task deadlines: persist raw drafts before applying a schedule
+
+Migration `0014` adds optional task reminders and per-task raw schedule drafts. The
+collapsed editor preserves incomplete Jalali date/clock text, the deadline toggle and
+alarm choice. Closing saves the draft; Apply validates it and atomically updates the
+actual deadline/reminder intent while clearing that draft. Turning off the deadline
+also turns off its reminder. An overdue deadline is valid without a new alarm.
+
+Tradeoff: applying a schedule requires one explicit action, even though its raw draft
+autosaves. This avoids silently retaining an old parsed date or moving an alarm while
+the user is halfway through typing. CAS draft revisions reject competing writes;
+an applied-schedule signature rejects stale schedule changes without treating a
+concurrent title autosave as a conflict. Conflict resolution shows the stored value
+before explicitly keeping local input or loading the saved version. Reopening the
+editor reads the current row rather than relying on a potentially stale screen prop.
+
+Tasks use stable native ids `medos.task.<id>`, database-first changes and serialized
+desired/applied revision repair. Completion, cancellation, deletion and patient
+deletion cancel the reminder; reopening/restoration re-arms eligible future work.
+Permission refusal does not discard the task. Startup, foreground and backup restore
+repair task reminders alongside follow-ups. Invalid/unapplied raw dates never change
+the OS alarm. Native delivery and interrupted restore still require device evidence.
+
+Patient tab changes, including URL changes, flush mounted autosave fields before
+unmounting the old tab. A failed flush retains the editor. Updating state during
+render solely because a route parameter changed bypasses this safeguard.
 
 ---
 

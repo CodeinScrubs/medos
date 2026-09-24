@@ -21,6 +21,12 @@ const STATUS: Record<Consultation['status'], { label: string; tone: 'warning' | 
   cancelled: { label: 'لغو شد', tone: 'neutral' },
 };
 
+const URGENCY: Record<Consultation['urgency'], { label: string; tone: 'danger' | 'warning' | 'neutral' }> = {
+  emergency: { label: 'اورژانسی', tone: 'danger' },
+  urgent: { label: 'فوری', tone: 'warning' },
+  routine: { label: 'روتین', tone: 'neutral' },
+};
+
 /**
  * Consults for one patient: what was asked, and what is still owed.
  *
@@ -59,7 +65,12 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
                     {consult.reason}
                   </Text>
                 </Column>
-                <Badge label={STATUS[consult.status].label} tone={STATUS[consult.status].tone} />
+                <Row gap="xs" align="center">
+                  {consult.urgency !== 'routine' ? (
+                    <Badge label={URGENCY[consult.urgency].label} tone={URGENCY[consult.urgency].tone} />
+                  ) : null}
+                  <Badge label={STATUS[consult.status].label} tone={STATUS[consult.status].tone} />
+                </Row>
               </Row>
 
               {consult.response ? (

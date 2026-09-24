@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 export const CHANNELS = {
   followUps: 'follow-ups.v2',
   occasions: 'occasions.v2',
+  tasks: 'tasks.v1',
 } as const;
 
 /** Channels from earlier builds, removed so they stop appearing in system settings. */
@@ -49,6 +50,11 @@ export function setupNotifications(): Promise<void> {
       name: 'مناسبت‌ها',
       description: 'یادآور تولد و مناسبت همکاران',
       importance: Notifications.AndroidImportance.DEFAULT,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+    });
+    await Notifications.setNotificationChannelAsync(CHANNELS.tasks, {
+      name: 'کارها',
+      importance: Notifications.AndroidImportance.HIGH,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
     });
     for (const id of RETIRED_CHANNELS) {

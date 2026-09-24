@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
 import { repairFollowUpReminders } from '@/features/followups/reminder-queries';
+import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { logError } from '@/platform/error-log';
 
 /**
@@ -22,8 +23,12 @@ export function useReminderUpkeep(): void {
     const repair = () => {
       if (running) return;
       running = true;
-      void repairFollowUpReminders()
-        .catch((e: unknown) => logError(e, { source: 'handled', context: 'follow-up upkeep' }))
+      void Promise.allSettled([repairFollowUpReminders(), repairTaskReminders()])
+        .then((results) => {
+          for (const result of results)
+            if (result.status === 'rejected')
+              logError(result.reason, { source: 'handled', context: 'reminder upkeep' });
+        })
         .finally(() => {
           running = false;
         });

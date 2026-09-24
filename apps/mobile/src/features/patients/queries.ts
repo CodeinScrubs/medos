@@ -14,6 +14,7 @@ import {
 import { contains, matchesSearch } from '@/db/search';
 import { activeEncounter, reconcilePatientStatus, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
+import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
 
@@ -184,6 +185,7 @@ export async function setPatientStarred(id: string, starred: boolean): Promise<v
 export async function deletePatient(id: string): Promise<void> {
   await db.update(patients).set(softDelete()).where(eq(patients.id, id));
   await cancelPatientReminders(id);
+  await repairTaskReminders({ patientId: id });
   await audit('patient.deleted', { entityType: 'patient', entityId: id });
 }
 
@@ -196,6 +198,7 @@ export async function restorePatient(id: string): Promise<void> {
   // no longer match its episodes — and only the episodes can say.
   await reconcilePatientStatus(id);
   await rescheduleReminders({ patientId: id });
+  await repairTaskReminders({ patientId: id });
   await audit('patient.restored', { entityType: 'patient', entityId: id });
 }
 

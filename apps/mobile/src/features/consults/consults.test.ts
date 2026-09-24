@@ -38,6 +38,30 @@ describe('a consult', () => {
     ]);
   });
 
+  it('orders patient consults by open status and urgency before answered ones', async () => {
+    const routineId = await createConsult({ patientId, reason: 'Routine', urgency: 'routine' });
+    const emergencyId = await createConsult({ patientId, reason: 'Emergency', urgency: 'emergency' });
+    const requestedId = await createConsult({
+      patientId,
+      reason: 'Requested emergency',
+      urgency: 'emergency',
+      status: 'requested',
+    });
+    const urgentId = await createConsult({
+      patientId,
+      reason: 'Requested urgent',
+      urgency: 'urgent',
+      status: 'requested',
+    });
+    const answeredId = await createConsult({ patientId, reason: 'Answered', urgency: 'emergency' });
+    const revision = await saveConsultAnswerDraft(answeredId, { response: 'OK', instruction: '' }, 0);
+    await commitConsultAnswerDraft(answeredId, revision);
+
+    const rows = await patientConsultsQuery(patientId);
+    expect(new Set(rows.slice(0, 2).map(({ consult }) => consult.id))).toEqual(new Set([emergencyId, requestedId]));
+    expect(rows.slice(2).map(({ consult }) => consult.id)).toEqual([urgentId, routineId, answeredId]);
+  });
+
   it('starts owed, and attaches itself to the open admission', async () => {
     const encounterId = await openEncounter({ patientId, kind: 'admission' });
     const id = await createConsult({ patientId, specialty: 'قلب', reason: 'افت فشار بعد از دیالیز' });

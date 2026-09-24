@@ -1,5 +1,6 @@
 import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
 import { repairFollowUpReminders } from '@/features/followups/reminder-queries';
+import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { cancelAllReminders } from '@/platform/notifications';
 
 /**
@@ -10,18 +11,20 @@ import { cancelAllReminders } from '@/platform/notifications';
  * phone that made it, so everything is cancelled and scheduled again.
  *
  * **Any feature that schedules a reminder must be rescheduled here.** Today
- * that is follow-ups and the occasions (birthdays) of the doctors directory.
+ * that is tasks, follow-ups and the occasions (birthdays) of the doctors directory.
  * Miss one and a restore leaves the phone quietly without those reminders.
  */
-export async function rescheduleAllReminders(): Promise<{ followUps: number; occasions: number }> {
+export async function rescheduleAllReminders(): Promise<{ followUps: number; occasions: number; tasks: number }> {
   await cancelAllReminders();
-  // Try both kinds even when one fails; the restore reports a housekeeping warning.
+  // Try every kind even when one fails; restore reports a housekeeping warning.
   const results = await Promise.allSettled([
     repairFollowUpReminders({ reportFailures: true }),
     rescheduleOccasionReminders(),
+    repairTaskReminders({ reportFailures: true }),
   ]);
-  const [followUps, occasions] = results;
+  const [followUps, occasions, tasks] = results;
   if (followUps.status === 'rejected') throw followUps.reason;
   if (occasions.status === 'rejected') throw occasions.reason;
-  return { followUps: followUps.value, occasions: occasions.value };
+  if (tasks.status === 'rejected') throw tasks.reason;
+  return { followUps: followUps.value, occasions: occasions.value, tasks: tasks.value };
 }

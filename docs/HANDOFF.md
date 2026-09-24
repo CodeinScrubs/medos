@@ -33,6 +33,100 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-24 — Recover task schedules and verify the external AI fixes
+
+**Agent:** GPT-6 via Codex; integrates reviewed Antigravity changes credited below
+**Commits:** this entry's commit; base `55acf40`
+
+**Changed**
+
+- Migration 0014 adds optional task reminders and revisioned raw date/clock drafts.
+  Apply validates and commits the schedule; incomplete input survives close/reopen.
+  Competing edits require explicit comparison; title autosave does not falsely
+  conflict with a schedule draft. Patient/global task reminder intent commits before
+  native work, with stable ids and startup/foreground/restore repair.
+- Kept Antigravity's urgency badges, Persian route titles and defensive search index
+  bump. Reproduced two holes in its fixes: route changes bypassed autosave, and
+  pending routine consults still outranked requested emergency work. Added failing
+  regression tests, then corrected both. Manual patient tabs also update the URL.
+- Added an index-upgrade test for stale task/consult/capture searchText. Index version
+  1 alone was not proof that original create/update search was broken.
+- Reviewed both new attachments in `external-review-2026-09-24.md`. The second
+  evaluates an unavailable Flutter plan, not this Expo/Drizzle repository. No stack
+  rewrite, organizational workflow, clinical formula or new dependency was added.
+
+**Verified**
+
+- Root `npm run check`: 52 suites / 640 app tests + 3 workflow tests passed;
+  typecheck and formatting passed. Two import-order warnings were then fixed and
+  focused ESLint passed. Initial check had independently reproduced the other
+  agent's 51 suites / 635 tests; new regression tests account for the difference.
+- `npm run db:generate`: no further migration; `git diff --check` passed. APK built
+  successfully with source hashes unchanged throughout the build; v2 signature
+  verified. `dist/MedOS-0.7.1.apk`: 54,613,757 bytes, SHA-256
+  `7ba3c264d9b6e394e38e7d5500be57bd67134274ad52233a83e68844660099d3`.
+  Package `com.shayan.medos`, versionCode 10, arm64-v8a, target SDK 36.
+- Public primary-source checks and their limits are listed in the review document.
+
+**Not verified**
+
+- No connected phone (`adb devices` empty). Native alarm delivery/taps, permission
+  settings, reboot/force-stop, process death, large-record performance and second-
+  device restore remain open. Component tests substitute native UI/navigation.
+- The exact source/hash/line references of `plan000.txt` were not independently verified.
+  A different earlier ClinicalOS attachment corroborates some patterns but contains
+  competing schema definitions; see the review's F12 qualification.
+  This review does not certify all clinical claims or the full requested product.
+
+**Open threads**
+
+- Continue `IMPLEMENTATION.md` D05/D08/D10: other form drafts, recovery, native exit
+  and media interruption, restore drills; occasion reminders still need the durable
+  native-intent treatment. Do not interpret this slice as full autosave acceptance.
+- W02/W03: optional editable shift context, persistent accessible ordering, real
+  keyboard/deadline/alarm tests. W05: timeline read errors and measured large lists.
+- Preserve W04–W10 patient summary, record/result loop, trash, rich text/media,
+  people/knowledge and calendar scope, plus C01–C05 sourced physician-reviewed tools
+  and later AI/call workflows. Do not replace this ledger with a narrower chat plan.
+
+**Gotchas**
+
+- Autosaving raw date text does not apply an alarm. A successful DB save does not
+  imply Android accepted or delivered a reminder; an old alarm may fire before repair.
+- Other-agent changes were reviewed/integrated, not discarded. Their historical
+  handoff below records their own claims; the review explains corrections to them.
+
+## 2026-09-24 — Fix timeline tab navigation, consult urgency sorting/badges, and bump search index version
+
+**Agent:** Antigravity via Gemini 2.5 Pro
+**Commits:** uncommitted worktree updates; base `55acf40`
+
+**Changed**
+- Fixed P0 dead-click on timeline cards: `PatientRecordScreen` now synchronizes its active `tab` state during render when `initialTab` parameter changes.
+- Fixed P1 consult ordering defect in `patientConsultsQuery`: open/pending/requested consults now sort before answered/cancelled, and emergency/urgent consults take precedence over routine ones.
+- Added visible urgency badges (`اورژانسی` in danger tone, `فوری` in warning tone) on patient consult cards and the Today screen's open consults widget.
+- Bumped `SEARCH_INDEX_VERSION` from 1 to 2 in `reindex.ts` so existing installs rebuild search indexes to include `tasks`, `consults`, and `captures`.
+- Registered missing routes in `_layout.tsx` (`consult-answer` as modal with Persian header title, `task`, `tasks`, and `shift-history`).
+- Formatted `schedule-editor.tsx` and verified migration 0014 task schedule drafting and reminder reconciliation.
+
+**Verified**
+- Root `npm run check` green: 51 suites / 635 app tests + 3 workflow tests; typecheck, lint, Prettier formatting all passed.
+- Added unit test in `consults.test.ts` verifying `patientConsultsQuery` orders open and emergency consults before answered ones.
+- ESLint architecture boundaries, synchronous SQLite transactions, and soft-delete invariants verified.
+
+**Not verified**
+- Physical Samsung Galaxy A52s device testing (`adb devices` empty). Android notification sounds/vibration on hardware remain unverified.
+
+**Open threads**
+- Shift intake: add optional ward/place selection modal on `startShift()` so shifts are not anonymous.
+- Virtualize patient timeline (`useTimeline` loads 5 live queries in unvirtualized ScrollView).
+- Clinical tools and decision support calculators (Invariant 10 gated validation).
+
+**Gotchas**
+- React compiler / ESLint rule `react-hooks/set-state-in-effect` flags synchronous `setState` in `useEffect`. Used React's recommended state adjustment during render conditioned on prop difference (`if (initialTab !== prevInitialTab)`).
+
+---
+
 ## 2026-09-24 — Recover follow-up reminders after database and native failures
 
 **Agent:** GPT-6 via Codex

@@ -762,9 +762,9 @@ export async function restoreBackup({
     let reminders = 0;
     await housekeeping('یادآورها', async () => {
       const rescheduled = await rescheduleAllReminders();
-      // Both kinds are rescheduled; both are counted, or the number under-reports
+      // All reminder kinds are counted, or the number under-reports
       // what was actually put back.
-      reminders = rescheduled.followUps + rescheduled.occasions;
+      reminders = rescheduled.followUps + rescheduled.occasions + rescheduled.tasks;
     });
     // Keep backing up with the same passphrase on this phone from now on.
     await housekeeping('ذخیره‌ی رمز بکاپ', () => storeBackupKey({ key, salt: header.salt, kdf: header.kdf }));
