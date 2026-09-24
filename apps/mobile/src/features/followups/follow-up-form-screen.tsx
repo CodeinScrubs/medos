@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { alertError } from '@/components/feedback';
@@ -43,14 +43,17 @@ export function FollowUpFormScreen() {
   const [channel, setChannel] = useState<FollowUp['channel']>('call');
   const [priority, setPriority] = useState<FollowUp['priority']>('normal');
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const dateValidation = useDateValidation();
 
   async function save() {
+    if (savingRef.current) return;
     if (!dateValidation.check()) return;
     if (!reason.trim()) {
       Alert.alert('دلیل پیگیری را بنویسید');
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     try {
       await createFollowUp({ patientId, reason, dueAt, channel, priority });
@@ -58,6 +61,7 @@ export function FollowUpFormScreen() {
     } catch (e) {
       alertError('ذخیره نشد', e);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -94,7 +98,7 @@ export function FollowUpFormScreen() {
         <Segmented label="اهمیت" options={PRIORITY_OPTIONS} value={priority} onChange={setPriority} />
 
         <Text variant="tiny" color="textFaint">
-          در زمان تعیین‌شده گوشی یادآوری می‌کند. اگر اجازه‌ی اعلان داده نشود، پیگیری فقط در صفحه‌ی «امروز» دیده می‌شود.
+          برای دریافت یادآور، اجازهٔ اعلان لازم است. پیگیری در صفحهٔ «امروز» هم نمایش داده می‌شود.
         </Text>
 
         <Button
@@ -105,7 +109,7 @@ export function FollowUpFormScreen() {
           full
           style={{ marginTop: spacing.sm }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="انصراف" variant="ghost" onPress={() => router.back()} disabled={saving} full haptic={false} />
       </Column>
     </Screen>
   );

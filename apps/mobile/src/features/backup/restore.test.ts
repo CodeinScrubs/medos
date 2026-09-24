@@ -5,6 +5,7 @@ import {
   backupRuns,
   consultations,
   consultRequestDrafts,
+  followUps,
   imagingStudies,
   notes,
   patients,
@@ -67,6 +68,55 @@ describe('importTables', () => {
   beforeEach(async () => {
     live = await createTestDatabase();
     backup = await createTestDatabase();
+  });
+
+  it('restores legacy follow-ups with SQL defaults that request reminder reconciliation', async () => {
+    const patientId = await addPatient(backup, 'Legacy');
+    await backup.db.insert(followUps).values({
+      id: 'legacy-reminder',
+      ...stamps(),
+      patientId,
+      dueAt: new Date('2030-01-02T12:00:00Z'),
+      reason: 'Review',
+      notificationId: 'previous-phone-id',
+    });
+    backup.conn.execSync(
+      'ALTER TABLE follow_ups DROP COLUMN reminder_revision; ALTER TABLE follow_ups DROP COLUMN reminder_applied_revision;',
+    );
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(followUps).get()).toMatchObject({
+      notificationId: 'previous-phone-id',
+      reminderRevision: 0,
+      reminderAppliedRevision: -1,
+      reason: 'Review',
+    });
+  });
+
+  it('preserves an interrupted reminder generation in a current backup', async () => {
+    const patientId = await addPatient(backup, 'Current');
+    await backup.db.insert(followUps).values({
+      id: 'pending-repair',
+      ...stamps(),
+      patientId,
+      dueAt: new Date('2030-01-02T12:00:00Z'),
+      reason: 'Review',
+      reminderRevision: 8,
+      reminderAppliedRevision: -1,
+    });
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(followUps).get()).toMatchObject({ reminderRevision: 8, reminderAppliedRevision: -1 });
   });
 
   it('restores unsubmitted consult questions separately and accepts backups predating them', async () => {

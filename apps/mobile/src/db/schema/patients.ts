@@ -513,6 +513,9 @@ export const followUps = sqliteTable(
     completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
     /** expo-notifications id, so the reminder can be cancelled or rescheduled. */
     notificationId: text('notification_id'),
+    /** Desired reminder generation and the last generation confirmed with Android. */
+    reminderRevision: integer('reminder_revision').notNull().default(0),
+    reminderAppliedRevision: integer('reminder_applied_revision').notNull().default(-1),
   },
   (t) => [index('follow_ups_due_idx').on(t.status, t.dueAt), index('follow_ups_patient_idx').on(t.patientId)],
 );

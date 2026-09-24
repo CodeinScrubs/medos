@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
+import { alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { Badge, Card, Column, Row, Text } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import type { FollowUp, Patient } from '@/db/schema';
 import { formatJalaliWithWeekday, formatRelative, formatTime } from '@/lib/jalali';
 import { normalizePhone } from '@/lib/persian';
@@ -14,6 +16,7 @@ import { useTheme } from '@/theme';
 import { FOLLOWUP_CHANNEL_LABELS } from './labels';
 import { postponedDueDate, urgencyOf } from './logic';
 import { completeFollowUp, deleteFollowUp, setFollowUpStatus, updateFollowUp } from './queries';
+import { reconcileFollowUpReminder } from './reminder-queries';
 
 const CHANNEL_ICONS: Record<FollowUp['channel'], keyof typeof Ionicons.glyphMap> = {
   call: 'call-outline',
@@ -43,13 +46,29 @@ export function FollowUpCard({
   const router = useRouter();
   const { colors, spacing } = useTheme();
   const [prompting, setPrompting] = useState(false);
+  const busy = useRef(false);
+  const now = new Date(useNow());
 
   const pending = followUp.status === 'pending';
-  const urgency = urgencyOf(followUp);
+  const urgency = urgencyOf(followUp, now);
+  const reminderDirty = followUp.reminderRevision !== followUp.reminderAppliedRevision;
+  const reminderUnavailable = pending && followUp.dueAt > now && !followUp.notificationId;
   const overdue = urgency === 'overdue';
   const dueToday = urgency === 'today';
 
   const tone = overdue ? 'danger' : dueToday ? 'warning' : 'neutral';
+
+  async function perform(action: () => Promise<unknown>) {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await action();
+    } catch (error) {
+      alertError('عملیات انجام نشد', error);
+    } finally {
+      busy.current = false;
+    }
+  }
 
   function postpone() {
     Alert.alert(
@@ -58,15 +77,18 @@ export function FollowUpCard({
       [
         {
           text: 'فردا',
-          onPress: () => void updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 1) }),
+          onPress: () =>
+            void perform(() => updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 1) })),
         },
         {
           text: '۳ روز',
-          onPress: () => void updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 3) }),
+          onPress: () =>
+            void perform(() => updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 3) })),
         },
         {
           text: '۱ هفته',
-          onPress: () => void updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 7) }),
+          onPress: () =>
+            void perform(() => updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 7) })),
         },
       ],
       { cancelable: true },
@@ -80,12 +102,12 @@ export function FollowUpCard({
       [
         {
           text: pending ? 'انجام نشد' : 'دوباره فعال شود',
-          onPress: () => void setFollowUpStatus(followUp.id, pending ? 'missed' : 'pending'),
+          onPress: () => void perform(() => setFollowUpStatus(followUp.id, pending ? 'missed' : 'pending')),
         },
         {
           text: 'حذف',
           style: 'destructive',
-          onPress: () => void deleteFollowUp(followUp.id),
+          onPress: () => void perform(() => deleteFollowUp(followUp.id)),
         },
         { text: 'انصراف', style: 'cancel' },
       ],
@@ -126,7 +148,9 @@ export function FollowUpCard({
 
             <Row gap="xs" wrap>
               <Badge
-                label={pending ? formatRelative(followUp.dueAt) : followUp.status === 'done' ? 'انجام شد' : 'انجام نشد'}
+                label={
+                  pending ? formatRelative(followUp.dueAt, now) : followUp.status === 'done' ? 'انجام شد' : 'انجام نشد'
+                }
                 tone={pending ? tone : followUp.status === 'done' ? 'success' : 'neutral'}
                 icon={overdue ? 'alert-circle' : undefined}
               />
@@ -143,12 +167,29 @@ export function FollowUpCard({
               </Text>
             ) : null}
 
+            {(reminderDirty || reminderUnavailable) && (
+              <Row gap="sm" wrap>
+                <Text variant="caption" color="textMuted">
+                  {reminderDirty ? 'اعلان نیاز به هماهنگی دارد' : 'اعلان فعال نیست'}
+                </Text>
+                <Action
+                  icon="refresh-outline"
+                  label="تلاش مجدد"
+                  onPress={() => void perform(() => reconcileFollowUpReminder(followUp.id, true))}
+                />
+              </Row>
+            )}
+
             {pending && (
               <Row gap="sm" style={{ marginTop: spacing.xs }}>
                 <Action icon="checkmark" label="انجام شد" tone="success" onPress={() => setPrompting(true)} />
                 <Action icon="time-outline" label="تعویق" onPress={postpone} />
                 {phone && followUp.channel === 'call' ? (
-                  <Action icon="call" label="تماس" onPress={() => void Linking.openURL(`tel:${phone}`)} />
+                  <Action
+                    icon="call"
+                    label="تماس"
+                    onPress={() => void perform(() => Linking.openURL(`tel:${phone}`))}
+                  />
                 ) : null}
               </Row>
             )}
@@ -161,11 +202,15 @@ export function FollowUpCard({
         title="پیگیری انجام شد"
         message="در یک خط بنویسید چه شد (اختیاری)."
         placeholder="مثلاً حالش خوب است، آزمایش نرمال"
-        onCancel={() => setPrompting(false)}
+        onCancel={() => {
+          if (!busy.current) setPrompting(false);
+        }}
         onSubmit={(text) => {
-          setPrompting(false);
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          void completeFollowUp(followUp.id, text || null);
+          void perform(async () => {
+            await completeFollowUp(followUp.id, text || null);
+            setPrompting(false);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+          });
         }}
       />
     </>

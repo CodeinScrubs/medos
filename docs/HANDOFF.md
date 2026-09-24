@@ -33,6 +33,66 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-24 — Recover follow-up reminders after database and native failures
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; base `3be4435`
+
+**Changed**
+
+- Reproduced the native-first bug: failed deadline update retained the old database
+  date while replacing its alarm. Clinical create/update/complete/delete now commits
+  before native scheduling/cancellation. Failed native work preserves the saved record.
+- Migration `0013` adds desired/applied reminder revisions with SQL defaults. Stable
+  native ids make retries replace the same request. Per-record serialization and
+  fresh intent checks handle concurrent edits, deletion and same-revision replacement.
+- Startup/foreground repair does not request notification permission. Cards offer a
+  compact retry for unavailable reminders; completion retains typed outcome on failed
+  save. Sensitive mutations are audited. Restore reports repair failures separately
+  from the already-committed clinical import and still attempts both reminder kinds.
+- Channel setup can recover after transient failure. No new dependency or subagent.
+
+**Verified**
+
+- Root `npm run check`: 49 suites / 615 app tests + 3 workflow tests; typecheck, lint
+  and formatting passed. SQL failure injection covers insert/update/completion/delete and failed native
+  acknowledgement. Tests cover denied permission, legacy ids, overlapping operations,
+  old-backup defaults, real wrapper arguments, dialog input retention and foreground retry.
+- `npm run db:generate`: no further schema changes. `git diff --check` passed.
+- Inspected installed Expo Android scheduling/store/PendingIntent code for id replacement.
+- Signed APK built with final code frozen during the build; apksigner v2 verification
+  passed. `dist/MedOS-0.7.1.apk`: 54,585,857 bytes; SHA-256
+  `f45cdd77337b20af57f40067fc69154615d46188a0f151da78dfe588b2ff30e1`.
+  Package `com.shayan.medos`, versionCode 10, arm64-v8a. APK size does not establish performance.
+
+**Not verified**
+
+- No connected device (`adb devices` empty). Native alarm delivery, channel/battery
+  settings, reboot/force-stop, process death, performance and second-device restore
+  remain unverified. Native APIs/navigation/widgets are replaced in automated tests.
+- A committed change and its alarm cannot be atomic: an older alarm may still fire
+  before repair succeeds. Occasion mutations retain the older side-effect ordering.
+
+**Open threads**
+
+- W03: editable task deadlines and patient/global task reminders; validate delivery
+  on Android separately. Review occasion reminder failure ordering without adding a
+  generic scheduler framework prematurely.
+- D05/D08: other edit gates/concurrent editors, raw invalid date recovery, interrupted
+  media and native exit/process-death acceptance. Follow-up entry/outcome drafts are
+  not yet process-death recovery; the new dialog test covers failed-save retention.
+- W02 persistent accessible reorder; full clinical record/correction flows, patient
+  summary, sourced physician-reviewed tools, AI and the remaining execution ledger.
+
+**Gotchas**
+
+- Reminder mocks must replace by the caller's stable id. Native-wrapper tests explicitly
+  select Android; Jest otherwise selects iOS and skips channel setup.
+- Follow-up restore fixtures disable statement FKs around `importTables`, matching
+  the engine; the importer validates the complete restored dataset before committing.
+
+---
+
 ## 2026-09-24 — Preserve loaded editors when database refresh fails
 
 **Agent:** GPT-6 via Codex

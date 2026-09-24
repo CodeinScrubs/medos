@@ -83,6 +83,48 @@ Iranian IPs, which would make the app depend on a VPN to open a patient chart on
 
 ---
 
+## Follow-up reminder intent commits before Android side effects
+
+SQLite and Android's alarm scheduler cannot share a transaction. Cancelling the old
+alarm and scheduling the new one before writing the follow-up left the wrong alarm
+active when the database write failed. The regression test reproduces that ordering.
+Clinical create/update/complete/delete now commits first, then reconciles the alarm.
+Native failures do not turn a successful clinical save into a reported save failure.
+
+Migration `0013` adds `reminderRevision` (SQL default 0) and
+`reminderAppliedRevision` (SQL default -1). Clinical mutations increment the desired
+revision in their synchronous transaction. A worker marks repair pending before
+touching Android and acknowledges only after native success and a fresh read of the
+same intent. It compares both the revision and request content: restoring an older
+database can replace content without increasing its revision. Jobs for one follow-up
+are serialized; a bounded retry loop observes newer edits rather than acknowledging
+an earlier alarm against them. Pending markers survive restart and old-backup import.
+
+The native identifier is deterministic (`medos.follow-up.<id>`), so retry after a
+successful schedule but failed database acknowledgement replaces one request. Legacy
+random ids are cancelled first. This behavior was checked in the installed Expo
+Android implementation (`ExpoSchedulingDelegate`, `SharedPreferencesNotificationsStore`
+and `NotificationsService.createNotificationTrigger`); native delivery still needs
+device acceptance. A strict cancel API exposes failures; legacy best-effort callers
+are not evidence of confirmed cancellation.
+
+Startup and foreground upkeep repair interrupted work and re-arm future reminders
+without permission prompts. Explicit creation/retry can request permission. Cards
+show a short retry action when repair is pending or a future reminder is unavailable.
+The completion dialog retains its input on failed clinical save. Restore attempts
+both follow-up and occasion repair, and reports failed repair as housekeeping rather
+than pretending the already-imported clinical data was untouched.
+
+Trade-off: an old alarm can still fire between a committed edit and successful repair,
+especially while the app is stopped. OS permission, channel settings, battery policy,
+force-stop and exact delivery time are separate from successful scheduling. Tests
+cover SQL/native failures, overlapping edits, older schemas and component handlers;
+they do not prove Android delivery. Occasion reminder mutations still use their older
+ordering and need a separate review. Task deadlines/reminders remain a separate slice.
+No generic job framework or new dependency is introduced for these two counters.
+
+---
+
 ## UUID primary keys, soft deletes everywhere
 
 Autoincrement integers make offline multi-device merges require renumbering. UUIDs cost

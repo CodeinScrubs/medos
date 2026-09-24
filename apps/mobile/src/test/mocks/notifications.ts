@@ -17,6 +17,8 @@ export type ScheduledReminder = {
   body?: string;
   channelId: ChannelId;
   data?: Record<string, unknown>;
+  identifier?: string;
+  askPermission?: boolean;
 };
 
 export const scheduled = new Map<string, ScheduledReminder>();
@@ -39,12 +41,16 @@ export async function ensureNotificationPermission(): Promise<boolean> {
 export async function scheduleReminder(reminder: ScheduledReminder): Promise<string | null> {
   if (reminder.at.getTime() <= Date.now() || !permission.granted) return null;
   nextId += 1;
-  const id = `notification-${nextId}`;
+  const id = reminder.identifier ?? `notification-${nextId}`;
   scheduled.set(id, reminder);
   return id;
 }
 
 export async function cancelReminder(id: string | null | undefined): Promise<void> {
+  if (id) scheduled.delete(id);
+}
+
+export async function cancelReminderRequired(id: string | null | undefined): Promise<void> {
   if (id) scheduled.delete(id);
 }
 

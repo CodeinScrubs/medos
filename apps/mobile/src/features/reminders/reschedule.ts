@@ -1,5 +1,5 @@
 import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
-import { rescheduleReminders } from '@/features/followups/queries';
+import { repairFollowUpReminders } from '@/features/followups/reminder-queries';
 import { cancelAllReminders } from '@/platform/notifications';
 
 /**
@@ -15,5 +15,13 @@ import { cancelAllReminders } from '@/platform/notifications';
  */
 export async function rescheduleAllReminders(): Promise<{ followUps: number; occasions: number }> {
   await cancelAllReminders();
-  return { followUps: await rescheduleReminders(), occasions: await rescheduleOccasionReminders() };
+  // Try both kinds even when one fails; the restore reports a housekeeping warning.
+  const results = await Promise.allSettled([
+    repairFollowUpReminders({ reportFailures: true }),
+    rescheduleOccasionReminders(),
+  ]);
+  const [followUps, occasions] = results;
+  if (followUps.status === 'rejected') throw followUps.reason;
+  if (occasions.status === 'rejected') throw occasions.reason;
+  return { followUps: followUps.value, occasions: occasions.value };
 }

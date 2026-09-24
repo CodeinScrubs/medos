@@ -54,15 +54,18 @@ export function setupNotifications(): Promise<void> {
     for (const id of RETIRED_CHANNELS) {
       await Notifications.deleteNotificationChannelAsync(id).catch(() => undefined);
     }
-  })();
+  })().catch((error: unknown) => {
+    setup = null;
+    throw error;
+  });
   return setup;
 }
 
 /** Ask for permission if needed. Returns whether reminders can be shown. */
-export async function ensureNotificationPermission(): Promise<boolean> {
+export async function ensureNotificationPermission(ask = true): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
-  if (!current.canAskAgain) return false;
+  if (!ask || !current.canAskAgain) return false;
   const next = await Notifications.requestPermissionsAsync();
   return next.granted;
 }
@@ -78,18 +81,26 @@ export async function scheduleReminder({
   body,
   channelId,
   data,
+  identifier,
+  askPermission = true,
 }: {
   at: Date;
   title: string;
   body?: string;
   channelId: ChannelId;
   data?: Record<string, unknown>;
+  /** A stable id makes retry after interruption replace the same Android request. */
+  identifier?: string;
+  /** Background repair must not unexpectedly open a permission prompt. */
+  askPermission?: boolean;
 }): Promise<string | null> {
+  if (!Number.isFinite(at.getTime())) throw new Error('Invalid reminder date');
   if (at.getTime() <= Date.now()) return null;
   await setupNotifications();
-  if (!(await ensureNotificationPermission())) return null;
+  if (!(await ensureNotificationPermission(askPermission))) return null;
 
   return Notifications.scheduleNotificationAsync({
+    identifier,
     content: { title, body: body ?? null, data: data ?? {} },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -111,9 +122,14 @@ export async function cancelAllReminders(): Promise<void> {
 export async function cancelReminder(id: string | null | undefined): Promise<void> {
   if (!id) return;
   try {
-    await Notifications.cancelScheduledNotificationAsync(id);
+    await cancelReminderRequired(id);
   } catch {
-    // Already fired, already cancelled, or scheduled on another phone before a
-    // restore; in every case the goal state — no such reminder — holds.
+    // Best effort for legacy callers. A rejected native call is NOT evidence
+    // that cancellation succeeded; durable reconciliation uses the strict API.
   }
+}
+
+/** Reconciliation must observe cancellation failure rather than claiming success. */
+export async function cancelReminderRequired(id: string | null | undefined): Promise<void> {
+  if (id) await Notifications.cancelScheduledNotificationAsync(id);
 }
