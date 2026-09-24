@@ -579,6 +579,32 @@ export const consultations = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Unsubmitted consult questions                                             */
+/* -------------------------------------------------------------------------- */
+
+export const consultRequestDrafts = sqliteTable(
+  'consult_request_drafts',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id),
+    /** Episode at first capture, including null; never retarget a recovered draft. */
+    encounterId: text('encounter_id').references(() => encounters.id),
+    specialty: text('specialty').notNull().default(''),
+    reason: text('reason').notNull().default(''),
+    revision: integer('revision').notNull().default(0),
+    consultId: text('consult_id').references(() => consultations.id),
+  },
+  (t) => [
+    uniqueIndex('consult_request_drafts_open_patient_idx')
+      .on(t.patientId)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type ConsultRequestDraft = typeof consultRequestDrafts.$inferSelect;
+
+/* -------------------------------------------------------------------------- */
 /*  Shifts: the unit of the owner's working day                                 */
 /* -------------------------------------------------------------------------- */
 

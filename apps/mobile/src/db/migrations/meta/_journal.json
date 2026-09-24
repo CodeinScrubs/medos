@@ -85,6 +85,13 @@
       "when": 1790209017131,
       "tag": "0011_stale_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790209911942,
+      "tag": "0012_cynical_lady_vermin",
+      "breakpoints": true
     }
   ]
 }

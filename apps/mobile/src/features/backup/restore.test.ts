@@ -4,6 +4,7 @@ import {
   auditLog,
   backupRuns,
   consultations,
+  consultRequestDrafts,
   imagingStudies,
   notes,
   patients,
@@ -66,6 +67,34 @@ describe('importTables', () => {
   beforeEach(async () => {
     live = await createTestDatabase();
     backup = await createTestDatabase();
+  });
+
+  it('restores unsubmitted consult questions separately and accepts backups predating them', async () => {
+    // Match engine.importDatabase: replacement disables statement-level FKs,
+    // then importTables checks the entire result before committing.
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      const patientId = await addPatient(backup, 'Request');
+      await backup.db
+        .insert(consultRequestDrafts)
+        .values({ id: 'request', ...stamps(), patientId, specialty: 'Service', reason: 'Question', revision: 4 });
+      attachAsBackup(live, backup);
+      importTables(live.conn);
+      expect(live.db.select().from(consultRequestDrafts).get()).toMatchObject({
+        specialty: 'Service',
+        reason: 'Question',
+        revision: 4,
+        consultId: null,
+      });
+      expect(live.db.select().from(consultations).all()).toHaveLength(0);
+      live.conn.execSync('DETACH DATABASE restore_src');
+      backup.conn.execSync('DROP TABLE consult_request_drafts');
+      attachAsBackup(live, backup);
+      importTables(live.conn);
+      expect(live.db.select().from(consultRequestDrafts).all()).toHaveLength(0);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
   });
 
   it('restores quick-add task drafts without turning them into tasks', async () => {

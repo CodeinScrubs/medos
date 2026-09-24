@@ -71,6 +71,8 @@ const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
  * whole result is checked before the transaction commits: a backup with a row
  * pointing at something that is not there rolls back instead of landing as a
  * broken record.
+ * The caller must disable `foreign_keys` before the transaction and restore it
+ * afterwards (see engine.importDatabase); SQLite ignores that pragma inside a transaction.
  *
  * Throws, leaving `main` untouched, if any table cannot be copied.
  */

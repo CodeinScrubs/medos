@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { consultations, doctors, patients, type Consultation } from '@/db/schema';
+import { consultations, doctors, encounters, patients, type Consultation } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText } from '@/lib/persian';
@@ -76,12 +76,37 @@ export type ConsultInput = {
 };
 
 export async function createConsult(input: ConsultInput): Promise<string> {
+  return db.transaction((tx) => createConsultInTransaction(tx, input));
+}
+
+/** Also used when publishing a persisted request draft, in the same transaction. */
+export function createConsultInTransaction(tx: DbTransaction, input: ConsultInput): string {
   if (!input.reason.trim()) throw new Error('A consult needs a question');
+  if (
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, input.patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new Error('پروندهٔ بیمار پیدا نشد.');
+  const encounterId =
+    input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx);
+  // Historical linkage is retained through discharge or soft deletion. It must still belong to this patient.
+  if (
+    encounterId &&
+    !tx
+      .select({ id: encounters.id })
+      .from(encounters)
+      .where(and(eq(encounters.id, encounterId), eq(encounters.patientId, input.patientId)))
+      .get()
+  )
+    throw new Error('نوبت مراجعه به این بیمار تعلق ندارد.');
   const id = newId();
   const row = {
     patientId: input.patientId,
     // Undefined means "whatever admission is active"; null means explicitly none.
-    encounterId: input.encounterId !== undefined ? input.encounterId : await resolveActiveEncounterId(input.patientId),
+    encounterId,
     specialty: input.specialty?.trim() || null,
     doctorId: input.doctorId ?? null,
     reason: input.reason.trim(),
@@ -90,12 +115,14 @@ export async function createConsult(input: ConsultInput): Promise<string> {
     requestedAt: input.requestedAt ?? null,
     noteId: input.noteId ?? null,
   };
-  await db.insert(consultations).values({
-    id,
-    ...stamps(),
-    ...row,
-    searchText: consultSearchText({ ...row, response: null, followUpInstruction: null }),
-  });
+  tx.insert(consultations)
+    .values({
+      id,
+      ...stamps(),
+      ...row,
+      searchText: consultSearchText({ ...row, response: null, followUpInstruction: null }),
+    })
+    .run();
   return id;
 }
 

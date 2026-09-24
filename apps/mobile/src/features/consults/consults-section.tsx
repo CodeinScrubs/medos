@@ -1,17 +1,18 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
+import { useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
-import { Badge, Button, Card, Column, Input, Row, SectionHeader, Text } from '@/components/ui';
+import { Badge, Button, Card, Column, Row, SectionHeader, Text } from '@/components/ui';
 import type { Consultation } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
-import { cancelConsult, createConsult, markConsultRequested, patientConsultsQuery } from './queries';
+import { cancelConsult, markConsultRequested, patientConsultsQuery } from './queries';
+import { ConsultRequestEditor } from './request-editor';
 
 const STATUS: Record<Consultation['status'], { label: string; tone: 'warning' | 'info' | 'success' | 'neutral' }> = {
   pending: { label: 'نوشته شده، هنوز درخواست نشده', tone: 'warning' },
@@ -30,33 +31,13 @@ const STATUS: Record<Consultation['status'], { label: string; tone: 'warning' | 
  */
 export function ConsultsSection({ patientId }: { patientId: string }) {
   const router = useRouter();
+  const scope = useAutosaveScope()!;
   const { spacing } = useTheme();
   const { data, error } = useLive(patientConsultsQuery(patientId), [patientId]);
   const rows = data ?? [];
 
-  const [specialty, setSpecialty] = useState('');
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
-  const adding = useRef(false);
-
-  async function add() {
-    if (adding.current) return;
-    if (!reason.trim()) {
-      Alert.alert('سؤال کانسالت را بنویسید', 'مثلاً: افت فشار بعد از دیالیز، نظر قلب؟');
-      return;
-    }
-    adding.current = true;
-    setBusy(true);
-    try {
-      await createConsult({ patientId, specialty: specialty || null, reason });
-      setSpecialty((current) => (current === specialty ? '' : current));
-      setReason((current) => (current === reason ? '' : current));
-    } catch (e) {
-      alertError('ثبت نشد', e);
-    } finally {
-      adding.current = false;
-      setBusy(false);
-    }
+  function openAnswer(consultId: string) {
+    void scope.perform(() => router.push({ pathname: '/consult-answer', params: { consultId } }));
   }
 
   return (
@@ -64,19 +45,7 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
       <ErrorNotice error={error} what="کانسالت‌ها" />
       <SectionHeader title="کانسالت‌ها" count={rows.length} />
       <Column gap="sm">
-        <Card tone="alt">
-          <Column gap="sm">
-            <Row gap="sm">
-              <View style={styles.third}>
-                <Input value={specialty} onChangeText={setSpecialty} placeholder="سرویس" editable={!busy} />
-              </View>
-              <View style={styles.grow}>
-                <Input value={reason} onChangeText={setReason} placeholder="سؤال کانسالت" editable={!busy} />
-              </View>
-            </Row>
-            <Button label="ثبت کانسالت" icon="add" onPress={() => void add()} loading={busy} />
-          </Column>
-        </Card>
+        <ConsultRequestEditor patientId={patientId} />
 
         {rows.map(({ consult, doctor }) => (
           <Card key={consult.id}>
@@ -132,26 +101,19 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
                       icon="chatbox-outline"
                       variant="secondary"
                       size="sm"
-                      disabled={busy}
-                      onPress={() => router.push({ pathname: '/consult-answer', params: { consultId: consult.id } })}
+                      onPress={() => openAnswer(consult.id)}
                     />
                     <Button
                       label="لغو"
                       variant="ghost"
                       size="sm"
                       haptic={false}
-                      disabled={busy}
                       onPress={() => void cancelConsult(consult.id).catch((e) => alertError('تغییر ثبت نشد', e))}
                     />
                   </>
                 ) : null}
                 {consult.status === 'cancelled' && (consult.draftResponse || consult.draftInstruction) ? (
-                  <Button
-                    label="پیش‌نویس ثبت‌نشده"
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => router.push({ pathname: '/consult-answer', params: { consultId: consult.id } })}
-                  />
+                  <Button label="پیش‌نویس ثبت‌نشده" variant="ghost" size="sm" onPress={() => openAnswer(consult.id)} />
                 ) : null}
               </Row>
             </Column>
@@ -164,5 +126,4 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  third: { width: 110 },
 });

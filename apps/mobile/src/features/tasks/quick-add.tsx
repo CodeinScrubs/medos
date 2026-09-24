@@ -22,13 +22,16 @@ function DraftGate({ patientId, shiftId }: { patientId: string | null; shiftId: 
   if (!seed && data) setSeed({ draft: data[0] ?? null, generation: 0 });
   if (seed)
     return (
-      <TaskDraftEditor
-        key={seed.generation}
-        initial={seed.draft}
-        patientId={patientId}
-        shiftId={shiftId}
-        onReset={(draft) => setSeed({ draft, generation: seed.generation + 1 })}
-      />
+      <>
+        <ErrorNotice error={error} what="پیش‌نویس کار" />
+        <TaskDraftEditor
+          key={seed.generation}
+          initial={seed.draft}
+          patientId={patientId}
+          shiftId={shiftId}
+          onReset={(draft) => setSeed({ draft, generation: seed.generation + 1 })}
+        />
+      </>
     );
   if (error) return <ErrorNotice error={error} what="پیش‌نویس کار" />;
   return (

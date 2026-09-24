@@ -308,9 +308,23 @@ shows the stored version and replacement requires an explicit choice of that rev
 Background conflict retries stop until another edit or explicit retry. The dedicated
 answer route avoids losing an inline editor when changing a patient tab; its seed stays
 mounted through later query changes. Other edit flows do not yet share this conflict
-protection. Full consult correction/history, quick-add request drafts and native
+protection. Full consult correction/history and native
 process-death/back testing remain separate work. The autosave delay is still an exposure
 window for text not yet committed to SQLite.
+
+Unsubmitted consult questions use `consult_request_drafts` (migration 0012), one
+active draft per patient. Service and question are persisted as one exact-text
+document with a revision check. A partial question is not a pending consult and
+does not appear in outstanding work. Explicit publication creates a pending consult
+and retires the draft in one synchronous transaction, with an idempotent retry link.
+It does not mark the request sent. The encounter at first persisted capture,
+including null, is preserved through a later admission; a soft-deleted/closed
+encounter remains provenance and is not presented as a current encounter. Direct
+consult creation now also rejects missing/deleted patients and wrong-patient
+encounter links. The inline form joins the patient autosave group and flushes before
+opening an answer editor. Failed writes keep the form mounted; conflict replacement
+requires the exact displayed revision. Later read errors are visible without
+resetting either the task or request editor. Native recovery remains unverified.
 
 Quick-add tasks use a separate `task_drafts` table rather than a new `tasks.status`:
 unconfirmed text must not appear in open work, Today counts or task history. A partial

@@ -33,6 +33,62 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-24 — Keep an unfinished consult question recoverable
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; task draft recovery `e87831a`
+
+**Changed**
+
+- Migration 0012 adds separate per-patient consult-request drafts. Service and
+  question autosave together, recover inline, refuse stale concurrent edits and
+  require an explicit comparison before replacement. Ordinary UI keeps the same
+  two inputs and publish button; extra controls appear only on failure/conflict.
+- Publishing creates one pending consult and retires the draft atomically. It
+  never implies the request was actually sent. Capture-time encounter provenance
+  (including null) survives a later admission, discharge or soft deletion.
+- Direct consult creation is transactional and rejects a deleted/missing patient
+  or an encounter belonging to another patient. Later draft-query errors remain
+  visible without removing the task/consult editor. Answer navigation flushes the
+  patient save group first.
+- Updated architecture/ledger and removed premature whole-phase completion labels
+  from roadmap. No dependency or subagent added.
+
+**Verified**
+
+- `npm run check`: 45 suites / 583 app tests + 3 workflow tests, all checks passed.
+- SQLite tests cover exact text, separate patients, incomplete drafts, publication
+  rollback/retry, concurrent creation/editing, encounter changes and deleted parents.
+  Component-handler tests cover recovery, save failure, blocked departure and stale
+  comparisons. Current/old-backup restore covered with the engine's foreign-key mode.
+- `db:generate` reports no schema changes; `git diff --check` passed.
+- Android export: 2,462 modules, `entry-c142c1a024bf16654d95ab6553bcf355.hbc`.
+- Signed APK built from this unchanged source tree; apksigner v2 verification passed.
+  `dist/MedOS-0.7.1.apk`: 54,579,697 bytes; SHA-256
+  `c10fdd49566b01df21eedf25d69d843a496a3b0c749e21f65b1e65a551169e3a`.
+- Task draft commit `e87831a` matches GitHub main and CI run 35938749412 succeeded.
+
+**Not verified**
+
+- No connected Android device; native UI/back/keyboard, process death, notification
+  delivery and second-device restore remain unverified. The autosave delay still
+  exposes text not yet committed to SQLite.
+
+**Open threads**
+
+- D08: task and round read-error branches currently unmount loaded editors; note
+  edit/draft initial query failures can remain as loading. Add retention regressions.
+- D05: raw invalid date drafts, interrupted media and concurrent non-consult editors.
+- W03: deadline editing/reminders. W02: persistent accessible reorder.
+- Continue all remaining IMPLEMENTATION requirements: clinical record workflows,
+  patient context, rich media, clinical tools/review, AI and native acceptance.
+
+**Gotchas**
+
+- `importTables` expects statement-level foreign keys disabled by its caller;
+  `engine.importDatabase` does this and restores them afterwards. A replacement
+  test must use that mode, then assert the final foreign-key check.
+
 ## 2026-09-24 — Recover quick-add task text before it becomes a task
 
 **Agent:** GPT-6 via Codex
