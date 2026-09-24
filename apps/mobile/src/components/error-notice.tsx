@@ -31,7 +31,7 @@ export function ErrorNotice({ error, what }: { error: Error | undefined; what: s
             {what} خوانده نشد
           </Text>
           <Text variant="tiny" style={{ color: colors.danger }}>
-            این فهرست ممکن است ناقص باشد. اپ را ببندید و باز کنید؛ اگر تکرار شد، «بیشتر ← تنظیمات ← گزارش خطاها».
+            اطلاعات ممکن است به‌روز نباشد. پیش از خروج، از ذخیره‌شدن نوشته‌ها مطمئن شوید.
           </Text>
           <Text variant="tiny" color="textFaint" ltr selectable style={{ marginTop: spacing.xxs }}>
             {redactErrorText(error.message)}

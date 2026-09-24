@@ -312,6 +312,13 @@ protection. Full consult correction/history and native
 process-death/back testing remain separate work. The autosave delay is still an exposure
 window for text not yet committed to SQLite.
 
+A refresh failure must not unmount an editor that already has a record: task,
+round and note screens retain their fields and show the read error inline. Initial
+note/draft failures block the editor and show an error instead of waiting forever
+or opening a blank form over an unread draft. These are distinct cases. Component
+tests inject read failures alongside real SQLite write failures and verify retained
+text can subsequently be saved; native navigation remains a separate gate.
+
 Unsubmitted consult questions use `consult_request_drafts` (migration 0012), one
 active draft per patient. Service and question are persisted as one exact-text
 document with a revision check. A partial question is not a pending consult and

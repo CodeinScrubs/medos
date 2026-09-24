@@ -33,6 +33,56 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-24 — Preserve loaded editors when database refresh fails
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; request draft recovery `a3ae011`, task drafts `e87831a`
+
+**Changed**
+
+- Task and round refresh errors no longer replace the whole loaded editor. They
+  show an inline error while retaining the latest text and the existing autosaver.
+- Initial note or note-draft read failure shows an error instead of endless loading.
+  A failed draft read cannot open a blank editor over an unread draft. Later read
+  errors stay visible inside the note form without reseeding typed text. Note gates
+  are keyed by patient and note identity.
+- Shortened the shared read-error message and removed the instruction to close the
+  app, which could be unsafe with unsaved text. No new dependency, feature or subagent.
+
+**Verified**
+
+- `npm run check`: 46 suites / 588 app tests + 3 workflow tests, all checks passed.
+- Five component-handler regressions use the real screen/autosave/query code and
+  migrated SQLite. Task and round tests fail writes, inject a later cached-query
+  read error, retain the typed field, remove the failure and save that same text.
+  Note tests cover initial query/draft errors and later refresh failures.
+- Signed APK rebuilt with the final code (source frozen during build); apksigner v2
+  verification passed. `dist/MedOS-0.7.1.apk`: 54,580,677 bytes; SHA-256
+  `3e1623ea5c7c796c5f83211c776fd4da53fa4eeaa3a7131051dfae3a859ea79e`.
+- `git diff --check` passed. Previous `a3ae011` exact-SHA CI run 35943051780 succeeded.
+
+**Not verified**
+
+- Native UI/navigation, interrupted media, process death and second-device restore
+  remain unverified; no device is connected. Component tests replace useLive's
+  notification machinery, navigation/media and visual widgets with stand-ins.
+- This change covers read errors with cached data, not every competing write or
+  successful deletion/restore that removes a record while its editor is open.
+
+**Open threads**
+
+- D05/D08: other edit gates and concurrent editors; raw invalid date recovery;
+  interrupted media and native navigation/process-death acceptance.
+- W03: editable task deadlines and reminders. W02: persistent accessible reorder.
+- Full clinical record/correction/restore flows, patient summary, sourced clinical
+  tools with physician review, AI and remaining IMPLEMENTATION requirements.
+
+**Gotchas**
+
+- `useLive` intentionally retains cached rows after a refresh failure. Check both
+  the error and whether data has ever loaded before replacing an editor with an
+  error-only screen. Never interpret an unread draft as an absent draft.
+
 ## 2026-09-24 — Keep an unfinished consult question recoverable
 
 **Agent:** GPT-6 via Codex

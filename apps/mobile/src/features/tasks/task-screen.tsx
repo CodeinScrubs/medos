@@ -23,7 +23,7 @@ export function TaskScreen() {
 
 function TaskGate({ id }: { id: string }) {
   const { data, error } = useLive(taskQuery(id, true), [id]);
-  if (error)
+  if (error && data === undefined)
     return (
       <Screen>
         <ErrorNotice error={error} what="کار" />
@@ -34,7 +34,7 @@ function TaskGate({ id }: { id: string }) {
       {(task) =>
         task ? (
           <AutosaveScope key={`${task.id}:${!!task.deletedAt}`}>
-            <TaskDetail task={task} />
+            <TaskDetail task={task} readError={error} />
           </AutosaveScope>
         ) : null
       }
@@ -42,7 +42,7 @@ function TaskGate({ id }: { id: string }) {
   );
 }
 
-function TaskDetail({ task }: { task: Task }) {
+function TaskDetail({ task, readError }: { task: Task; readError?: Error }) {
   const scope = useAutosaveScope()!;
   const router = useRouter();
   const { spacing } = useTheme();
@@ -52,6 +52,7 @@ function TaskDetail({ task }: { task: Task }) {
     <Screen scroll>
       <Stack.Screen options={{ title: 'کار' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <ErrorNotice error={readError} what="کار" />
         <ErrorNotice error={error} what="بیمار" />
         {patient ? (
           <Button

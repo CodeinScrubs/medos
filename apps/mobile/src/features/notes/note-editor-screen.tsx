@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
@@ -62,12 +63,24 @@ const TYPE_OPTIONS = NOTE_TYPES.map((t) => ({ value: t, label: NOTE_TYPE_LABELS[
 /** Create or edit a note. Params: `id` (patient), optional `noteId`, optional `type`. */
 export function NoteEditorScreen() {
   const { id: patientId, noteId, type } = useLocalSearchParams<{ id: string; noteId?: string; type?: string }>();
-  const { data } = useLive(noteQuery(noteId ?? ''), [noteId]);
+  return <NoteGate key={`${patientId}:${noteId ?? 'new'}`} patientId={patientId} noteId={noteId} type={type} />;
+}
+
+function NoteGate({ patientId, noteId, type }: { patientId: string; noteId?: string; type?: string }) {
+  const { data, error } = useLive(noteQuery(noteId ?? ''), [noteId]);
+  if (noteId && error && data === undefined)
+    return (
+      <Screen>
+        <ErrorNotice error={error} what="نوت" />
+      </Screen>
+    );
   // The type comes from the URL, so it is checked rather than trusted.
   const initialType = NOTE_TYPES.find((t) => t === type) ?? 'progress';
   return (
     <EditGate editing={Boolean(noteId)} rows={data}>
-      {(note) => <DraftGate patientId={patientId} note={note} initialType={initialType} />}
+      {(note) => (
+        <DraftGate patientId={patientId} note={note} initialType={initialType} noteError={noteId ? error : undefined} />
+      )}
     </EditGate>
   );
 }
@@ -79,20 +92,42 @@ export function NoteEditorScreen() {
  * writes to that same row, and re-reading its own writes into the form would
  * fight the keyboard.
  */
-function DraftGate({ patientId, note, initialType }: { patientId: string; note: Note | null; initialType: NoteType }) {
+function DraftGate({
+  patientId,
+  note,
+  initialType,
+  noteError,
+}: {
+  patientId: string;
+  note: Note | null;
+  initialType: NoteType;
+  noteError?: Error;
+}) {
   const { colors, spacing } = useTheme();
-  const { data } = useLive(noteDraftQuery(patientId, note?.id ?? null), [patientId, note?.id]);
+  const { data, error } = useLive(noteDraftQuery(patientId, note?.id ?? null), [patientId, note?.id]);
 
   if (data === undefined) {
     return (
       <Screen>
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.huge }} />
+        {error ? (
+          <ErrorNotice error={error} what="پیش‌نویس نوت" />
+        ) : (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.huge }} />
+        )}
       </Screen>
     );
   }
   // The editor reads this once, when it mounts. Later versions of the row are
   // its own writes coming back, and must not be pushed into the fields.
-  return <NoteEditor patientId={patientId} note={note} initialType={initialType} draft={data[0] ?? null} />;
+  return (
+    <NoteEditor
+      patientId={patientId}
+      note={note}
+      initialType={initialType}
+      draft={data[0] ?? null}
+      readError={noteError ?? error}
+    />
+  );
 }
 
 function fieldsOf(note: Note | null, draft: NoteDraft | null, initialType: NoteType): NoteDraftFields {
@@ -119,11 +154,13 @@ function NoteEditor({
   note,
   initialType,
   draft,
+  readError,
 }: {
   patientId: string;
   note: Note | null;
   initialType: NoteType;
   draft: NoteDraft | null;
+  readError?: Error;
 }) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
@@ -324,6 +361,7 @@ function NoteEditor({
         }}
       />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <ErrorNotice error={readError} what="نوت و پیش‌نویس" />
         {recovered ? (
           <Text variant="caption" color="textMuted">
             نوشته‌ی ذخیره‌نشده‌ی قبلی برگردانده شد.

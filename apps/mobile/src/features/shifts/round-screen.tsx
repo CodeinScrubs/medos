@@ -83,7 +83,7 @@ function RoundScreenContent() {
     goTo(nextIndex(rows, at, { includeCurrent: true }));
   }
 
-  if (error || membersError) {
+  if ((error || membersError) && (shifts === undefined || members === undefined)) {
     return (
       <Screen>
         <Stack.Screen options={{ title: 'راند' }} />
@@ -141,7 +141,7 @@ function RoundScreenContent() {
     <Screen scroll>
       <Stack.Screen options={{ title: 'راند' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error} what="راند" />
+        <ErrorNotice error={error ?? membersError} what="راند" />
 
         <Row justify="space-between" align="center">
           <Text variant="caption" color="textMuted">
