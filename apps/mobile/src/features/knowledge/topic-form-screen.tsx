@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
@@ -27,17 +27,17 @@ const toList = (text: string) =>
 /** Write or edit a subject summary. Param: optional `topicId`. */
 export function TopicFormScreen() {
   const { topicId } = useLocalSearchParams<{ topicId?: string }>();
-  const { data } = useLive(topicQuery(topicId ?? ''), [topicId]);
+  const { data, error, retry } = useLive(topicQuery(topicId ?? ''), [topicId]);
   return (
-    <EditGate editing={Boolean(topicId)} rows={data}>
-      {(row) => <TopicForm row={row} />}
+    <EditGate editing={Boolean(topicId)} rows={data} error={error} onRetry={retry} what="مبحث">
+      {(row, readNotice) => <TopicForm readNotice={readNotice} row={row} />}
     </EditGate>
   );
 }
 
 type TopicRow = NonNullable<Awaited<ReturnType<typeof topicQuery>>[number]>;
 
-function TopicForm({ row }: { row: TopicRow | null }) {
+function TopicForm({ row, readNotice }: { readNotice: ReactNode; row: TopicRow | null }) {
   const router = useRouter();
   const { spacing } = useTheme();
   const topic = row?.topic ?? null;
@@ -117,6 +117,7 @@ function TopicForm({ row }: { row: TopicRow | null }) {
     <Screen scroll>
       <Stack.Screen options={{ title: topic ? 'ویرایش مبحث' : 'مبحث جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="مثلاً ARDS" />
         <Input
           label="خلاصه"

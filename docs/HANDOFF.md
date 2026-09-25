@@ -33,6 +33,68 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-25 — Recover edit-screen reads without replacing loaded forms
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; base `d4acef2`
+
+**Changed**
+
+- Reproduced endless initial loading, false absence after a failed cached-empty
+  read, and missing loaded-form warnings before changing `EditGate` (three red
+  tests). It now requires error/retry inputs and supplies an explicit notice slot
+  inside the existing form Screen, preserving the form instance and local input.
+- Wired all 17 existing consumers. Labs handle panel/value failures separately;
+  notes keep their draft gate; consult answers retain their loaded draft/conflict
+  behavior while reporting refresh errors. Occasion/task/history screens use the
+  same gate; historical rows remain visible on failed refresh. No dependency,
+  schema change or additional screen wrapper. Updated AGENTS/architecture/D08.
+- Corrected an obsolete credential-editor comment claiming biometric-protected
+  ciphertext; the current notebook stores text and distinguishes legacy ciphertext.
+  No credential behavior or security workflow changed.
+
+**Verified**
+
+- Root `npm run check`: 58 suites / 710 app tests + 3 workflow tests passed;
+  typecheck and formatting passed. One test import-order warning was corrected
+  afterward; focused lint and formatting passed on the final gate/test files.
+- Added four gate behavior tests plus 18 primary-read error/retry cases across
+  the actual screens (labs have two queries), and retained lab/encounter input
+  through failure and retry. Existing note/task/occasion/consult tests still pass.
+  These use migrated SQLite with substituted live-query/native UI contracts.
+- `git diff --check` passed. Release APK built successfully; all 412 mobile
+  build inputs were unchanged during the build. APK: 54,624,333 bytes, SHA-256
+  `6300f3641f51f7ccef6009003d9b2b29cbe47fd4325e0693728e884ccd2e5802`.
+  Android build tools verified its v2 signature, `com.shayan.medos`, version
+  0.7.1/code 10, arm64-v8a and target SDK 36. Hosted CI remains to be checked
+  against this entry's resulting commit after push.
+
+**Not verified**
+
+- No physical UI, keyboard/back/gesture, process-death, alarm-delivery or native
+  restore acceptance. Read recovery is not autosave: several explicit-save forms
+  still need durable drafts, exit recovery and stale-write handling.
+
+**Open threads**
+
+- Next D08: full shift-screen empty/progress claims and retry (Today card was
+  fixed separately); failed status actions and auxiliary lookup/picker queries.
+  Async suggestions in order/imaging forms still need failure handling.
+- D05/D10: durable manual-form/raw-date drafts, media interruption and native
+  exit/restore drills. W02/W03: editable optional shift context, accessible
+  persistent ordering and native deadline/keyboard/alarm checks.
+- Preserve W04–W10 patient summary, clinical/result loop, trash, rich text/media,
+  people/knowledge, calendar and large-record timeline work; C01–C05 sourced
+  physician-reviewed tools and later AI/call workflows remain in scope.
+
+**Gotchas**
+
+- Keep the same form component mounted on refresh failure. Render `readNotice`
+  inside its Screen; do not replace the form with a separate error screen once
+  loaded. Some specialized draft gates provide equivalent explicit feedback.
+- Retry clears read errors only after a successful read; it must not copy fresh
+  database values into in-progress form fields or reset draft conflict state.
+
 ## 2026-09-25 — Distinguish failed reads from an empty workload
 
 **Agent:** GPT-6 via Codex

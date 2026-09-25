@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
@@ -35,15 +35,15 @@ const toList = (text: string) =>
 /** Add or edit one credential. Param: optional `credentialId`. */
 export function CredentialFormScreen() {
   const { credentialId } = useLocalSearchParams<{ credentialId?: string }>();
-  const { data } = useLive(credentialQuery(credentialId ?? ''), [credentialId]);
+  const { data, error, retry } = useLive(credentialQuery(credentialId ?? ''), [credentialId]);
   return (
-    <EditGate editing={Boolean(credentialId)} rows={data}>
-      {(credential) => <CredentialForm credential={credential} />}
+    <EditGate editing={Boolean(credentialId)} rows={data} error={error} onRetry={retry} what="رمز">
+      {(credential, readNotice) => <CredentialForm readNotice={readNotice} credential={credential} />}
     </EditGate>
   );
 }
 
-function CredentialForm({ credential }: { credential: Credential | null }) {
+function CredentialForm({ credential, readNotice }: { readNotice: ReactNode; credential: Credential | null }) {
   const router = useRouter();
   const { spacing } = useTheme();
 
@@ -51,11 +51,8 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
   const [category, setCategory] = useState<Credential['category']>(credential?.category ?? 'prescription');
   const [url, setUrl] = useState(credential?.url ?? '');
   const [username, setUsername] = useState(credential?.username ?? '');
-  /*
-   * Editing never shows the stored password: it is only in the database as
-   * ciphertext, and revealing it needs the phone's own check on the detail
-   * screen. Left empty, the stored one is kept untouched.
-   */
+  // Blank means preserve the stored secret. The detail screen can show current
+  // text; legacy encrypted entries remain distinguishable until replaced.
   const [secret, setSecret] = useState('');
   const [clearSecret, setClearSecret] = useState(false);
   const [secondFactorNotes, setSecondFactorNotes] = useState(credential?.secondFactorNotes ?? '');
@@ -119,6 +116,7 @@ function CredentialForm({ credential }: { credential: Credential | null }) {
     <Screen scroll>
       <Stack.Screen options={{ title: credential ? 'ویرایش رمز' : 'رمز جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Input
           label="نام سامانه"
           required

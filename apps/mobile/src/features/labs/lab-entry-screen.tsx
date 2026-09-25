@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -58,16 +58,37 @@ function initialRows(values: LabValue[]): EntryRow[] {
  */
 export function LabEntryScreen() {
   const { id: patientId, panelId } = useLocalSearchParams<{ id: string; panelId?: string }>();
-  const { data: panels } = useLive(labPanelQuery(panelId ?? ''), [panelId]);
-  const { data: values } = useLive(panelValuesQuery(panelId ?? ''), [panelId]);
+  const { data: panels, error: panelError, retry: retryPanel } = useLive(labPanelQuery(panelId ?? ''), [panelId]);
+  const { data: values, error: valuesError, retry: retryValues } = useLive(panelValuesQuery(panelId ?? ''), [panelId]);
   return (
-    <EditGate editing={Boolean(panelId)} rows={panels && values ? panels : undefined}>
-      {(panel) => <LabEntry patientId={patientId} panel={panel} values={values ?? []} />}
+    <EditGate
+      editing={Boolean(panelId)}
+      rows={panels && values ? panels : undefined}
+      error={panelError ?? valuesError}
+      onRetry={() => {
+        retryPanel();
+        retryValues();
+      }}
+      what="آزمایش"
+    >
+      {(panel, readNotice) => (
+        <LabEntry patientId={patientId} panel={panel} values={values ?? []} readNotice={readNotice} />
+      )}
     </EditGate>
   );
 }
 
-function LabEntry({ patientId, panel, values }: { patientId: string; panel: LabPanel | null; values: LabValue[] }) {
+function LabEntry({
+  patientId,
+  panel,
+  values,
+  readNotice,
+}: {
+  patientId: string;
+  panel: LabPanel | null;
+  values: LabValue[];
+  readNotice: ReactNode;
+}) {
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
 
@@ -225,6 +246,7 @@ function LabEntry({ patientId, panel, values }: { patientId: string; panel: LabP
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         {sheetPhotos && sheetPhotos.length > 0 && (
           <Column gap="xs">
             <Text variant="captionStrong" color="textMuted">

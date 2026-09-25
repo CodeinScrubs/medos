@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -35,15 +35,25 @@ const COMMON_DEPARTMENTS = [
 /** Add or edit an extension. Params: optional `extensionId`, optional `placeId`. */
 export function ExtensionFormScreen() {
   const { extensionId, placeId } = useLocalSearchParams<{ extensionId?: string; placeId?: string }>();
-  const { data } = useLive(extensionQuery(extensionId ?? ''), [extensionId]);
+  const { data, error, retry } = useLive(extensionQuery(extensionId ?? ''), [extensionId]);
   return (
-    <EditGate editing={Boolean(extensionId)} rows={data}>
-      {(record) => <ExtensionForm record={record} initialPlaceId={placeId ?? null} />}
+    <EditGate editing={Boolean(extensionId)} rows={data} error={error} onRetry={retry} what="شمارهٔ داخلی">
+      {(record, readNotice) => (
+        <ExtensionForm readNotice={readNotice} record={record} initialPlaceId={placeId ?? null} />
+      )}
     </EditGate>
   );
 }
 
-function ExtensionForm({ record, initialPlaceId }: { record: Extension | null; initialPlaceId: string | null }) {
+function ExtensionForm({
+  record,
+  initialPlaceId,
+  readNotice,
+}: {
+  readNotice: ReactNode;
+  record: Extension | null;
+  initialPlaceId: string | null;
+}) {
   const router = useRouter();
   const { spacing } = useTheme();
 
@@ -99,6 +109,7 @@ function ExtensionForm({ record, initialPlaceId }: { record: Extension | null; i
     <Screen scroll>
       <Stack.Screen options={{ title: record ? 'ویرایش داخلی' : 'داخلی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <SelectField
           label="بیمارستان"
           required

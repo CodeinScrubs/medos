@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -52,15 +52,15 @@ const EMPTY_ITEM: PrescriptionItem = { drug: '' };
  */
 export function PrescriptionFormScreen() {
   const { templateId } = useLocalSearchParams<{ templateId?: string }>();
-  const { data } = useLive(prescriptionQuery(templateId ?? ''), [templateId]);
+  const { data, error, retry } = useLive(prescriptionQuery(templateId ?? ''), [templateId]);
   return (
-    <EditGate editing={Boolean(templateId)} rows={data}>
-      {(template) => <PrescriptionForm template={template} />}
+    <EditGate editing={Boolean(templateId)} rows={data} error={error} onRetry={retry} what="قالب نسخه">
+      {(template, readNotice) => <PrescriptionForm readNotice={readNotice} template={template} />}
     </EditGate>
   );
 }
 
-function PrescriptionForm({ template }: { template: PrescriptionTemplate | null }) {
+function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; template: PrescriptionTemplate | null }) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
 
@@ -133,6 +133,7 @@ function PrescriptionForm({ template }: { template: PrescriptionTemplate | null 
     <Screen scroll>
       <Stack.Screen options={{ title: template ? 'ویرایش نسخه' : 'نسخه‌ی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="مثلاً UTI ساده" />
         <Input
           label="برای چه بیماری"

@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -21,15 +21,15 @@ const KIND_OPTIONS = (Object.keys(PLACE_KIND_LABELS) as Place['kind'][]).map((k)
 /** Add or edit a place. Param: optional `placeId`. */
 export function PlaceFormScreen() {
   const { placeId } = useLocalSearchParams<{ placeId?: string }>();
-  const { data } = useLive(placeQuery(placeId ?? ''), [placeId]);
+  const { data, error, retry } = useLive(placeQuery(placeId ?? ''), [placeId]);
   return (
-    <EditGate editing={Boolean(placeId)} rows={data}>
-      {(place) => <PlaceForm place={place} />}
+    <EditGate editing={Boolean(placeId)} rows={data} error={error} onRetry={retry} what="مکان">
+      {(place, readNotice) => <PlaceForm readNotice={readNotice} place={place} />}
     </EditGate>
   );
 }
 
-function PlaceForm({ place }: { place: Place | null }) {
+function PlaceForm({ place, readNotice }: { readNotice: ReactNode; place: Place | null }) {
   const router = useRouter();
   const { spacing } = useTheme();
 
@@ -88,6 +88,7 @@ function PlaceForm({ place }: { place: Place | null }) {
     <Screen scroll>
       <Stack.Screen options={{ title: place ? 'ویرایش مکان' : 'مکان جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Input label="نام" required value={name} onChangeText={setName} placeholder="مثلاً بیمارستان مرکزی" />
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
         <Input label="شهر" value={city} onChangeText={setCity} />

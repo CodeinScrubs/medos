@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -25,15 +25,15 @@ const PRIORITY_OPTIONS = (Object.keys(IDEA_PRIORITY_LABELS) as Idea['priority'][
 /** Add or edit an idea. Param: optional `ideaId`. */
 export function IdeaFormScreen() {
   const { ideaId } = useLocalSearchParams<{ ideaId?: string }>();
-  const { data } = useLive(ideaQuery(ideaId ?? ''), [ideaId]);
+  const { data, error, retry } = useLive(ideaQuery(ideaId ?? ''), [ideaId]);
   return (
-    <EditGate editing={Boolean(ideaId)} rows={data}>
-      {(idea) => <IdeaForm idea={idea} />}
+    <EditGate editing={Boolean(ideaId)} rows={data} error={error} onRetry={retry} what="ایده">
+      {(idea, readNotice) => <IdeaForm readNotice={readNotice} idea={idea} />}
     </EditGate>
   );
 }
 
-function IdeaForm({ idea }: { idea: Idea | null }) {
+function IdeaForm({ idea, readNotice }: { readNotice: ReactNode; idea: Idea | null }) {
   const router = useRouter();
   const { spacing } = useTheme();
 
@@ -74,6 +74,7 @@ function IdeaForm({ idea }: { idea: Idea | null }) {
     <Screen scroll>
       <Stack.Screen options={{ title: idea ? 'ویرایش ایده' : 'ایده‌ی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="در یک جمله" />
         <Input label="توضیح" value={body} onChangeText={setBody} multiline />
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />

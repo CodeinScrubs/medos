@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -33,15 +33,23 @@ const DEFAULT_LOCATIONS = ['PACS بیمارستان', 'CD دست همراه', '�
 /** Create or edit an imaging study. Params: `id` (patient), optional `studyId`. */
 export function ImagingFormScreen() {
   const { id: patientId, studyId } = useLocalSearchParams<{ id: string; studyId?: string }>();
-  const { data } = useLive(imagingStudyQuery(studyId ?? ''), [studyId]);
+  const { data, error, retry } = useLive(imagingStudyQuery(studyId ?? ''), [studyId]);
   return (
-    <EditGate editing={Boolean(studyId)} rows={data}>
-      {(study) => <ImagingForm patientId={patientId} study={study} />}
+    <EditGate editing={Boolean(studyId)} rows={data} error={error} onRetry={retry} what="تصویربرداری">
+      {(study, readNotice) => <ImagingForm readNotice={readNotice} patientId={patientId} study={study} />}
     </EditGate>
   );
 }
 
-function ImagingForm({ patientId, study }: { patientId: string; study: ImagingStudy | null }) {
+function ImagingForm({
+  patientId,
+  study,
+  readNotice,
+}: {
+  readNotice: ReactNode;
+  patientId: string;
+  study: ImagingStudy | null;
+}) {
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
 
@@ -98,6 +106,7 @@ function ImagingForm({ patientId, study }: { patientId: string; study: ImagingSt
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <ChipSelect label="نوع" options={MODALITY_OPTIONS} value={modality} onChange={(v) => v && setModality(v)} />
         <Input label="ناحیه / شرح" value={region} onChangeText={setRegion} placeholder="مثلاً Brain w/o contrast" ltr />
         <QuickDateField

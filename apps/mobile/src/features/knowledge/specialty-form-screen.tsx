@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -25,17 +25,17 @@ const toList = (text: string) =>
 /** Research one field. Param: optional `profileId`. */
 export function SpecialtyFormScreen() {
   const { profileId } = useLocalSearchParams<{ profileId?: string }>();
-  const { data } = useLive(specialtyProfileQuery(profileId ?? ''), [profileId]);
+  const { data, error, retry } = useLive(specialtyProfileQuery(profileId ?? ''), [profileId]);
   return (
-    <EditGate editing={Boolean(profileId)} rows={data}>
-      {(row) => <SpecialtyForm row={row} />}
+    <EditGate editing={Boolean(profileId)} rows={data} error={error} onRetry={retry} what="رشته">
+      {(row, readNotice) => <SpecialtyForm readNotice={readNotice} row={row} />}
     </EditGate>
   );
 }
 
 type ProfileRow = NonNullable<Awaited<ReturnType<typeof specialtyProfileQuery>>[number]>;
 
-function SpecialtyForm({ row }: { row: ProfileRow | null }) {
+function SpecialtyForm({ row, readNotice }: { readNotice: ReactNode; row: ProfileRow | null }) {
   const router = useRouter();
   const { spacing } = useTheme();
   const profile = row?.profile ?? null;
@@ -111,6 +111,7 @@ function SpecialtyForm({ row }: { row: ProfileRow | null }) {
     <Screen scroll>
       <Stack.Screen options={{ title: profile ? 'ویرایش رشته' : 'رشته‌ی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <SelectField
           label="رشته"
           icon="medkit-outline"

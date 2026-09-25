@@ -67,19 +67,19 @@ export function NoteEditorScreen() {
 }
 
 function NoteGate({ patientId, noteId, type }: { patientId: string; noteId?: string; type?: string }) {
-  const { data, error } = useLive(noteQuery(noteId ?? ''), [noteId]);
-  if (noteId && error && data === undefined)
-    return (
-      <Screen>
-        <ErrorNotice error={error} what="نوت" />
-      </Screen>
-    );
+  const { data, error, retry } = useLive(noteQuery(noteId ?? ''), [noteId]);
   // The type comes from the URL, so it is checked rather than trusted.
   const initialType = NOTE_TYPES.find((t) => t === type) ?? 'progress';
   return (
-    <EditGate editing={Boolean(noteId)} rows={data}>
+    <EditGate editing={Boolean(noteId)} rows={data} error={error} onRetry={retry} what="نوت">
       {(note) => (
-        <DraftGate patientId={patientId} note={note} initialType={initialType} noteError={noteId ? error : undefined} />
+        <DraftGate
+          patientId={patientId}
+          note={note}
+          initialType={initialType}
+          noteError={noteId ? error : undefined}
+          retryNote={retry}
+        />
       )}
     </EditGate>
   );
@@ -97,20 +97,22 @@ function DraftGate({
   note,
   initialType,
   noteError,
+  retryNote,
 }: {
   patientId: string;
   note: Note | null;
   initialType: NoteType;
   noteError?: Error;
+  retryNote: () => void;
 }) {
   const { colors, spacing } = useTheme();
-  const { data, error } = useLive(noteDraftQuery(patientId, note?.id ?? null), [patientId, note?.id]);
+  const { data, error, retry } = useLive(noteDraftQuery(patientId, note?.id ?? null), [patientId, note?.id]);
 
   if (data === undefined) {
     return (
       <Screen>
         {error ? (
-          <ErrorNotice error={error} what="پیش‌نویس نوت" />
+          <ErrorNotice error={error} what="پیش‌نویس نوت" onRetry={retry} />
         ) : (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.huge }} />
         )}
@@ -126,6 +128,10 @@ function DraftGate({
       initialType={initialType}
       draft={data[0] ?? null}
       readError={noteError ?? error}
+      retryRead={() => {
+        retryNote();
+        retry();
+      }}
     />
   );
 }
@@ -155,12 +161,14 @@ function NoteEditor({
   initialType,
   draft,
   readError,
+  retryRead,
 }: {
   patientId: string;
   note: Note | null;
   initialType: NoteType;
   draft: NoteDraft | null;
   readError?: Error;
+  retryRead: () => void;
 }) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
@@ -361,7 +369,7 @@ function NoteEditor({
         }}
       />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={readError} what="نوت و پیش‌نویس" />
+        <ErrorNotice error={readError} what="نوت و پیش‌نویس" onRetry={retryRead} />
         {recovered ? (
           <Text variant="caption" color="textMuted">
             نوشته‌ی ذخیره‌نشده‌ی قبلی برگردانده شد.

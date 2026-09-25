@@ -22,7 +22,7 @@ export function ConsultAnswerScreen() {
 }
 
 function AnswerGate({ id }: { id: string }) {
-  const { data, error } = useLive(consultQuery(id, true), [id]);
+  const { data, error, retry } = useLive(consultQuery(id, true), [id]);
   const [loaded, setLoaded] = useState<{ row: Consultation; generation: number } | null>(null);
   // Keep the editor mounted through later read failures/deletion. Only an explicit
   // reload replaces its text; live query results must never fight the keyboard.
@@ -32,26 +32,36 @@ function AnswerGate({ id }: { id: string }) {
       <AnswerEditor
         key={loaded.generation}
         initial={loaded.row}
+        readError={error}
+        retryRead={retry}
         onReload={(row) => setLoaded({ row, generation: loaded.generation + 1 })}
       />
     );
-  if (error)
-    return (
-      <Screen>
-        <ErrorNotice error={error} what="کانسالت" />
-      </Screen>
-    );
   return (
-    <EditGate editing rows={data}>
+    <EditGate editing rows={data} error={error} onRetry={retry} what="کانسالت">
       {() => null}
     </EditGate>
   );
 }
 
 /** One scheduler for both fields, one persisted revision, and an explicit publish. */
-export function AnswerEditor({ initial, onReload }: { initial: Consultation; onReload: (row: Consultation) => void }) {
+export function AnswerEditor({
+  initial,
+  onReload,
+  readError,
+  retryRead,
+}: {
+  initial: Consultation;
+  onReload: (row: Consultation) => void;
+  readError?: Error;
+  retryRead?: () => void;
+}) {
   const router = useRouter();
-  const { data: patientRows, error: patientError } = useLive(patientQuery(initial.patientId), [initial.patientId]);
+  const {
+    data: patientRows,
+    error: patientError,
+    retry: retryPatient,
+  } = useLive(patientQuery(initial.patientId), [initial.patientId]);
   const editable = !initial.deletedAt && OPEN_STATUSES.includes(initial.status);
   const [fields, setFields] = useState<AnswerDraft>({
     response: initial.draftResponse,
@@ -140,7 +150,8 @@ export function AnswerEditor({ initial, onReload }: { initial: Consultation; onR
     <Screen scroll>
       <Stack.Screen options={{ title: 'پاسخ کانسالت' }} />
       <Column gap="md">
-        <ErrorNotice error={patientError} what="بیمار" />
+        <ErrorNotice error={readError} what="کانسالت" onRetry={retryRead} />
+        <ErrorNotice error={patientError} what="بیمار" onRetry={retryPatient} />
         {patientRows?.[0] ? (
           <Text variant="captionStrong">{fullName(patientRows[0].firstName, patientRows[0].lastName)}</Text>
         ) : null}

@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
@@ -27,15 +27,15 @@ const toList = (text: string) =>
 /** Add or edit a doctor. Param: optional `doctorId`. */
 export function DoctorFormScreen() {
   const { doctorId } = useLocalSearchParams<{ doctorId?: string }>();
-  const { data } = useLive(doctorQuery(doctorId ?? ''), [doctorId]);
+  const { data, error, retry } = useLive(doctorQuery(doctorId ?? ''), [doctorId]);
   return (
-    <EditGate editing={Boolean(doctorId)} rows={data}>
-      {(doctor) => <DoctorForm doctor={doctor} />}
+    <EditGate editing={Boolean(doctorId)} rows={data} error={error} onRetry={retry} what="پزشک">
+      {(doctor, readNotice) => <DoctorForm readNotice={readNotice} doctor={doctor} />}
     </EditGate>
   );
 }
 
-function DoctorForm({ doctor }: { doctor: Doctor | null }) {
+function DoctorForm({ doctor, readNotice }: { readNotice: ReactNode; doctor: Doctor | null }) {
   const router = useRouter();
   const { spacing } = useTheme();
 
@@ -148,6 +148,7 @@ function DoctorForm({ doctor }: { doctor: Doctor | null }) {
     <Screen scroll>
       <Stack.Screen options={{ title: doctor ? 'ویرایش پزشک' : 'پزشک جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Input label="عنوان" value={title} onChangeText={setTitle} placeholder="دکتر" />
         <Input label="نام" required value={firstName} onChangeText={setFirstName} />
         <Input label="نام خانوادگی" required value={lastName} onChangeText={setLastName} />

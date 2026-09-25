@@ -1,37 +1,72 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { type ReactElement } from 'react';
-import { ActivityIndicator, Alert } from 'react-native';
+import { ActivityIndicator, Alert, TextInput } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { Button, Input } from '@/components/ui';
+import { tablesOf } from '@/db/query-tables';
 import * as notifications from '@/platform/notifications';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
+import { ConsultAnswerScreen } from './consults/answer-screen';
+import { consultQuery } from './consults/queries';
+import { DoctorFormScreen } from './doctors/doctor-form-screen';
 import { OccasionFormScreen } from './doctors/occasion-form-screen';
 import { createOccasion, occasionQuery } from './doctors/occasions-queries';
-import { createDoctor } from './doctors/queries';
+import { createDoctor, doctorQuery } from './doctors/queries';
+import { EncounterFormScreen } from './encounters/encounter-form-screen';
+import { encounterQuery, openEncounter } from './encounters/queries';
+import { ImagingFormScreen } from './imaging/imaging-form-screen';
+import { imagingStudyQuery } from './imaging/queries';
+import { OrderFormScreen } from './kardex/order-form-screen';
+import { orderQuery } from './kardex/queries';
+import { IdeaFormScreen } from './knowledge/idea-form-screen';
+import { ideaQuery } from './knowledge/ideas-queries';
+import { PrescriptionFormScreen } from './knowledge/prescription-form-screen';
+import { prescriptionQuery } from './knowledge/prescriptions-queries';
+import { topicQuery } from './knowledge/queries';
+import { SpecialtyFormScreen } from './knowledge/specialty-form-screen';
+import { specialtyProfileQuery } from './knowledge/specialty-profiles-queries';
+import { TopicFormScreen } from './knowledge/topic-form-screen';
+import { LabEntryScreen } from './labs/lab-entry-screen';
+import { createLabPanel, labPanelQuery, panelValuesQuery } from './labs/queries';
 import { noteDraftQuery } from './notes/draft-queries';
 import { NoteEditorScreen } from './notes/note-editor-screen';
-import { createNote } from './notes/queries';
+import { createNote, noteQuery } from './notes/queries';
 import { createPatient } from './patients/queries';
-import { addPatientToShift, shiftPatientsQuery, startShift } from './shifts/queries';
+import { ExtensionFormScreen } from './places/extension-form-screen';
+import { PlaceFormScreen } from './places/place-form-screen';
+import { extensionQuery, placeQuery } from './places/queries';
+import { ShiftHistoryScreen } from './shifts/history-screen';
+import { addPatientToShift, shiftPatientsQuery, shiftQuery, startShift } from './shifts/queries';
 import { RoundScreen } from './shifts/round-screen';
 import { createTask, taskQuery } from './tasks/queries';
 import { TaskScreen } from './tasks/task-screen';
+import { CredentialFormScreen } from './vault/credential-form-screen';
+import { credentialQuery } from './vault/queries';
 
 // Retain the last query result on failure, exactly as useLive does. Rendering and
 // autosave handlers are real; native navigation, media and visual widgets are not.
 const mockCache = new Map<string, unknown[] | undefined>();
 const mockErrors = new Map<string, Error>();
+const mockRetried: string[] = [];
 let mockParams: Record<string, string>;
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[] }) => {
     const { tablesOf } = jest.requireActual<typeof import('@/db/query-tables')>('@/db/query-tables');
     const key = tablesOf(query)[0]!;
     if (!mockCache.has(key)) mockCache.set(key, query.all());
-    return { data: mockCache.get(key), error: mockErrors.get(key) };
+    return {
+      data: mockCache.get(key),
+      error: mockErrors.get(key),
+      retry: () => {
+        mockRetried.push(key);
+        mockErrors.delete(key);
+        mockCache.delete(key);
+      },
+    };
   },
 }));
 jest.mock('expo-router', () => ({
@@ -45,6 +80,7 @@ jest.mock('@/components/ui', () => ({
   Card: 'Card',
   ChipSelect: 'ChipSelect',
   Column: 'Column',
+  Divider: 'Divider',
   EmptyState: 'EmptyState',
   IconButton: 'IconButton',
   Input: 'Input',
@@ -55,12 +91,13 @@ jest.mock('@/components/ui', () => ({
   Text: 'Text',
   Toggle: 'Toggle',
 }));
-jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii: {} }) }));
+jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii: {}, typography: {} }) }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
 jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
 jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
 jest.mock('@/components/use-now', () => ({ useNow: () => new Date('2026-09-24T12:00:00Z').getTime() }));
 jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
+jest.mock('@/components/prompt-modal', () => ({ PromptModal: 'PromptModal' }));
 jest.mock('@/components/voice-note-player', () => ({ VoiceNotePlayer: 'VoiceNotePlayer' }));
 jest.mock('@/components/voice-recorder', () => ({ VoiceRecorder: 'VoiceRecorder' }));
 jest.mock('@/components/quick-date-field', () => ({ QuickDateField: 'QuickDateField' }));
@@ -107,6 +144,7 @@ beforeEach(async () => {
   mockParams = { id: patientId };
   mockCache.clear();
   mockErrors.clear();
+  mockRetried.length = 0;
   jest.useFakeTimers();
 });
 afterEach(async () => {
@@ -121,6 +159,95 @@ afterEach(async () => {
 });
 
 describe('editors survive database read failures', () => {
+  it.each<[string, string, (id: string) => unknown, () => ReactElement]>([
+    ['doctor', 'doctorId', doctorQuery, () => <DoctorFormScreen />],
+    ['encounter', 'encounterId', encounterQuery, () => <EncounterFormScreen />],
+    ['imaging', 'studyId', imagingStudyQuery, () => <ImagingFormScreen />],
+    ['order', 'orderId', orderQuery, () => <OrderFormScreen />],
+    ['idea', 'ideaId', ideaQuery, () => <IdeaFormScreen />],
+    ['prescription', 'templateId', prescriptionQuery, () => <PrescriptionFormScreen />],
+    ['specialty', 'profileId', specialtyProfileQuery, () => <SpecialtyFormScreen />],
+    ['topic', 'topicId', topicQuery, () => <TopicFormScreen />],
+    ['place', 'placeId', placeQuery, () => <PlaceFormScreen />],
+    ['extension', 'extensionId', extensionQuery, () => <ExtensionFormScreen />],
+    ['credential', 'credentialId', credentialQuery, () => <CredentialFormScreen />],
+    ['lab panel', 'panelId', labPanelQuery, () => <LabEntryScreen />],
+    ['lab values', 'panelId', panelValuesQuery, () => <LabEntryScreen />],
+    ['note', 'noteId', noteQuery, () => <NoteEditorScreen />],
+    ['occasion', 'occasionId', occasionQuery, () => <OccasionFormScreen />],
+    ['task', 'taskId', taskQuery, () => <TaskScreen />],
+    ['consult answer', 'consultId', consultQuery, () => <ConsultAnswerScreen />],
+    ['shift history', 'shiftId', shiftQuery, () => <ShiftHistoryScreen />],
+  ])('offers retry instead of endless loading for a failed %s read', async (_label, param, query, element) => {
+    mockParams = { id: patientId, [param]: 'example' };
+    const key = tablesOf(query('example'))[0]!;
+    mockCache.set(key, undefined);
+    mockErrors.set(key, new Error('Synthetic read failure'));
+    await render(element());
+    expect(tree.root.findAllByType(ActivityIndicator).length).toBe(0);
+    expect(tree.root.findAllByType(Input).length).toBe(0);
+    const notice = tree.root.findAllByType(ErrorNotice).find((node) => node.props.error)!;
+    expect(notice).toBeDefined();
+    await act(async () => {
+      notice.props.onRetry();
+    });
+    expect(mockRetried).toContain(key);
+  });
+
+  it('retains edited lab values when the value query fails after loading', async () => {
+    const id = await createLabPanel({
+      patientId,
+      collectedAt: new Date('2026-09-25T12:00:00Z'),
+      source: 'manual',
+      values: [{ analyte: 'Hb', value: '12.5', unit: 'g/dL' }],
+    });
+    mockParams = { id: patientId, panelId: id };
+    await render(<LabEntryScreen />);
+    await act(async () => {
+      tree.root
+        .findAllByType(TextInput)
+        .find((node) => node.props.value === '12.5')!
+        .props.onChangeText('13.0');
+    });
+    const key = tablesOf(panelValuesQuery(id))[0]!;
+    mockErrors.set(key, new Error('Synthetic read failure'));
+    await refresh(<LabEntryScreen />);
+    expectReadError();
+    expect(tree.root.findAllByType(TextInput).some((node) => node.props.value === '13.0')).toBe(true);
+    await act(async () => {
+      tree.root
+        .findAllByType(ErrorNotice)
+        .find((node) => node.props.error)!
+        .props.onRetry();
+    });
+    await refresh(<LabEntryScreen />);
+    expect(tree.root.findAllByType(TextInput).some((node) => node.props.value === '13.0')).toBe(true);
+  });
+
+  it('retains unsaved encounter text through a failed refresh and retry', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission', chiefComplaint: 'Stored complaint' });
+    mockParams = { id: patientId, encounterId: id };
+    await render(<EncounterFormScreen />);
+    const field = tree.root.findAllByType(Input).find((node) => node.props.value === 'Stored complaint')!;
+    await act(async () => {
+      field.props.onChangeText('Latest complaint');
+    });
+    const key = tablesOf(encounterQuery(id))[0]!;
+    mockErrors.set(key, new Error('Synthetic read failure'));
+    await refresh(<EncounterFormScreen />);
+    expectReadError();
+    expect(tree.root.findAllByType(Input).some((node) => node.props.value === 'Latest complaint')).toBe(true);
+    await act(async () => {
+      tree.root
+        .findAllByType(ErrorNotice)
+        .find((node) => node.props.error)!
+        .props.onRetry();
+    });
+    await refresh(<EncounterFormScreen />);
+    expect(tree.root.findAllByType(Input).some((node) => node.props.value === 'Latest complaint')).toBe(true);
+    expect(tree.root.findAllByType(ErrorNotice).some((node) => node.props.error)).toBe(false);
+  });
+
   it('separates an occasion save from a failed alarm and ignores a second simultaneous submit', async () => {
     const doctorId = await createDoctor({ firstName: 'Example', lastName: 'Colleague' });
     const occasionId = await createOccasion({

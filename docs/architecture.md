@@ -82,6 +82,15 @@ and empty/success claims, and retain available rows. `ErrorNotice` keeps technic
 diagnostics behind an explicit details action; displayed details remain redacted.
 The timeline is still assembled in memory and is not yet accepted for large records.
 
+`EditGate` requires the read error and retry callback. Failed initial reads (including
+a previously empty result) show retry instead of loading forever or claiming absence.
+Once a row is loaded, the gate supplies a `readNotice` slot to the same form instance.
+Forms place it inside their existing `Screen`, preserving keyboard/scroll ownership
+and local input through refresh failure/retry. This explicit slot avoids a second
+screen wrapper or hidden context in generic UI primitives. Notes and consult answers
+keep their own draft/conflict handling while exposing equivalent read/retry feedback.
+This is read recovery, not autosave for forms that still require explicit Save.
+
 **Rejected: SQLCipher via op-sqlite.** It would encrypt the database file itself. Android
 already encrypts app-private storage at rest (FBE, default since Android 10), so SQLCipher
 buys defence-in-depth against a rooted or forensically imaged device — a real but narrow

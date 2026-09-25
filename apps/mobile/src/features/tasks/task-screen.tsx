@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import type { ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { AutosaveField } from '@/components/autosave-field';
@@ -23,19 +24,13 @@ export function TaskScreen() {
 }
 
 function TaskGate({ id }: { id: string }) {
-  const { data, error } = useLive(taskQuery(id, true), [id]);
-  if (error && data === undefined)
-    return (
-      <Screen>
-        <ErrorNotice error={error} what="کار" />
-      </Screen>
-    );
+  const { data, error, retry } = useLive(taskQuery(id, true), [id]);
   return (
-    <EditGate editing rows={data}>
-      {(task) =>
+    <EditGate editing rows={data} error={error} onRetry={retry} what="کار">
+      {(task, readNotice) =>
         task ? (
           <AutosaveScope key={`${task.id}:${!!task.deletedAt}`}>
-            <TaskDetail task={task} readError={error} />
+            <TaskDetail task={task} readNotice={readNotice} />
           </AutosaveScope>
         ) : null
       }
@@ -43,18 +38,18 @@ function TaskGate({ id }: { id: string }) {
   );
 }
 
-function TaskDetail({ task, readError }: { task: Task; readError?: Error }) {
+function TaskDetail({ task, readNotice }: { task: Task; readNotice: ReactNode }) {
   const scope = useAutosaveScope()!;
   const router = useRouter();
   const { spacing } = useTheme();
-  const { data: patients, error } = useLive(patientQuery(task.patientId ?? ''), [task.patientId]);
+  const { data: patients, error, retry } = useLive(patientQuery(task.patientId ?? ''), [task.patientId]);
   const patient = patients?.[0];
   return (
     <Screen scroll>
       <Stack.Screen options={{ title: 'کار' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={readError} what="کار" />
-        <ErrorNotice error={error} what="بیمار" />
+        {readNotice}
+        <ErrorNotice error={error} what="بیمار" onRetry={retry} />
         {patient ? (
           <Button
             label={fullName(patient.firstName, patient.lastName)}

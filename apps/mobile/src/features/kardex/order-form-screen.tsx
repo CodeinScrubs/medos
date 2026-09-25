@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -33,15 +33,23 @@ const NAME_HINTS: Record<Order['kind'], string> = {
 /** Create or edit a kardex order. Params: `id` (patient), optional `orderId`. */
 export function OrderFormScreen() {
   const { id: patientId, orderId } = useLocalSearchParams<{ id: string; orderId?: string }>();
-  const { data } = useLive(orderQuery(orderId ?? ''), [orderId]);
+  const { data, error, retry } = useLive(orderQuery(orderId ?? ''), [orderId]);
   return (
-    <EditGate editing={Boolean(orderId)} rows={data}>
-      {(order) => <OrderForm patientId={patientId} order={order} />}
+    <EditGate editing={Boolean(orderId)} rows={data} error={error} onRetry={retry} what="کاردکس">
+      {(order, readNotice) => <OrderForm readNotice={readNotice} patientId={patientId} order={order} />}
     </EditGate>
   );
 }
 
-function OrderForm({ patientId, order }: { patientId: string; order: Order | null }) {
+function OrderForm({
+  patientId,
+  order,
+  readNotice,
+}: {
+  readNotice: ReactNode;
+  patientId: string;
+  order: Order | null;
+}) {
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
   const isEdit = order != null;
@@ -122,6 +130,7 @@ function OrderForm({ patientId, order }: { patientId: string; order: Order | nul
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
 
         <Column gap="xs">

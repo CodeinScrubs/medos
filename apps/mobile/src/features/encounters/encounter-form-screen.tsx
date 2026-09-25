@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -34,15 +34,23 @@ const COMMON_SERVICES = ['داخلی', 'جراحی', 'اطفال', 'زنان', '
  */
 export function EncounterFormScreen() {
   const { id: patientId, encounterId } = useLocalSearchParams<{ id: string; encounterId?: string }>();
-  const { data } = useLive(encounterQuery(encounterId ?? ''), [encounterId]);
+  const { data, error, retry } = useLive(encounterQuery(encounterId ?? ''), [encounterId]);
   return (
-    <EditGate editing={Boolean(encounterId)} rows={data}>
-      {(encounter) => <EncounterForm patientId={patientId} encounter={encounter} />}
+    <EditGate editing={Boolean(encounterId)} rows={data} error={error} onRetry={retry} what="بستری">
+      {(encounter, readNotice) => <EncounterForm readNotice={readNotice} patientId={patientId} encounter={encounter} />}
     </EditGate>
   );
 }
 
-function EncounterForm({ patientId, encounter }: { patientId: string; encounter: Encounter | null }) {
+function EncounterForm({
+  patientId,
+  encounter,
+  readNotice,
+}: {
+  readNotice: ReactNode;
+  patientId: string;
+  encounter: Encounter | null;
+}) {
   const router = useRouter();
   const { spacing } = useTheme();
   const isEdit = encounter != null;
@@ -112,6 +120,7 @@ function EncounterForm({ patientId, encounter }: { patientId: string; encounter:
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
 
         <SelectField

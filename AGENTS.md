@@ -117,6 +117,9 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
 - Reads use `useLive` (`src/db/use-live.ts`), never drizzle's `useLiveQuery`.
 - Edit screens use `EditGate` (`src/components/edit-gate.tsx`) — load the record, then
   initialise form state from it; never copy a loaded record into state with an effect.
+  Pass the query's `error` and `retry` as `error`/`onRetry`. Render the callback's
+  `readNotice` inside the form's `Screen` (or handle the same error/retry explicitly).
+  A refresh failure must not unmount the loaded form and discard current input.
 - Preferences are typed settings (`defineSetting` + zod) in the feature's `settings.ts`.
   Keys starting with `backup.` describe the phone and survive a restore.
 - Destructive or sensitive actions call `audit(...)`; user-facing failures call

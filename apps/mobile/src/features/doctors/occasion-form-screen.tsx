@@ -1,9 +1,8 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, ChipSelect, Column, Input, Screen, Text, Toggle } from '@/components/ui';
@@ -43,16 +42,10 @@ const LEAD_OPTIONS = [
  */
 export function OccasionFormScreen() {
   const { doctorId, occasionId } = useLocalSearchParams<{ doctorId: string; occasionId?: string }>();
-  const { data, error } = useLive(occasionQuery(occasionId ?? ''), [occasionId]);
-  if (occasionId && error && !data)
-    return (
-      <Screen>
-        <ErrorNotice error={error} what="مناسبت" />
-      </Screen>
-    );
+  const { data, error, retry } = useLive(occasionQuery(occasionId ?? ''), [occasionId]);
   return (
-    <EditGate editing={Boolean(occasionId)} rows={data}>
-      {(occasion) => <OccasionForm doctorId={doctorId} occasion={occasion} readError={error} />}
+    <EditGate editing={Boolean(occasionId)} rows={data} error={error} onRetry={retry} what="مناسبت">
+      {(occasion, readNotice) => <OccasionForm doctorId={doctorId} occasion={occasion} readNotice={readNotice} />}
     </EditGate>
   );
 }
@@ -60,11 +53,11 @@ export function OccasionFormScreen() {
 function OccasionForm({
   doctorId,
   occasion,
-  readError,
+  readNotice,
 }: {
   doctorId: string;
   occasion: Occasion | null;
-  readError?: Error;
+  readNotice: ReactNode;
 }) {
   const router = useRouter();
   const { spacing } = useTheme();
@@ -156,7 +149,7 @@ function OccasionForm({
     <Screen scroll>
       <Stack.Screen options={{ title: occasion ? 'ویرایش مناسبت' : 'مناسبت جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={readError} what="مناسبت" />
+        {readNotice}
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
         <Input
           label="عنوان"

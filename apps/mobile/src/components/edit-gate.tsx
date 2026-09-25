@@ -5,6 +5,8 @@ import { ActivityIndicator } from 'react-native';
 import { Button, EmptyState, Screen } from '@/components/ui';
 import { useTheme } from '@/theme';
 
+import { ErrorNotice } from './error-notice';
+
 /**
  * The front half of every "new or edit" form screen.
  *
@@ -20,18 +22,27 @@ import { useTheme } from '@/theme';
 export function EditGate<T>({
   editing,
   rows,
+  error,
+  onRetry,
+  what = 'اطلاعات',
   children,
 }: {
   /** False for "new": the form renders at once, with no record. */
   editing: boolean;
   /** The live query result; undefined while loading. */
   rows: T[] | undefined;
-  children: (record: T | null) => ReactNode;
+  error: Error | undefined;
+  onRetry: () => void;
+  what?: string;
+  /** Place the notice inside the form's Screen; keep the same form mounted on refresh errors. */
+  children: (record: T | null, readNotice: ReactNode) => ReactNode;
 }) {
   const { colors, spacing } = useTheme();
   const router = useRouter();
 
-  if (!editing) return <>{children(null)}</>;
+  if (!editing) return <>{children(null, null)}</>;
+  const notice = <ErrorNotice error={error} what={what} onRetry={onRetry} />;
+  if (error && !rows?.length) return <Screen>{notice}</Screen>;
   if (!rows) {
     return (
       <Screen>
@@ -52,5 +63,5 @@ export function EditGate<T>({
       </Screen>
     );
   }
-  return <>{children(record)}</>;
+  return <>{children(record, notice)}</>;
 }

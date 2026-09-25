@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
@@ -22,12 +22,12 @@ function ShiftHistoryList() {
   const router = useRouter();
   const { spacing } = useTheme();
   const [limit, setLimit] = useState(30);
-  const { data, error } = useLive(shiftsQuery(limit + 1), [limit]);
+  const { data, error, retry } = useLive(shiftsQuery(limit + 1), [limit]);
   return (
     <Screen scroll>
       <Stack.Screen options={{ title: 'شیفت‌های قبلی' }} />
       <Column gap="sm" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error} what="شیفت‌ها" />
+        <ErrorNotice error={error} what="شیفت‌ها" onRetry={retry} />
         {data?.slice(0, limit).map((shift) => (
           <Card key={shift.id}>
             <Column gap="xs">
@@ -55,33 +55,28 @@ function ShiftHistoryList() {
 }
 
 function ShiftDetailGate({ id }: { id: string }) {
-  const { data, error } = useLive(shiftQuery(id), [id]);
-  if (error)
-    return (
-      <Screen>
-        <ErrorNotice error={error} what="شیفت" />
-      </Screen>
-    );
+  const { data, error, retry } = useLive(shiftQuery(id), [id]);
   return (
-    <EditGate editing rows={data}>
-      {(shift) => (shift ? <ShiftDetail key={shift.id} shift={shift} /> : null)}
+    <EditGate editing rows={data} error={error} onRetry={retry} what="شیفت">
+      {(shift, readNotice) => (shift ? <ShiftDetail key={shift.id} shift={shift} readNotice={readNotice} /> : null)}
     </EditGate>
   );
 }
 
-function ShiftDetail({ shift }: { shift: Shift }) {
+function ShiftDetail({ shift, readNotice }: { shift: Shift; readNotice: ReactNode }) {
   const router = useRouter();
   const { spacing } = useTheme();
-  const { data, error } = useLive(shiftHistoryPatientsQuery(shift.id), [shift.id]);
+  const { data, error, retry } = useLive(shiftHistoryPatientsQuery(shift.id), [shift.id]);
   return (
     <Screen scroll>
       <Stack.Screen options={{ title: 'گزارش شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Text variant="heading">{formatJalaliDateTime(shift.startAt)}</Text>
         {shift.ward ? <Text>{shift.ward}</Text> : null}
         {shift.endAt ? <Text variant="caption">پایان: {formatJalaliDateTime(shift.endAt)}</Text> : null}
         {shift.notes ? <Text>{shift.notes}</Text> : null}
-        <ErrorNotice error={error} what="بیماران شیفت" />
+        <ErrorNotice error={error} what="بیماران شیفت" onRetry={retry} />
         {data?.map(({ member, patient }) => (
           <Card key={member.id}>
             <Column gap="xs">
