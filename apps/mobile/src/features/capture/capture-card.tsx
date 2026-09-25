@@ -53,11 +53,15 @@ export function CaptureCard({
   const voices = media.filter((m) => m.kind === 'voice');
   const photos = media.filter((m) => m.kind !== 'voice');
   const filed = capture.filedAt != null;
+  // The list joins only patients still in the record. A capture can outlive the
+  // patient it was about; filing it under that id would be refused, so the card
+  // says so and lets the user choose instead of failing on a hidden link.
+  const patientGone = capture.patientId != null && patient == null;
 
-  async function toTask() {
+  async function fileAsTask(patientId?: null) {
     setBusy(true);
     try {
-      await fileCaptureAsTask(capture.id);
+      await fileCaptureAsTask(capture.id, patientId === null ? { patientId: null } : {});
     } catch (e) {
       alertError('به کار تبدیل نشد', e);
     } finally {
@@ -65,8 +69,19 @@ export function CaptureCard({
     }
   }
 
+  function toTask() {
+    if (!patientGone) {
+      void fileAsTask();
+      return;
+    }
+    Alert.alert('بیمارِ این مورد حذف شده است', 'بدون بیمار به کار تبدیل شود؟ برای بیمار دیگر، «بیمار» را بزنید.', [
+      { text: 'انصراف', style: 'cancel' },
+      { text: 'بدون بیمار', onPress: () => void fileAsTask(null) },
+    ]);
+  }
+
   async function toNote() {
-    if (!capture.patientId) {
+    if (!capture.patientId || patientGone) {
       onAskPatient({ captureId: capture.id, purpose: 'note', selectedId: null });
       return;
     }
@@ -110,7 +125,8 @@ export function CaptureCard({
                 {formatJalaliDateTime(capture.capturedAt)}
               </Text>
               {patient ? <Badge label={fullName(patient.firstName, patient.lastName)} /> : null}
-              {filed ? <Badge label={capture.filedAs === 'note' ? 'شد نوت' : 'شد کار'} tone="success" /> : null}
+              {patientGone && !filed ? <Badge label="بیمارِ حذف‌شده" tone="warning" /> : null}
+              {filed ? <Badge label={capture.filedAs === 'note' ? 'نوت شد' : 'کار شد'} tone="success" /> : null}
             </Row>
           </Column>
         </Row>
@@ -151,7 +167,7 @@ export function CaptureCard({
               variant="secondary"
               size="sm"
               disabled={busy || !capture.text}
-              onPress={() => void toTask()}
+              onPress={toTask}
               loading={busy}
             />
             <Button
