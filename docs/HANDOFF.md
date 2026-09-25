@@ -73,7 +73,7 @@ had 0.6.0 with the owner's own data (3 patients, a follow-up, backups up to 1 Me
   phone (done on the emulator only), doctors/knowledge/vault flows on the phone.
 
 **Found, for the owner (reported in chat)**
-- The two «رضا حسینی» patients were «بستری» in 0.6.0 without an admission record; on
+- Two patients were «بستری» in 0.6.0 without an admission record; on
   startup the app reconciles status with episodes and made them «سرپایی» (audited as
   `patient.statusReconciled`). If they are really admitted, record the admission.
 - MedOS lacks Android's exact-alarm permission, so reminders may come minutes late. Only
