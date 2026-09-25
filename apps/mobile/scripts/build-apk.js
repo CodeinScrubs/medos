@@ -33,9 +33,34 @@ if (!fs.existsSync(path.join(repoRoot, 'private', 'keystore.properties'))) {
   process.exit(1);
 }
 
-// android/ is generated and gitignored; create it on a fresh checkout.
-if (!fs.existsSync(androidDir)) {
+const app = JSON.parse(fs.readFileSync(path.join(mobileRoot, 'app.json'), 'utf8')).expo;
+
+/** The version Gradle will actually stamp into the APK, as prebuild last wrote it. */
+function nativeVersion() {
+  const gradle = path.join(androidDir, 'app', 'build.gradle');
+  if (!fs.existsSync(gradle)) return null;
+  const text = fs.readFileSync(gradle, 'utf8');
+  return {
+    code: Number(/versionCode\s+(\d+)/.exec(text)?.[1]),
+    name: /versionName\s+"([^"]+)"/.exec(text)?.[1],
+  };
+}
+
+// android/ is generated and gitignored: create it on a fresh checkout, and
+// regenerate it when app.json has a newer version than the last prebuild.
+// Without the second case the APK keeps the old version while being copied
+// out under the new name — two different builds wearing one version number.
+const before = nativeVersion();
+if (!before || before.code !== app.android.versionCode || before.name !== app.version) {
   run('npx', ['expo', 'prebuild', '--platform', 'android', '--no-install'], mobileRoot);
+  const after = nativeVersion();
+  if (!after || after.code !== app.android.versionCode || after.name !== app.version) {
+    console.error(
+      `\n[MedOS] android/ still says ${after?.name}/${after?.code}, app.json says ${app.version}/${app.android.versionCode}.\n` +
+        '[MedOS] Refusing to build an APK whose version does not match its file name.\n',
+    );
+    process.exit(1);
+  }
 }
 
 // Absolute path: some Windows setups (NoDefaultCurrentDirectoryInExePath)
@@ -57,7 +82,7 @@ run(
   androidDir,
 );
 
-const version = JSON.parse(fs.readFileSync(path.join(mobileRoot, 'app.json'), 'utf8')).expo.version;
+const version = app.version;
 const built = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 const dist = path.join(repoRoot, 'dist');
 fs.mkdirSync(dist, { recursive: true });
