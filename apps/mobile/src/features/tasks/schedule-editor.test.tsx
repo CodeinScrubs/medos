@@ -98,7 +98,7 @@ describe('task schedule editor', () => {
     await render();
     expect(input('تاریخ موعد').props.value).toBe('۱۴۰');
     expect(input('ساعت موعد').props.value).toBe('۱:');
-    await click('اعمال موعد');
+    await click('ذخیرهٔ موعد');
     expect(current().dueAt).toBeNull();
     expect(input('تاریخ موعد').props.value).toBe('۱۴۰');
   });
@@ -121,7 +121,7 @@ describe('task schedule editor', () => {
     await act(async () => {
       toggle('اعلان در موعد').props.onChange(true);
     });
-    await click('اعمال موعد');
+    await click('ذخیرهٔ موعد');
     expect(current()).toMatchObject({ dueAt: future, reminderEnabled: true, scheduleDraft: null });
     expect([...scheduled.keys()]).toEqual([taskReminderId(current().id)]);
   });

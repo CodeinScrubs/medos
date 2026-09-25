@@ -275,7 +275,7 @@ export function Toggle({
   onChange: (next: boolean) => void;
   disabled?: boolean;
 }) {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, isDark } = useTheme();
   return (
     <Pressable
       accessibilityRole="switch"
@@ -298,7 +298,9 @@ export function Toggle({
           onValueChange={onChange}
           disabled={disabled}
           trackColor={{ false: colors.borderStrong, true: colors.primary }}
-          thumbColor={colors.surface}
+          // A surface-coloured thumb vanished into the dark card, and "on"
+          // looked like "off": in the dark scheme the thumb is light.
+          thumbColor={isDark ? colors.text : colors.surface}
         />
       </Row>
     </Pressable>

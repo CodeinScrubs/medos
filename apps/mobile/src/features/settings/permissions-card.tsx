@@ -136,9 +136,22 @@ export function PermissionsCard() {
 
         <Divider />
         <Text variant="tiny" color="textFaint" style={{ marginTop: spacing.xxs }}>
-          اگر یادآورها دیر می‌رسند، در تنظیمات اندروید «Alarms & reminders» را برای MedOS روشن کنید؛ بدون آن اندروید
+          برای اینکه یادآورها سر ساعت برسند، در صفحه‌ی «Alarms & reminders» اندروید، MedOS را روشن کنید. بدون آن اندروید
           اجازه دارد یادآور را تا چند دقیقه عقب بیندازد.
         </Text>
+        {/*
+         * Straight to the list where the switch lives. It shows every app; one
+         * more tap on MedOS. (With the package in the intent's data it would open
+         * MedOS's own page, but Linking cannot set intent data.)
+         */}
+        <Button
+          label="باز کردن «Alarms & reminders»"
+          icon="alarm-outline"
+          variant="ghost"
+          onPress={() =>
+            void Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM').catch(() => Linking.openSettings())
+          }
+        />
         <Button
           label="باز کردن تنظیمات اپ در اندروید"
           icon="open-outline"

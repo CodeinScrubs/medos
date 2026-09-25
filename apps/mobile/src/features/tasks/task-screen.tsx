@@ -116,7 +116,7 @@ function TaskDetail({ task, readNotice }: { task: Task; readNotice: ReactNode })
                 label="حذف"
                 variant="ghost"
                 onPress={() =>
-                  Alert.alert('حذف این کار؟', 'از فهرست حذف‌شده‌ها قابل بازگرداندن است.', [
+                  Alert.alert('حذف این کار؟', 'از «همه و تاریخچه» ← «حذف‌شده» برمی‌گردد.', [
                     { text: 'انصراف', style: 'cancel' },
                     { text: 'حذف', style: 'destructive', onPress: () => void scope.perform(() => deleteTask(task.id)) },
                   ])

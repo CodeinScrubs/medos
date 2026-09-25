@@ -197,11 +197,13 @@ function ScheduleEditor({
           />
         </>
       ) : null}
-      <Text variant="tiny" color="textMuted">
-        پیش‌نویس خودکار ذخیره می‌شود؛ موعد با «اعمال» تغییر می‌کند.
-      </Text>
+      {initial.scheduleDraft ? (
+        <Text variant="tiny" color="warning">
+          این موعد هنوز ذخیره نشده است.
+        </Text>
+      ) : null}
       <Row gap="sm">
-        <Button label="اعمال موعد" size="sm" loading={busy} onPress={() => void perform(apply)} />
+        <Button label="ذخیرهٔ موعد" size="sm" loading={busy} onPress={() => void perform(apply)} />
         <Button
           label="بستن"
           size="sm"
@@ -283,28 +285,31 @@ function ScheduleEditor({
           />
         </Column>
       ) : null}
-      <Button
-        label="کنارگذاشتن پیش‌نویس موعد"
-        size="sm"
-        variant="ghost"
-        disabled={busy}
-        onPress={() =>
-          Alert.alert('پیش‌نویس موعد کنار گذاشته شود؟', undefined, [
-            { text: 'انصراف', style: 'cancel' },
-            {
-              text: 'کنار گذاشتن',
-              style: 'destructive',
-              onPress: () =>
-                void perform(async () => {
-                  if (!(await saver.flush())) return;
-                  await discardTaskScheduleDraft(initial.id, persistence.revision());
-                  saver.cancel();
-                  onClose();
-                }),
-            },
-          ])
-        }
-      />
+      {/* Only a leftover draft needs throwing away; a fresh edit is left with «بستن». */}
+      {initial.scheduleDraft ? (
+        <Button
+          label="کنارگذاشتن پیش‌نویس موعد"
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onPress={() =>
+            Alert.alert('پیش‌نویس موعد کنار گذاشته شود؟', undefined, [
+              { text: 'انصراف', style: 'cancel' },
+              {
+                text: 'کنار گذاشتن',
+                style: 'destructive',
+                onPress: () =>
+                  void perform(async () => {
+                    if (!(await saver.flush())) return;
+                    await discardTaskScheduleDraft(initial.id, persistence.revision());
+                    saver.cancel();
+                    onClose();
+                  }),
+              },
+            ])
+          }
+        />
+      ) : null}
     </Column>
   );
 }
