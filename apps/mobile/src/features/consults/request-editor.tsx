@@ -18,15 +18,30 @@ import {
   type RequestDraftFields,
 } from './request-drafts';
 
-export function ConsultRequestEditor({ patientId }: { patientId: string }) {
-  return <DraftGate key={patientId} patientId={patientId} />;
+/**
+ * The new-consult form. It stays folded away until asked for — most visits to
+ * a record are not to write a consult — except when an unfinished question is
+ * waiting in a draft, which is shown straight away.
+ */
+export function ConsultRequestEditor({
+  patientId,
+  open,
+  onDone,
+}: {
+  patientId: string;
+  open: boolean;
+  onDone: () => void;
+}) {
+  return <DraftGate key={patientId} patientId={patientId} open={open} onDone={onDone} />;
 }
 
-function DraftGate({ patientId }: { patientId: string }) {
+function DraftGate({ patientId, open, onDone }: { patientId: string; open: boolean; onDone: () => void }) {
   const { data, error } = useLive(requestDraftQuery(patientId), [patientId]);
   const [seed, setSeed] = useState<{ draft: ConsultRequestDraft | null; generation: number } | null>(null);
   if (!seed && data) setSeed({ draft: data[0] ?? null, generation: 0 });
-  if (seed)
+  if (seed) {
+    const waiting = Boolean(seed.draft && (seed.draft.specialty || seed.draft.reason));
+    if (!open && !waiting) return <ErrorNotice error={error} what="پیش‌نویس کانسالت" />;
     return (
       <>
         <ErrorNotice error={error} what="پیش‌نویس کانسالت" />
@@ -34,25 +49,32 @@ function DraftGate({ patientId }: { patientId: string }) {
           key={seed.generation}
           initial={seed.draft}
           patientId={patientId}
-          onReset={(draft) => setSeed({ draft, generation: seed.generation + 1 })}
+          autoFocus={open && !waiting}
+          onReset={(draft) => {
+            setSeed({ draft, generation: seed.generation + 1 });
+            if (!draft) onDone();
+          }}
         />
       </>
     );
+  }
   if (error) return <ErrorNotice error={error} what="پیش‌نویس کانسالت" />;
-  return (
+  return open ? (
     <Text variant="tiny" color="textMuted">
       بارگذاری پیش‌نویس…
     </Text>
-  );
+  ) : null;
 }
 
 export function RequestDraftEditor({
   initial,
   patientId,
+  autoFocus = false,
   onReset,
 }: {
   initial: ConsultRequestDraft | null;
   patientId: string;
+  autoFocus?: boolean;
   onReset: (draft: ConsultRequestDraft | null) => void;
 }) {
   const scope = useAutosaveScope()!;
@@ -138,6 +160,7 @@ export function RequestDraftEditor({
               onChangeText={(specialty) => update({ specialty })}
               placeholder="سرویس"
               editable={!busy}
+              autoFocus={autoFocus}
             />
           </View>
           <View style={{ flex: 1 }}>
@@ -149,7 +172,7 @@ export function RequestDraftEditor({
             />
           </View>
         </Row>
-        <Button label="ثبت کانسالت" icon="add" loading={busy} onPress={() => void perform(add)} />
+        <Button label="ثبت کانسالت" icon="add" variant="secondary" loading={busy} onPress={() => void perform(add)} />
         {state.status === 'pending' || state.status === 'writing' ? (
           <Text variant="tiny" color="textMuted">
             در حال ذخیره…

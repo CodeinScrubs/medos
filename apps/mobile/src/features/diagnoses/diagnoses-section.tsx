@@ -38,11 +38,14 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
   const rows = data ?? [];
 
   const [title, setTitle] = useState('');
-  const [kind, setKind] = useState<Diagnosis['kind']>('secondary');
+  const [chosenKind, setChosenKind] = useState<Diagnosis['kind'] | null>(null);
   const [busy, setBusy] = useState(false);
 
   const active = rows.filter((d) => d.status === 'active');
   const closed = rows.filter((d) => d.status !== 'active');
+  // The first problem written down is usually the main one; the chip shows
+  // the choice and one tap changes it.
+  const kind = chosenKind ?? (active.length === 0 ? 'primary' : 'secondary');
 
   async function add() {
     const text = title.trim();
@@ -51,6 +54,7 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
     try {
       await addDiagnosis({ patientId, title: text, kind });
       setTitle('');
+      setChosenKind(null);
     } catch (e) {
       alertError('اضافه نشد', e);
     } finally {
@@ -97,9 +101,9 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
               ltr
             />
           </View>
-          <Button label="افزودن" icon="add" onPress={() => void add()} loading={busy} />
+          <Button label="افزودن" icon="add" variant="secondary" onPress={() => void add()} loading={busy} />
         </Row>
-        <ChipSelect options={KINDS} value={kind} onChange={(v) => v && setKind(v)} />
+        {title.trim() ? <ChipSelect options={KINDS} value={kind} onChange={(v) => v && setChosenKind(v)} /> : null}
 
         {rows.length === 0 && data !== undefined ? (
           <Text variant="tiny" color="textFaint" style={{ marginBottom: spacing.xs }}>

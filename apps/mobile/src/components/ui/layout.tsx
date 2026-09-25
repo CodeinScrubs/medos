@@ -183,15 +183,21 @@ export function Column({
 export function SectionHeader({ title, action, count }: { title: string; action?: ReactNode; count?: number }) {
   const { spacing } = useTheme();
   return (
-    <Row justify="space-between" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>
-      <Row gap="xs">
-        <Text variant="heading">{title}</Text>
-        {count != null && count > 0 && (
+    <Row justify="space-between" gap="sm" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>
+      {/*
+       * The title takes the free width rather than its own measured width:
+       * sized to fit, Android sometimes laid it out a hair narrower than it
+       * needed and dropped the last word ("کارهای این بیمار" → "کارهای این").
+       */}
+      <Text variant="heading" style={styles.flex}>
+        {title}
+        {count != null && count > 0 ? (
           <Text variant="caption" color="textFaint">
+            {'  '}
             {toPersianDigits(count)}
           </Text>
-        )}
-      </Row>
+        ) : null}
+      </Text>
       {action}
     </Row>
   );

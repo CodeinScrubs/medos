@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet } from 'react-native';
 
 import { useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
@@ -41,6 +42,19 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
   const { spacing } = useTheme();
   const { data, error } = useLive(patientConsultsQuery(patientId), [patientId]);
   const rows = data ?? [];
+  const [composing, setComposing] = useState(false);
+
+  // One tap from "ثبت پاسخ", and there is no way back from it: ask first.
+  function confirmCancel(consultId: string) {
+    Alert.alert('لغو این کانسالت؟', 'کانسالت لغوشده دیگر در فهرست کارهای باز نمی‌آید.', [
+      { text: 'نه', style: 'cancel' },
+      {
+        text: 'لغو کانسالت',
+        style: 'destructive',
+        onPress: () => void cancelConsult(consultId).catch((e) => alertError('تغییر ثبت نشد', e)),
+      },
+    ]);
+  }
 
   function openAnswer(consultId: string) {
     void scope.perform(() => router.push({ pathname: '/consult-answer', params: { consultId } }));
@@ -49,9 +63,28 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
   return (
     <>
       <ErrorNotice error={error} what="کانسالت‌ها" />
-      <SectionHeader title="کانسالت‌ها" count={rows.length} />
+      <SectionHeader
+        title="کانسالت‌ها"
+        count={rows.length}
+        action={
+          composing ? null : (
+            <Pressable hitSlop={8} onPress={() => setComposing(true)}>
+              <Text variant="captionStrong" color="primary">
+                + کانسالت
+              </Text>
+            </Pressable>
+          )
+        }
+      />
       <Column gap="sm">
-        <ConsultRequestEditor patientId={patientId} />
+        <ConsultRequestEditor patientId={patientId} open={composing} onDone={() => setComposing(false)} />
+        {rows.length === 0 && data !== undefined && !composing ? (
+          <Card tone="alt">
+            <Text variant="caption" color="textFaint">
+              کانسالتی ثبت نشده.
+            </Text>
+          </Card>
+        ) : null}
 
         {rows.map(({ consult, doctor }) => (
           <Card key={consult.id}>
@@ -119,7 +152,7 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
                       variant="ghost"
                       size="sm"
                       haptic={false}
-                      onPress={() => void cancelConsult(consult.id).catch((e) => alertError('تغییر ثبت نشد', e))}
+                      onPress={() => confirmCancel(consult.id)}
                     />
                   </>
                 ) : null}

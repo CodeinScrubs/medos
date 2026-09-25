@@ -134,7 +134,7 @@ export function TaskDraftEditor({
             returnKeyType="done"
           />
         </View>
-        <Button label="افزودن" icon="add" loading={busy} onPress={() => void perform(add)} />
+        <Button label="افزودن" icon="add" variant="secondary" loading={busy} onPress={() => void perform(add)} />
       </Row>
       {initial?.shiftId && initial.shiftId !== shiftId ? (
         <Text variant="tiny" color="textMuted">
