@@ -33,6 +33,69 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-25 — Review of the Codex commits since 41eba6c; 0.8.0
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** `c4bbb3d`, `0b1bc92`, and this entry's commit
+
+**Changed**
+
+- Reviewed all 17 commits `f8913ce..a59d9ee` (GPT-6 via Codex, plus integrated
+  "Antigravity" fixes): data layer, migrations 0010–0015, backup, reminders, autosave
+  scope, date validation, edit gates. Invariants hold: no hard deletes, synchronous
+  transactions, additive migrations with SQL defaults, backup format/crypto/import
+  untouched, no personal data or keys in the diff.
+- Four defects in Claude's own earlier M1/M2 work were found and fixed there, and are
+  confirmed here: note-version equality used lossy search text (moving text between SOAP
+  fields counted as "no change"); one shared reply buffer could carry consult A's answer
+  into consult B; the round card's "last note" was pinned-first; the admission badge
+  read "روز ۳ روز".
+- Fixed: a capture whose patient was deleted looked patient-less in the inbox but filing
+  failed with an English "Patient not found", and could never be filed without a patient.
+  The card now says the patient was deleted; "Task" asks before dropping the link, "Note"
+  asks which patient. The "filed" badge read backwards ("شد نوت" → "نوت شد").
+- 0.8.0 / versionCode 11. Codex's APK of this code was 0.7.1/10 and overwrote the older
+  `dist/MedOS-0.7.1.apk`; that file is now a copy of `a59d9ee` under the wrong label.
+  `build-apk.js` now re-runs prebuild when app.json and build.gradle disagree, and refuses
+  to build if they still do.
+
+**Verified**
+
+- `npm run check` before and after: 58/710 → 59 suites / 714 tests + 3 workflow tests.
+  The new capture-card tests fail without the fix (3 of 4) and pass with it.
+- `expo export --platform android` bundles (2469 modules, 6.5 MB Hermes bytecode).
+- CI green on GitHub for every Codex commit checked (`gh run list`).
+- `npm run apk` re-ran prebuild on its own (versions differed) and built
+  `dist/MedOS-0.8.0.apk`: 52,777,473 bytes, SHA-256 `de10c03e…4df99dda`; aapt2 reports
+  `com.shayan.medos` 0.8.0 / versionCode 11; signer SHA-256 `1119f776…7e0c`, the same
+  release key as every earlier build, so it installs over the phone's copy.
+
+**Not verified**
+
+- Nothing on the phone (not connected). Everything since 0.6.0 is still device-untested.
+- The reminder-upkeep cost below is an estimate from the code, not a measurement.
+
+**Open threads**
+
+- **Owner decision pending:** AGENTS.md invariant 10 now allows sourced clinical tools
+  (C01–C05), attributed to the owner on 2026-09-23; `CLAUDE.md` still says "MedOS
+  records, it does not advise". Do not build C-items, and do not edit either file,
+  until the owner confirms which one is right.
+- Device session on 0.8.0, in this order: upgrade over the installed build (migrations
+  0004–0015), back/gesture on patient record and round (`usePreventRemove` is always on
+  there), note save, capture → note/task, vitals, a backup — and read which evidence the
+  backup screen reports: only `bytes` lets old backups be pruned; `size` means the folder
+  grows without limit.
+- Reminder upkeep reschedules every future follow-up, open task reminder and enabled
+  occasion on every return to the foreground (two DB writes and one native call each,
+  plus live-query refreshes). Measure on the phone; if it shows, list the OS's scheduled
+  ids once and reconcile only rows that differ.
+
+**Gotchas**
+
+- Other agents push to `main` between Claude sessions. Compare `git log` with the last
+  commit you made before building on anything.
+
 ## 2026-09-25 — Recover edit-screen reads without replacing loaded forms
 
 **Agent:** GPT-6 via Codex
