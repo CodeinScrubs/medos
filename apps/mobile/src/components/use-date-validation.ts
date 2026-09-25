@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
+
+import { notify } from './feedback';
 
 /** The ref closes the gap between a native text event and the next React render. */
 export function useDateValidation() {
@@ -9,7 +10,7 @@ export function useDateValidation() {
   }, []);
   const check = useCallback(() => {
     if (valid.current) return true;
-    Alert.alert('تاریخ یا ساعت معتبر نیست', 'مقدار نوشته‌شده را اصلاح کنید.');
+    notify('تاریخ یا ساعت معتبر نیست', 'مقدار نوشته‌شده را اصلاح کنید.');
     return false;
   }, []);
   return { setValid, check };

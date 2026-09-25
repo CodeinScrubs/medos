@@ -18,7 +18,10 @@ jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 jest.mock('@/components/voice-note-player', () => ({ VoiceNotePlayer: 'VoiceNotePlayer' }));
-jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
+jest.mock('@/components/feedback', () => ({
+  alertError: jest.fn(),
+  notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
+}));
 jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii: {} }) }));
 jest.mock('@/components/ui', () => ({
   Badge: 'Badge',

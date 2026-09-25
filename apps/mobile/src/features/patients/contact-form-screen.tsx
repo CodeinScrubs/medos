@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Button, ChipSelect, Column, Input, Screen } from '@/components/ui';
 import { addPatientContact } from '@/features/patients/queries';
 import { normalizePhone } from '@/lib/persian';
@@ -27,7 +26,7 @@ export function ContactFormScreen() {
 
   async function save() {
     if (!digits) {
-      Alert.alert('شماره لازم است');
+      notify('شماره لازم است');
       return;
     }
     setSaving(true);

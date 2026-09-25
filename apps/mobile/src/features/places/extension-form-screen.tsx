@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Row, Screen, SelectField } from '@/components/ui';
@@ -78,11 +78,11 @@ function ExtensionForm({
 
   async function save() {
     if (!placeId) {
-      Alert.alert('بیمارستان را انتخاب کنید');
+      notify('بیمارستان را انتخاب کنید');
       return;
     }
     if (!department.trim() || !extension.trim()) {
-      Alert.alert('نام بخش و شماره‌ی داخلی لازم است');
+      notify('نام بخش و شماره‌ی داخلی لازم است');
       return;
     }
     setSaving(true);

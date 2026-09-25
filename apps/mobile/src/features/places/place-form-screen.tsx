@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import type { Place } from '@/db/schema';
@@ -58,7 +58,7 @@ function PlaceForm({ place, readNotice }: { readNotice: ReactNode; place: Place 
 
   async function save() {
     if (!name.trim()) {
-      Alert.alert('نام لازم است');
+      notify('نام لازم است');
       return;
     }
     setSaving(true);

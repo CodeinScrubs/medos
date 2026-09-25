@@ -23,7 +23,10 @@ jest.mock('@/components/ui', () => ({
   Text: 'Text',
 }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
-jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
+jest.mock('@/components/feedback', () => ({
+  alertError: jest.fn(),
+  notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
+}));
 jest.mock('@/db/use-live', () => ({ useLive: () => ({ data: [], error: undefined }) }));
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));

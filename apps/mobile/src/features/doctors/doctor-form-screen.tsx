@@ -1,10 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Toggle } from '@/components/ui';
@@ -103,7 +102,7 @@ function DoctorForm({ doctor, readNotice }: { readNotice: ReactNode; doctor: Doc
 
   async function save() {
     if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('نام و نام خانوادگی لازم است');
+      notify('نام و نام خانوادگی لازم است');
       return;
     }
     setSaving(true);

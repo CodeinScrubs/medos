@@ -4,7 +4,7 @@ import { Alert, AppState } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Card, Column, Input, Screen, Text } from '@/components/ui';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
@@ -129,7 +129,7 @@ export function AnswerEditor({
 
   async function publish() {
     if (!latest.current.response.trim()) {
-      Alert.alert('پاسخ کانسالت را بنویسید.');
+      notify('پاسخ کانسالت را بنویسید.');
       return;
     }
     if (!(await saver.flush()) || saver.unsaved) return;

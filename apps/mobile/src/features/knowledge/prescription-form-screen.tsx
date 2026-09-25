@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import {
@@ -99,11 +99,11 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
 
   async function save() {
     if (!title.trim()) {
-      Alert.alert('عنوان لازم است');
+      notify('عنوان لازم است');
       return;
     }
     if (items.every((i) => !i.drug.trim())) {
-      Alert.alert('حداقل یک دارو بنویسید');
+      notify('حداقل یک دارو بنویسید');
       return;
     }
     setSaving(true);

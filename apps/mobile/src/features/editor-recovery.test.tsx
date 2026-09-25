@@ -93,7 +93,10 @@ jest.mock('@/components/ui', () => ({
 }));
 jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii: {}, typography: {} }) }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
-jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
+jest.mock('@/components/feedback', () => ({
+  alertError: jest.fn(),
+  notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
+}));
 jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
 jest.mock('@/components/use-now', () => ({ useNow: () => new Date('2026-09-24T12:00:00Z').getTime() }));
 jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
@@ -273,7 +276,7 @@ describe('editors survive database read failures', () => {
       reminderRevision: 1,
       reminderAppliedRevision: -1,
     });
-    expect(alert).toHaveBeenCalledWith('مناسبت ذخیره شد', expect.stringContaining('یادآور'));
+    expect(alert).toHaveBeenCalledWith('مناسبت ذخیره شد', expect.stringContaining('یادآور'), [{ text: 'باشه' }]);
   });
 
   it('shows an initial occasion read failure without leaving an endless loading indicator', async () => {

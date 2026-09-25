@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { ScreenOptions } from '@/components/screen-options';
@@ -248,7 +248,7 @@ function NoteEditor({
           { relativePath: stored.relativePath, durationMs: recording.durationMs, sizeBytes: stored.sizeBytes },
         ],
       });
-      if (!(await saver.flush())) Alert.alert('وویس هنوز ثبت نشد', 'وویس روی صفحه باقی مانده؛ دوباره ذخیره کنید.');
+      if (!(await saver.flush())) notify('وویس هنوز ثبت نشد', 'وویس روی صفحه باقی مانده؛ دوباره ذخیره کنید.');
     } catch (e) {
       alertError('وویس ذخیره نشد', e);
     }
@@ -258,7 +258,7 @@ function NoteEditor({
     if (!dateValidation.check()) return;
     if (committing.current) return;
     if (!draftHasContent(latest.current)) {
-      Alert.alert('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
+      notify('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
       return;
     }
     committing.current = true;
@@ -267,7 +267,7 @@ function NoteEditor({
       // Even an unchanged existing note may not have a draft yet.
       saver.change(latest.current);
       if (!(await saver.flush())) {
-        Alert.alert('ذخیره نشد', 'نوشته روی صفحه باقی مانده؛ دوباره تلاش کنید.');
+        notify('ذخیره نشد', 'نوشته روی صفحه باقی مانده؛ دوباره تلاش کنید.');
         return;
       }
       await commitNoteDraft(draftId);
@@ -319,7 +319,7 @@ function NoteEditor({
             void saver.flush().then((stored) => {
               if (stored) router.back();
               else {
-                Alert.alert(
+                notify(
                   'هنوز ذخیره نشد',
                   'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
                 );
@@ -350,8 +350,11 @@ function NoteEditor({
       <ScreenOptions
         options={{
           title: isEdit ? 'ویرایش نوت' : 'نوت جدید',
-          headerRight: isEdit
-            ? () => (
+          // Save is also up here: a long admission note ends far below the
+          // fold, and saving should not mean scrolling to the bottom first.
+          headerRight: () => (
+            <Row gap="xs">
+              {isEdit ? (
                 <IconButton
                   icon="time-outline"
                   label="تاریخچه"
@@ -362,8 +365,10 @@ function NoteEditor({
                     })
                   }
                 />
-              )
-            : undefined,
+              ) : null}
+              <Button label="ذخیره" variant="secondary" size="sm" loading={saving} onPress={() => void save()} />
+            </Row>
+          ),
         }}
       />
       <Column gap="md" style={{ paddingTop: spacing.md }}>

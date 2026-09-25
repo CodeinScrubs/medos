@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert } from 'react-native';
 
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Screen, Segmented, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
@@ -50,7 +49,7 @@ export function FollowUpFormScreen() {
     if (savingRef.current) return;
     if (!dateValidation.check()) return;
     if (!reason.trim()) {
-      Alert.alert('دلیل پیگیری را بنویسید');
+      notify('دلیل پیگیری را بنویسید');
       return;
     }
     savingRef.current = true;

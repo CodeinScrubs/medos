@@ -1,6 +1,4 @@
-import { Alert } from 'react-native';
-
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { deletedCapturesQuery, restoreCapture } from '@/features/capture/queries';
@@ -63,9 +61,7 @@ export function TrashScreen() {
                     variant="secondary"
                     onPress={() =>
                       void restorePatient(p.id)
-                        .then(() =>
-                          Alert.alert('برگردانده شد', `${p.firstName} ${p.lastName} دوباره در لیست بیماران است.`),
-                        )
+                        .then(() => notify('برگردانده شد', `${p.firstName} ${p.lastName} دوباره در لیست بیماران است.`))
                         .catch((e) => alertError('برگردانده نشد', e))
                     }
                   />

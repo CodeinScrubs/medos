@@ -3,10 +3,10 @@ import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, Card, Column, Divider, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
@@ -173,7 +173,7 @@ function LabEntry({
     const text = await Clipboard.getStringAsync();
     const lines = parsePastedTable(text);
     if (lines.length === 0) {
-      Alert.alert(
+      notify(
         'چیزی برای چسباندن نیست',
         'در اکسل یا Google Sheets دو ستون «نام آزمایش» و «مقدار» را انتخاب و کپی کنید، بعد دوباره بزنید.',
       );
@@ -202,7 +202,7 @@ function LabEntry({
       });
     }
     setRows(next);
-    Alert.alert(
+    notify(
       'چسبانده شد',
       `${toPersianDigits(lines.length)} مقدار وارد شد. قبل از ذخیره، واحدها و محدوده‌ها را یک نگاه بیندازید.`,
     );
@@ -213,7 +213,7 @@ function LabEntry({
   async function save() {
     if (!dateValidation.check()) return;
     if (filledCount === 0 && !(sheetPhotos && sheetPhotos.length > 0)) {
-      Alert.alert('هیچ مقداری وارد نشده');
+      notify('هیچ مقداری وارد نشده');
       return;
     }
     setSaving(true);
@@ -379,7 +379,7 @@ function LabEntry({
         onSubmit={(text) => {
           const parsed = parseRangeInput(text);
           if (!parsed) {
-            Alert.alert('محدوده خوانده نشد', 'به شکل ۱۳۵-۱۴۵ بنویسید.');
+            notify('محدوده خوانده نشد', 'به شکل ۱۳۵-۱۴۵ بنویسید.');
             return;
           }
           if (editingRange) patchRow(editingRange.key, { refLow: parsed.low, refHigh: parsed.high });

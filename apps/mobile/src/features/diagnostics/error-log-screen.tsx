@@ -2,6 +2,7 @@ import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { notify } from '@/components/feedback';
 import { Badge, Button, Card, Column, Divider, EmptyState, Row, Screen, Text } from '@/components/ui';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
@@ -27,7 +28,7 @@ export function ErrorLogScreen() {
     const uri = errorLogUri();
     if (!uri) return;
     if (!(await Sharing.isAvailableAsync())) {
-      Alert.alert('اشتراک‌گذاری روی این گوشی در دسترس نیست');
+      notify('اشتراک‌گذاری روی این گوشی در دسترس نیست');
       return;
     }
     await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: 'ارسال گزارش خطاها' });

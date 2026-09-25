@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Row, Screen, SelectField, Toggle } from '@/components/ui';
@@ -17,7 +17,7 @@ import { createPlace, placesQuery } from '@/features/places/queries';
 import { useTheme } from '@/theme';
 
 import { ENCOUNTER_KIND_LABELS } from './labels';
-import { encounterQuery, openEncounter, updateEncounter } from './queries';
+import { deleteEncounter, encounterQuery, encounterRecordCount, openEncounter, updateEncounter } from './queries';
 
 const KIND_OPTIONS = (Object.keys(ENCOUNTER_KIND_LABELS) as Encounter['kind'][]).map((k) => ({
   value: k,
@@ -91,6 +91,30 @@ function EncounterForm({
 
   const placeLabel = placeItems.find((p) => p.id === placeId)?.label ?? null;
   const attendingLabel = doctorItems.find((d) => d.id === attendingId)?.label ?? null;
+
+  // For an episode entered by mistake. A real one — with anything filed
+  // under it — is ended with a discharge, not deleted.
+  function confirmDelete(current: Encounter) {
+    const label = ENCOUNTER_KIND_LABELS[current.kind];
+    if (encounterRecordCount(current.id) > 0) {
+      notify(
+        `این ${label} حذف نمی‌شود`,
+        'نوت، دستور، آزمایش یا کاری زیر آن ثبت شده است. اگر تمام شده «ترخیص» را بزنید؛ اگر جزئیاتش اشتباه است، همین‌جا ویرایشش کنید.',
+      );
+      return;
+    }
+    Alert.alert(`حذف این ${label}؟`, 'فقط برای موردی است که اشتباهی ثبت شده. از پرونده برداشته می‌شود.', [
+      { text: 'انصراف', style: 'cancel' },
+      {
+        text: 'حذف',
+        style: 'destructive',
+        onPress: () =>
+          void deleteEncounter(current.id)
+            .then(() => router.back())
+            .catch((e) => alertError('حذف نشد', e)),
+      },
+    ]);
+  }
 
   async function save() {
     if (!dateValidation.check()) return;
@@ -193,6 +217,17 @@ function EncounterForm({
           style={{ marginTop: spacing.sm }}
         />
         <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        {encounter ? (
+          <Button
+            label="حذف (ثبت اشتباه)"
+            icon="trash-outline"
+            variant="danger"
+            size="sm"
+            haptic={false}
+            onPress={() => confirmDelete(encounter)}
+            style={{ marginTop: spacing.lg }}
+          />
+        ) : null}
       </Column>
 
       <PickerModal

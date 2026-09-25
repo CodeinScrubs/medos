@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, AppState, BackHandler, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, StyleSheet, View } from 'react-native';
 
+import { notify } from '@/components/feedback';
 import { Button, Column, Text } from '@/components/ui';
 import { audit } from '@/db/audit';
 import { writeSetting } from '@/db/settings';
@@ -47,7 +48,7 @@ export function LockGate({ children }: { children: ReactNode }) {
       // cannot protect anything on such a phone, so it steps aside and says so.
       if ((await LocalAuthentication.getEnrolledLevelAsync()) === LocalAuthentication.SecurityLevel.NONE) {
         setLocked(false);
-        Alert.alert(
+        notify(
           'قفل MedOS کار نمی‌کند',
           'روی این گوشی قفل صفحه (پین، الگو یا اثر انگشت) تنظیم نشده است. تا وقتی آن را در تنظیمات گوشی فعال نکنید، MedOS هم قفل نمی‌شود.',
         );

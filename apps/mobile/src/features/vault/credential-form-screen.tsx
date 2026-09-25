@@ -1,10 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, Text, Toggle } from '@/components/ui';
@@ -74,7 +73,7 @@ function CredentialForm({ credential, readNotice }: { readNotice: ReactNode; cre
   async function save() {
     if (!dateValidation.check()) return;
     if (!systemName.trim()) {
-      Alert.alert('نام سامانه لازم است');
+      notify('نام سامانه لازم است');
       return;
     }
     setSaving(true);

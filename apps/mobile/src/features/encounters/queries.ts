@@ -1,7 +1,24 @@
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 
+import { audit } from '@/db/audit';
 import { db, type Database } from '@/db/client';
-import { doctors, encounters, orders, patients, places, type Encounter, type PatientStatus } from '@/db/schema';
+import {
+  consultations,
+  diagnoses,
+  doctors,
+  encounters,
+  followUps,
+  imagingStudies,
+  labPanels,
+  notes,
+  orders,
+  patients,
+  places,
+  tasks,
+  vitals,
+  type Encounter,
+  type PatientStatus,
+} from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { statusAfterDischarge, statusForEncounterKind } from './logic';
@@ -191,6 +208,37 @@ export async function dischargeEncounter(id: string, input: DischargeInput): Pro
       .where(eq(patients.id, current.patientId))
       .run();
   });
+  await audit('encounter.deleted', { entityType: 'encounter', entityId: id });
+}
+
+/** The encounter has notes, orders or results filed under it; see `deleteEncounter`. */
+export class EncounterNotEmptyError extends Error {
+  constructor() {
+    super('This episode has records filed under it and cannot be deleted');
+    this.name = 'EncounterNotEmptyError';
+  }
+}
+
+/**
+ * How many live records are filed under an encounter.
+ *
+ * Deleting an episode is for one entered by mistake. One with notes, orders,
+ * results or tasks under it is real, and deleting it would take them out of
+ * the kardex and the episode's lists — so it is closed with a discharge, or
+ * corrected with an edit, instead.
+ */
+export function encounterRecordCount(id: string): number {
+  const tables = [notes, orders, vitals, labPanels, imagingStudies, diagnoses, followUps, consultations, tasks];
+  return tables.reduce(
+    (sum, table) =>
+      sum +
+      (db
+        .select({ n: count() })
+        .from(table)
+        .where(and(eq(table.encounterId, id), isNull(table.deletedAt)))
+        .get()?.n ?? 0),
+    0,
+  );
 }
 
 /**
@@ -211,6 +259,7 @@ export async function deleteEncounter(id: string): Promise<void> {
       .limit(1)
   )[0];
   if (!current) return;
+  if (encounterRecordCount(id) > 0) throw new EncounterNotEmptyError();
   const now = new Date();
 
   db.transaction((tx) => {

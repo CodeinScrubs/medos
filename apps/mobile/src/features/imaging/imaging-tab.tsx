@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Text } from '@/components/ui';
 import type { ImagingStudy } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -134,7 +134,7 @@ function StudyCard({ study, patientId }: { study: ImagingStudy; patientId: strin
               {study.accessUrl ? (
                 <Pressable
                   onPress={() =>
-                    Linking.openURL(study.accessUrl!).catch(() => Alert.alert('لینک باز نشد', study.accessUrl!))
+                    Linking.openURL(study.accessUrl!).catch(() => notify('لینک باز نشد', study.accessUrl!))
                   }
                   hitSlop={6}
                   accessibilityLabel="باز کردن لینک"

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { TrendChart } from '@/components/trend-chart';
 import { Button, Card, ChipSelect, Column, EmptyState, Input, Row, SectionHeader, Text } from '@/components/ui';
@@ -105,7 +105,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
     const values = { ...parsed.values, measuredAt };
 
     if (!hasAnyVital(values)) {
-      Alert.alert('چیزی ثبت نشده', 'حداقل یک اندازه‌گیری بنویسید.');
+      notify('چیزی ثبت نشده', 'حداقل یک اندازه‌گیری بنویسید.');
       return;
     }
 

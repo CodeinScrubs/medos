@@ -1,7 +1,8 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 
+import { notify } from '@/components/feedback';
 import { normalizePhone } from '@/lib/persian';
 
 /*
@@ -15,7 +16,7 @@ async function open(url: string, failure: string): Promise<boolean> {
     await Linking.openURL(url);
     return true;
   } catch {
-    Alert.alert('باز نشد', failure);
+    notify('باز نشد', failure);
     return false;
   }
 }

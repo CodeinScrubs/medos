@@ -24,7 +24,10 @@ jest.mock('@/components/ui', () => ({
 }));
 jest.mock('@/components/edit-gate', () => ({ EditGate: 'EditGate' }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
-jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
+jest.mock('@/components/feedback', () => ({
+  alertError: jest.fn(),
+  notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
+}));
 jest.mock('@/components/use-save-before-leave', () => ({
   useSaveBeforeLeave: (flush: () => Promise<boolean>) => {
     mockExit = flush;

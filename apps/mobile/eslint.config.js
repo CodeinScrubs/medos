@@ -185,6 +185,11 @@ module.exports = defineConfig([
           message:
             'Inside a screen, set header options with <ScreenOptions> (components/screen-options.tsx): <Stack.Screen> updates the header of a closing screen and crashes Android.',
         },
+        /* Without buttons, Android draws its own English "OK". */
+        {
+          selector: "CallExpression[callee.object.name='Alert'][callee.property.name='alert'][arguments.length<3]",
+          message: 'A message with no choice goes through notify() in components/feedback.ts, whose button is Persian.',
+        },
       ],
     },
   },

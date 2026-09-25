@@ -76,7 +76,10 @@ jest.mock('@/components/ui', () => ({
 jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii: {} }) }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
 jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
-jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
+jest.mock('@/components/feedback', () => ({
+  alertError: jest.fn(),
+  notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
+}));
 jest.mock('@/components/use-now', () => ({ useNow: () => new Date('2026-09-25T12:00:00Z').getTime() }));
 jest.mock('@/components/autosave-scope', () => ({
   useAutosaveScope: () => ({ perform: (action: () => void) => action() }),

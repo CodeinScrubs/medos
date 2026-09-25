@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } fro
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
@@ -63,7 +63,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
       .then((saved) => {
         if (!current) return;
         if (saved) setTab(initialTab);
-        else Alert.alert('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');
+        else notify('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');
       })
       .catch((error: unknown) => {
         if (current) alertError('تب باز نشد', error);

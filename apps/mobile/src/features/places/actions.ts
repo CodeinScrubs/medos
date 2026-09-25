@@ -1,7 +1,8 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 
+import { notify } from '@/components/feedback';
 import type { Extension, Place } from '@/db/schema';
 import { toPersianDigits } from '@/lib/persian';
 
@@ -17,14 +18,14 @@ export async function callExtension(ext: Extension, place: Place): Promise<void>
   const uri = extensionDialUri(ext, place);
   if (!uri) {
     await copyExtension(ext);
-    Alert.alert(
+    notify(
       'شماره‌ی تلفنخانه ثبت نشده',
       `داخلی ${toPersianDigits(dialDigits(ext.extension))} کپی شد. برای تماس مستقیم از بیرون، شماره‌ی تلفنخانه‌ی ${place.name} را در مشخصات مرکز وارد کنید.`,
     );
     return;
   }
   void recordExtensionUse(ext.id);
-  await Linking.openURL(uri).catch(() => Alert.alert('تماس برقرار نشد'));
+  await Linking.openURL(uri).catch(() => notify('تماس برقرار نشد'));
 }
 
 export async function copyExtension(ext: Extension): Promise<void> {
@@ -36,10 +37,8 @@ export async function copyExtension(ext: Extension): Promise<void> {
 export async function openInMaps(place: Place): Promise<void> {
   const uri = mapsUri(place);
   if (!uri) {
-    Alert.alert('آدرس یا موقعیت ثبت نشده');
+    notify('آدرس یا موقعیت ثبت نشده');
     return;
   }
-  await Linking.openURL(uri).catch(() =>
-    Alert.alert('برنامه‌ی نقشه باز نشد', 'یک برنامه‌ی نقشه مثل نشان یا بلد نصب کنید.'),
-  );
+  await Linking.openURL(uri).catch(() => notify('برنامه‌ی نقشه باز نشد', 'یک برنامه‌ی نقشه مثل نشان یا بلد نصب کنید.'));
 }

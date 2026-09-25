@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Row, Screen, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
@@ -99,7 +99,7 @@ function OrderForm({
   async function save() {
     if (!dateValidation.check()) return;
     if (!name.trim()) {
-      Alert.alert('نام دستور لازم است');
+      notify('نام دستور لازم است');
       return;
     }
     setSaving(true);

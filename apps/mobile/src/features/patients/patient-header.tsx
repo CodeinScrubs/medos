@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
+import { Linking, Pressable, StyleSheet } from 'react-native';
 
+import { notify } from '@/components/feedback';
 import { Avatar, Badge, Card, Column, Row, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
 import { formatAge } from '@/lib/jalali';
@@ -162,7 +163,7 @@ export function CallRow({ phone, label, relation }: { phone: string; label: stri
           hitSlop={10}
           onPress={() => {
             Linking.openURL(`tel:${normalized}`).catch(() =>
-              Alert.alert('تماس برقرار نشد', 'شماره را کپی کنید و دستی بگیرید.'),
+              notify('تماس برقرار نشد', 'شماره را کپی کنید و دستی بگیرید.'),
             );
           }}
           style={[styles.action, { backgroundColor: colors.primary, borderRadius: radii.sm }]}

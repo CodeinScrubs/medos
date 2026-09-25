@@ -1,9 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, Text, Toggle } from '@/components/ui';
@@ -105,7 +104,7 @@ function OccasionForm({
     if (busy.current) return;
     if (!dateValidation.check()) return;
     if (!dateIso || !jalali) {
-      Alert.alert('تاریخ لازم است', 'تاریخ مناسبت را بنویسید.');
+      notify('تاریخ لازم است', 'تاریخ مناسبت را بنویسید.');
       return;
     }
     busy.current = true;
@@ -134,7 +133,7 @@ function OccasionForm({
         (saved.reminderRevision !== saved.reminderAppliedRevision ||
           (occasionReminderAt(saved) && !saved.notificationId))
       ) {
-        Alert.alert('مناسبت ذخیره شد', 'تنظیم یادآور کامل نشد؛ از بخش مناسبت‌ها دوباره تلاش کنید.');
+        notify('مناسبت ذخیره شد', 'تنظیم یادآور کامل نشد؛ از بخش مناسبت‌ها دوباره تلاش کنید.');
       }
     } catch (e) {
       // A post-save status read is not proof that the committed save failed.

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, Linking, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, DataRow, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
@@ -164,7 +164,7 @@ export function CredentialScreen() {
             variant="secondary"
             full
             onPress={() => {
-              Linking.openURL(credential.url!).catch(() => Alert.alert('باز نشد', 'آدرس را بررسی کنید.'));
+              Linking.openURL(credential.url!).catch(() => notify('باز نشد', 'آدرس را بررسی کنید.'));
             }}
           />
         ) : null}

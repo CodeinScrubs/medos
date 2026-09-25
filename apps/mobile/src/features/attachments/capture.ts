@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
+import { notify } from '@/components/feedback';
 import type { AttachmentEntity, AttachmentKind } from '@/db/schema';
 import { readSetting } from '@/db/settings';
 import { storePhoto } from '@/platform/media';
@@ -24,7 +25,7 @@ export async function pickPhotos(
   if (source === 'camera') {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('دسترسی دوربین لازم است', 'از تنظیمات گوشی، دسترسی دوربین را برای MedOS فعال کنید.');
+      notify('دسترسی دوربین لازم است', 'از تنظیمات گوشی، دسترسی دوربین را برای MedOS فعال کنید.');
       return null;
     }
   }

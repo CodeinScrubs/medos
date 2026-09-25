@@ -8,9 +8,9 @@ import {
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Row, Text } from '@/components/ui';
 import { toPersianDigits } from '@/lib/persian';
 import { prepareAudioForPlayback } from '@/platform/audio';
@@ -60,7 +60,7 @@ export function VoiceRecorder({
   async function start() {
     const permission = await requestRecordingPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('دسترسی میکروفون لازم است', 'از تنظیمات گوشی، دسترسی میکروفون را برای MedOS فعال کنید.');
+      notify('دسترسی میکروفون لازم است', 'از تنظیمات گوشی، دسترسی میکروفون را برای MedOS فعال کنید.');
       return;
     }
     setBusy(true);

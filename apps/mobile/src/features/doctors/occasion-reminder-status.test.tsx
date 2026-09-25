@@ -16,7 +16,10 @@ import { createDoctor } from './queries';
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/components/ui', () => ({ Button: 'Button' }));
-jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
+jest.mock('@/components/feedback', () => ({
+  alertError: jest.fn(),
+  notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
+}));
 
 let t: TestDatabase;
 let tree: ReactTestRenderer | undefined;

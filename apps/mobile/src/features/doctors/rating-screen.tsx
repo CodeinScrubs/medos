@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Card, ChipSelect, Column, Input, Row, Screen, Text } from '@/components/ui';
 import { RATING_AXES } from '@/db/schema';
@@ -43,7 +42,7 @@ export function RatingScreen() {
 
   async function save() {
     if (Object.values(scores).every((v) => v == null) && !reasoning.trim()) {
-      Alert.alert('چیزی ثبت نشده', 'حداقل یک معیار را امتیاز بدهید یا دلیلی بنویسید.');
+      notify('چیزی ثبت نشده', 'حداقل یک معیار را امتیاز بدهید یا دلیلی بنویسید.');
       return;
     }
     setSaving(true);

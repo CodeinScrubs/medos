@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { notify } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Column, IconButton, Row, Text } from '@/components/ui';
@@ -35,7 +36,7 @@ export function MediaViewerScreen() {
   async function share() {
     if (!uri) return;
     if (!(await Sharing.isAvailableAsync())) {
-      Alert.alert('اشتراک‌گذاری روی این گوشی در دسترس نیست');
+      notify('اشتراک‌گذاری روی این گوشی در دسترس نیست');
       return;
     }
     await Sharing.shareAsync(uri, { mimeType: item?.mimeType ?? 'image/jpeg' });

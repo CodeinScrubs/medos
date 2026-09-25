@@ -1,9 +1,8 @@
 import { createContext, useContext, useState, type PropsWithChildren } from 'react';
-import { Alert } from 'react-native';
 
 import { SaveGroup } from '@/lib/save-before-leave';
 
-import { alertError } from './feedback';
+import { alertError, notify } from './feedback';
 import { useSaveBeforeLeave } from './use-save-before-leave';
 
 type Scope = { group: SaveGroup; perform(action: () => void | Promise<void>): Promise<void> };
@@ -18,7 +17,7 @@ export function AutosaveScope({ children }: PropsWithChildren) {
       async perform(action) {
         try {
           if ((await group.perform(action)) === 'unsaved') {
-            Alert.alert('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');
+            notify('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');
           }
         } catch (e) {
           alertError('انجام نشد', e);

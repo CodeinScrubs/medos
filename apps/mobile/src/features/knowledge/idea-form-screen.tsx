@@ -1,9 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen } from '@/components/ui';
 import type { Idea } from '@/db/schema';
@@ -55,7 +54,7 @@ function IdeaForm({ idea, readNotice }: { readNotice: ReactNode; idea: Idea | nu
 
   async function save() {
     if (!title.trim()) {
-      Alert.alert('عنوان لازم است');
+      notify('عنوان لازم است');
       return;
     }
     setSaving(true);

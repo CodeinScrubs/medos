@@ -1,9 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Text } from '@/components/ui';
@@ -75,7 +74,7 @@ function SpecialtyForm({ row, readNotice }: { readNotice: ReactNode; row: Profil
 
   async function save() {
     if (!specialtyId && !nameText.trim()) {
-      Alert.alert('رشته را انتخاب کنید', 'یا نامش را دستی بنویسید.');
+      notify('رشته را انتخاب کنید', 'یا نامش را دستی بنویسید.');
       return;
     }
     setSaving(true);

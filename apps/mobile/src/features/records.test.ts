@@ -6,7 +6,14 @@ import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { deleteEncounter, dischargeEncounter, openEncounter, updateEncounter } from './encounters/queries';
+import {
+  deleteEncounter,
+  dischargeEncounter,
+  EncounterNotEmptyError,
+  encounterRecordCount,
+  openEncounter,
+  updateEncounter,
+} from './encounters/queries';
 import { reconcileAllPatientStatuses } from './encounters/status';
 import { createOrder, patientOrdersQuery, setOrderStatus, suggestOrderNames } from './kardex/queries';
 import { analyteSeriesQuery, createLabPanel, updateLabPanel } from './labs/queries';
@@ -263,6 +270,24 @@ describe('deleting an episode', () => {
     const row = (await t.db.select().from(encounters)).find((e) => e.id === id);
     expect(row?.deletedAt).toBeInstanceOf(Date);
     expect(row?.isActive).toBe(false);
+  });
+
+  /*
+   * Deleting is for an episode entered by mistake. One with a note or an
+   * order under it is real: deleting it would drop those from the kardex and
+   * the episode's lists, so it has to be discharged or edited instead.
+   */
+  it('refuses an episode that has records filed under it', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission' });
+    expect(encounterRecordCount(id)).toBe(0);
+    await createNote({ patientId, type: 'progress', body: 'Seen on the ward' });
+    await createOrder({ patientId, kind: 'lab', name: 'CBC' });
+    expect(encounterRecordCount(id)).toBe(2);
+
+    await expect(deleteEncounter(id)).rejects.toBeInstanceOf(EncounterNotEmptyError);
+
+    expect(await patientStatus()).toBe('admitted');
+    expect((await t.db.select().from(encounters)).find((e) => e.id === id)?.deletedAt).toBeNull();
   });
 
   it('leaves the status alone when a closed episode is deleted', async () => {

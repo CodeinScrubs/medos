@@ -33,7 +33,10 @@ jest.mock('@/components/ui', () => ({
   Text: 'Text',
 }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
-jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
+jest.mock('@/components/feedback', () => ({
+  alertError: jest.fn(),
+  notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
+}));
 jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
 jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii: {} }) }));
 jest.mock('./patient-header', () => ({ PatientHeader: 'PatientHeader' }));

@@ -4,7 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import {
   Badge,
@@ -169,7 +169,7 @@ export function BackupScreen() {
           { text: 'بله', onPress: () => void markBackupDelivered().catch((e) => alertError('تأیید ثبت نشد', e)) },
         ]);
       } else if (!result.savedTo) {
-        Alert.alert(
+        notify(
           'بکاپ ساخته شد ولی جایی ذخیره نشد',
           'پوشه‌ی بکاپ انتخاب نشده است. یا یک پوشه انتخاب کنید، یا از «بکاپ و ارسال» استفاده کنید.',
         );
@@ -214,7 +214,7 @@ export function BackupScreen() {
         `${toPersianDigits(result.manifest.counts.patients ?? 0)} بیمار، ` +
         `${toPersianDigits(result.files)} فایل.\n\n` +
         'یک نسخه از اطلاعات قبلی هم داخل گوشی نگه داشته شد.';
-      Alert.alert(
+      notify(
         result.warnings.length === 0 ? 'بازگردانی کامل شد' : 'اطلاعات برگشت، با چند کار ناتمام',
         result.warnings.length === 0
           ? summary
@@ -222,7 +222,7 @@ export function BackupScreen() {
       );
     } catch (e) {
       if (e instanceof WrongPassphraseError) {
-        Alert.alert('رمز اشتباه است', 'اطلاعات فعلی گوشی دست نخورده است.');
+        notify('رمز اشتباه است', 'اطلاعات فعلی گوشی دست نخورده است.');
       } else {
         alertError('بازگردانی انجام نشد', e);
       }
@@ -237,7 +237,7 @@ export function BackupScreen() {
     setProgress({ phase: 'key', fraction: 0 });
     try {
       const ok = await checkBackupPassphrase(passphrase);
-      Alert.alert(
+      notify(
         ok ? 'رمز درست است' : 'رمز درست نیست',
         ok
           ? 'با همین رمز می‌توانید بکاپ‌ها را روی هر گوشی باز کنید.'

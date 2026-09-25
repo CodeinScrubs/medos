@@ -3,7 +3,7 @@ import { Alert, AppState, View } from 'react-native';
 
 import { useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Button, Card, Column, Input, Row, Text } from '@/components/ui';
 import type { ConsultRequestDraft } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -142,7 +142,7 @@ export function RequestDraftEditor({
   }
   async function add() {
     if (!latest.current.reason.trim()) {
-      Alert.alert('سؤال کانسالت را بنویسید');
+      notify('سؤال کانسالت را بنویسید');
       return;
     }
     if (!(await saver.flush()) || saver.unsaved) return;

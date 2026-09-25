@@ -2,9 +2,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Card, Column, DataRow, Divider, Row, Screen, SectionHeader, Segmented, Text, Toggle } from '@/components/ui';
 import { databaseSizeBytes } from '@/db/files';
 import { writeSetting } from '@/db/settings';
@@ -41,7 +41,7 @@ export function SettingsScreen() {
               onChange={async (next) => {
                 if (next) {
                   const result = await enableAppLock();
-                  if (!result.ok && result.reason) Alert.alert('فعال نشد', result.reason);
+                  if (!result.ok && result.reason) notify('فعال نشد', result.reason);
                 } else {
                   await disableAppLock();
                 }
