@@ -1,9 +1,10 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, Input, Screen, SectionHeader, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import type { DoctorProfile } from '@/db/schema';
@@ -95,7 +96,7 @@ function ProfileForm({ doctorId, profile }: { doctorId: string; profile: DoctorP
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'پروفایل شخصی' }} />
+      <ScreenOptions options={{ title: 'پروفایل شخصی' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <Text variant="tiny" color="textFaint">
           یادداشت خصوصی شماست. برای تبریک تولد، کافی است تاریخ تولد را بنویسید و بعد از ذخیره، مناسبت تولد را اضافه

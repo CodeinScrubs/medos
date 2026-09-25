@@ -1,9 +1,10 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen } from '@/components/ui';
 import type { Idea } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -72,7 +73,7 @@ function IdeaForm({ idea, readNotice }: { readNotice: ReactNode; idea: Idea | nu
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: idea ? 'ویرایش ایده' : 'ایده‌ی جدید' }} />
+      <ScreenOptions options={{ title: idea ? 'ویرایش ایده' : 'ایده‌ی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="در یک جمله" />

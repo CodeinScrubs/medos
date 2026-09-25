@@ -27,7 +27,7 @@ export function AutosaveScope({ children }: PropsWithChildren) {
     };
   });
   // Checking an already-clean group resolves immediately, with no prompt.
-  useSaveBeforeLeave(true, () => scope.group.flush());
+  useSaveBeforeLeave(() => scope.group.flush());
   return <Context.Provider value={scope}>{children}</Context.Provider>;
 }
 

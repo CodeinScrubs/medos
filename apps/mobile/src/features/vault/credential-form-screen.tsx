@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
@@ -6,6 +6,7 @@ import { CollapsibleSection } from '@/components/collapsible-section';
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import type { Credential } from '@/db/schema';
@@ -114,7 +115,7 @@ function CredentialForm({ credential, readNotice }: { readNotice: ReactNode; cre
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: credential ? 'ویرایش رمز' : 'رمز جدید' }} />
+      <ScreenOptions options={{ title: credential ? 'ویرایش رمز' : 'رمز جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <Input

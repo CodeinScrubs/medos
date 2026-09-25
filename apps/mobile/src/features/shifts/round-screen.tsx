@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -7,6 +7,7 @@ import { AutosaveField } from '@/components/autosave-field';
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, Row, Screen, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import type { Encounter, Patient, ShiftPatient } from '@/db/schema';
@@ -86,7 +87,7 @@ function RoundScreenContent() {
   if ((error || membersError) && (shifts === undefined || members === undefined)) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'راند' }} />
+        <ScreenOptions options={{ title: 'راند' }} />
         <ErrorNotice error={error ?? membersError} what="راند" />
       </Screen>
     );
@@ -95,7 +96,7 @@ function RoundScreenContent() {
   if (members !== undefined && rows.length === 0) {
     return (
       <Screen scroll>
-        <Stack.Screen options={{ title: 'راند' }} />
+        <ScreenOptions options={{ title: 'راند' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="راند" />
           <EmptyState
@@ -116,7 +117,7 @@ function RoundScreenContent() {
   if (progress.done) {
     return (
       <Screen scroll>
-        <Stack.Screen options={{ title: 'راند' }} />
+        <ScreenOptions options={{ title: 'راند' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <EmptyState
             icon="checkmark-done-outline"
@@ -132,14 +133,14 @@ function RoundScreenContent() {
   if (!current || index == null) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'راند' }} />
+        <ScreenOptions options={{ title: 'راند' }} />
       </Screen>
     );
   }
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'راند' }} />
+      <ScreenOptions options={{ title: 'راند' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ErrorNotice error={error ?? membersError} what="راند" />
 

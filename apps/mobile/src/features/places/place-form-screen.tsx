@@ -1,9 +1,10 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import type { Place } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -86,7 +87,7 @@ function PlaceForm({ place, readNotice }: { readNotice: ReactNode; place: Place 
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: place ? 'ویرایش مکان' : 'مکان جدید' }} />
+      <ScreenOptions options={{ title: place ? 'ویرایش مکان' : 'مکان جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <Input label="نام" required value={name} onChangeText={setName} placeholder="مثلاً بیمارستان مرکزی" />

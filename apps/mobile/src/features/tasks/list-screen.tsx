@@ -1,7 +1,8 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, EmptyState, Input, Screen, SectionHeader } from '@/components/ui';
 import type { Task } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -35,7 +36,7 @@ function TaskList({ patientId: initialPatientId }: { patientId: string | null | 
   );
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: patientId === null ? 'کارهای بدون بیمار' : 'کارها' }} />
+      <ScreenOptions options={{ title: patientId === null ? 'کارهای بدون بیمار' : 'کارها' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {!initialPatientId ? (
           <ChipSelect

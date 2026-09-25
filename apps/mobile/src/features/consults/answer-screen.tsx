@@ -1,10 +1,11 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Card, Column, Input, Screen, Text } from '@/components/ui';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import type { Consultation } from '@/db/schema';
@@ -91,8 +92,7 @@ export function AnswerEditor({
     };
   });
   const saver = persistence.saver;
-  // Always evaluate the scheduler; an input event can precede the next React render.
-  useSaveBeforeLeave(true, () => saver.flush());
+  useSaveBeforeLeave(() => saver.flush());
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') void saver.flush();
@@ -148,7 +148,7 @@ export function AnswerEditor({
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'پاسخ کانسالت' }} />
+      <ScreenOptions options={{ title: 'پاسخ کانسالت' }} />
       <Column gap="md">
         <ErrorNotice error={readError} what="کانسالت" onRetry={retryRead} />
         <ErrorNotice error={patientError} what="بیمار" onRetry={retryPatient} />

@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
@@ -8,6 +8,7 @@ import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { locationLabel } from '@/features/encounters/status';
@@ -93,7 +94,7 @@ function ShiftScreenContent() {
   if (shifts !== undefined && !shift) {
     return (
       <Screen scroll>
-        <Stack.Screen options={{ title: 'شیفت' }} />
+        <ScreenOptions options={{ title: 'شیفت' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="شیفت" />
           <Button label="شیفت‌های قبلی" variant="ghost" onPress={() => router.push('/shift-history')} />
@@ -110,7 +111,7 @@ function ShiftScreenContent() {
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'شیفت' }} />
+      <ScreenOptions options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ErrorNotice error={error ?? membersError ?? patientsError} what="شیفت" />
         <Button

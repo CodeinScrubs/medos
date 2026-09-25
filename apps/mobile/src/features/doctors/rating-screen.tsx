@@ -1,8 +1,9 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
 import { alertError } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Card, ChipSelect, Column, Input, Row, Screen, Text } from '@/components/ui';
 import { RATING_AXES } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -58,7 +59,7 @@ export function RatingScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'امتیاز جدید' }} />
+      <ScreenOptions options={{ title: 'امتیاز جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {doctor ? <Text variant="subheading">{doctorDisplayName(doctor)}</Text> : null}
         <Text variant="tiny" color="textFaint">

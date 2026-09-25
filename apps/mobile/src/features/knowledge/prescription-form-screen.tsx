@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import {
   Button,
   Card,
@@ -131,7 +132,7 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: template ? 'ویرایش نسخه' : 'نسخه‌ی جدید' }} />
+      <ScreenOptions options={{ title: template ? 'ویرایش نسخه' : 'نسخه‌ی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="مثلاً UTI ساده" />

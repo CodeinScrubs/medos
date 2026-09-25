@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
@@ -6,6 +6,7 @@ import { CollapsibleSection } from '@/components/collapsible-section';
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Toggle } from '@/components/ui';
 import type { Doctor, Specialty } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -146,7 +147,7 @@ function DoctorForm({ doctor, readNotice }: { readNotice: ReactNode; doctor: Doc
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: doctor ? 'ویرایش پزشک' : 'پزشک جدید' }} />
+      <ScreenOptions options={{ title: doctor ? 'ویرایش پزشک' : 'پزشک جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <Input label="عنوان" value={title} onChangeText={setTitle} placeholder="دکتر" />

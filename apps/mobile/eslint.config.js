@@ -173,6 +173,18 @@ module.exports = defineConfig([
           selector: "CallExpression[callee.object.name=/^(db|tx)$/][callee.property.name='delete']",
           message: 'Clinical data is never hard-deleted. Stamp deletedAt with softDelete() instead.',
         },
+        /*
+         * <Stack.Screen options> inside a screen re-applies the header on every
+         * render, including a render while the screen is closing — which stops
+         * the app on Android. Layouts declare screens with a `name`; screens use
+         * <ScreenOptions>.
+         */
+        {
+          selector:
+            "JSXOpeningElement[name.object.name='Stack'][name.property.name='Screen']:not(:has(JSXAttribute[name.name='name']))",
+          message:
+            'Inside a screen, set header options with <ScreenOptions> (components/screen-options.tsx): <Stack.Screen> updates the header of a closing screen and crashes Android.',
+        },
       ],
     },
   },

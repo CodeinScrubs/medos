@@ -14,8 +14,8 @@ const mockRouter = {
     mockParams = { ...mockParams, ...params };
   }),
 };
+jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
 jest.mock('expo-router', () => ({
-  Stack: { Screen: 'StackScreen' },
   useLocalSearchParams: () => mockParams,
   useRouter: () => mockRouter,
 }));

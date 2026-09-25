@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -6,6 +6,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PromptModal } from '@/components/prompt-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Column, IconButton, Row, Text } from '@/components/ui';
 import { ZoomableImage } from '@/components/zoomable-image';
 import { useLive } from '@/db/use-live';
@@ -56,7 +57,7 @@ export function MediaViewerScreen() {
 
   return (
     <View style={[styles.flex, styles.black]}>
-      <Stack.Screen options={{ headerShown: false, animation: 'fade' }} />
+      <ScreenOptions options={{ headerShown: false, animation: 'fade' }} />
       <StatusBar style="light" />
 
       {uri && !missing ? (

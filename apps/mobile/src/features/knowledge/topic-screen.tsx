@@ -1,7 +1,8 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { VoiceNotesSection } from '@/features/attachments/voice-notes';
@@ -24,7 +25,7 @@ export function TopicScreen() {
   if (!topic) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'مبحث' }} />
+        <ScreenOptions options={{ title: 'مبحث' }} />
         <ErrorNotice error={error} what="مبحث" />
         {data && !error ? (
           <EmptyState
@@ -40,7 +41,7 @@ export function TopicScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen
+      <ScreenOptions
         options={{
           title: topic.title,
           headerRight: () => (

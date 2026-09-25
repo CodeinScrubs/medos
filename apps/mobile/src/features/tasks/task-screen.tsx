@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Alert } from 'react-native';
 
@@ -6,6 +6,7 @@ import { AutosaveField } from '@/components/autosave-field';
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, ChipSelect, Column, Row, Screen, Text } from '@/components/ui';
 import type { Task } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -46,7 +47,7 @@ function TaskDetail({ task, readNotice }: { task: Task; readNotice: ReactNode })
   const patient = patients?.[0];
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'کار' }} />
+      <ScreenOptions options={{ title: 'کار' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <ErrorNotice error={error} what="بیمار" onRetry={retry} />

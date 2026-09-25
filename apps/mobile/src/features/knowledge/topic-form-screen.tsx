@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
@@ -7,6 +7,7 @@ import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import type { Specialty } from '@/db/schema';
@@ -115,7 +116,7 @@ function TopicForm({ row, readNotice }: { readNotice: ReactNode; row: TopicRow |
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: topic ? 'ویرایش مبحث' : 'مبحث جدید' }} />
+      <ScreenOptions options={{ title: topic ? 'ویرایش مبحث' : 'مبحث جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="مثلاً ARDS" />

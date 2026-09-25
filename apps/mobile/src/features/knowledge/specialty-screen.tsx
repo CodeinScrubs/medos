@@ -1,7 +1,8 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, DataRow, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { toPersianDigits } from '@/lib/persian';
@@ -23,7 +24,7 @@ export function SpecialtyScreen() {
   if (!profile) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'رشته' }} />
+        <ScreenOptions options={{ title: 'رشته' }} />
         <ErrorNotice error={error} what="پرونده‌ی رشته" />
         {data && !error ? (
           <EmptyState
@@ -39,7 +40,7 @@ export function SpecialtyScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen
+      <ScreenOptions
         options={{
           title: name,
           headerRight: () => (

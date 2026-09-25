@@ -1,10 +1,11 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
@@ -147,7 +148,7 @@ function OccasionForm({
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: occasion ? 'ویرایش مناسبت' : 'مناسبت جدید' }} />
+      <ScreenOptions options={{ title: occasion ? 'ویرایش مناسبت' : 'مناسبت جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />

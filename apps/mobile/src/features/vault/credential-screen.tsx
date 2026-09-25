@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, DataRow, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { copyText } from '@/features/doctors/actions';
@@ -42,7 +43,7 @@ export function CredentialScreen() {
   if (!credential) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'رمز' }} />
+        <ScreenOptions options={{ title: 'رمز' }} />
         <ErrorNotice error={error} what="رمز" />
         {data && !error ? (
           <EmptyState
@@ -61,7 +62,7 @@ export function CredentialScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen
+      <ScreenOptions
         options={{
           title: credential.systemName,
           headerRight: () => (

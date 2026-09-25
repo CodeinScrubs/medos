@@ -1,9 +1,10 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, Input, Row, Screen, SelectField, Text } from '@/components/ui';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
@@ -52,10 +53,7 @@ export function CaptureScreen() {
     [writer],
   );
 
-  useSaveBeforeLeave(
-    autosave.status === 'pending' || autosave.status === 'writing' || autosave.status === 'failed',
-    () => saver.flush(),
-  );
+  useSaveBeforeLeave(() => saver.flush());
 
   function update(patch: Partial<CaptureFields>) {
     const next = { ...writer.current, ...patch };
@@ -157,7 +155,7 @@ export function CaptureScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'ثبت سریع' }} />
+      <ScreenOptions options={{ title: 'ثبت سریع' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <Input
           value={text}

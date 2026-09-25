@@ -1,7 +1,8 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { copyText } from '@/features/doctors/actions';
@@ -40,7 +41,7 @@ export function PrescriptionScreen() {
   if (!template) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'نسخه' }} />
+        <ScreenOptions options={{ title: 'نسخه' }} />
         <ErrorNotice error={error} what="نسخه" />
         {data && !error ? (
           <EmptyState
@@ -59,7 +60,7 @@ export function PrescriptionScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen
+      <ScreenOptions
         options={{
           title: template.title,
           headerRight: () => (

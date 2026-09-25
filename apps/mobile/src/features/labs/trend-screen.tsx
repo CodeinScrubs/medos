@@ -1,6 +1,7 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
+import { ScreenOptions } from '@/components/screen-options';
 import { TrendChart, type TrendPoint } from '@/components/trend-chart';
 import { Card, Column, Divider, EmptyState, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
@@ -59,7 +60,7 @@ export function TrendScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: analyte }} />
+      <ScreenOptions options={{ title: analyte }} />
       <Screen scroll>
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           {rows.length === 0 ? (

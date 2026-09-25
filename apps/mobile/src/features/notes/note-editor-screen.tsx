@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 
@@ -7,6 +7,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
+import { ScreenOptions } from '@/components/screen-options';
 import {
   Button,
   ChipSelect,
@@ -196,10 +197,7 @@ function NoteEditor({
     [draftId, patientId, note?.id],
   );
 
-  useSaveBeforeLeave(
-    autosave.status === 'pending' || autosave.status === 'writing' || autosave.status === 'failed',
-    () => saver.flush(),
-  );
+  useSaveBeforeLeave(() => saver.flush());
 
   function update(patch: Partial<NoteDraftFields>) {
     const next = { ...latest.current, ...patch };
@@ -349,7 +347,7 @@ function NoteEditor({
 
   return (
     <Screen scroll>
-      <Stack.Screen
+      <ScreenOptions
         options={{
           title: isEdit ? 'ویرایش نوت' : 'نوت جدید',
           headerRight: isEdit

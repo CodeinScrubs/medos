@@ -1,8 +1,9 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
+import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, Row, Screen, Text } from '@/components/ui';
 import type { Shift } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -25,7 +26,7 @@ function ShiftHistoryList() {
   const { data, error, retry } = useLive(shiftsQuery(limit + 1), [limit]);
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'شیفت‌های قبلی' }} />
+      <ScreenOptions options={{ title: 'شیفت‌های قبلی' }} />
       <Column gap="sm" style={{ paddingTop: spacing.md }}>
         <ErrorNotice error={error} what="شیفت‌ها" onRetry={retry} />
         {data?.slice(0, limit).map((shift) => (
@@ -69,7 +70,7 @@ function ShiftDetail({ shift, readNotice }: { shift: Shift; readNotice: ReactNod
   const { data, error, retry } = useLive(shiftHistoryPatientsQuery(shift.id), [shift.id]);
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'گزارش شیفت' }} />
+      <ScreenOptions options={{ title: 'گزارش شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <Text variant="heading">{formatJalaliDateTime(shift.startAt)}</Text>

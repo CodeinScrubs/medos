@@ -12,7 +12,8 @@ import { consultQuery, createConsult, saveConsultAnswerDraft } from './queries';
 
 const mockBack = jest.fn();
 let mockExit: () => Promise<boolean>;
-jest.mock('expo-router', () => ({ Stack: { Screen: 'StackScreen' }, useRouter: () => ({ back: mockBack }) }));
+jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: mockBack }) }));
 jest.mock('@/components/ui', () => ({
   Button: 'Button',
   Card: 'Card',
@@ -25,7 +26,7 @@ jest.mock('@/components/edit-gate', () => ({ EditGate: 'EditGate' }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
 jest.mock('@/components/feedback', () => ({ alertError: jest.fn() }));
 jest.mock('@/components/use-save-before-leave', () => ({
-  useSaveBeforeLeave: (_unsaved: boolean, flush: () => Promise<boolean>) => {
+  useSaveBeforeLeave: (flush: () => Promise<boolean>) => {
     mockExit = flush;
   },
 }));

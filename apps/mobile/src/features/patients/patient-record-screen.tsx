@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { MediaTab } from '@/features/attachments/media-tab';
@@ -126,7 +127,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
 
   return (
     <>
-      <Stack.Screen
+      <ScreenOptions
         options={{
           title: `${patient.firstName} ${patient.lastName}`,
           headerRight: () => (

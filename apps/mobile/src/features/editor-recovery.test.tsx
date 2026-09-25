@@ -69,8 +69,8 @@ jest.mock('@/db/use-live', () => ({
     };
   },
 }));
+jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
 jest.mock('expo-router', () => ({
-  Stack: { Screen: 'StackScreen' },
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
 }));

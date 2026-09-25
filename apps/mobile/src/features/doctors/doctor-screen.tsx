@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import {
   Avatar,
   Badge,
@@ -59,7 +60,7 @@ export function DoctorScreen() {
   if (!doctor) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'پزشک' }} />
+        <ScreenOptions options={{ title: 'پزشک' }} />
         <ErrorNotice error={error} what="پرونده‌ی پزشک" />
         {data && !error ? (
           <EmptyState
@@ -75,7 +76,7 @@ export function DoctorScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen
+      <ScreenOptions
         options={{
           title: doctorDisplayName(doctor),
           headerRight: () => (

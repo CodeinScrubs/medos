@@ -1,9 +1,10 @@
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, EmptyState, Input, Screen, SectionHeader } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { patientListQuery } from '@/features/patients/queries';
@@ -77,7 +78,7 @@ export function InboxScreen() {
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: 'صندوق ثبت سریع' }} />
+      <ScreenOptions options={{ title: 'صندوق ثبت سریع' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ErrorNotice
           error={error ?? filedError ?? openCountError ?? filedCountError ?? mediaError}

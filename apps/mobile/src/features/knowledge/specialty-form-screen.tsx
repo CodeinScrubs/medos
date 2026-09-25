@@ -1,10 +1,11 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Text } from '@/components/ui';
 import type { Specialty } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -109,7 +110,7 @@ function SpecialtyForm({ row, readNotice }: { readNotice: ReactNode; row: Profil
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: profile ? 'ویرایش رشته' : 'رشته‌ی جدید' }} />
+      <ScreenOptions options={{ title: profile ? 'ویرایش رشته' : 'رشته‌ی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <SelectField

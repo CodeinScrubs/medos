@@ -1,10 +1,11 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Row, Screen, SelectField } from '@/components/ui';
 import type { Extension } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -107,7 +108,7 @@ function ExtensionForm({
 
   return (
     <Screen scroll>
-      <Stack.Screen options={{ title: record ? 'ویرایش داخلی' : 'داخلی جدید' }} />
+      <ScreenOptions options={{ title: record ? 'ویرایش داخلی' : 'داخلی جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         <SelectField
