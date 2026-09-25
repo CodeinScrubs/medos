@@ -84,7 +84,9 @@ export function DoctorScreen() {
               <IconButton
                 icon={doctor.starred ? 'star' : 'star-outline'}
                 label={doctor.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
-                onPress={() => void setDoctorStarred(doctor.id, !doctor.starred)}
+                onPress={() =>
+                  void setDoctorStarred(doctor.id, !doctor.starred).catch((e) => alertError('تغییر ثبت نشد', e))
+                }
               />
               <IconButton
                 icon="create-outline"

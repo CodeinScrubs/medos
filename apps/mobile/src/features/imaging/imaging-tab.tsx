@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Text } from '@/components/ui';
 import type { ImagingStudy } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -66,7 +67,11 @@ function StudyCard({ study, patientId }: { study: ImagingStudy; patientId: strin
       onLongPress={() =>
         Alert.alert('حذف این تصویربرداری؟', undefined, [
           { text: 'انصراف', style: 'cancel' },
-          { text: 'حذف', style: 'destructive', onPress: () => void deleteImagingStudy(study.id) },
+          {
+            text: 'حذف',
+            style: 'destructive',
+            onPress: () => void deleteImagingStudy(study.id).catch((e) => alertError('حذف نشد', e)),
+          },
         ])
       }
       style={({ pressed }) => [pressed && styles.pressed]}

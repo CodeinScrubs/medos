@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Idea } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -90,7 +91,11 @@ function IdeaCard({ idea }: { idea: Idea }) {
       onLongPress={() =>
         Alert.alert('حذف ایده؟', idea.title, [
           { text: 'انصراف', style: 'cancel' },
-          { text: 'حذف', style: 'destructive', onPress: () => void deleteIdea(idea.id) },
+          {
+            text: 'حذف',
+            style: 'destructive',
+            onPress: () => void deleteIdea(idea.id).catch((e) => alertError('حذف نشد', e)),
+          },
         ])
       }
       style={{ marginTop: spacing.sm }}

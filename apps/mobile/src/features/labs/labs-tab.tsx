@@ -307,7 +307,11 @@ function PanelList({
             onLongPress={() =>
               Alert.alert('حذف این نوبت آزمایش؟', formatJalaliDateTime(p.collectedAt), [
                 { text: 'انصراف', style: 'cancel' },
-                { text: 'حذف', style: 'destructive', onPress: () => void deleteLabPanel(p.id) },
+                {
+                  text: 'حذف',
+                  style: 'destructive',
+                  onPress: () => void deleteLabPanel(p.id).catch((e) => alertError('حذف نشد', e)),
+                },
               ])
             }
             style={({ pressed }) => [pressed && styles.pressed]}

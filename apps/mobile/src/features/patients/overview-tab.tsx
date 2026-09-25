@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, DataRow, Divider, Row, SectionHeader, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -134,7 +135,11 @@ export function OverviewTab({ patient }: { patient: Patient }) {
               onLongPress={() =>
                 Alert.alert('حذف این شماره؟', c.name ?? c.phone, [
                   { text: 'انصراف', style: 'cancel' },
-                  { text: 'حذف', style: 'destructive', onPress: () => void deletePatientContact(c.id) },
+                  {
+                    text: 'حذف',
+                    style: 'destructive',
+                    onPress: () => void deletePatientContact(c.id).catch((e) => alertError('حذف نشد', e)),
+                  },
                 ])
               }
             >

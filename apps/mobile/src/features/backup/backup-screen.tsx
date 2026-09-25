@@ -319,20 +319,24 @@ export function BackupScreen() {
                   label="فعال"
                   description="هر بار که اپ باز می‌شود، اگر موعد رسیده باشد"
                   value={config.autoEnabled}
-                  onChange={(v) => void writeSetting(backupAutoEnabled, v)}
+                  onChange={(v) => void writeSetting(backupAutoEnabled, v).catch((e) => alertError('تنظیم ثبت نشد', e))}
                 />
                 <Divider />
                 <Toggle
                   label="همراه با عکس‌ها و صداها"
                   description="وقتی تعداد عکس‌ها زیاد شد، خاموشش کنید و هفته‌ای یک بار بکاپ کامل دستی بگیرید"
                   value={config.autoIncludeMedia}
-                  onChange={(v) => void writeSetting(backupAutoIncludeMedia, v)}
+                  onChange={(v) =>
+                    void writeSetting(backupAutoIncludeMedia, v).catch((e) => alertError('تنظیم ثبت نشد', e))
+                  }
                 />
                 <Divider />
                 <Segmented
                   label="هر چند وقت"
                   value={String(config.intervalHours)}
-                  onChange={(v) => void writeSetting(backupIntervalHours, Number(v))}
+                  onChange={(v) =>
+                    void writeSetting(backupIntervalHours, Number(v)).catch((e) => alertError('تنظیم ثبت نشد', e))
+                  }
                   options={[
                     { value: '12', label: '۱۲ ساعت' },
                     { value: '24', label: 'روزانه' },
@@ -391,7 +395,8 @@ export function BackupScreen() {
         <Card>
           <Column gap="sm">
             <Text variant="caption" color="textMuted">
-              برای انتقال به گوشی جدید یا برگرداندن اطلاعات: فایل .medosbak را انتخاب کنید و رمز بکاپ را وارد کنید.
+              برای انتقال به گوشی جدید یا برگرداندن اطلاعات: فایل بکاپ (با پسوند medosbak) را انتخاب کنید و رمز بکاپ را
+              وارد کنید.
             </Text>
             <Button
               label="انتخاب فایل بکاپ"

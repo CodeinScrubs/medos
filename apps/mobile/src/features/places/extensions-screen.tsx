@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { alertError } from '@/components/feedback';
 import { Card, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Extension, Place } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -79,7 +80,8 @@ function ExtensionRow({ extension, place }: { extension: Extension; place: Place
     Alert.alert(extension.department, place.name, [
       {
         text: extension.starred ? 'برداشتن ستاره' : 'ستاره‌دار',
-        onPress: () => void setExtensionStarred(extension.id, !extension.starred),
+        onPress: () =>
+          void setExtensionStarred(extension.id, !extension.starred).catch((e) => alertError('تغییر ثبت نشد', e)),
       },
       {
         text: 'ویرایش',
@@ -88,7 +90,7 @@ function ExtensionRow({ extension, place }: { extension: Extension; place: Place
       {
         text: 'حذف',
         style: 'destructive',
-        onPress: () => void deleteExtension(extension.id),
+        onPress: () => void deleteExtension(extension.id).catch((e) => alertError('حذف نشد', e)),
       },
     ]);
   }

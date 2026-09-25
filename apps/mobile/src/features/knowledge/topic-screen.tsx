@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
@@ -49,7 +50,9 @@ export function TopicScreen() {
               <IconButton
                 icon={topic.starred ? 'star' : 'star-outline'}
                 label={topic.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
-                onPress={() => void setTopicStarred(topic.id, !topic.starred)}
+                onPress={() =>
+                  void setTopicStarred(topic.id, !topic.starred).catch((e) => alertError('تغییر ثبت نشد', e))
+                }
               />
               <IconButton
                 icon="create-outline"
@@ -92,7 +95,7 @@ export function TopicScreen() {
             icon="checkmark-done"
             variant="secondary"
             full
-            onPress={() => void markTopicReviewed(topic.id)}
+            onPress={() => void markTopicReviewed(topic.id).catch((e) => alertError('تغییر ثبت نشد', e))}
           />
         ) : (
           <Button
@@ -100,7 +103,7 @@ export function TopicScreen() {
             icon="repeat"
             variant="secondary"
             full
-            onPress={() => void setTopicNeedsReview(topic.id, true)}
+            onPress={() => void setTopicNeedsReview(topic.id, true).catch((e) => alertError('تغییر ثبت نشد', e))}
           />
         )}
         {topic.lastReviewedAt ? (

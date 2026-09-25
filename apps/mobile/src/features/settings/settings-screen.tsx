@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
+import { alertError } from '@/components/feedback';
 import { Card, Column, DataRow, Divider, Row, Screen, SectionHeader, Segmented, Text, Toggle } from '@/components/ui';
 import { databaseSizeBytes } from '@/db/files';
 import { writeSetting } from '@/db/settings';
@@ -52,7 +53,9 @@ export function SettingsScreen() {
                 <Segmented
                   label="قفل دوباره بعد از"
                   value={String(grace)}
-                  onChange={(v) => void writeSetting(lockGraceSeconds, Number(v))}
+                  onChange={(v) =>
+                    void writeSetting(lockGraceSeconds, Number(v)).catch((e) => alertError('تنظیم ثبت نشد', e))
+                  }
                   options={[
                     { value: '30', label: '۳۰ ثانیه' },
                     { value: '60', label: '۱ دقیقه' },
@@ -78,7 +81,9 @@ export function SettingsScreen() {
           <Segmented
             label="نگه داشتن اصل عکس‌ها"
             value={keepOriginals}
-            onChange={(v) => void writeSetting(keepOriginalsMode, v as KeepOriginalsMode)}
+            onChange={(v) =>
+              void writeSetting(keepOriginalsMode, v as KeepOriginalsMode).catch((e) => alertError('تنظیم ثبت نشد', e))
+            }
             options={[
               { value: 'clinical', label: 'عکس بالینی' },
               { value: 'always', label: 'همه' },

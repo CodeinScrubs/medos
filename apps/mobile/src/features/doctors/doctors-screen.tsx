@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { Avatar, Badge, Card, Column, EmptyState, Fab, IconButton, Row, Text } from '@/components/ui';
 import type { Doctor, Specialty } from '@/db/schema';
@@ -250,7 +251,9 @@ function DoctorCard({ doctor, average }: { doctor: Doctor; average: number | nul
             <IconButton
               icon={doctor.starred ? 'star' : 'star-outline'}
               label={doctor.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
-              onPress={() => void setDoctorStarred(doctor.id, !doctor.starred)}
+              onPress={() =>
+                void setDoctorStarred(doctor.id, !doctor.starred).catch((e) => alertError('تغییر ثبت نشد', e))
+              }
             />
             {doctor.phone ? (
               <IconButton icon="call-outline" label="تماس" onPress={() => void callNumber(doctor.phone)} />

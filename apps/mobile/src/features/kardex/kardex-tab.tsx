@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, SectionHeader, Text } from '@/components/ui';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -110,7 +111,11 @@ function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
       'اگر این دستور اشتباه ثبت شده حذفش کنید. اگر فقط قطع شده، «قطع» بهتر است تا در سابقه بماند.',
       [
         { text: 'انصراف', style: 'cancel' },
-        { text: 'حذف', style: 'destructive', onPress: () => void deleteOrder(order.id) },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: () => void deleteOrder(order.id).catch((e) => alertError('حذف نشد', e)),
+        },
       ],
     );
   }

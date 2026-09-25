@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { alertError } from '@/components/feedback';
 import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Place } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -69,7 +70,11 @@ function PlaceCard({ place }: { place: Place }) {
       onLongPress={() =>
         Alert.alert('حذف مکان؟', place.name, [
           { text: 'انصراف', style: 'cancel' },
-          { text: 'حذف', style: 'destructive', onPress: () => void deletePlace(place.id) },
+          {
+            text: 'حذف',
+            style: 'destructive',
+            onPress: () => void deletePlace(place.id).catch((e) => alertError('حذف نشد', e)),
+          },
         ])
       }
     >

@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
@@ -68,7 +69,11 @@ export function PrescriptionScreen() {
               <IconButton
                 icon={template.starred ? 'star' : 'star-outline'}
                 label={template.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
-                onPress={() => void setPrescriptionStarred(template.id, !template.starred)}
+                onPress={() =>
+                  void setPrescriptionStarred(template.id, !template.starred).catch((e) =>
+                    alertError('تغییر ثبت نشد', e),
+                  )
+                }
               />
               <IconButton
                 icon="create-outline"

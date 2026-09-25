@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, Linking, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, DataRow, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
@@ -70,7 +71,11 @@ export function CredentialScreen() {
               <IconButton
                 icon={credential.starred ? 'star' : 'star-outline'}
                 label={credential.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
-                onPress={() => void setCredentialStarred(credential.id, !credential.starred)}
+                onPress={() =>
+                  void setCredentialStarred(credential.id, !credential.starred).catch((e) =>
+                    alertError('تغییر ثبت نشد', e),
+                  )
+                }
               />
               <IconButton
                 icon="create-outline"
