@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { Button, Column, Row, SectionHeader, Text } from '@/components/ui';
@@ -9,7 +10,7 @@ import { patientListQuery } from '@/features/patients/queries';
 import { fullName, toPersianDigits } from '@/lib/persian';
 
 import { CaptureCard, groupMedia, NO_MEDIA, type PatientAsk } from './capture-card';
-import { captureMediaQuery, fileCaptureAsNote, inboxQuery, updateCapture } from './queries';
+import { captureCountQuery, captureMediaQuery, fileCaptureAsNote, inboxQuery, updateCapture } from './queries';
 
 const SHOWN = 3;
 
@@ -21,14 +22,26 @@ const SHOWN = 3;
  */
 export function InboxSection() {
   const router = useRouter();
-  const { data } = useLive(inboxQuery());
-  const { data: media } = useLive(captureMediaQuery());
+  const captures = useLive(inboxQuery(SHOWN));
+  const count = useLive(captureCountQuery(false));
+  const attachments = useLive(captureMediaQuery());
+  const { data } = captures;
+  const { data: media } = attachments;
   const [ask, setAsk] = useState<PatientAsk | null>(null);
+  const saving = useRef(false);
 
   const rows = data ?? [];
+  const total = captures.error || count.error ? undefined : count.data?.[0]?.total;
   const byCapture = useMemo(() => groupMedia(media), [media]);
 
-  const { data: patientRows } = useLive(patientListQuery());
+  const patients = useLive(patientListQuery());
+  const { data: patientRows } = patients;
+  const failed = [
+    { label: 'ثبت‌های سریع', query: captures, relevant: true },
+    { label: 'تعداد ثبت‌های سریع', query: count, relevant: true },
+    { label: 'پیوست‌های ثبت سریع', query: attachments, relevant: rows.length > 0 },
+    { label: 'فهرست بیماران', query: patients, relevant: ask != null },
+  ].filter(({ query, relevant }) => relevant && query.error);
   const patientItems: PickerItem[] = useMemo(
     () =>
       (patientRows ?? []).map((p) => ({
@@ -42,8 +55,8 @@ export function InboxSection() {
 
   async function answerAsk(patientId: string) {
     const pending = ask;
-    setAsk(null);
-    if (!pending) return;
+    if (!pending || patients.error || patients.loading || saving.current) return;
+    saving.current = true;
     try {
       if (pending.purpose === 'note') {
         const noteId = await fileCaptureAsNote(pending.captureId, { patientId });
@@ -51,16 +64,24 @@ export function InboxSection() {
       } else {
         await updateCapture(pending.captureId, { patientId });
       }
+      setAsk((current) => (current === pending ? null : current));
     } catch (e) {
       alertError('انجام نشد', e);
+    } finally {
+      saving.current = false;
     }
   }
 
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && failed.length === 0 && !ask) return null;
 
   return (
     <>
-      <SectionHeader title="ثبت‌های نشده" count={rows.length} />
+      <SectionHeader title="ثبت‌های نشده" count={total} />
+      <ErrorNotice
+        error={failed[0]?.query.error}
+        what={failed.map(({ label }) => label).join('، ')}
+        onRetry={() => failed.forEach(({ query }) => query.retry())}
+      />
       <Column gap="sm">
         {rows.slice(0, SHOWN).map(({ capture, patient }) => (
           <CaptureCard
@@ -72,10 +93,10 @@ export function InboxSection() {
           />
         ))}
 
-        {rows.length > SHOWN ? (
+        {(total != null && total > SHOWN) || (total == null && rows.length === SHOWN) ? (
           <Row justify="space-between" align="center">
             <Text variant="tiny" color="textFaint">
-              {toPersianDigits(rows.length - SHOWN)} مورد دیگر
+              {total == null ? 'ثبت‌های بیشتر' : `${toPersianDigits(total - SHOWN)} مورد دیگر`}
             </Text>
             <Button label="همه" variant="ghost" size="sm" haptic={false} onPress={() => router.push('/inbox')} />
           </Row>
@@ -83,9 +104,10 @@ export function InboxSection() {
       </Column>
 
       <PickerModal
-        visible={ask != null}
+        visible={ask != null && !patients.error}
         title={ask?.purpose === 'note' ? 'نوت برای کدام بیمار؟' : 'این برای کیست؟'}
-        items={patientItems}
+        items={patients.error ? [] : patientItems}
+        emptyText={patients.loading ? 'در حال خواندن…' : 'موردی پیدا نشد'}
         selectedId={ask?.selectedId ?? null}
         onClose={() => setAsk(null)}
         onSelect={(item) => void answerAsk(item.id)}

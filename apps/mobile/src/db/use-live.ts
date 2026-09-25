@@ -1,5 +1,5 @@
 import { addDatabaseChangeListener } from 'expo-sqlite';
-import { useEffect, useState, type DependencyList } from 'react';
+import { useCallback, useEffect, useRef, useState, type DependencyList } from 'react';
 
 import { tablesOf } from './query-tables';
 
@@ -19,6 +19,9 @@ import { tablesOf } from './query-tables';
  * This hook watches every table the query touches (FROM plus joins), coalesces
  * bursts of change events into one re-run, and reports `data: undefined`
  * until the first result, so `loading` is real.
+ * `retry` re-runs a failed read without requiring a write or navigation. A
+ * failed refresh retains the last rows and its error until a read succeeds;
+ * consumers must not present those rows as a complete, current result.
  *
  * When `deps` change, the previous rows stay on screen until the new query
  * lands — a few milliseconds against a local database. That is deliberate: a
@@ -34,9 +37,11 @@ const BURST_WINDOW_MS = 60;
 export function useLive<T>(
   query: Thenable<T[]>,
   deps: DependencyList = [],
-): { data: T[] | undefined; error: Error | undefined; loading: boolean } {
+): { data: T[] | undefined; error: Error | undefined; loading: boolean; retry: () => void } {
   const [data, setData] = useState<T[] | undefined>(undefined);
   const [error, setError] = useState<Error | undefined>(undefined);
+  const retryRef = useRef<(() => void) | null>(null);
+  const retry = useCallback(() => retryRef.current?.(), []);
 
   useEffect(() => {
     let alive = true;
@@ -45,13 +50,14 @@ export function useLive<T>(
     let rerunRequested = false;
 
     const run = () => {
+      if (!alive) return;
       if (inFlight) {
         // Coalesce: one more run after the current one, however many events arrived.
         rerunRequested = true;
         return;
       }
       inFlight = true;
-      query
+      Promise.resolve(query)
         .then(
           (rows) => {
             if (alive) {
@@ -72,6 +78,7 @@ export function useLive<T>(
         });
     };
 
+    retryRef.current = run;
     run();
 
     const watched = new Set(tablesOf(query));
@@ -83,6 +90,7 @@ export function useLive<T>(
 
     return () => {
       alive = false;
+      if (retryRef.current === run) retryRef.current = null;
       if (timer) clearTimeout(timer);
       sub.remove();
     };
@@ -92,5 +100,5 @@ export function useLive<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { data, error, loading: data === undefined && error === undefined };
+  return { data, error, loading: data === undefined && error === undefined, retry };
 }

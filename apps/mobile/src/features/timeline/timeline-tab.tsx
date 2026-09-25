@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Card, Column, EmptyState, Row, Text } from '@/components/ui';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
@@ -35,9 +36,9 @@ const KIND_LABEL: Record<TimelineKind, string> = {
 export function TimelineTab({ patientId }: { patientId: string }) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
-  const { items, loading } = useTimeline(patientId);
+  const { items, loading, error, failedSources, retry } = useTimeline(patientId);
 
-  if (!loading && items.length === 0) {
+  if (!loading && !error && items.length === 0) {
     return (
       <EmptyState
         icon="time-outline"
@@ -49,6 +50,12 @@ export function TimelineTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="sm" style={{ paddingTop: spacing.md }}>
+      <ErrorNotice error={error} what={`تایم‌لاین (${failedSources.join('، ')})`} onRetry={retry} />
+      {loading ? (
+        <Text variant="tiny" color="textFaint">
+          در حال خواندن…
+        </Text>
+      ) : null}
       {items.map((item) => (
         <Pressable
           key={item.id}
@@ -87,7 +94,7 @@ export function TimelineTab({ patientId }: { patientId: string }) {
 
       {items.length > 0 ? (
         <Text variant="tiny" color="textFaint">
-          {toPersianDigits(items.length)} رویداد
+          {toPersianDigits(items.length)} {error || loading ? 'رویداد خوانده‌شده؛ فهرست کامل نیست' : 'رویداد'}
         </Text>
       ) : null}
     </Column>

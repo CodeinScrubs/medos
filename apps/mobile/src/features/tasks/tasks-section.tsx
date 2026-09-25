@@ -26,8 +26,12 @@ export function TasksSection(props: Props) {
 function TaskSectionBody({ patientId, shiftId, title = 'کارها', limit = 20 }: Props) {
   const router = useRouter();
   const scope = useAutosaveScope();
-  const { data, error } = useLive(tasksQuery({ patientId, status: 'open' }, limit), [patientId, limit]);
-  const { data: count, error: countError } = useLive(taskCountQuery({ patientId, status: 'open' }), [patientId]);
+  const { data, error, retry } = useLive(tasksQuery({ patientId, status: 'open' }, limit), [patientId, limit]);
+  const {
+    data: count,
+    error: countError,
+    retry: retryCount,
+  } = useLive(taskCountQuery({ patientId, status: 'open' }), [patientId]);
   const rows = data?.filter(({ task }) => task.patientId === patientId && task.status === 'open' && !task.deletedAt);
 
   function navigate(action: () => void) {
@@ -39,7 +43,7 @@ function TaskSectionBody({ patientId, shiftId, title = 'کارها', limit = 20 
     <>
       <SectionHeader
         title={title}
-        count={count?.[0]?.total}
+        count={countError || error ? undefined : count?.[0]?.total}
         action={
           <Button
             label="همه و تاریخچه"
@@ -54,7 +58,14 @@ function TaskSectionBody({ patientId, shiftId, title = 'کارها', limit = 20 
         }
       />
       <Column gap="sm">
-        <ErrorNotice error={error ?? countError} what="کارها" />
+        <ErrorNotice
+          error={error ?? countError}
+          what="کارها"
+          onRetry={() => {
+            retry();
+            retryCount();
+          }}
+        />
         <QuickAddTask patientId={patientId} shiftId={shiftId ?? null} />
         {rows?.map(({ task, patient }) => (
           <TaskRow
@@ -65,7 +76,7 @@ function TaskSectionBody({ patientId, shiftId, title = 'کارها', limit = 20 
             onOpen={() => navigate(() => router.push({ pathname: '/task', params: { taskId: task.id } }))}
           />
         ))}
-        {!error && rows?.length === 0 ? (
+        {!error && !countError && rows?.length === 0 ? (
           <Text variant="tiny" color="textFaint">
             کاری باز نیست.
           </Text>

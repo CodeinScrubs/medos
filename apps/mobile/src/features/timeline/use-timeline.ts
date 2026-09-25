@@ -36,7 +36,13 @@ export type TimelineItem = {
   tab?: 'notes' | 'labs' | 'imaging' | 'overview';
 };
 
-export function useTimeline(patientId: string): { items: TimelineItem[]; loading: boolean } {
+export function useTimeline(patientId: string): {
+  items: TimelineItem[];
+  loading: boolean;
+  error: Error | undefined;
+  failedSources: string[];
+  retry: () => void;
+} {
   const notes = useLive(patientNotesQuery(patientId), [patientId]);
   const labs = useLive(patientLabPanelsQuery(patientId), [patientId]);
   const imaging = useLive(patientImagingQuery(patientId), [patientId]);
@@ -120,12 +126,19 @@ export function useTimeline(patientId: string): { items: TimelineItem[]; loading
     return out.sort((a, b) => b.at.getTime() - a.at.getTime());
   }, [notes.data, labs.data, imaging.data, consults.data, encounters.data]);
 
-  const loading =
-    notes.data === undefined ||
-    labs.data === undefined ||
-    imaging.data === undefined ||
-    consults.data === undefined ||
-    encounters.data === undefined;
-
-  return { items, loading };
+  const sources = [
+    { label: 'نوت‌ها', query: notes },
+    { label: 'آزمایش‌ها', query: labs },
+    { label: 'تصویربرداری', query: imaging },
+    { label: 'کانسالت‌ها', query: consults },
+    { label: 'بستری‌ها', query: encounters },
+  ];
+  const failed = sources.filter(({ query }) => query.error);
+  return {
+    items,
+    loading: sources.some(({ query }) => query.loading),
+    error: failed[0]?.query.error,
+    failedSources: failed.map(({ label }) => label),
+    retry: () => failed.forEach(({ query }) => query.retry()),
+  };
 }

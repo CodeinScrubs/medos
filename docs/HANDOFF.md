@@ -33,6 +33,67 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-25 — Distinguish failed reads from an empty workload
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; base `ae7fc6f`
+
+**Changed**
+
+- `useLive` now exposes explicit retry, catches synchronous query failures,
+  coalesces overlapping retries and ignores disposed results. Cached rows survive
+  a refresh failure. Today, timeline and their shift/capture/task/consult/draft/
+  occasion sections expose failed sources and retry instead of false zero counts,
+  empty-work claims or endless initial loading. Timeline marks partial totals.
+- Shift progress mounts per shift id; retry and round actions are outside the
+  header navigation pressable. Unreliable progress cannot show a completion badge.
+- Today inbox reads a three-row preview plus the actual matching total rather
+  than counting a capped 50-row result. Failed patient assignment retains its
+  picker; stale picker data and overlapping submissions are rejected.
+- Read errors are short; redacted technical details open only on request.
+  Updated architecture/D08/W05 ledger. No dependency, schema or unrelated module.
+
+**Verified**
+
+- Root `npm run check`: 57 suites / 686 app tests + 3 workflow tests passed,
+  including typecheck, lint and formatting. Nineteen added tests cover hook
+  lifecycle/retry, retained rows, unknown versus zero counts, partial timeline,
+  shift failures, inbox overflow, assignment failure/retry and diagnostic redaction.
+  Screen tests use real migrated SQLite queries but substitute the live-query
+  hook and native widgets; separate hook tests exercise async subscription behavior.
+- `git diff --check` passed; `npm run db:generate` reported no schema changes.
+- APK build passed with all 411 recorded mobile input hashes unchanged; v2
+  signature verified. `dist/MedOS-0.7.1.apk`: 54,622,897 bytes, SHA-256
+  `343025bd4d51bfdecff46874d592f3f4325694759f4c27dd9458d71c7c4ba8b2`.
+  Package `com.shayan.medos`, versionCode 10, arm64-v8a, target SDK 36.
+
+**Not verified**
+
+- `adb devices` has no connected phone. Native UI/layout, read-error recovery on
+  device, back/gesture/process death, alarm delivery/reboot and interrupted or
+  second-device restore are not established by these component tests.
+
+**Open threads**
+
+- Continue D05/D08/D10: remaining form drafts/edit gates and failed status actions,
+  media interruption and native exit/restore drills. Do not call all recovery done.
+  `EditGate` still has no read-error input; several forms can wait forever on an
+  initial failed read. The full shift screen also needs reliable empty/progress
+  claims and retries; the card fixed here does not fix that separate screen.
+- W02/W03: editable optional shift context and persistent accessible ordering;
+  native deadline/keyboard/alarm checks. W05: timeline filters and measured
+  large-record retrieval/rendering still remain; this change only handles reads.
+- Preserve W04–W10 patient summary, record/result loop, trash, rich text/media,
+  people/knowledge and calendar scope, plus C01–C05 sourced physician-reviewed
+  clinical tools and later AI/call workflows. Full product completion is unproven.
+
+**Gotchas**
+
+- `useLive` deliberately retains data across dependency changes. Key children
+  by record id when previous-identity rows must never be shown under the new id.
+- Counts and preview queries are independent live reads, not an atomic snapshot.
+  An error invalidates a total; cached data is a reference, not proof of completeness.
+
 ## 2026-09-25 — Make occasion reminders recoverable without losing saved data
 
 **Agent:** GPT-6 via Codex

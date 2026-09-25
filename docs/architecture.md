@@ -70,6 +70,18 @@ times), and starts with `[]`, indistinguishable from "no rows". `useLive` watche
 every join (`tablesOf`, which has its own test because it reads drizzle internals),
 coalesces bursts, and reports `undefined` until the first result.
 
+Read failure is distinct from an empty result. `useLive` retains the last loaded
+rows and reports the error; its stable `retry()` callback re-runs the read without
+requiring a database mutation or navigation. Overlapping requests are coalesced,
+late results from a disposed subscription are ignored, and synchronous thenable
+failures become read errors too. Rows intentionally survive dependency changes;
+identity-sensitive children such as the shift progress card must be keyed by id.
+
+Today and timeline expose failed sources and retry, withhold unreliable totals
+and empty/success claims, and retain available rows. `ErrorNotice` keeps technical
+diagnostics behind an explicit details action; displayed details remain redacted.
+The timeline is still assembled in memory and is not yet accepted for large records.
+
 **Rejected: SQLCipher via op-sqlite.** It would encrypt the database file itself. Android
 already encrypts app-private storage at rest (FBE, default since Android 10), so SQLCipher
 buys defence-in-depth against a rooted or forensically imaged device — a real but narrow

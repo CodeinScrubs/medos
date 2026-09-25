@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-import { Card, Column, Row, Text } from '@/components/ui';
+import { Button, Card, Column, Row, Text } from '@/components/ui';
 import { redactErrorText } from '@/lib/redact';
 import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
@@ -13,8 +13,17 @@ import { useTheme } from '@/theme';
  * which is the wrong thing to tell someone on a ward round. The error is also
  * written to the on-phone log, since nobody is watching a console here.
  */
-export function ErrorNotice({ error, what }: { error: Error | undefined; what: string }) {
+export function ErrorNotice({
+  error,
+  what,
+  onRetry,
+}: {
+  error: Error | undefined;
+  what: string;
+  onRetry?: () => void;
+}) {
   const { colors, spacing } = useTheme();
+  const [details, setDetails] = useState(false);
 
   useEffect(() => {
     if (error) logError(error, { source: 'handled', context: what });
@@ -31,11 +40,23 @@ export function ErrorNotice({ error, what }: { error: Error | undefined; what: s
             {what} خوانده نشد
           </Text>
           <Text variant="tiny" style={{ color: colors.danger }}>
-            اطلاعات ممکن است به‌روز نباشد. پیش از خروج، از ذخیره‌شدن نوشته‌ها مطمئن شوید.
+            اطلاعات ممکن است ناقص یا قدیمی باشد.
           </Text>
-          <Text variant="tiny" color="textFaint" ltr selectable style={{ marginTop: spacing.xxs }}>
-            {redactErrorText(error.message)}
-          </Text>
+          <Row gap="sm">
+            {onRetry ? <Button label="تلاش دوباره" size="sm" variant="ghost" onPress={onRetry} /> : null}
+            <Button
+              label={details ? 'بستن جزئیات' : 'جزئیات'}
+              size="sm"
+              variant="ghost"
+              onPress={() => setDetails((value) => !value)}
+              haptic={false}
+            />
+          </Row>
+          {details ? (
+            <Text variant="tiny" color="textFaint" ltr selectable style={{ marginTop: spacing.xxs }}>
+              {redactErrorText(error.message)}
+            </Text>
+          ) : null}
         </Column>
       </Row>
     </Card>

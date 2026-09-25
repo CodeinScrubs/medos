@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Card, Column, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { daysBetween, formatJalaliLong } from '@/lib/jalali';
@@ -22,7 +23,7 @@ import { upcomingOccasionsQuery } from './occasions-queries';
 export function UpcomingOccasions({ now, withinDays = 14 }: { now: Date; withinDays?: number }) {
   const router = useRouter();
   const { colors } = useTheme();
-  const { data } = useLive(upcomingOccasionsQuery());
+  const { data, error, retry } = useLive(upcomingOccasionsQuery());
 
   const rows = useMemo(() => {
     return (data ?? [])
@@ -34,11 +35,12 @@ export function UpcomingOccasions({ now, withinDays = 14 }: { now: Date; withinD
       .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
   }, [data, now, withinDays]);
 
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && !error) return null;
 
   return (
     <>
-      <SectionHeader title="مناسبت‌های نزدیک" count={rows.length} />
+      <SectionHeader title="مناسبت‌های نزدیک" count={error ? undefined : rows.length} />
+      <ErrorNotice error={error} what="مناسبت‌های نزدیک" onRetry={retry} />
       <Column gap="sm">
         {rows.map(({ occasion, doctor, at, days }) => (
           <Pressable

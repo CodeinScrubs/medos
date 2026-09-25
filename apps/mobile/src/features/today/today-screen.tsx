@@ -37,11 +37,23 @@ export function TodayScreen() {
   const now = new Date(useNow());
   const today = toIsoDate(now);
 
-  const { data: due, error } = useLive(dueFollowUpsQuery(endOfDay(now)), [today]);
-  const { data: pending } = useLive(pendingFollowUpsQuery());
-  const { data: admitted } = useLive(patientListQuery({ statuses: ['admitted'] }));
-  const { data: starred } = useLive(patientListQuery({ starredOnly: true }));
-  const { data: locationRows } = useLive(activeLocationsQuery());
+  const dueQuery = useLive(dueFollowUpsQuery(endOfDay(now)), [today]);
+  const pendingQuery = useLive(pendingFollowUpsQuery());
+  const admittedQuery = useLive(patientListQuery({ statuses: ['admitted'] }));
+  const starredQuery = useLive(patientListQuery({ starredOnly: true }));
+  const locationQuery = useLive(activeLocationsQuery());
+  const { data: due } = dueQuery;
+  const { data: pending } = pendingQuery;
+  const { data: admitted } = admittedQuery;
+  const { data: starred } = starredQuery;
+  const { data: locationRows } = locationQuery;
+  const failed = [
+    { label: 'پیگیری‌های امروز', query: dueQuery },
+    { label: 'پیگیری‌های پیش رو', query: pendingQuery },
+    { label: 'بیماران بستری', query: admittedQuery },
+    { label: 'بیماران ستاره‌دار', query: starredQuery },
+    { label: 'محل بستری', query: locationQuery },
+  ].filter(({ query }) => query.error);
   const locations = useMemo(() => new Map((locationRows ?? []).map((r) => [r.patientId, r])), [locationRows]);
 
   const { jy } = toJalali(now);
@@ -50,7 +62,8 @@ export function TodayScreen() {
   const upcoming = (pending ?? []).filter((r) => (daysBetween(r.followUp.dueAt, now) ?? 0) > 0).slice(0, 5);
 
   const loaded = due !== undefined && admitted !== undefined && pending !== undefined;
-  const nothingYet = loaded && dueRows.length === 0 && (admitted?.length ?? 0) === 0 && (pending?.length ?? 0) === 0;
+  const reliable = loaded && !dueQuery.error && !admittedQuery.error && !pendingQuery.error;
+  const nothingYet = reliable && dueRows.length === 0 && admitted!.length === 0 && pending!.length === 0;
 
   return (
     <Screen scroll>
@@ -60,21 +73,30 @@ export function TodayScreen() {
         </Text>
         <Text variant="display">امروز</Text>
 
-        <ErrorNotice error={error} what="کارهای امروز" />
+        <ErrorNotice
+          error={failed[0]?.query.error}
+          what={failed.map(({ label }) => label).join('، ')}
+          onRetry={() => failed.forEach(({ query }) => query.retry())}
+        />
         <RestoreTrouble />
 
         <Row gap="sm" style={{ marginTop: spacing.lg }}>
-          <StatTile icon="alarm-outline" label="پیگیری امروز" value={dueRows.length} alert={overdue > 0} />
+          <StatTile
+            icon="alarm-outline"
+            label="پیگیری امروز"
+            value={due === undefined || dueQuery.error ? null : due.length}
+            alert={!dueQuery.error && overdue > 0}
+          />
           <StatTile
             icon="bed-outline"
             label="بستری"
-            value={admitted?.length ?? 0}
+            value={admittedQuery.error ? null : (admitted?.length ?? null)}
             onPress={() => router.push('/patients')}
           />
           <StatTile
             icon="star-outline"
             label="ستاره‌دار"
-            value={starred?.length ?? 0}
+            value={starredQuery.error ? null : (starred?.length ?? null)}
             onPress={() => router.push('/patients')}
           />
         </Row>
@@ -82,8 +104,12 @@ export function TodayScreen() {
         {dueRows.length > 0 && (
           <>
             <SectionHeader
-              title={overdue > 0 ? `پیگیری‌ها — ${toPersianDigits(overdue)} عقب‌افتاده` : 'پیگیری‌های امروز'}
-              count={dueRows.length}
+              title={
+                !dueQuery.error && overdue > 0
+                  ? `پیگیری‌ها — ${toPersianDigits(overdue)} عقب‌افتاده`
+                  : 'پیگیری‌های امروز'
+              }
+              count={dueQuery.error ? undefined : dueRows.length}
             />
             <Column gap="sm">
               {dueRows.map(({ followUp, patient }) => (
@@ -95,9 +121,13 @@ export function TodayScreen() {
 
         {(admitted?.length ?? 0) > 0 && (
           <>
-            <SectionHeader title="بیماران بستری" count={admitted!.length} />
+            <SectionHeader title="بیماران بستری" count={admittedQuery.error ? undefined : admitted!.length} />
             {admitted!.slice(0, 8).map((p) => (
-              <PatientCard key={p.id} patient={p} location={locationLabel(locations.get(p.id))} />
+              <PatientCard
+                key={p.id}
+                patient={p}
+                location={locationQuery.error ? 'محل بستری خوانده نشد' : locationLabel(locations.get(p.id))}
+              />
             ))}
           </>
         )}
@@ -116,7 +146,7 @@ export function TodayScreen() {
 
         {upcoming.length > 0 && (
           <>
-            <SectionHeader title="پیگیری‌های پیش رو" count={upcoming.length} />
+            <SectionHeader title="پیگیری‌های پیش رو" count={pendingQuery.error ? undefined : upcoming.length} />
             <Column gap="sm">
               {upcoming.map(({ followUp, patient }) => (
                 <FollowUpCard key={followUp.id} followUp={followUp} patient={patient} showPatient />
@@ -125,15 +155,9 @@ export function TodayScreen() {
           </>
         )}
 
-        {nothingYet ? (
-          <EmptyState
-            icon="medkit-outline"
-            title="امروز چیزی در انتظار شما نیست"
-            description="بیماران بستری و پیگیری‌هایی که موعدشان رسیده اینجا جمع می‌شوند."
-          />
-        ) : null}
+        {nothingYet ? <EmptyState icon="medkit-outline" title="بیمار بستری یا پیگیری ثبت‌شده‌ای نیست" /> : null}
 
-        {loaded && !nothingYet && dueRows.length === 0 ? (
+        {reliable && !nothingYet && dueRows.length === 0 ? (
           <Card tone="alt" style={{ marginTop: spacing.lg }}>
             <Text variant="caption" color="textFaint">
               برای امروز پیگیری‌ای نمانده.
@@ -156,7 +180,7 @@ function StatTile({
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  value: number;
+  value: number | null;
   onPress?: () => void;
   alert?: boolean;
 }) {
@@ -175,7 +199,7 @@ function StatTile({
       >
         <Ionicons name={icon} size={18} color={alert ? colors.danger : colors.primary} />
         <Text variant="title" color={alert ? 'danger' : 'text'}>
-          {toPersianDigits(value)}
+          {value == null ? '—' : toPersianDigits(value)}
         </Text>
         <Text variant="tiny" color="textMuted">
           {label}

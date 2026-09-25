@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Card, Column, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { formatJalaliDateTime } from '@/lib/jalali';
@@ -18,14 +19,15 @@ import { notePreview } from './logic';
  */
 export function UnfinishedNotes() {
   const router = useRouter();
-  const { data } = useLive(openNoteDraftsQuery());
+  const { data, error, retry } = useLive(openNoteDraftsQuery());
   const drafts = (data ?? []).filter((row) => draftHasContent(row.draft));
 
-  if (drafts.length === 0) return null;
+  if (drafts.length === 0 && !error) return null;
 
   return (
     <>
-      <SectionHeader title="نوت‌های ناتمام" count={drafts.length} />
+      <SectionHeader title="نوت‌های ناتمام" count={error ? undefined : drafts.length} />
+      <ErrorNotice error={error} what="نوت‌های ناتمام" onRetry={retry} />
       <Column gap="sm">
         {drafts.map(({ draft, patient }) => (
           <Pressable

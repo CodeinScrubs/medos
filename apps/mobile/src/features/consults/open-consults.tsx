@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Card, Column, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { formatRelativeTime } from '@/lib/jalali';
@@ -17,14 +18,15 @@ import { openConsultsQuery } from './queries';
  */
 export function OpenConsults() {
   const router = useRouter();
-  const { data } = useLive(openConsultsQuery());
+  const { data, error, retry } = useLive(openConsultsQuery());
   const rows = data ?? [];
 
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && !error) return null;
 
   return (
     <>
-      <SectionHeader title="کانسالت‌های بی‌پاسخ" count={rows.length} />
+      <SectionHeader title="کانسالت‌های بی‌پاسخ" count={error ? undefined : rows.length} />
+      <ErrorNotice error={error} what="کانسالت‌های بی‌پاسخ" onRetry={retry} />
       <Column gap="sm">
         {rows.map(({ consult, patient }) => (
           <Pressable
