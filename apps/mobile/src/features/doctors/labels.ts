@@ -1,4 +1,4 @@
-import type { Doctor, Occasion, ScheduledMessage } from '@/db/schema';
+import type { Doctor, Occasion } from '@/db/schema';
 
 export const RELATIONSHIP_LABELS: Record<Doctor['relationship'], string> = {
   professor: 'استاد',
@@ -28,15 +28,6 @@ export const OCCASION_KIND_LABELS: Record<Occasion['kind'], string> = {
   holiday: 'مناسبت تقویمی',
   religious: 'مناسبت مذهبی',
   custom: 'دلخواه',
-};
-
-export const MESSAGE_CHANNEL_LABELS: Record<ScheduledMessage['channel'], string> = {
-  sms: 'پیامک',
-  whatsapp: 'واتس‌اپ',
-  telegram: 'تلگرام',
-  call: 'تماس',
-  email: 'ایمیل',
-  inperson: 'حضوری',
 };
 
 /** What each 1–5 rating step means, so the numbers stay comparable over years. */

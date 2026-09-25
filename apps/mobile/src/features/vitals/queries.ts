@@ -28,16 +28,6 @@ export function patientVitalsQuery(patientId: string, limit = 100) {
     .limit(limit);
 }
 
-/** The most recent set, for the summary at the top of a record. */
-export function latestVitalQuery(patientId: string) {
-  return db
-    .select()
-    .from(vitals)
-    .where(and(alive, eq(vitals.patientId, patientId)))
-    .orderBy(desc(vitals.measuredAt))
-    .limit(1);
-}
-
 export function vitalQuery(id: string) {
   return db
     .select()

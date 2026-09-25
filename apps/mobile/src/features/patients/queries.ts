@@ -2,15 +2,7 @@ import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL } from 'drizzle
 
 import { audit } from '@/db/audit';
 import { db } from '@/db/client';
-import {
-  encounters,
-  followUps,
-  patientContacts,
-  patients,
-  type NewPatient,
-  type Patient,
-  type PatientStatus,
-} from '@/db/schema';
+import { patientContacts, patients, type NewPatient, type Patient, type PatientStatus } from '@/db/schema';
 import { contains, matchesSearch } from '@/db/search';
 import { activeEncounter, reconcilePatientStatus, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
@@ -80,23 +72,6 @@ export function patientContactsQuery(patientId: string) {
     .from(patientContacts)
     .where(and(eq(patientContacts.patientId, patientId), isNull(patientContacts.deletedAt)))
     .orderBy(desc(patientContacts.isPrimary));
-}
-
-export function activeEncounterQuery(patientId: string) {
-  return db
-    .select()
-    .from(encounters)
-    .where(and(eq(encounters.patientId, patientId), eq(encounters.isActive, true), isNull(encounters.deletedAt)))
-    .orderBy(desc(encounters.admittedAt))
-    .limit(1);
-}
-
-export function pendingFollowUpsQuery(patientId: string) {
-  return db
-    .select()
-    .from(followUps)
-    .where(and(eq(followUps.patientId, patientId), eq(followUps.status, 'pending'), isNull(followUps.deletedAt)))
-    .orderBy(followUps.dueAt);
 }
 
 /** Used by the duplicate check when creating a patient. */

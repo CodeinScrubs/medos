@@ -35,13 +35,6 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   return { sqlite, db, conn: sqlJsConnection(sqlite) };
 }
 
-/** An empty in-memory SQLite, for tests that build their own tables. */
-export async function createEmptyDatabase(): Promise<{ sqlite: SqlJsDatabase; conn: SqlConnection }> {
-  SQL ??= await initSqlJs();
-  const sqlite = new SQL.Database();
-  return { sqlite, conn: sqlJsConnection(sqlite) };
-}
-
 /** The minimal synchronous interface the restore code is written against. */
 export function sqlJsConnection(sqlite: SqlJsDatabase): SqlConnection {
   const all = <T>(sql: string): T[] => {

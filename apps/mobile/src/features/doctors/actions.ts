@@ -68,12 +68,3 @@ export async function sendTelegram(handle: string | null | undefined, body: stri
     'تلگرام باز نشد. متن کپی شده است.',
   );
 }
-
-export async function sendEmail(address: string | null | undefined, subject: string, body: string): Promise<boolean> {
-  const to = (address ?? '').trim();
-  if (!to) return false;
-  return open(
-    `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
-    'برنامه‌ی ایمیل باز نشد.',
-  );
-}

@@ -82,14 +82,6 @@ export function noteVersionsQuery(noteId: string) {
     .orderBy(desc(noteVersions.createdAt));
 }
 
-export function noteVersionQuery(id: string) {
-  return db
-    .select()
-    .from(noteVersions)
-    .where(and(isNull(noteVersions.deletedAt), eq(noteVersions.id, id)))
-    .limit(1);
-}
-
 /**
  * Record what the note says now.
  *

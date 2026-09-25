@@ -39,8 +39,3 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme(): Theme {
   return useContext(ThemeContext);
 }
-
-/** Shorthand for the common case of only needing colours. */
-export function useColors(): Colors {
-  return useContext(ThemeContext).colors;
-}

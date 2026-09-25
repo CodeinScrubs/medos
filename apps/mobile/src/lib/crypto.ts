@@ -185,39 +185,6 @@ export async function chunkCipher(key: Uint8Array, noncePrefix: Uint8Array, aad:
 }
 
 /* -------------------------------------------------------------------------- */
-/*  One short secret                                                            */
-/* -------------------------------------------------------------------------- */
-
-/** A sealed secret: standard AES-256-GCM, ciphertext with the tag appended. */
-export type SealedSecret = { nonce: Uint8Array; sealed: Uint8Array };
-
-/**
- * Seal one short value — a vault password, not a file.
- *
- * Each secret gets its own random 12-byte nonce, which is the right shape for
- * values written independently at different times; the chunked stream above is
- * for one long file sealed in a single pass. `aad` binds the ciphertext to
- * where it is stored, so a row's secret cannot be moved to another row.
- */
-export async function sealSecret(key: Uint8Array, plaintext: Uint8Array, aad: Uint8Array): Promise<SealedSecret> {
-  const nonce = randomBytes(12);
-  const nativeKey = await Crypto.AESEncryptionKey.import(key);
-  const sealed = await Crypto.aesEncryptAsync(plaintext, nativeKey, {
-    nonce: { bytes: nonce },
-    additionalData: aad,
-    tagLength: TAG_BYTES,
-  });
-  return { nonce, sealed: await sealed.ciphertext({ includeTag: true }) };
-}
-
-/** Open a sealed secret. Throws on a wrong key, altered data, or a different `aad`. */
-export async function openSecret(key: Uint8Array, secret: SealedSecret, aad: Uint8Array): Promise<Uint8Array> {
-  const nativeKey = await Crypto.AESEncryptionKey.import(key);
-  const data = Crypto.AESSealedData.fromParts(secret.nonce, secret.sealed, TAG_BYTES);
-  return Crypto.aesDecryptAsync(data, nativeKey, { additionalData: aad });
-}
-
-/* -------------------------------------------------------------------------- */
 /*  Encoding helpers                                                            */
 /* -------------------------------------------------------------------------- */
 

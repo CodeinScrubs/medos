@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, isNull, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { doctors, specialties, topics } from '@/db/schema';
@@ -210,18 +210,4 @@ export function topicsByTeacherQuery(doctorId: string) {
     .from(topics)
     .where(and(alive, eq(topics.taughtById, doctorId)))
     .orderBy(desc(topics.taughtAt), desc(topics.createdAt));
-}
-
-/** Titles used before, for the "same subject again" case. */
-export async function suggestTopicTitles(prefix: string, limit = 8): Promise<string[]> {
-  const term = prefix.trim();
-  if (term.length < 2) return [];
-  const rows = await db
-    .select({ title: topics.title, uses: sql<number>`count(*)` })
-    .from(topics)
-    .where(and(alive, or(eq(topics.title, term), matchesSearch(topics.searchText, term)[0])))
-    .groupBy(topics.title)
-    .orderBy(desc(sql`count(*)`), asc(topics.title))
-    .limit(limit);
-  return rows.map((r) => r.title);
 }

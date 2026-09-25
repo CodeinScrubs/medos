@@ -149,8 +149,3 @@ export function itemsOf(template: Pick<PrescriptionTemplate, 'items'>): Prescrip
 export function cleanItems(items: PrescriptionItem[]): PrescriptionItem[] {
   return items.map((i) => ({ ...i, drug: i.drug?.trim() ?? '' })).filter((i) => i.drug.length > 0);
 }
-
-/** Topics still marked for another pass before exams, hardest first is the user's job. */
-export function needsReviewCount(topics: Pick<Topic, 'needsReview'>[]): number {
-  return topics.filter((t) => t.needsReview).length;
-}

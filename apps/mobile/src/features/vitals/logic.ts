@@ -1,4 +1,4 @@
-import { parseDecimal, toPersianDigits } from '@/lib/persian';
+import { parseDecimal } from '@/lib/persian';
 
 /*
  * Reading and writing observations the way they are actually said.
@@ -159,9 +159,4 @@ export function vitalChips(v: Partial<VitalFields> & { urineOutput?: string | nu
   push('pain', 'درد', v.painScore);
   push('uo', 'ادرار', v.urineOutput?.trim() || null);
   return chips;
-}
-
-/** "۳ مورد" and friends, for counts in the UI. */
-export function countLabel(n: number): string {
-  return `${toPersianDigits(n)} مورد`;
 }

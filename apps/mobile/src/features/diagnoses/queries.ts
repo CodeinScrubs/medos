@@ -19,8 +19,6 @@ import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 const alive = isNull(diagnoses.deletedAt);
 
-export const DIAGNOSIS_KINDS: Diagnosis['kind'][] = ['primary', 'secondary', 'rule_out', 'past', 'complication'];
-
 export function patientDiagnosesQuery(patientId: string) {
   return db
     .select()
