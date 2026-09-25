@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { type ReactElement } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { Button, Input } from '@/components/ui';
+import * as notifications from '@/platform/notifications';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
+import { OccasionFormScreen } from './doctors/occasion-form-screen';
+import { createOccasion, occasionQuery } from './doctors/occasions-queries';
+import { createDoctor } from './doctors/queries';
 import { noteDraftQuery } from './notes/draft-queries';
 import { NoteEditorScreen } from './notes/note-editor-screen';
 import { createNote } from './notes/queries';
@@ -60,6 +64,7 @@ jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
 jest.mock('@/components/voice-note-player', () => ({ VoiceNotePlayer: 'VoiceNotePlayer' }));
 jest.mock('@/components/voice-recorder', () => ({ VoiceRecorder: 'VoiceRecorder' }));
 jest.mock('@/components/quick-date-field', () => ({ QuickDateField: 'QuickDateField' }));
+jest.mock('@/components/jalali-date-field', () => ({ JalaliDateField: 'JalaliDateField' }));
 jest.mock('@/features/attachments/voice-notes', () => ({ VoiceNotesSection: 'VoiceNotesSection' }));
 jest.mock('@/features/consults/consults-brief', () => ({ ConsultsBrief: 'ConsultsBrief' }));
 jest.mock('@/features/patients/patient-header', () => ({ AllergyBanner: 'AllergyBanner' }));
@@ -112,9 +117,85 @@ afterEach(async () => {
     });
   jest.clearAllTimers();
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 describe('editors survive database read failures', () => {
+  it('separates an occasion save from a failed alarm and ignores a second simultaneous submit', async () => {
+    const doctorId = await createDoctor({ firstName: 'Example', lastName: 'Colleague' });
+    const occasionId = await createOccasion({
+      doctorId,
+      title: 'Stored title',
+      kind: 'custom',
+      isRecurring: false,
+      onDate: '2030-01-02',
+    });
+    mockParams = { doctorId, occasionId };
+    await render(<OccasionFormScreen />);
+    await type('عنوان', 'Latest title');
+    jest.spyOn(notifications, 'scheduleReminder').mockRejectedValueOnce(new Error('Native unavailable'));
+    const alert = jest.spyOn(Alert, 'alert');
+    await act(async () => {
+      const submit = tree.root.findAllByType(Button).find((node) => node.props.label === 'ذخیره')!.props.onPress;
+      submit();
+      submit();
+      await settle();
+    });
+    expect(occasionQuery(occasionId).get()).toMatchObject({
+      title: 'Latest title',
+      reminderRevision: 1,
+      reminderAppliedRevision: -1,
+    });
+    expect(alert).toHaveBeenCalledWith('مناسبت ذخیره شد', expect.stringContaining('یادآور'));
+  });
+
+  it('shows an initial occasion read failure without leaving an endless loading indicator', async () => {
+    mockParams = { doctorId: 'example', occasionId: 'example' };
+    mockCache.set('occasions', undefined);
+    mockErrors.set('occasions', new Error('Synthetic read failure'));
+    await render(<OccasionFormScreen />);
+    expectReadError();
+    expect(tree.root.findAllByType(ActivityIndicator)).toHaveLength(0);
+  });
+
+  it('keeps an occasion edit mounted when refresh and explicit save both fail', async () => {
+    const doctorId = await createDoctor({ firstName: 'Example', lastName: 'Colleague' });
+    const occasionId = await createOccasion({
+      doctorId,
+      title: 'Stored title',
+      kind: 'custom',
+      isRecurring: false,
+      onDate: '2030-01-02',
+    });
+    mockParams = { doctorId, occasionId };
+    await render(<OccasionFormScreen />);
+    await type('عنوان', 'Latest title');
+    mockErrors.set('occasions', new Error('Synthetic read failure'));
+    await refresh(<OccasionFormScreen />);
+    expectReadError();
+    expect(input('عنوان').props.value).toBe('Latest title');
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_occasion BEFORE UPDATE ON occasions BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+    );
+    await act(async () => {
+      tree.root
+        .findAllByType(Button)
+        .find((node) => node.props.label === 'ذخیره')!
+        .props.onPress();
+      await settle();
+    });
+    expect(input('عنوان').props.value).toBe('Latest title');
+    t.sqlite.exec('DROP TRIGGER fail_occasion');
+    await act(async () => {
+      tree.root
+        .findAllByType(Button)
+        .find((node) => node.props.label === 'ذخیره')!
+        .props.onPress();
+      await settle();
+    });
+    expect(occasionQuery(occasionId).get()?.title).toBe('Latest title');
+  });
+
   it('keeps a failed task edit mounted through a later read error, then retries the same text', async () => {
     const taskId = await createTask({ title: 'Stored title' });
     mockParams = { taskId };

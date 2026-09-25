@@ -1,19 +1,21 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, ChipSelect, Column, Input, Screen, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
+import { useNow } from '@/components/use-now';
 import type { Occasion } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { formatJalaliLong, fromJalali, toIsoDate, toJalali } from '@/lib/jalali';
+import { formatJalaliLong, toJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
 import { OCCASION_KIND_LABELS } from './labels';
-import { DEFAULT_GREETING, occasionNextDate, occasionReminderAt } from './logic';
+import { DEFAULT_GREETING, occasionEditorDate, occasionNextDate, occasionReminderAt } from './logic';
 import { createOccasion, occasionQuery, updateOccasion } from './occasions-queries';
 import { doctorProfileQuery } from './ratings-queries';
 
@@ -41,17 +43,32 @@ const LEAD_OPTIONS = [
  */
 export function OccasionFormScreen() {
   const { doctorId, occasionId } = useLocalSearchParams<{ doctorId: string; occasionId?: string }>();
-  const { data } = useLive(occasionQuery(occasionId ?? ''), [occasionId]);
+  const { data, error } = useLive(occasionQuery(occasionId ?? ''), [occasionId]);
+  if (occasionId && error && !data)
+    return (
+      <Screen>
+        <ErrorNotice error={error} what="مناسبت" />
+      </Screen>
+    );
   return (
     <EditGate editing={Boolean(occasionId)} rows={data}>
-      {(occasion) => <OccasionForm doctorId={doctorId} occasion={occasion} />}
+      {(occasion) => <OccasionForm doctorId={doctorId} occasion={occasion} readError={error} />}
     </EditGate>
   );
 }
 
-function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occasion | null }) {
+function OccasionForm({
+  doctorId,
+  occasion,
+  readError,
+}: {
+  doctorId: string;
+  occasion: Occasion | null;
+  readError?: Error;
+}) {
   const router = useRouter();
   const { spacing } = useTheme();
+  const now = useNow();
 
   const { data: profileRows } = useLive(doctorProfileQuery(doctorId ?? ''), [doctorId]);
   const knownBirthDate = profileRows?.[0]?.birthDate ?? null;
@@ -63,22 +80,18 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
   const [remindDaysBefore, setRemindDaysBefore] = useState(String(occasion?.remindDaysBefore ?? 1));
   const [messageTemplate, setMessageTemplate] = useState(occasion?.messageTemplate ?? '');
   const [saving, setSaving] = useState(false);
+  const busy = useRef(false);
   const dateValidation = useDateValidation();
 
   /*
    * Both shapes of date are edited as one Jalali field. For a recurring
    * occasion only the month and day are kept, so the year the user types is
    * irrelevant — the birthday's own year is the natural thing to type, and
-   * the profile's birth date pre-fills it.
+   * a profile date can pre-fill it or be explicitly selected after loading.
    */
-  const [dateIso, setDateIso] = useState<string | null>(() => {
-    if (occasion?.onDate) return occasion.onDate;
-    if (occasion?.jalaliMonth && occasion.jalaliDay) {
-      const { jy } = toJalali(new Date());
-      return toIsoDate(fromJalali(jy, occasion.jalaliMonth, occasion.jalaliDay));
-    }
-    return knownBirthDate;
-  });
+  const [dateIso, setDateIso] = useState<string | null>(() =>
+    occasion ? occasionEditorDate(occasion, new Date(now)) : knownBirthDate,
+  );
 
   const jalali = dateIso ? toJalali(new Date(`${dateIso}T00:00:00`)) : null;
   const preview = jalali
@@ -91,15 +104,17 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
         isEnabled,
       }
     : null;
-  const nextAt = preview ? occasionNextDate(preview) : null;
-  const remindAt = preview ? occasionReminderAt(preview) : null;
+  const nextAt = preview ? occasionNextDate(preview, new Date(now)) : null;
+  const remindAt = preview ? occasionReminderAt(preview, new Date(now)) : null;
 
   async function save() {
+    if (busy.current) return;
     if (!dateValidation.check()) return;
     if (!dateIso || !jalali) {
       Alert.alert('تاریخ لازم است', 'تاریخ مناسبت را بنویسید.');
       return;
     }
+    busy.current = true;
     setSaving(true);
     const payload = {
       doctorId,
@@ -113,13 +128,26 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
       messageTemplate: messageTemplate.trim() || null,
       isEnabled,
     };
+    let committed = false;
     try {
       if (occasion) await updateOccasion(occasion.id, payload);
-      else await createOccasion(payload);
+      const id = occasion?.id ?? (await createOccasion(payload));
+      committed = true;
+      const saved = occasionQuery(id).get();
       router.back();
+      if (
+        saved &&
+        (saved.reminderRevision !== saved.reminderAppliedRevision ||
+          (occasionReminderAt(saved) && !saved.notificationId))
+      ) {
+        Alert.alert('مناسبت ذخیره شد', 'تنظیم یادآور کامل نشد؛ از بخش مناسبت‌ها دوباره تلاش کنید.');
+      }
     } catch (e) {
-      alertError('ذخیره نشد', e);
+      // A post-save status read is not proof that the committed save failed.
+      if (committed) router.back();
+      alertError(committed ? 'ذخیره شد؛ وضعیت یادآور خوانده نشد' : 'ذخیره نشد', e);
     } finally {
+      busy.current = false;
       setSaving(false);
     }
   }
@@ -128,6 +156,7 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
     <Screen scroll>
       <Stack.Screen options={{ title: occasion ? 'ویرایش مناسبت' : 'مناسبت جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <ErrorNotice error={readError} what="مناسبت" />
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
         <Input
           label="عنوان"
@@ -145,6 +174,14 @@ function OccasionForm({ doctorId, occasion }: { doctorId: string; occasion: Occa
           allowFuture
           hint={isRecurring ? 'فقط ماه و روزش نگه داشته می‌شود؛ سال مهم نیست.' : undefined}
         />
+        {!occasion && kind === 'birthday' && knownBirthDate && dateIso !== knownBirthDate ? (
+          <Button
+            label="استفاده از تاریخ تولد پروفایل"
+            variant="ghost"
+            size="sm"
+            onPress={() => setDateIso(knownBirthDate)}
+          />
+        ) : null}
         <Toggle
           label="هر سال تکرار شود"
           description="تولد و سالگرد بله؛ یک مناسبت یک‌باره خیر"

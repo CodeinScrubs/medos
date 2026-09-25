@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { RATING_AXES, type Doctor, type DoctorRating, type Occasion, type RatingAxis } from '@/db/schema';
-import { fromIsoDate, nextJalaliOccurrence, toJalali } from '@/lib/jalali';
+import { fromIsoDate, fromJalali, isValidJalali, nextJalaliOccurrence, toIsoDate, toJalali } from '@/lib/jalali';
 import { buildSearchText, fullName, normalizePhone, toPersianDigits } from '@/lib/persian';
 import { addDays, atTime } from '@/lib/time';
 
@@ -92,6 +92,16 @@ export type OccasionTiming = Pick<
 
 /** The hour of day a greeting reminder fires. Early enough to send before work. */
 export const OCCASION_REMINDER_HOUR = 9;
+
+/** The editor needs a real date but must never normalize Esfand 30 into Farvardin 1. */
+export function occasionEditorDate(o: OccasionTiming, now = new Date()): string | null {
+  if (!o.isRecurring) return o.onDate;
+  if (!o.jalaliMonth || !o.jalaliDay || !isValidJalali(1403, o.jalaliMonth, o.jalaliDay)) return null;
+  const year = toJalali(now).jy;
+  return toIsoDate(
+    fromJalali(isValidJalali(year, o.jalaliMonth, o.jalaliDay) ? year : 1403, o.jalaliMonth, o.jalaliDay),
+  );
+}
 
 /**
  * When this occasion next happens.

@@ -23,6 +23,8 @@ export type AuditAction =
   | 'consult.deleted'
   | 'followup.statusChanged'
   | 'followup.deleted'
+  | 'occasion.deleted'
+  | 'doctor.deleted'
   | 'backup.created'
   | 'backup.restored'
   // A restore that was cut short and had its files put back.

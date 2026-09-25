@@ -33,6 +33,68 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-25 — Make occasion reminders recoverable without losing saved data
+
+**Agent:** GPT-6 via Codex
+**Commits:** this entry's commit; base `af477e8`
+
+**Changed**
+
+- Reproduced three failures before the fix: native work before a failed insert,
+  replacement/cancellation before a failed update, and no saved occasion after a
+  native scheduling exception. Migration 0015 adds SQL-default desired/applied
+  revisions; occasion writes now commit before native work.
+- Stable native ids, strict cancellation and per-occasion serialization allow
+  retry after native/acknowledgement failure. Repair includes disabled/deleted rows
+  and deleted doctors, retires legacy ids, checks restored content and runs at
+  startup, foreground and restore without permission prompts. Doctor deletion and
+  rename update reminder intent atomically; deletions are audited without names/text.
+- Failed/unavailable alarms get a compact retry action. Save feedback distinguishes
+  saved data from a failed alarm. The editor retains text on refresh/save failure,
+  shows initial read errors and guards duplicate submits. Recurring Esfand 30 stays
+  intact when editing in a non-leap year; reminder text uses the scheduled year.
+- Updated architecture and D12 acceptance ledger. Removed obsolete best-effort
+  occasion helpers. No dependency, background service or unrelated feature added.
+
+**Verified**
+
+- Root `npm run check`: 54 suites / 667 app tests + 3 workflow tests passed;
+  typecheck, lint and formatting passed. SQL/native failure and overlapping
+  postpone/disable/delete/doctor-delete cases, old-backup defaults, legacy ids,
+  permission refusal, retry UI and retained editor text have regression coverage.
+- `npm run db:generate`: no further changes; `git diff --check` passed.
+- APK built successfully with all 408 recorded mobile input hashes unchanged;
+  v2 signature verified. `dist/MedOS-0.7.1.apk`: 54,617,933 bytes, SHA-256
+  `8326a411d697d6642d65802453d2de72797d18f72f96eed9d915b15c3f6b7f8f`.
+  Package `com.shayan.medos`, versionCode 10, arm64-v8a, target SDK 36.
+
+**Not verified**
+
+- No connected phone (`adb devices` empty). Actual notification delivery/taps,
+  permission/channel settings, reboot/force-stop, process death, interrupted native
+  restore and second-device restore remain open. Native modules/UI are substituted
+  in automated tests; successful scheduling does not prove delivery.
+
+**Open threads**
+
+- Continue D05/D08/D10: raw form drafts (including occasions), recovery/native exit,
+  media interruption and restore drills. Occasion saves remain explicit; do not
+  describe this reminder repair as full autosave acceptance.
+  The Today `UpcomingOccasions` list still needs its own visible read-error handling.
+- W02/W03: optional editable shift context, persistent accessible ordering and
+  native deadline/keyboard/alarm checks. W05: timeline read errors and measured
+  large-record retrieval/rendering.
+- Preserve W04–W10 patient summary, record/result loop, trash, rich text/media,
+  people/knowledge and calendar scope, plus C01–C05 sourced physician-reviewed tools
+  and later AI/call workflows. Full product completion is not established.
+
+**Gotchas**
+
+- SQLite and Android cannot commit together. An old alarm may ring before repair;
+  pending revision/id must survive until successful cancellation/acknowledgement.
+- The form's post-save reminder read can fail after the save committed. Its error
+  must not invite creating a duplicate by saying the original save failed.
+
 ## 2026-09-24 — Recover task schedules and verify the external AI fixes
 
 **Agent:** GPT-6 via Codex; integrates reviewed Antigravity changes credited below

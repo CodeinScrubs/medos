@@ -1,4 +1,4 @@
-import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
+import { repairOccasionReminders } from '@/features/doctors/occasion-reminder-queries';
 import { repairFollowUpReminders } from '@/features/followups/reminder-queries';
 import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { cancelAllReminders } from '@/platform/notifications';
@@ -19,7 +19,7 @@ export async function rescheduleAllReminders(): Promise<{ followUps: number; occ
   // Try every kind even when one fails; restore reports a housekeeping warning.
   const results = await Promise.allSettled([
     repairFollowUpReminders({ reportFailures: true }),
-    rescheduleOccasionReminders(),
+    repairOccasionReminders({ reportFailures: true }),
     repairTaskReminders({ reportFailures: true }),
   ]);
   const [followUps, occasions, tasks] = results;

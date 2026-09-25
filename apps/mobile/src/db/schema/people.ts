@@ -226,6 +226,9 @@ export const occasions = sqliteTable(
       .notNull()
       .$default(() => true),
     notificationId: text('notification_id'),
+    /** Persist intent before calling Android; -1 means native work is unacknowledged. */
+    reminderRevision: integer('reminder_revision').notNull().default(0),
+    reminderAppliedRevision: integer('reminder_applied_revision').notNull().default(-1),
   },
   (t) => [index('occasions_doctor_idx').on(t.doctorId), index('occasions_date_idx').on(t.jalaliMonth, t.jalaliDay)],
 );

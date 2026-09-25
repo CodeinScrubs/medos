@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { AppState, type AppStateStatus } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
-import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
+import { repairOccasionReminders } from '@/features/doctors/occasion-reminder-queries';
 import { repairFollowUpReminders } from '@/features/followups/reminder-queries';
 import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { logError } from '@/platform/error-log';
 
 import { useReminderUpkeep } from './use-reminder-upkeep';
 
-jest.mock('@/features/doctors/occasions-queries', () => ({ rescheduleOccasionReminders: jest.fn() }));
+jest.mock('@/features/doctors/occasion-reminder-queries', () => ({ repairOccasionReminders: jest.fn() }));
 jest.mock('@/features/followups/reminder-queries', () => ({ repairFollowUpReminders: jest.fn() }));
 jest.mock('@/features/tasks/reminder-queries', () => ({ repairTaskReminders: jest.fn() }));
 jest.mock('@/platform/error-log', () => ({ logError: jest.fn() }));
@@ -29,7 +29,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   jest.mocked(repairFollowUpReminders).mockResolvedValue(0);
   jest.mocked(repairTaskReminders).mockResolvedValue(0);
-  jest.mocked(rescheduleOccasionReminders).mockResolvedValue(0);
+  jest.mocked(repairOccasionReminders).mockResolvedValue(0);
   jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
     change = listener;
     return { remove };
@@ -55,7 +55,7 @@ describe('reminder upkeep', () => {
     });
     expect(repairFollowUpReminders).toHaveBeenCalledTimes(1);
     expect(repairTaskReminders).toHaveBeenCalledTimes(1);
-    expect(rescheduleOccasionReminders).toHaveBeenCalledTimes(1);
+    expect(repairOccasionReminders).toHaveBeenCalledTimes(1);
     await act(async () => {
       change('background');
       change('active');
@@ -63,6 +63,8 @@ describe('reminder upkeep', () => {
     });
     expect(repairFollowUpReminders).toHaveBeenCalledTimes(2);
     expect(repairTaskReminders).toHaveBeenCalledTimes(2);
+    expect(repairOccasionReminders).toHaveBeenCalledTimes(2);
+    expect(repairOccasionReminders).toHaveBeenLastCalledWith();
     expect(repairTaskReminders).toHaveBeenLastCalledWith();
     expect(repairFollowUpReminders).toHaveBeenLastCalledWith();
     await act(async () => {

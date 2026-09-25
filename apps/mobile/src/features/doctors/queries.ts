@@ -1,15 +1,14 @@
-import { and, asc, desc, eq, isNull, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, or, sql, type SQL } from 'drizzle-orm';
 
+import { audit } from '@/db/audit';
 import { db } from '@/db/client';
 import { doctors, occasions, specialties, type Doctor, type NewDoctor } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { normalizePhone } from '@/lib/persian';
-import { logError } from '@/platform/error-log';
-import { cancelReminder } from '@/platform/notifications';
 
 import { doctorDisplayName, doctorSearchText, parseDoctorName } from './logic';
-import { occasionNotificationIds } from './occasions-queries';
+import { repairOccasionReminders } from './occasion-reminder-queries';
 
 const alive = isNull(doctors.deletedAt);
 
@@ -53,13 +52,14 @@ export function specialtiesQuery() {
 export type DoctorInput = Omit<NewDoctor, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'searchText'>;
 
 /** Every name a doctor's specialty and subspecialty go by, for the search index. */
-async function specialtyWords(d: Partial<DoctorInput>): Promise<string[]> {
+function specialtyWords(d: Partial<DoctorInput>): string[] {
   const ids = [d.specialtyId, d.subspecialtyId].filter((id): id is string => Boolean(id));
   if (ids.length === 0) return [];
-  const specs = await db
+  const specs = db
     .select()
     .from(specialties)
-    .where(or(...ids.map((id) => eq(specialties.id, id))));
+    .where(or(...ids.map((id) => eq(specialties.id, id))))
+    .all();
   return specs.flatMap((s) => [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]);
 }
 
@@ -70,24 +70,38 @@ export async function createDoctor(input: DoctorInput): Promise<string> {
     id,
     ...stamps(),
     phone: input.phone ? normalizePhone(input.phone) : null,
-    searchText: doctorSearchText(input, await specialtyWords(input)),
+    searchText: doctorSearchText(input, specialtyWords(input)),
   });
   return id;
 }
 
 export async function updateDoctor(id: string, input: Partial<DoctorInput>): Promise<void> {
-  const current = (await doctorQuery(id))[0];
-  if (!current) throw new Error(`Doctor ${id} not found`);
-  const merged = { ...current, ...input };
-  await db
-    .update(doctors)
-    .set({
-      ...input,
-      ...touch(),
-      phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
-      searchText: doctorSearchText(merged, await specialtyWords(merged)),
-    })
-    .where(and(alive, eq(doctors.id, id)));
+  const renamed = db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(doctors)
+      .where(and(alive, eq(doctors.id, id)))
+      .get();
+    if (!current) throw new Error('پزشک پیدا نشد یا حذف شده است.');
+    const merged = { ...current, ...input };
+    tx.update(doctors)
+      .set({
+        ...input,
+        ...touch(),
+        phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
+        searchText: doctorSearchText(merged, specialtyWords(merged)),
+      })
+      .where(and(alive, eq(doctors.id, id)))
+      .run();
+    const nameChanged = doctorDisplayName(current) !== doctorDisplayName(merged);
+    if (nameChanged)
+      tx.update(occasions)
+        .set({ reminderRevision: sql`${occasions.reminderRevision} + 1` })
+        .where(and(isNull(occasions.deletedAt), eq(occasions.doctorId, id)))
+        .run();
+    return nameChanged;
+  });
+  if (renamed) await repairOccasionReminders({ doctorId: id });
 }
 
 export async function setDoctorStarred(id: string, starred: boolean): Promise<void> {
@@ -108,12 +122,11 @@ export async function setDoctorStarred(id: string, starred: boolean): Promise<vo
  * than by holding the transaction open across it.
  */
 export async function deleteDoctor(id: string): Promise<void> {
-  const notifications = await occasionNotificationIds(id);
   const now = new Date();
 
   db.transaction((tx) => {
     tx.update(occasions)
-      .set(softDelete(now))
+      .set({ ...softDelete(now), reminderRevision: sql`${occasions.reminderRevision} + 1` })
       .where(and(isNull(occasions.deletedAt), eq(occasions.doctorId, id)))
       .run();
     tx.update(doctors)
@@ -122,11 +135,8 @@ export async function deleteDoctor(id: string): Promise<void> {
       .run();
   });
 
-  for (const notificationId of notifications) {
-    await cancelReminder(notificationId).catch((e: unknown) =>
-      logError(e, { source: 'handled', context: 'doctor delete: cancelling an occasion alarm' }),
-    );
-  }
+  await audit('doctor.deleted', { entityType: 'doctor', entityId: id });
+  await repairOccasionReminders({ doctorId: id });
 }
 
 /**

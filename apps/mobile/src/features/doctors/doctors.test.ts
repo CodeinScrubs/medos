@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { doctors, occasions } from '@/db/schema';
-import { fromJalali, toJalali } from '@/lib/jalali';
+import { fromIsoDate, fromJalali, toJalali } from '@/lib/jalali';
 import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications, scheduled } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -11,20 +11,15 @@ import {
   DEFAULT_GREETING,
   greetingText,
   latestRating,
+  occasionEditorDate,
   occasionNextDate,
   occasionReminderAt,
   ratedAxisCount,
   ratingAverage,
 } from './logic';
 import { confirmGreetingSent, doctorMessagesQuery, logGreetingPrepared } from './messages-queries';
-import {
-  cancelDoctorOccasionReminders,
-  createOccasion,
-  deleteOccasion,
-  doctorOccasionsQuery,
-  rescheduleOccasionReminders,
-  updateOccasion,
-} from './occasions-queries';
+import { repairOccasionReminders } from './occasion-reminder-queries';
+import { createOccasion, deleteOccasion, doctorOccasionsQuery, updateOccasion } from './occasions-queries';
 import { createDoctor, deleteDoctor, doctorsQuery, quickCreateDoctor } from './queries';
 import { addDoctorRating, doctorProfileQuery, doctorRatingsQuery, saveDoctorProfile } from './ratings-queries';
 
@@ -82,6 +77,11 @@ describe('occasion dates', () => {
   // 12 Mordad 1403 was a Friday; the exact day does not matter, only that it
   // is a fixed point to reason from.
   const now = fromJalali(1403, 5, 12);
+
+  it('preserves Esfand 30 when editing in a non-leap year instead of saving Farvardin 1', () => {
+    const iso = occasionEditorDate({ ...enabled, jalaliMonth: 12, jalaliDay: 30 }, fromJalali(1404, 5, 12));
+    expect(toJalali(fromIsoDate(iso)!)).toMatchObject({ jm: 12, jd: 30 });
+  });
 
   it('resolves a recurring occasion on the Persian calendar', () => {
     const next = occasionNextDate({ ...enabled, jalaliMonth: 5, jalaliDay: 20 }, now);
@@ -156,10 +156,12 @@ describe('occasion reminders', () => {
     const later = toJalali(new Date(Date.now() + 60 * 86_400_000));
     const id = await createOccasion({ doctorId, ...birthday({ jalaliMonth: later.jm, jalaliDay: later.jd }) });
     const first = [...scheduled.keys()][0];
+    const firstDate = scheduled.get(first!)!.at;
 
     await updateOccasion(id, { remindDaysBefore: 5 });
     expect(scheduled.size).toBe(1);
-    expect([...scheduled.keys()][0]).not.toBe(first);
+    expect([...scheduled.keys()][0]).toBe(first);
+    expect(scheduled.get(first!)!.at.getTime()).toBeLessThan(firstDate.getTime());
 
     await updateOccasion(id, { isEnabled: false });
     expect(scheduled.size).toBe(0);
@@ -192,10 +194,10 @@ describe('occasion reminders', () => {
     });
 
     scheduled.clear();
-    expect(await rescheduleOccasionReminders()).toBe(2);
+    expect(await repairOccasionReminders()).toBe(2);
     expect(scheduled.size).toBe(2);
 
-    await cancelDoctorOccasionReminders(doctorId);
+    await deleteDoctor(doctorId);
     expect(scheduled.size).toBe(0);
   });
 });

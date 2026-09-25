@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import {
   Avatar,
   Badge,
@@ -18,6 +19,7 @@ import {
   Screen,
   Text,
 } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import { RATING_AXES, type Doctor, type DoctorProfile, type Occasion, type ScheduledMessage } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { topicsByTeacherQuery } from '@/features/knowledge/queries';
@@ -40,6 +42,7 @@ import {
   ratingAverage,
 } from './logic';
 import { confirmGreetingSent, doctorMessagesQuery, logGreetingPrepared } from './messages-queries';
+import { OccasionReminderStatus } from './occasion-reminder-status';
 import { deleteOccasion, doctorOccasionsQuery } from './occasions-queries';
 import { deleteDoctor, doctorQuery, setDoctorStarred } from './queries';
 import { doctorProfileQuery, doctorRatingsQuery } from './ratings-queries';
@@ -126,7 +129,9 @@ export function DoctorScreen() {
                 style: 'destructive',
                 onPress: () => {
                   // `deleteDoctor` cancels the alarms and takes the occasions.
-                  void deleteDoctor(doctor.id).then(() => router.back());
+                  void deleteDoctor(doctor.id)
+                    .then(() => router.back())
+                    .catch((error: unknown) => alertError('حذف نشد', error));
                 },
               },
             ])
@@ -330,22 +335,31 @@ function RatingSection({ doctor }: { doctor: Doctor }) {
 
 function OccasionsSection({ doctor }: { doctor: Doctor }) {
   const router = useRouter();
-  const { data } = useLive(doctorOccasionsQuery(doctor.id), [doctor.id]);
-  const { data: messages } = useLive(doctorMessagesQuery(doctor.id), [doctor.id]);
+  const now = useNow();
+  const { data, error } = useLive(doctorOccasionsQuery(doctor.id), [doctor.id]);
+  const { data: messages, error: messagesError } = useLive(doctorMessagesQuery(doctor.id), [doctor.id]);
   const rows = useMemo(() => {
-    const withDate = (data ?? []).map((o) => ({ occasion: o, at: occasionNextDate(o) }));
+    const withDate = (data ?? []).map((o) => ({ occasion: o, at: occasionNextDate(o, new Date(now)) }));
     return withDate.sort((a, b) => (a.at?.getTime() ?? Infinity) - (b.at?.getTime() ?? Infinity));
-  }, [data]);
+  }, [data, now]);
 
   return (
     <CollapsibleSection
       title="مناسبت‌ها"
       icon="gift-outline"
-      subtitle={rows.length === 0 ? 'تولد و مناسبت‌ها را اینجا اضافه کنید' : undefined}
+      subtitle={
+        error || messagesError
+          ? 'خواندن اطلاعات کامل نشد'
+          : data && rows.length === 0
+            ? 'تولد و مناسبت‌ها را اینجا اضافه کنید'
+            : undefined
+      }
       defaultOpen={rows.length > 0}
       filledCount={rows.length}
     >
       <Column gap="sm">
+        <ErrorNotice error={error} what="مناسبت‌ها" />
+        <ErrorNotice error={messagesError} what="سابقهٔ تبریک" />
         {rows.map(({ occasion, at }) => (
           <OccasionRow
             key={occasion.id}
@@ -402,7 +416,7 @@ function OccasionRow({
         if (await go()) {
           await logGreetingPrepared({ doctorId: doctor.id, occasionId: occasion.id, channel, body: text });
         }
-      })();
+      })().catch((error: unknown) => alertError('آماده‌سازی یا ثبت پیام کامل نشد', error));
     };
 
     const options: { text: string; onPress?: () => void; style?: 'cancel' }[] = [];
@@ -429,6 +443,7 @@ function OccasionRow({
             {at ? formatJalaliLong(at) : 'بدون تاریخ'}
             {days != null ? ` — ${daysUntilLabel(days)}` : ''}
           </Text>
+          <OccasionReminderStatus occasion={occasion} />
           {lastMessage?.status === 'sent' && lastMessage.sentAt ? (
             <Text variant="tiny" color="textFaint">
               آخرین تبریک: {formatJalali(lastMessage.sentAt)}
@@ -443,7 +458,9 @@ function OccasionRow({
                 accessibilityRole="button"
                 accessibilityLabel="ثبت اینکه فرستاده شد"
                 hitSlop={8}
-                onPress={() => void confirmGreetingSent(lastMessage.id)}
+                onPress={() =>
+                  void confirmGreetingSent(lastMessage.id).catch((error: unknown) => alertError('ثبت نشد', error))
+                }
               >
                 <Text variant="tiny" color="primary">
                   فرستادم
@@ -471,7 +488,12 @@ function OccasionRow({
             onPress={() =>
               Alert.alert('حذف مناسبت؟', occasion.title, [
                 { text: 'انصراف', style: 'cancel' },
-                { text: 'حذف', style: 'destructive', onPress: () => void deleteOccasion(occasion.id) },
+                {
+                  text: 'حذف',
+                  style: 'destructive',
+                  onPress: () =>
+                    void deleteOccasion(occasion.id).catch((error: unknown) => alertError('حذف نشد', error)),
+                },
               ])
             }
           />

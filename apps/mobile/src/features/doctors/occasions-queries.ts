@@ -1,19 +1,13 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
+import { audit } from '@/db/audit';
 import { db } from '@/db/client';
 import { doctors, occasions, type Occasion } from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
-import { formatJalali } from '@/lib/jalali';
-import { CHANNELS, cancelReminder, scheduleReminder } from '@/platform/notifications';
+import { fromIsoDate, isValidJalali } from '@/lib/jalali';
 
 import { OCCASION_KIND_LABELS } from './labels';
-import {
-  doctorDisplayName,
-  occasionNextDate,
-  occasionReminderAt,
-  type OccasionReminderPayload,
-  type OccasionTiming,
-} from './logic';
+import { reconcileOccasionReminder } from './occasion-reminder-queries';
 
 /*
  * Birthdays and other dates worth a message.
@@ -67,39 +61,8 @@ export type OccasionInput = {
   isEnabled?: boolean;
 };
 
-async function doctorName(doctorId: string | null): Promise<string> {
-  if (!doctorId) return '';
-  const row = (
-    await db
-      .select({ title: doctors.title, firstName: doctors.firstName, lastName: doctors.lastName })
-      .from(doctors)
-      .where(eq(doctors.id, doctorId))
-      .limit(1)
-  )[0];
-  return row ? doctorDisplayName(row) : '';
-}
-
-/** Schedule the notification for one occasion, or nothing if it has no future date. */
-async function scheduleFor(o: Occasion | (OccasionTiming & Pick<Occasion, 'id' | 'doctorId' | 'kind' | 'title'>)) {
-  const at = occasionReminderAt(o);
-  if (!at) return null;
-  const name = await doctorName(o.doctorId);
-  const on = occasionNextDate(o);
-  return scheduleReminder({
-    at,
-    title: name ? `${OCCASION_KIND_LABELS[o.kind]}: ${name}` : o.title,
-    body: `${o.title}${on ? ` — ${formatJalali(on)}` : ''}`,
-    channelId: CHANNELS.occasions,
-    data: {
-      kind: 'occasion',
-      doctorId: o.doctorId ?? '',
-      occasionId: o.id,
-    } satisfies OccasionReminderPayload,
-  });
-}
-
 function values(input: OccasionInput) {
-  return {
+  const next = {
     doctorId: input.doctorId,
     kind: input.kind,
     title: input.title.trim(),
@@ -111,98 +74,71 @@ function values(input: OccasionInput) {
     remindDaysBefore: input.remindDaysBefore ?? 1,
     isEnabled: input.isEnabled ?? true,
   };
+  if (!next.title || !Object.hasOwn(OCCASION_KIND_LABELS, next.kind)) throw new Error('عنوان و نوع مناسبت معتبر نیست.');
+  if (!Number.isInteger(next.remindDaysBefore) || next.remindDaysBefore < 0 || next.remindDaysBefore > 365)
+    throw new Error('فاصلهٔ یادآوری معتبر نیست.');
+  // 1403 is a leap year: a recurring Esfand 30 remains a valid birthday.
+  if (
+    next.isRecurring
+      ? !Number.isInteger(next.jalaliMonth) ||
+        !Number.isInteger(next.jalaliDay) ||
+        !isValidJalali(1403, next.jalaliMonth!, next.jalaliDay!)
+      : !fromIsoDate(next.onDate)
+  )
+    throw new Error('تاریخ مناسبت معتبر نیست.');
+  return next;
 }
 
 export async function createOccasion(input: OccasionInput): Promise<string> {
   const id = newId();
   const row = values(input);
-  const notificationId = await scheduleFor({ id, ...row });
-  try {
-    await db.insert(occasions).values({ id, ...stamps(), ...row, notificationId });
-  } catch (e) {
-    // No row, no reminder: one that fires for nothing is worse than none.
-    await cancelReminder(notificationId);
-    throw e;
-  }
+  db.transaction((tx) => {
+    if (
+      !tx
+        .select({ id: doctors.id })
+        .from(doctors)
+        .where(and(eq(doctors.id, row.doctorId), isNull(doctors.deletedAt)))
+        .get()
+    )
+      throw new Error('پزشک پیدا نشد یا حذف شده است.');
+    tx.insert(occasions)
+      .values({ id, ...stamps(), ...row })
+      .run();
+  });
+  await reconcileOccasionReminder(id, true);
   return id;
 }
 
 export async function updateOccasion(id: string, patch: Partial<OccasionInput>): Promise<void> {
-  const current = (await occasionQuery(id))[0];
-  if (!current) throw new Error(`Occasion ${id} not found`);
-
-  // Only the editable columns are rewritten: spreading the whole row back
-  // would also write `id`, `createdAt` and `deletedAt` for no reason.
-  const next = values({ ...current, ...patch } as OccasionInput);
-  // Any change to the date, the lead time or the switch makes the old reminder
-  // wrong; replace it rather than trying to work out whether it still holds.
-  await cancelReminder(current.notificationId);
-  const notificationId = await scheduleFor({ ...next, id });
-
-  await db
-    .update(occasions)
-    .set({ ...next, notificationId, ...touch() })
-    .where(and(alive, eq(occasions.id, id)));
+  db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(occasions)
+      .where(and(alive, eq(occasions.id, id)))
+      .get();
+    if (!current) throw new Error('مناسبت پیدا نشد یا حذف شده است.');
+    const next = values({ ...current, ...patch } as OccasionInput);
+    if (
+      !tx
+        .select({ id: doctors.id })
+        .from(doctors)
+        .where(and(eq(doctors.id, next.doctorId), isNull(doctors.deletedAt)))
+        .get()
+    )
+      throw new Error('پزشک پیدا نشد یا حذف شده است.');
+    tx.update(occasions)
+      .set({ ...next, ...touch(), reminderRevision: current.reminderRevision + 1 })
+      .where(eq(occasions.id, id))
+      .run();
+  });
+  await reconcileOccasionReminder(id, true);
 }
 
 export async function deleteOccasion(id: string): Promise<void> {
-  const current = (await occasionQuery(id))[0];
-  await cancelReminder(current?.notificationId);
-  await db
-    .update(occasions)
-    .set({ ...softDelete(), notificationId: null })
-    .where(eq(occasions.id, id));
-}
-
-/**
- * Re-create the OS reminder for every enabled occasion of a living doctor.
- *
- * Called after a restore (the ids in a backup belong to another phone) and on
- * every app start — a recurring reminder that has already fired leaves a stale
- * id behind, and without this the birthday would be announced once and then
- * never again. Returns how many reminders were scheduled.
- */
-export async function rescheduleOccasionReminders(): Promise<number> {
-  const rows = await db
-    .select({ occasion: occasions })
-    .from(occasions)
-    .innerJoin(doctors, eq(occasions.doctorId, doctors.id))
-    .where(and(alive, isNull(doctors.deletedAt), eq(occasions.isEnabled, true)));
-
-  let scheduled = 0;
-  for (const { occasion } of rows) {
-    await cancelReminder(occasion.notificationId);
-    const notificationId = await scheduleFor(occasion);
-    if (notificationId) scheduled += 1;
-    await db.update(occasions).set({ notificationId }).where(eq(occasions.id, occasion.id));
-  }
-  return scheduled;
-}
-
-/** Silence a doctor's reminders without forgetting the occasions themselves. */
-/**
- * The alarms Android is holding for one doctor's occasions.
- *
- * Returns the notification ids it cleared, so the caller can decide what to do
- * if the operating system refuses: the database part has already committed by
- * then, and an alarm that survives its occasion is a greeting that rings for
- * someone who is no longer in the directory.
- */
-export async function occasionNotificationIds(doctorId: string): Promise<string[]> {
-  const rows = await db
-    .select()
-    .from(occasions)
-    .where(and(alive, eq(occasions.doctorId, doctorId)));
-  return rows.map((o) => o.notificationId).filter((id): id is string => Boolean(id));
-}
-
-export async function cancelDoctorOccasionReminders(doctorId: string): Promise<void> {
-  const rows = await db
-    .select()
-    .from(occasions)
-    .where(and(alive, eq(occasions.doctorId, doctorId)));
-  for (const o of rows) {
-    await cancelReminder(o.notificationId);
-    await db.update(occasions).set({ notificationId: null }).where(eq(occasions.id, o.id));
-  }
+  db.update(occasions)
+    .set({ ...softDelete(), reminderRevision: sql`${occasions.reminderRevision} + 1` })
+    .where(and(alive, eq(occasions.id, id)))
+    .run();
+  await audit('occasion.deleted', { entityType: 'occasion', entityId: id });
+  await reconcileOccasionReminder(id);
 }

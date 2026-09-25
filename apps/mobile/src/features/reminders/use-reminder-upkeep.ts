@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
-import { rescheduleOccasionReminders } from '@/features/doctors/occasions-queries';
+import { repairOccasionReminders } from '@/features/doctors/occasion-reminder-queries';
 import { repairFollowUpReminders } from '@/features/followups/reminder-queries';
 import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { logError } from '@/platform/error-log';
@@ -23,7 +23,7 @@ export function useReminderUpkeep(): void {
     const repair = () => {
       if (running) return;
       running = true;
-      void Promise.allSettled([repairFollowUpReminders(), repairTaskReminders()])
+      void Promise.allSettled([repairFollowUpReminders(), repairTaskReminders(), repairOccasionReminders()])
         .then((results) => {
           for (const result of results)
             if (result.status === 'rejected')
@@ -33,12 +33,7 @@ export function useReminderUpkeep(): void {
           running = false;
         });
     };
-    const timer = setTimeout(() => {
-      repair();
-      void rescheduleOccasionReminders().catch((e: unknown) =>
-        logError(e, { source: 'handled', context: 'reminder upkeep' }),
-      );
-    }, 6000);
+    const timer = setTimeout(repair, 6000);
     const listener = AppState.addEventListener('change', (state) => {
       if (state === 'active') repair();
     });

@@ -5,9 +5,11 @@ import {
   backupRuns,
   consultations,
   consultRequestDrafts,
+  doctors,
   followUps,
   imagingStudies,
   notes,
+  occasions,
   patients,
   settings,
   taskDrafts,
@@ -69,6 +71,45 @@ describe('importTables', () => {
   beforeEach(async () => {
     live = await createTestDatabase();
     backup = await createTestDatabase();
+  });
+
+  it('imports legacy occasions with durable repair defaults and preserves their old native ids', async () => {
+    backup.db
+      .insert(doctors)
+      .values({ id: 'colleague', ...stamps(), firstName: 'Example', lastName: 'Colleague' })
+      .run();
+    backup.db
+      .insert(occasions)
+      .values({
+        id: 'legacy-occasion',
+        ...stamps(),
+        doctorId: 'colleague',
+        title: 'Birthday',
+        jalaliMonth: 12,
+        jalaliDay: 30,
+        notificationId: 'previous-phone-id',
+      })
+      .run();
+    backup.conn.execSync(
+      'ALTER TABLE occasions DROP COLUMN reminder_revision; ALTER TABLE occasions DROP COLUMN reminder_applied_revision;',
+    );
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(occasions).get()).toMatchObject({
+      doctorId: 'colleague',
+      title: 'Birthday',
+      jalaliMonth: 12,
+      jalaliDay: 30,
+      notificationId: 'previous-phone-id',
+      reminderRevision: 0,
+      reminderAppliedRevision: -1,
+    });
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
   });
 
   it('imports task backups predating optional reminders without enabling any alarm', async () => {

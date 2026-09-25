@@ -119,8 +119,8 @@ Trade-off: an old alarm can still fire between a committed edit and successful r
 especially while the app is stopped. OS permission, channel settings, battery policy,
 force-stop and exact delivery time are separate from successful scheduling. Tests
 cover SQL/native failures, overlapping edits, older schemas and component handlers;
-they do not prove Android delivery. Occasion reminder mutations still use their older
-ordering and need a separate review. Task reminders use the same ordering contract below.
+they do not prove Android delivery. Tasks and occasions now use the same ordering
+contract, with their separate lifecycles described below.
 No generic job framework or new dependency is introduced for these two counters.
 
 ---
@@ -151,6 +151,36 @@ the OS alarm. Native delivery and interrupted restore still require device evide
 Patient tab changes, including URL changes, flush mounted autosave fields before
 unmounting the old tab. A failed flush retains the editor. Updating state during
 render solely because a route parameter changed bypasses this safeguard.
+
+---
+
+## Occasion reminders survive native failures
+
+Migration `0015` adds the same desired/applied revision counters to `occasions`,
+with SQL defaults for old backups. Creation and editing validate the date and live
+doctor inside a synchronous transaction; only then is Android called. Deletion
+preserves the old native id until cancellation succeeds. Doctor deletion stamps
+the doctor and their occasions atomically; a rename also marks their alarms for
+refresh in the same transaction. Deletions are audited without private text.
+
+The worker uses `medos.occasion.<id>`, retires legacy random ids, serializes requests
+per occasion and checks current content before acknowledgement. Repair includes
+disabled/deleted occasions and deleted doctors with pending cancellation. It runs
+at startup, foreground and restore without asking for permission. Restore reports
+incomplete native work separately from imported data. Explicit save/retry may ask
+for permission; a failed alarm does not mean the occasion failed to save. The form
+states that distinction and the occasion row offers retry only when needed.
+
+Tradeoff: the committed intent and native alarm cannot change atomically. An old
+alarm can still ring before successful repair; no software test proves delivery,
+permission/channel settings, reboot behavior or a full interrupted restore on a
+phone. Occasions still need a separate raw-draft/autosave implementation. These
+changes add neither a background service nor a general job framework/dependency.
+
+The notification body uses the occurrence actually being scheduled, including the
+following year when this year's lead time has passed. Editing a recurring Esfand 30
+uses a valid leap-year reference date, preserving month/day instead of normalizing
+them to Farvardin 1. This does not change the existing non-leap occurrence policy.
 
 ---
 
