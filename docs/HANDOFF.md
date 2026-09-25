@@ -33,6 +33,69 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-26 (phone) — 0.9.1 on the owner's phone: backups fixed, upgrade from 0.6.0 checked
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** 654292f, c055f70, and this one (0.9.1)
+
+The owner connected the phone (SM-A528B, Android 14, dark mode, three-button bar). It
+had 0.6.0 with the owner's own data (3 patients, a follow-up, backups up to 1 Mehr).
+
+**Changed**
+- Backups: every manual backup on 0.9.0 said the destination check failed, though the
+  file was complete. The copy is now proved with a native MD5 of both files (byte read
+  as fallback); the error log names the failed step. Status card no longer says "time for
+  a fresh backup" right after one (minute-ticking clock vs. a just-written timestamp).
+- Dark-mode switches readable; due-date editor plainer (discard button only for a
+  leftover draft); Settings button that opens Android's «Alarms & reminders» list; task
+  delete text says where to restore from. Version 0.9.1 (versionCode 13).
+
+**Verified on the phone**
+- Before upgrading: the 0.6.0 app's auto-backup ran at 01:44; that file was pulled to
+  `private/backup-before-0.9/` (gitignored, encrypted) because retention later removed it
+  from the phone.
+- Upgrade 0.6.0 → 0.9.0 → 0.9.1 over the installed app, same signer (1119f776…7e0c):
+  migrations ran, data intact, no crash, no new entries in the error log from startup.
+  Cold start: activity 0.78–0.86 s; Today content visible within 3.7 s (upper bound,
+  includes uiautomator time).
+- With a test patient "Device Test" (deleted afterwards; it is in the trash): note new
+  (header save), edit + bottom save, **no crash**; voice recorded 31 s and played back;
+  system back and header back with unsaved text keep the draft, which comes back;
+  quick capture with a camera photo → assigned to the patient → filed as a note, photo
+  moved to «عکس و صدا»; task with a due time and notification → notification posted
+  (2.5 min late, see below); vitals saved; patient delete → trash.
+- Backups on 0.9.1: automatic + two manual full backups, all «محتوای فایل مقصد بررسی شد».
+
+**Not verified**
+- Tapping a notification (Samsung's shade could not be read by uiautomator, and a
+  screenshot would have shown the owner's other notifications).
+- App lock (needs the owner's fingerprint), restore from a backup, a shift/round on the
+  phone (done on the emulator only), doctors/knowledge/vault flows on the phone.
+
+**Found, for the owner (reported in chat)**
+- The two «رضا حسینی» patients were «بستری» in 0.6.0 without an admission record; on
+  startup the app reconciles status with episodes and made them «سرپایی» (audited as
+  `patient.statusReconciled`). If they are really admitted, record the admission.
+- MedOS lacks Android's exact-alarm permission, so reminders may come minutes late. Only
+  the owner can turn it on: Settings → «باز کردن «Alarms & reminders»» → MedOS.
+- App lock is off.
+- Retention keeps three full backups, so the phone no longer holds the pre-upgrade ones;
+  the laptop copy above is the pre-upgrade backup.
+
+**Open threads**
+- Retention still counts a copy whose check failed. With the digest check this should be
+  rare; if the error log shows `copy check failed at …`, look at the named step first.
+- The 0.6.0 → reconciliation of «بستری» without an episode is silent apart from the
+  audit log; consider a one-time notice if this can recur.
+- Then `docs/IMPLEMENTATION.md` in priority order.
+
+**Gotchas**
+- On the Samsung keyboard `input keyevent 111` does not close the keyboard, and swipes
+  over it type swipe-words: close it with BACK only when `dumpsys input_method` says it is
+  shown. Select-all + delete in a field: `input keycombination 113 29` then `keyevent 67`.
+- Buttons near the bottom edge sit under the three-button bar mid-scroll; a tap there
+  presses the system Back.
+
 ## 2026-09-26 — Emulator walk-through: a crash on every note save, and a cleaner app (0.9.0)
 
 **Agent:** claude-opus-5-5 via Claude Code
