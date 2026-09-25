@@ -33,6 +33,36 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-25 — Owner confirmed the clinical-tools scope
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** this entry's commit
+
+**Changed**
+
+- The owner confirmed in chat that they asked for the invariant 10 change (sourced,
+  physician-reviewed clinical tools; AI and call workflows later). `CLAUDE.md`,
+  `.cursor/rules/medos.mdc` and `.github/copilot-instructions.md` still carried the old
+  "no clinical advice" rule and now point at invariant 10 instead. AGENTS.md unchanged.
+
+**Verified**
+
+- `npm run check` green (docs only).
+
+**Not verified**
+
+- Nothing on the phone. The previous entry's device checklist for 0.8.0 still stands.
+
+**Open threads**
+
+- Device session on `dist/MedOS-0.8.0.apk`, in the order of the previous entry: upgrade
+  over the installed build, back/gesture on patient record and round, note save, capture
+  → note/task, vitals, a backup (read whether the copy check says `bytes` or `size`).
+- Measure the reminder upkeep that runs on every return to the foreground.
+- Then `docs/IMPLEMENTATION.md` in priority order. C-items (clinical tools) are in scope,
+  but each tool needs its own source, version, boundary tests and physician review before
+  it is enabled — a formula from a chat is not a validated tool.
+
 ## 2026-09-25 — Review of the Codex commits since 41eba6c; 0.8.0
 
 **Agent:** claude-opus-5-5 via Claude Code

@@ -15,5 +15,6 @@ numbers stay in Latin digits and are parsed with `parseDecimal` / `parseLabNumbe
 goes through `searchText` + `matchesSearch`; dates stored Gregorian, displayed Jalali;
 `db.transaction()` callbacks are synchronous; schema changes are additive with SQL-level
 defaults plus a generated migration; the backup format and passphrase schemes are frozen;
-no patient data in logs; no clinical advice features; the repository is public, so no keys,
+no patient data in logs; clinical tools only within the validation and physician-review
+gates of invariant 10 in AGENTS.md; the repository is public, so no keys,
 patient data or personal details of the owner. Reply to the owner in Persian.

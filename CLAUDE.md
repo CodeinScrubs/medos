@@ -23,7 +23,8 @@ npm run check     # typecheck + lint + formatting + tests: green before and afte
 6. Schema changes are additive, with SQL-level defaults, plus a generated migration.
 7. The backup format and passphrase schemes are frozen; add a scheme, never change one.
 8. No patient data in logs, errors or anything that leaves the app.
-9. MedOS records, it does not advise.
+9. Clinical tools only inside invariant 10: sourced, versioned, tested and physician-reviewed;
+   never infer a missing input, and nothing diagnoses, orders or treats by itself.
 10. The repository is public: no keys, no patient data, no personal details of the owner.
 
 Reply to the owner in **Persian**. Say plainly what you verified and what you did not — you
