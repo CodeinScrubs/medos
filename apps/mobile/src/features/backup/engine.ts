@@ -20,7 +20,7 @@ import { newId, stamps, touch } from '@/lib/ids';
 import { logError } from '@/platform/error-log';
 import { MEDIA_ROOT } from '@/platform/media';
 
-import { checkBackupCopy, type CopyCheck, type CopyFile } from './copy-check';
+import { checkBackupCopy, type CopyCheck, type CopyFailure, type CopyFile } from './copy-check';
 import { recordBackupDelivery } from './delivery-queries';
 import {
   archiveEnd,
@@ -313,6 +313,7 @@ export async function createBackup({
       if (folder) {
         onProgress?.({ phase: 'copy', fraction: 0 });
         await out.copy(folder, { overwrite: false });
+        let failedStep: CopyFailure | null = null;
         /*
          * Read the destination back before anything is deleted. A copy onto a
          * storage provider can come back without throwing and still leave a
@@ -330,11 +331,14 @@ export async function createBackup({
           },
           () => rotateBackups(folder, fileName),
           (f) => onProgress?.({ phase: 'copy', fraction: f }),
+          (why) => {
+            failedStep = why;
+          },
         );
         if (checked === 'failed') {
-          // Sizes only — no file names, no data. Without this the owner's
-          // report is "it says the backup failed" and nothing else.
-          logError(new Error(`backup copy check failed (source ${out.size ?? -1} bytes)`), {
+          // Sizes and the failed step only — no file names, no data. Without
+          // this the owner's report is "it says the backup failed" and nothing else.
+          logError(new Error(`backup copy check failed at ${failedStep} (source ${out.size ?? -1} bytes)`), {
             source: 'handled',
             context: 'backup: verifying destination copy',
           });
@@ -494,6 +498,9 @@ function copyFile(file: File): CopyFile {
   return {
     get size() {
       return file.size;
+    },
+    get digest() {
+      return file.md5 ?? null;
     },
     open: () => file.open(FileMode.ReadOnly),
   };

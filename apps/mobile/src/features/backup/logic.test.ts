@@ -27,4 +27,9 @@ describe('backupFreshness', () => {
     expect(backupFreshness(NOW - BACKUP_STALE_AFTER_MS - 1, NOW)).toBe('stale');
     expect(backupFreshness(NOW + HOUR, NOW)).toBe('stale');
   });
+
+  it('calls a backup taken since the screen last read the clock fresh', () => {
+    // The status card's clock ticks once a minute; the backup just finished.
+    expect(backupFreshness(NOW + 45_000, NOW)).toBe('fresh');
+  });
 });

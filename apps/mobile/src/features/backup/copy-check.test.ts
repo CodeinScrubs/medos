@@ -152,3 +152,47 @@ describe('backup copy verification and retention', () => {
     ).toBe('bytes');
   });
 });
+
+describe('native digest of the copy', () => {
+  const bytes = [1, 2, 3, 4];
+  const unreadable = (size: number, digest: string | null) => ({
+    size,
+    digest,
+    open(): never {
+      throw new Error('file handle unusable on this provider');
+    },
+  });
+
+  /*
+   * On the phone, reading a 19 MB copy back from the chosen folder through a
+   * file handle failed although the file was intact, so every manual backup
+   * reported failure. Matching native digests are proof on their own.
+   */
+  it('proves the copy with matching digests without opening either file', () => {
+    const prune = jest.fn();
+    expect(checkBackupCopy(unreadable(4, 'abc'), () => unreadable(4, 'abc'), prune)).toBe('bytes');
+    expect(prune).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails on different digests and says which step', () => {
+    const prune = jest.fn();
+    const why = jest.fn();
+    expect(checkBackupCopy(unreadable(4, 'abc'), () => unreadable(4, 'abd'), prune, undefined, why)).toBe('failed');
+    expect(prune).not.toHaveBeenCalled();
+    expect(why).toHaveBeenCalledWith('digest-differs');
+  });
+
+  it('falls back to reading bytes when the copy has no digest', () => {
+    const prune = jest.fn();
+    const source = { ...file(bytes), digest: 'abc' };
+    const destination = { ...file(bytes), digest: null };
+    expect(checkBackupCopy(source, () => destination, prune)).toBe('bytes');
+    expect(destination.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('still refuses a copy of the wrong size even when digests are offered', () => {
+    const why = jest.fn();
+    expect(checkBackupCopy(unreadable(4, 'abc'), () => unreadable(3, 'abc'), jest.fn(), undefined, why)).toBe('failed');
+    expect(why).toHaveBeenCalledWith('size-differs');
+  });
+});

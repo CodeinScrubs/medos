@@ -27,5 +27,10 @@ export function deliveryStrength(lastSuccessAt: number | null, delivery: BackupD
 export function backupFreshness(lastSuccessAt: number | null, now: number): BackupFreshness {
   if (lastSuccessAt == null) return 'never';
   const age = now - lastSuccessAt;
-  return age < 0 || age > BACKUP_STALE_AFTER_MS ? 'stale' : 'fresh';
+  // A backup far in the future means the clock was turned back. A few minutes
+  // ahead is only a screen whose clock ticks once a minute: right after a
+  // backup it said "time for a fresh backup" in a warning colour.
+  return age < -CLOCK_SLACK_MS || age > BACKUP_STALE_AFTER_MS ? 'stale' : 'fresh';
 }
+
+const CLOCK_SLACK_MS = 5 * 60_000;
