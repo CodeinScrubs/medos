@@ -1,7 +1,8 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 
+import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { noteDrafts, noteVersions, notes, type NoteType } from '@/db/schema';
+import { noteDrafts, noteVersions, notes, patients, type NoteType } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -176,6 +177,27 @@ export async function setNotePinned(id: string, isPinned: boolean): Promise<void
 
 export async function deleteNote(id: string): Promise<void> {
   await db.update(notes).set(softDelete()).where(eq(notes.id, id));
+  await audit('note.deleted', { entityType: 'note', entityId: id });
+}
+
+/** Deleted notes, newest first, with whose record they came from — for the trash. */
+export function deletedNotesQuery(limit = 50) {
+  return db
+    .select({ note: notes, patient: { firstName: patients.firstName, lastName: patients.lastName } })
+    .from(notes)
+    .leftJoin(patients, eq(patients.id, notes.patientId))
+    .where(isNotNull(notes.deletedAt))
+    .orderBy(desc(notes.deletedAt))
+    .limit(limit);
+}
+
+/** Put a deleted note back in its record, exactly as it was. */
+export async function restoreNote(id: string): Promise<void> {
+  await db
+    .update(notes)
+    .set({ deletedAt: null, ...touch() })
+    .where(eq(notes.id, id));
+  await audit('note.restored', { entityType: 'note', entityId: id });
 }
 
 /** Rebuild every note's search index; see features/search/reindex.ts. */

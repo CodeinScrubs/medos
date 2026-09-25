@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, ChipSelect, Column, EmptyState, Row, Text } from '@/components/ui';
 import type { Note, NoteType } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -84,20 +85,20 @@ function NoteCard({ note, patientId, voices }: { note: Note; patientId: string; 
       [
         {
           text: note.isPinned ? 'برداشتن سنجاق' : 'سنجاق کردن',
-          onPress: () => void setNotePinned(note.id, !note.isPinned),
+          onPress: () => void setNotePinned(note.id, !note.isPinned).catch((e) => alertError('تغییر ثبت نشد', e)),
         },
         {
           text: 'حذف',
           style: 'destructive',
           onPress: () =>
-            Alert.alert(
-              'حذف نوت؟',
-              'از پرونده‌ی بیمار برداشته می‌شود. در خود اپ راهی برای برگرداندنش نیست؛ فقط از بکاپ برمی‌گردد.',
-              [
-                { text: 'انصراف', style: 'cancel' },
-                { text: 'حذف', style: 'destructive', onPress: () => void deleteNote(note.id) },
-              ],
-            ),
+            Alert.alert('حذف نوت؟', 'از پرونده‌ی بیمار برداشته می‌شود و از «بیشتر ← حذف‌شده‌ها» برمی‌گردد.', [
+              { text: 'انصراف', style: 'cancel' },
+              {
+                text: 'حذف',
+                style: 'destructive',
+                onPress: () => void deleteNote(note.id).catch((e) => alertError('حذف نشد', e)),
+              },
+            ]),
         },
         { text: 'انصراف', style: 'cancel' },
       ],
