@@ -65,109 +65,112 @@ export function TodayScreen() {
   const reliable = loaded && !dueQuery.error && !admittedQuery.error && !pendingQuery.error;
   const nothingYet = reliable && dueRows.length === 0 && admitted!.length === 0 && pending!.length === 0;
 
+  // The capture button floats over the list, so it stays one tap away however
+  // far down the day goes.
   return (
-    <Screen scroll>
-      <Column gap="none" style={{ paddingTop: spacing.md }}>
-        <Text variant="caption" color="textMuted">
-          {formatJalaliWithWeekday(now)} {toPersianDigits(jy)}
-        </Text>
-        <Text variant="display">امروز</Text>
+    <View style={styles.grow}>
+      <Screen scroll>
+        <Column gap="none" style={{ paddingTop: spacing.md }}>
+          <Text variant="caption" color="textMuted">
+            {formatJalaliWithWeekday(now)} {toPersianDigits(jy)}
+          </Text>
+          <Text variant="display">امروز</Text>
 
-        <ErrorNotice
-          error={failed[0]?.query.error}
-          what={failed.map(({ label }) => label).join('، ')}
-          onRetry={() => failed.forEach(({ query }) => query.retry())}
-        />
-        <RestoreTrouble />
+          <ErrorNotice
+            error={failed[0]?.query.error}
+            what={failed.map(({ label }) => label).join('، ')}
+            onRetry={() => failed.forEach(({ query }) => query.retry())}
+          />
+          <RestoreTrouble />
 
-        <Row gap="sm" style={{ marginTop: spacing.lg }}>
-          <StatTile
-            icon="alarm-outline"
-            label="پیگیری امروز"
-            value={due === undefined || dueQuery.error ? null : due.length}
-            alert={!dueQuery.error && overdue > 0}
-          />
-          <StatTile
-            icon="bed-outline"
-            label="بستری"
-            value={admittedQuery.error ? null : (admitted?.length ?? null)}
-            onPress={() => router.push('/patients')}
-          />
-          <StatTile
-            icon="star-outline"
-            label="ستاره‌دار"
-            value={starredQuery.error ? null : (starred?.length ?? null)}
-            onPress={() => router.push('/patients')}
-          />
-        </Row>
-
-        {dueRows.length > 0 && (
-          <>
-            <SectionHeader
-              title={
-                !dueQuery.error && overdue > 0
-                  ? `پیگیری‌ها — ${toPersianDigits(overdue)} عقب‌افتاده`
-                  : 'پیگیری‌های امروز'
-              }
-              count={dueQuery.error ? undefined : dueRows.length}
+          <Row gap="sm" style={{ marginTop: spacing.lg }}>
+            <StatTile
+              icon="alarm-outline"
+              label="پیگیری امروز"
+              value={due === undefined || dueQuery.error ? null : due.length}
+              alert={!dueQuery.error && overdue > 0}
             />
-            <Column gap="sm">
-              {dueRows.map(({ followUp, patient }) => (
-                <FollowUpCard key={followUp.id} followUp={followUp} patient={patient} showPatient />
-              ))}
-            </Column>
-          </>
-        )}
+            <StatTile
+              icon="bed-outline"
+              label="بستری"
+              value={admittedQuery.error ? null : (admitted?.length ?? null)}
+              onPress={() => router.push('/patients')}
+            />
+            <StatTile
+              icon="star-outline"
+              label="ستاره‌دار"
+              value={starredQuery.error ? null : (starred?.length ?? null)}
+              onPress={() => router.push('/patients')}
+            />
+          </Row>
 
-        {(admitted?.length ?? 0) > 0 && (
-          <>
-            <SectionHeader title="بیماران بستری" count={admittedQuery.error ? undefined : admitted!.length} />
-            {admitted!.slice(0, 8).map((p) => (
-              <PatientCard
-                key={p.id}
-                patient={p}
-                location={locationQuery.error ? 'محل بستری خوانده نشد' : locationLabel(locations.get(p.id))}
+          {dueRows.length > 0 && (
+            <>
+              <SectionHeader
+                title={
+                  !dueQuery.error && overdue > 0
+                    ? `پیگیری‌ها — ${toPersianDigits(overdue)} عقب‌افتاده`
+                    : 'پیگیری‌های امروز'
+                }
+                count={dueQuery.error ? undefined : dueRows.length}
               />
-            ))}
-          </>
-        )}
+              <Column gap="sm">
+                {dueRows.map(({ followUp, patient }) => (
+                  <FollowUpCard key={followUp.id} followUp={followUp} patient={patient} showPatient />
+                ))}
+              </Column>
+            </>
+          )}
 
-        <ShiftCard />
-
-        <InboxSection />
-
-        <TasksSection patientId={null} title="کارهای بدون بیمار" />
-
-        <OpenConsults />
-
-        <UnfinishedNotes />
-
-        <UpcomingOccasions now={now} />
-
-        {upcoming.length > 0 && (
-          <>
-            <SectionHeader title="پیگیری‌های پیش رو" count={pendingQuery.error ? undefined : upcoming.length} />
-            <Column gap="sm">
-              {upcoming.map(({ followUp, patient }) => (
-                <FollowUpCard key={followUp.id} followUp={followUp} patient={patient} showPatient />
+          {(admitted?.length ?? 0) > 0 && (
+            <>
+              <SectionHeader title="بیماران بستری" count={admittedQuery.error ? undefined : admitted!.length} />
+              {admitted!.slice(0, 8).map((p) => (
+                <PatientCard
+                  key={p.id}
+                  patient={p}
+                  location={locationQuery.error ? 'محل بستری خوانده نشد' : locationLabel(locations.get(p.id))}
+                />
               ))}
-            </Column>
-          </>
-        )}
+            </>
+          )}
 
-        {nothingYet ? <EmptyState icon="medkit-outline" title="بیمار بستری یا پیگیری ثبت‌شده‌ای نیست" /> : null}
+          <ShiftCard />
 
-        {reliable && !nothingYet && dueRows.length === 0 ? (
-          <Card tone="alt" style={{ marginTop: spacing.lg }}>
-            <Text variant="caption" color="textFaint">
-              برای امروز پیگیری‌ای نمانده.
-            </Text>
-          </Card>
-        ) : null}
-      </Column>
+          <InboxSection />
 
+          <TasksSection patientId={null} title="کارهای بدون بیمار" />
+
+          <OpenConsults />
+
+          <UnfinishedNotes />
+
+          <UpcomingOccasions now={now} />
+
+          {upcoming.length > 0 && (
+            <>
+              <SectionHeader title="پیگیری‌های پیش رو" count={pendingQuery.error ? undefined : upcoming.length} />
+              <Column gap="sm">
+                {upcoming.map(({ followUp, patient }) => (
+                  <FollowUpCard key={followUp.id} followUp={followUp} patient={patient} showPatient />
+                ))}
+              </Column>
+            </>
+          )}
+
+          {nothingYet ? <EmptyState icon="medkit-outline" title="بیمار بستری یا پیگیری ثبت‌شده‌ای نیست" /> : null}
+
+          {reliable && !nothingYet && dueRows.length === 0 ? (
+            <Card tone="alt" style={{ marginTop: spacing.lg }}>
+              <Text variant="caption" color="textFaint">
+                برای امروز پیگیری‌ای نمانده.
+              </Text>
+            </Card>
+          ) : null}
+        </Column>
+      </Screen>
       <Fab icon="create-outline" label="ثبت سریع" onPress={() => router.push('/capture')} />
-    </Screen>
+    </View>
   );
 }
 
