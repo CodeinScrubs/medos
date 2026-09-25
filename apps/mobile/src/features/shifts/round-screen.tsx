@@ -227,6 +227,11 @@ function RoundCard({ row }: { row: RoundRow }) {
                 {elapsed ? <Badge label={elapsed} /> : null}
                 {member.reviewedAt ? <Badge label="دیده شد" tone="success" /> : null}
               </Row>
+              {patient.summary ? (
+                <Text variant="caption" color="textMuted">
+                  {patient.summary}
+                </Text>
+              ) : null}
             </Column>
             <Button
               label="پرونده"
@@ -246,7 +251,7 @@ function RoundCard({ row }: { row: RoundRow }) {
             label="امشب درباره‌ی این بیمار"
             initialValue={member.shiftSummary}
             onSave={(value) => updateShiftPatient(member.id, { shiftSummary: value })}
-            placeholder={patient.summary ?? 'یک خط که امشب مهم است'}
+            placeholder="یک خط که امشب مهم است"
             multiline
           />
         </Column>

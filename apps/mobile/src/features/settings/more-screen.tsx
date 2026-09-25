@@ -14,7 +14,7 @@ type Item = {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle?: string;
-  href?: Href;
+  href: Href;
   tone?: 'danger' | 'warning' | 'success';
 };
 
@@ -26,7 +26,7 @@ export function MoreScreen() {
   const now = useNow();
   const freshness = backupFreshness(lastBackup, now);
 
-  const ready: Item[] = [
+  const work: Item[] = [
     {
       icon: 'time-outline',
       title: 'شیفت و راند',
@@ -39,26 +39,6 @@ export function MoreScreen() {
       subtitle: 'هرچه سریع ثبت کرده‌اید و هنوز جایش مشخص نیست',
       href: '/inbox',
     },
-    {
-      icon: 'cloud-upload-outline',
-      title: 'پشتیبان‌گیری',
-      subtitle: lastBackup ? `آخرین بکاپ ${formatRelativeTime(lastBackup, new Date(now))}` : 'هنوز بکاپی گرفته نشده',
-      href: '/backup',
-      tone:
-        freshness === 'never'
-          ? 'danger'
-          : freshness === 'stale' || strength === 'size' || strength == null
-            ? 'warning'
-            : 'success',
-    },
-    { icon: 'trash-outline', title: 'حذف‌شده‌ها', subtitle: 'برگرداندن پرونده‌های حذف‌شده', href: '/trash' },
-    {
-      icon: 'key-outline',
-      title: 'رمزها',
-      subtitle: 'یوزرنیم و پسورد سامانه‌ها، یک‌جا و مرتب',
-      href: '/vault',
-    },
-    { icon: 'settings-outline', title: 'تنظیمات', subtitle: 'قفل اپ، حافظه', href: '/settings' },
   ];
 
   const reference: Item[] = [
@@ -74,6 +54,29 @@ export function MoreScreen() {
       subtitle: 'بیمارستان، مطب، آزمایشگاه — با آدرس و مسیریابی',
       href: '/places',
     },
+    {
+      icon: 'key-outline',
+      title: 'رمزها',
+      subtitle: 'یوزرنیم و پسورد سامانه‌ها، یک‌جا و مرتب',
+      href: '/vault',
+    },
+  ];
+
+  const data: Item[] = [
+    {
+      icon: 'cloud-upload-outline',
+      title: 'پشتیبان‌گیری',
+      subtitle: lastBackup ? `آخرین بکاپ ${formatRelativeTime(lastBackup, new Date(now))}` : 'هنوز بکاپی گرفته نشده',
+      href: '/backup',
+      tone:
+        freshness === 'never'
+          ? 'danger'
+          : freshness === 'stale' || strength === 'size' || strength == null
+            ? 'warning'
+            : 'success',
+    },
+    { icon: 'trash-outline', title: 'حذف‌شده‌ها', subtitle: 'پرونده، نوت و ثبت سریعِ حذف‌شده', href: '/trash' },
+    { icon: 'settings-outline', title: 'تنظیمات', subtitle: 'قفل اپ، حافظه', href: '/settings' },
   ];
 
   return (
@@ -81,11 +84,14 @@ export function MoreScreen() {
       <Column gap="none" style={{ paddingTop: spacing.md }}>
         <Text variant="display">بیشتر</Text>
 
+        <SectionHeader title="کار" />
+        <MenuCard items={work} />
+
         <SectionHeader title="مرجع" />
         <MenuCard items={reference} />
 
         <SectionHeader title="داده‌ها و امنیت" />
-        <MenuCard items={ready} />
+        <MenuCard items={data} />
       </Column>
     </Screen>
   );
@@ -106,37 +112,27 @@ function MenuCard({ items }: { items: Item[] }) {
               : item.tone === 'success'
                 ? colors.success
                 : colors.primary;
-        const enabled = Boolean(item.href);
         return (
           <View key={item.title}>
             {i > 0 && <Divider inset={spacing.lg + 36 + spacing.md} />}
             <Pressable
-              disabled={!enabled}
-              onPress={() => item.href && router.push(item.href)}
-              style={({ pressed }) => [{ padding: spacing.lg, opacity: enabled ? (pressed ? 0.6 : 1) : 0.55 }]}
+              accessibilityRole="button"
+              onPress={() => router.push(item.href)}
+              style={({ pressed }) => [{ padding: spacing.lg, opacity: pressed ? 0.6 : 1 }]}
             >
               <Row gap="md">
-                <View
-                  style={[
-                    styles.icon,
-                    { borderRadius: radii.md, backgroundColor: enabled ? colors.primarySoft : colors.neutralSoft },
-                  ]}
-                >
-                  <Ionicons name={item.icon} size={18} color={enabled ? toneColor : colors.textFaint} />
+                <View style={[styles.icon, { borderRadius: radii.md, backgroundColor: colors.primarySoft }]}>
+                  <Ionicons name={item.icon} size={18} color={toneColor} />
                 </View>
                 <Column gap="xxs" style={styles.grow}>
                   <Text variant="subheading">{item.title}</Text>
                   {item.subtitle ? (
-                    <Text
-                      variant="caption"
-                      color={item.tone && enabled ? undefined : 'textMuted'}
-                      style={item.tone ? { color: toneColor } : undefined}
-                    >
+                    <Text variant="caption" color="textMuted" style={item.tone ? { color: toneColor } : undefined}>
                       {item.subtitle}
                     </Text>
                   ) : null}
                 </Column>
-                {enabled && <Ionicons name="chevron-back" size={18} color={colors.textFaint} />}
+                <Ionicons name="chevron-back" size={18} color={colors.textFaint} />
               </Row>
             </Pressable>
           </View>

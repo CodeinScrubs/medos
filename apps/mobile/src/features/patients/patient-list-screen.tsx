@@ -34,19 +34,23 @@ export function PatientListScreen() {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<Tab>('all');
 
+  // Searching by name means "find this person", wherever they are now: on the
+  // default view a search also reaches discharged and archived patients, whose
+  // badge says so. A status chip still narrows it.
+  const searching = search.trim().length > 0;
   const statuses = useMemo<PatientStatus[] | undefined>(() => {
-    if (tab === 'all') return [...CURRENT_STATUSES];
-    return [tab];
-  }, [tab]);
+    if (tab !== 'all') return [tab];
+    return searching ? undefined : [...CURRENT_STATUSES];
+  }, [tab, searching]);
 
-  const { data: rows, error } = useLive(patientListQuery({ search, statuses }), [search, tab]);
+  const { data: rows, error } = useLive(patientListQuery({ search, statuses }), [search, statuses]);
   // One query for the whole list: which ward and bed each admitted patient is in.
   const { data: locationRows } = useLive(activeLocationsQuery());
   const locations = useMemo(() => new Map((locationRows ?? []).map((r) => [r.patientId, r])), [locationRows]);
   const patients = rows ?? [];
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'all', label: 'جاری' },
+    { key: 'all', label: searching ? 'همه' : 'جاری' },
     ...PATIENT_STATUS_ORDER.map((s) => ({ key: s as Tab, label: PATIENT_STATUS[s].label })),
   ];
 
@@ -131,11 +135,17 @@ export function PatientListScreen() {
         {rows === undefined ? null : patients.length === 0 ? (
           <EmptyState
             icon={search ? 'search-outline' : 'people-outline'}
-            title={search ? 'بیماری پیدا نشد' : 'هنوز بیماری ثبت نشده'}
+            // The default view hides discharged and archived patients, so an
+            // empty list here does not mean nobody has been recorded.
+            title={search ? 'بیماری پیدا نشد' : tab === 'all' ? 'بیمار جاری‌ای نیست' : 'در این دسته بیماری نیست'}
             description={
               search
-                ? 'جستجو را کوتاه‌تر کنید یا فیلتر وضعیت را عوض کنید.'
-                : 'اولین بیمارتان را با دکمه‌ی + اضافه کنید.'
+                ? tab === 'all'
+                  ? 'جستجو را کوتاه‌تر کنید؛ نام، کد ملی یا شماره پرونده.'
+                  : 'جستجو را کوتاه‌تر کنید یا فیلتر وضعیت را بردارید.'
+                : tab === 'all'
+                  ? 'بیمار تازه را با دکمه‌ی + اضافه کنید. ترخیص‌شده‌ها با جستجو یا چیپ‌های بالا پیدا می‌شوند.'
+                  : undefined
             }
           />
         ) : (
