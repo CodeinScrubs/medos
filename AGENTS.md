@@ -123,7 +123,18 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
 - Preferences are typed settings (`defineSetting` + zod) in the feature's `settings.ts`.
   Keys starting with `backup.` describe the phone and survive a restore.
 - Destructive or sensitive actions call `audit(...)`; user-facing failures call
-  `alertError(title, error)`.
+  `alertError(title, error)`. A write started from a button (`void save(...)`) ends in
+  `.catch((e) => alertError(...))` — a dropped promise looks like success to the user.
+  A message with no choice is `notify(title, message)` (Persian button); ESLint rejects
+  `Alert.alert` without buttons.
+- Header options inside a screen are `<ScreenOptions options={...} />`, never
+  `<Stack.Screen options>` (ESLint enforces it). A native header that changes while its
+  screen is being closed stops the app on Android; `ScreenOptions` only writes the header
+  when the title changes.
+- Editors guard leaving with `useSaveBeforeLeave(flush)`, which is on for the screen's
+  whole life. Do not make the guard conditional: switching it off as a save finishes
+  changes the header in the same moment `router.back()` removes the screen (the same
+  crash).
 - Anything time-dependent takes `now` as a parameter; screens get it from `useNow()`.
 - Date fields report validity separately from their parsed value. Wire `onValidityChange`
   to `useDateValidation().setValid`, and call `check()` before saving; never save an old
@@ -185,6 +196,15 @@ misses, a backup that cannot be opened a year from now.
   "medos://patients"`) beat tapping through navigation. `adb shell input text` is ASCII
   only: `<` and `>` need `adb shell "input text '>100'"`, and Persian cannot be typed at
   all. Say plainly what you ran on a device and what you did not.
+- **No phone? Use the emulator.** The release APK is arm64 only, and on the x86_64
+  emulator it dies at start ("couldn't find DSO libreactnative.so") — that is the ABI, not
+  the app. Build an emulator copy with `gradlew assembleRelease
+  -PreactNativeArchitectures=x86_64` (a JS-only change rebuilds in ~2 minutes) and install
+  that; never copy it to `dist/`. If the install says "not enough space", `adb shell pm
+  uninstall-system-updates` frees gigabytes on the emulator image. The emulator found the
+  note-save crash that tests could not.
+- **Run Prettier from the repository root.** Run inside `apps/mobile`, it misses the root
+  `.prettierignore` and rewrites the generated migration snapshots.
 - **Do not reformat or "tidy" files you are not changing.** It buries the real diff.
 - **Do not add dependencies casually.** Each one is a native build risk and a supply-chain
   risk on a machine behind a filtered network. If you add one, say why in the handoff.
