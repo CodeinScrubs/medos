@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { notify } from '@/components/feedback';
+import { notify, alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Column, IconButton, Row, Text } from '@/components/ui';
@@ -116,7 +116,8 @@ export function MediaViewerScreen() {
         onCancel={() => setEditing(false)}
         onSubmit={(text) => {
           setEditing(false);
-          if (item) void updateAttachment(item.id, { caption: text || null });
+          if (item)
+            void updateAttachment(item.id, { caption: text || null }).catch((e) => alertError('توضیح ذخیره نشد', e));
         }}
       />
     </View>

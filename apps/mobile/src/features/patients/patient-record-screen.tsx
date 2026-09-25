@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
@@ -150,7 +150,16 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
           <ErrorNotice error={error} what="پرونده" />
           <PatientHeader patient={patient} />
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
+          {/*
+           * Every part of the record in view at once, four to a row, rather
+           * than a sideways strip where the last tabs sat off-screen.
+           */}
+          <View
+            style={[
+              styles.tabs,
+              { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.lg },
+            ]}
+          >
             {TABS.map((t) => {
               const active = t.key === tab;
               return (
@@ -164,23 +173,23 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
                       router.setParams({ tab: t.key });
                     })
                   }
-                  style={[
-                    styles.tab,
-                    {
-                      borderRadius: radii.full,
-                      backgroundColor: active ? colors.primarySoft : 'transparent',
-                      paddingHorizontal: spacing.md,
-                    },
-                  ]}
+                  style={({ pressed }) => [styles.tabCell, pressed && styles.pressed]}
                 >
-                  <Ionicons name={t.icon} size={15} color={active ? colors.primary : colors.textFaint} />
-                  <Text variant="captionStrong" color={active ? 'primary' : 'textMuted'}>
-                    {t.label}
-                  </Text>
+                  <View
+                    style={[
+                      styles.tab,
+                      { borderRadius: radii.md, backgroundColor: active ? colors.primarySoft : 'transparent' },
+                    ]}
+                  >
+                    <Ionicons name={t.icon} size={18} color={active ? colors.primary : colors.textFaint} />
+                    <Text variant="tiny" color={active ? 'primary' : 'textMuted'} numberOfLines={1}>
+                      {t.label}
+                    </Text>
+                  </View>
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
 
           {tab === 'overview' && <OverviewTab patient={patient} />}
           {tab === 'timeline' && <TimelineTab patientId={id} />}
@@ -198,5 +207,8 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  tab: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, borderWidth: StyleSheet.hairlineWidth },
+  tabCell: { width: '25%', padding: 2 },
+  tab: { height: 52, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  pressed: { opacity: 0.6 },
 });

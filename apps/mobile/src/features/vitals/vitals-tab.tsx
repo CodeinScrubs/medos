@@ -281,7 +281,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
           </Column>
         </Card>
       ) : (
-        <Button label="اندازه‌گیری تازه" icon="add" onPress={startNew} full />
+        <Button label="اندازه‌گیری تازه" icon="add" variant="secondary" onPress={startNew} full />
       )}
 
       {rows.length === 0 && data !== undefined ? (

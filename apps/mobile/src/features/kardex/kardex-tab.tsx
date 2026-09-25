@@ -95,7 +95,7 @@ function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
 
   function change(status: Order['status']) {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    void setOrderStatus(order.id, status);
+    void setOrderStatus(order.id, status).catch((e) => alertError('تغییر ثبت نشد', e));
   }
 
   function confirmDiscontinue() {

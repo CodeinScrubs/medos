@@ -82,7 +82,7 @@ function IdeaCard({ idea }: { idea: Idea }) {
       done: 'inbox',
       dropped: 'inbox',
     };
-    void setIdeaStatus(idea.id, next[idea.status]);
+    void setIdeaStatus(idea.id, next[idea.status]).catch((e) => alertError('تغییر ثبت نشد', e));
   }
 
   return (
