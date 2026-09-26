@@ -90,12 +90,48 @@ export function parseVitalForm(
   for (const key of VITAL_NUMBER_KEYS) {
     values[key] = parseDecimal(form[key]);
     if (form[key].trim() && values[key] == null) errors[key] = 'عدد خوانده نشد؛ اعشار را با نقطه بنویسید.';
+    else if (!possible(key, values[key])) errors[key] = outOfBounds(key);
+  }
+  if (!errors.bp) {
+    if (!possible('systolic', values.systolic) || !possible('diastolic', values.diastolic))
+      errors.bp = `فشار ممکن نیست (سیستول ${POSSIBLE.systolic.join('–')}، دیاستول ${POSSIBLE.diastolic.join('–')}).`;
+    else if (values.systolic != null && values.diastolic != null && values.diastolic >= values.systolic)
+      errors.bp = 'عدد دوم (دیاستول) از اولی بیشتر است؛ جایشان عوض نشده؟';
   }
   if (Object.keys(errors).length) return { ok: false, errors };
   return {
     ok: true,
     values: { ...values, urineOutput: form.urineOutput.trim() || null, notes: form.notes.trim() || null },
   };
+}
+
+/**
+ * What each measurement can physically be. This is typo catching — an SpO2 of
+ * 150, a temperature of 385, a pain score of 12 — not a normal range: every
+ * value inside these limits is stored without comment, as the header says.
+ */
+const POSSIBLE: Record<keyof VitalFields, readonly [number, number]> = {
+  systolic: [20, 300],
+  diastolic: [5, 250],
+  heartRate: [0, 350],
+  respRate: [0, 100],
+  temperature: [20, 45],
+  spo2: [0, 100],
+  bloodSugar: [5, 3000],
+  weightKg: [0.2, 500],
+  heightCm: [20, 260],
+  painScore: [0, 10],
+};
+
+function possible(key: keyof VitalFields, value: number | null): boolean {
+  if (value == null) return true;
+  const [min, max] = POSSIBLE[key];
+  return value >= min && value <= max;
+}
+
+function outOfBounds(key: keyof VitalFields): string {
+  const [min, max] = POSSIBLE[key];
+  return `این عدد ممکن نیست (${min} تا ${max}). اشتباه تایپی؟`;
 }
 
 /** Storage validation, not a normal/abnormal clinical range. */

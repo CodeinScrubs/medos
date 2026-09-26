@@ -134,6 +134,36 @@ describe('recording observations', () => {
     expect(row?.temperature).toBe(38.5);
   });
 
+  /*
+   * An SpO2 of 150 was stored without a word. These are the limits of what can
+   * be measured at all — typo catching — and every value inside them is still
+   * stored without comment.
+   */
+  it('refuses a value that cannot be a measurement', () => {
+    const blank = {
+      bp: '',
+      heartRate: '',
+      respRate: '',
+      temperature: '',
+      spo2: '',
+      bloodSugar: '',
+      weightKg: '',
+      heightCm: '',
+      painScore: '',
+      urineOutput: '',
+      notes: '',
+    };
+    const spo2 = parseVitalForm({ ...blank, spo2: '150' });
+    expect(spo2.ok).toBe(false);
+    expect(!spo2.ok && spo2.errors.spo2).toMatch(/0 تا 100/);
+    expect(parseVitalForm({ ...blank, temperature: '385' }).ok).toBe(false);
+    expect(parseVitalForm({ ...blank, painScore: '12' }).ok).toBe(false);
+    expect(parseVitalForm({ ...blank, bp: '80/120' }).ok).toBe(false);
+    expect(parseVitalForm({ ...blank, bp: '400/80' }).ok).toBe(false);
+    // Abnormal is not impossible.
+    expect(parseVitalForm({ ...blank, spo2: '72', temperature: '41.2', bp: '70/40', heartRate: '180' }).ok).toBe(true);
+  });
+
   it('preserves the stated observation time and rejects an invalid timestamp', async () => {
     const measuredAt = new Date('2026-08-01T07:31:00Z');
     const id = await recordVital({ patientId, heartRate: 80, measuredAt });
