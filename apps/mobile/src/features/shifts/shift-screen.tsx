@@ -221,9 +221,13 @@ function ShiftScreenContent() {
                     }
                   >
                     <Column gap="xxs">
-                      <Text variant="bodyStrong" numberOfLines={1}>
-                        {fullName(patient.firstName, patient.lastName)}
-                      </Text>
+                      <Row gap="xs">
+                        <Text variant="bodyStrong" numberOfLines={1} style={styles.grow}>
+                          {fullName(patient.firstName, patient.lastName)}
+                        </Text>
+                        {/* Discharged mid-shift: still on the list for the handoff, but not on the ward. */}
+                        {encounter?.dischargedAt ? <Badge label="ترخیص شد" tone="neutral" /> : null}
+                      </Row>
                       {where ? (
                         <Text variant="caption" color="textMuted">
                           {where}

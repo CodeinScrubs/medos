@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HIT_SLOP, MIN_TOUCH, useTheme } from '@/theme';
 
@@ -143,18 +144,29 @@ export function IconButton({
 /*  Floating action button                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The screen's one main action, floating at the bottom corner.
+ *
+ * It sits above Android's navigation bar: on a screen pushed over the tabs
+ * the bar is right below it, and with three-button navigation a button half
+ * under it sent the tap to Back. A tab's root screen passes `tabRoot`, since
+ * the tab bar already lifts it clear.
+ */
 export function Fab({
   icon = 'add',
   onPress,
   label,
+  tabRoot = false,
 }: {
   icon?: keyof typeof Ionicons.glyphMap;
   onPress?: () => void;
   label: string;
+  tabRoot?: boolean;
 }) {
   const { colors, spacing, shadows } = useTheme();
+  const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.fabWrap, { bottom: spacing.xl, insetInlineEnd: spacing.lg }]}>
+    <View style={[styles.fabWrap, { bottom: spacing.xl + (tabRoot ? 0 : insets.bottom), insetInlineEnd: spacing.lg }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}

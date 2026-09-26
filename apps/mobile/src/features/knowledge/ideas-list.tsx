@@ -64,7 +64,7 @@ export function IdeasList() {
         />
       )}
 
-      <Fab label="ایده‌ی جدید" onPress={() => router.push('/knowledge/idea')} />
+      <Fab tabRoot label="ایده‌ی جدید" onPress={() => router.push('/knowledge/idea')} />
     </View>
   );
 }

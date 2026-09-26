@@ -1,4 +1,6 @@
-import { parseLabValue } from './flags';
+import type { LabValue } from '@/db/schema';
+
+import { FLAG_LABEL, parseLabValue } from './flags';
 
 /**
  * Rows copied from Excel, Google Sheets or a CSV, as [analyte, value, unit?].
@@ -121,3 +123,57 @@ export function isUnreadableNumber(value: string, alwaysNumeric: boolean): boole
 }
 
 const LOOKS_NUMERIC = /^(?:<=|>=|<|>|≤|≥)?\s*[-+]?[\d.,٫٬،۰-۹٠-٩]+$/;
+
+type LatestRow = { value: Pick<LabValue, 'analyte' | 'value' | 'valueNum' | 'flag'>; collectedAt: Date };
+
+const OUTSIDE_RANGE: readonly (LabValue['flag'] & string)[] = ['high', 'low', 'critical_high', 'critical_low'];
+
+/**
+ * What a patient's summary says about their labs.
+ *
+ * The newest result of each analyte decides: a potassium that was high
+ * yesterday and normal this morning is not shown. Of those newest results,
+ * only the ones that need a look are returned — flagged outside the range
+ * stored with them, or typed in a way that cannot be read as a number (a
+ * "5,8" that got no flag at all). Nothing here judges a result without a
+ * range; it is neither shown as abnormal nor counted as normal.
+ *
+ * `analytes` is how many analytes have a newest result, so the summary can say
+ * how much it looked at when it has nothing to show. Newest first.
+ */
+export function labsToReview<T extends LatestRow>(
+  rows: readonly T[],
+): { rows: T[]; analytes: number; latestAt: Date | null } {
+  const newest = new Map<string, T>();
+  for (const row of rows) {
+    const key = row.value.analyte.trim().toLowerCase();
+    const seen = newest.get(key);
+    if (!seen || row.collectedAt.getTime() > seen.collectedAt.getTime()) newest.set(key, row);
+  }
+  const latest = [...newest.values()].sort((a, b) => b.collectedAt.getTime() - a.collectedAt.getTime());
+  const review = latest.filter(
+    (r) =>
+      (r.value.flag != null && OUTSIDE_RANGE.includes(r.value.flag)) ||
+      (r.value.valueNum == null && isUnreadableNumber(r.value.value ?? '', false)),
+  );
+  return { rows: review, analytes: latest.length, latestAt: latest[0]?.collectedAt ?? null };
+}
+
+/**
+ * One draw as a line of results — "K 5.8 H · Cr 1.9 H · Na 138" — for the
+ * timeline, where a panel's name alone said nothing about what came back.
+ * Results flagged outside their range, or unreadable as a number ("?"), come
+ * first so they survive when the line is cut short; the rest keep the order
+ * they were entered in.
+ */
+export function panelResultsLine(values: readonly Pick<LabValue, 'analyte' | 'value' | 'valueNum' | 'flag'>[]): string {
+  const marked = values
+    .filter((v) => v.value?.trim())
+    .map((v) => {
+      const flag = v.flag && OUTSIDE_RANGE.includes(v.flag) ? FLAG_LABEL[v.flag] : null;
+      const unreadable = v.valueNum == null && isUnreadableNumber(v.value ?? '', false);
+      const mark = flag ?? (unreadable ? '?' : null);
+      return { text: [v.analyte.trim(), v.value!.trim(), mark].filter(Boolean).join(' '), first: mark != null };
+    });
+  return [...marked.filter((m) => m.first), ...marked.filter((m) => !m.first)].map((m) => m.text).join(' · ');
+}

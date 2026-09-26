@@ -55,7 +55,7 @@ export function SpecialtyProfilesList() {
         />
       )}
 
-      <Fab label="رشته‌ی جدید" onPress={() => router.push('/knowledge/specialty/edit')} />
+      <Fab tabRoot label="رشته‌ی جدید" onPress={() => router.push('/knowledge/specialty/edit')} />
     </View>
   );
 }

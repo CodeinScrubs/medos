@@ -1,7 +1,15 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { computeFlag, flagTone, formatRange, parseLabNumber, parseLabValue, parseRangeInput } from './flags';
-import { isUnreadableNumber, parsePastedTable, sameUnitSeries } from './logic';
+import {
+  computeFlag,
+  flagTone,
+  formatRange,
+  parseLabNumber,
+  parseLabValue,
+  parseRangeInput,
+  type LabFlag,
+} from './flags';
+import { isUnreadableNumber, labsToReview, panelResultsLine, parsePastedTable, sameUnitSeries } from './logic';
 import { analyteDef, ANALYTE_ORDER, LAB_PRESETS, rangeFor } from './presets';
 
 describe('parseLabNumber', () => {
@@ -242,5 +250,58 @@ describe('isUnreadableNumber', () => {
     expect(isUnreadableNumber('negative', false)).toBe(false);
     expect(isUnreadableNumber('5,8', false)).toBe(true);
     expect(isUnreadableNumber('>1,2', false)).toBe(true);
+  });
+});
+
+describe('labsToReview', () => {
+  const at = (day: number) => new Date(2026, 8, day, 8, 0);
+  const row = (analyte: string, value: string, flag: LabFlag | null, day: number) => ({
+    value: { analyte, value, valueNum: parseLabNumber(value), flag },
+    collectedAt: at(day),
+  });
+
+  it('lets the newest result of each analyte decide, newest first', () => {
+    const result = labsToReview([
+      row('K', '4.2', 'normal', 3),
+      row('Cr', '1.9', 'high', 3),
+      row('k', '5.8', 'high', 2),
+      row('Cr', '1.0', 'normal', 2),
+      row('Na', '128', 'low', 1),
+    ]);
+    // Yesterday's high potassium is not news once this morning's is normal.
+    expect(result.rows.map((r) => `${r.value.analyte} ${r.value.value}`)).toEqual(['Cr 1.9', 'Na 128']);
+    expect(result.analytes).toBe(3);
+    expect(result.latestAt).toEqual(at(3));
+  });
+
+  it('shows a number it cannot read, and says nothing about a result without a range', () => {
+    const result = labsToReview([row('K', '5,8', null, 2), row('Troponin', '0.8', null, 2)]);
+    expect(result.rows.map((r) => r.value.analyte)).toEqual(['K']);
+    expect(result.analytes).toBe(2);
+  });
+
+  it('has nothing to say about no results', () => {
+    expect(labsToReview([])).toEqual({ rows: [], analytes: 0, latestAt: null });
+  });
+});
+
+describe('panelResultsLine', () => {
+  const value = (analyte: string, text: string, flag: LabFlag | null = null) => ({
+    analyte,
+    value: text,
+    valueNum: parseLabNumber(text),
+    flag,
+  });
+
+  it('puts what needs a look first, and keeps the rest in entry order', () => {
+    expect(
+      panelResultsLine([
+        value('Na', '138', 'normal'),
+        value('K', '5,8'),
+        value('Cr', '1.9', 'high'),
+        value('BUN', '18', 'normal'),
+        value('Troponin', ''),
+      ]),
+    ).toBe('K 5,8 ? · Cr 1.9 H · Na 138 · BUN 18');
   });
 });

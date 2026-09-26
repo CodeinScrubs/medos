@@ -71,7 +71,8 @@ export function TodayScreen() {
   // far down the day goes.
   return (
     <View style={styles.grow}>
-      <Screen scroll tabRoot>
+      {/* Room at the end for the capture button, which would otherwise sit on the last card. */}
+      <Screen scroll tabRoot contentStyle={{ paddingBottom: spacing.huge * 2 }}>
         <Column gap="none" style={{ paddingTop: spacing.md }}>
           <Text variant="caption" color="textMuted">
             {formatJalaliWithWeekday(now)} {toPersianDigits(jy)}
@@ -174,7 +175,7 @@ export function TodayScreen() {
           ) : null}
         </Column>
       </Screen>
-      <Fab icon="create-outline" label="ثبت سریع" onPress={() => router.push('/capture')} />
+      <Fab tabRoot icon="create-outline" label="ثبت سریع" onPress={() => router.push('/capture')} />
     </View>
   );
 }

@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alertError } from '@/components/feedback';
 import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
@@ -18,6 +19,7 @@ type KindFilter = 'all' | Place['kind'];
 export function PlacesScreen() {
   const router = useRouter();
   const { colors, spacing } = useTheme();
+  const insets = useSafeAreaInsets();
   const [kind, setKind] = useState<KindFilter>('all');
   const { data } = useLive(placesQuery({ kind: kind === 'all' ? undefined : kind }), [kind]);
   const rows = data ?? [];
@@ -48,7 +50,11 @@ export function PlacesScreen() {
         <FlatList
           data={rows}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.huge * 2, gap: spacing.sm }}
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: spacing.huge * 2 + insets.bottom,
+            gap: spacing.sm,
+          }}
           renderItem={({ item }) => <PlaceCard place={item} />}
         />
       )}

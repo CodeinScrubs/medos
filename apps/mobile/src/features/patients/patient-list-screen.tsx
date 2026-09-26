@@ -162,7 +162,7 @@ export function PatientListScreen() {
         )}
       </View>
 
-      <Fab label="افزودن بیمار" onPress={() => router.push('/patient/new')} />
+      <Fab tabRoot label="افزودن بیمار" onPress={() => router.push('/patient/new')} />
     </SafeAreaView>
   );
 }

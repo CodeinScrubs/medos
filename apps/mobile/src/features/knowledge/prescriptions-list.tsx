@@ -72,7 +72,7 @@ export function PrescriptionsList() {
         />
       )}
 
-      <Fab label="نسخه‌ی جدید" onPress={() => router.push('/knowledge/rx/edit')} />
+      <Fab tabRoot label="نسخه‌ی جدید" onPress={() => router.push('/knowledge/rx/edit')} />
     </View>
   );
 }

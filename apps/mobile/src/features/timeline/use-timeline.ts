@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 
+import type { LabValue } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { patientConsultsQuery } from '@/features/consults/queries';
 import { encounterHistoryQuery } from '@/features/encounters/queries';
 import { patientImagingQuery } from '@/features/imaging/queries';
-import { patientLabPanelsQuery } from '@/features/labs/queries';
+import { panelResultsLine } from '@/features/labs/logic';
+import { patientLabPanelsQuery, patientLabValuesQuery } from '@/features/labs/queries';
 import { NOTE_TYPE_LABELS } from '@/features/notes/labels';
 import { notePreview } from '@/features/notes/logic';
 import { patientNotesQuery } from '@/features/notes/queries';
@@ -45,6 +47,7 @@ export function useTimeline(patientId: string): {
 } {
   const notes = useLive(patientNotesQuery(patientId), [patientId]);
   const labs = useLive(patientLabPanelsQuery(patientId), [patientId]);
+  const labValues = useLive(patientLabValuesQuery(patientId), [patientId]);
   const imaging = useLive(patientImagingQuery(patientId), [patientId]);
   const consults = useLive(patientConsultsQuery(patientId), [patientId]);
   const encounters = useLive(encounterHistoryQuery(patientId), [patientId]);
@@ -63,13 +66,18 @@ export function useTimeline(patientId: string): {
       });
     }
 
+    // What came back, not only which panel was sent.
+    const byPanel = new Map<string, LabValue[]>();
+    for (const { value, panelId } of labValues.data ?? []) {
+      byPanel.set(panelId, [...(byPanel.get(panelId) ?? []), value]);
+    }
     for (const panel of labs.data ?? []) {
       out.push({
         id: `lab:${panel.id}`,
         kind: 'lab',
         at: panel.collectedAt,
         title: panel.name?.trim() || 'آزمایش',
-        summary: panel.labName,
+        summary: panelResultsLine(byPanel.get(panel.id) ?? []) || panel.labName,
         tab: 'labs',
       });
     }
@@ -124,11 +132,12 @@ export function useTimeline(patientId: string): {
     }
 
     return out.sort((a, b) => b.at.getTime() - a.at.getTime());
-  }, [notes.data, labs.data, imaging.data, consults.data, encounters.data]);
+  }, [notes.data, labs.data, labValues.data, imaging.data, consults.data, encounters.data]);
 
   const sources = [
     { label: 'نوت‌ها', query: notes },
     { label: 'آزمایش‌ها', query: labs },
+    { label: 'نتیجه‌ی آزمایش‌ها', query: labValues },
     { label: 'تصویربرداری', query: imaging },
     { label: 'کانسالت‌ها', query: consults },
     { label: 'بستری‌ها', query: encounters },

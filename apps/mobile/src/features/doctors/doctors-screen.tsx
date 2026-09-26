@@ -196,7 +196,7 @@ export function DoctorsScreen() {
         )}
       </View>
 
-      <Fab label="افزودن پزشک" onPress={() => router.push('/doctor/edit')} />
+      <Fab tabRoot label="افزودن پزشک" onPress={() => router.push('/doctor/edit')} />
 
       <PickerModal
         visible={picking}

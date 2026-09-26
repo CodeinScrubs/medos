@@ -22,6 +22,7 @@ import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { CallRow } from './patient-header';
+import { PatientSnapshot } from './patient-snapshot';
 import { deletePatientContact, patientContactsQuery } from './queries';
 
 export function OverviewTab({ patient }: { patient: Patient }) {
@@ -46,6 +47,8 @@ export function OverviewTab({ patient }: { patient: Patient }) {
   return (
     <Column gap="none">
       <AdmissionCard patientId={patientId} />
+
+      <PatientSnapshot patientId={patientId} />
 
       <DiagnosesSection patientId={patientId} />
 

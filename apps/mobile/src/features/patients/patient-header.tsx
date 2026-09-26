@@ -13,41 +13,49 @@ import { useTheme } from '@/theme';
 import { PATIENT_STATUS, SEX_LABELS } from './labels';
 import { setPatientStarred } from './queries';
 
-/** Identity block at the top of the patient record. */
+/**
+ * Identity block at the top of the patient record.
+ *
+ * Kept short on purpose: it sits above the record's tabs, so every line here
+ * pushes what the tab shows further down the screen. Who, how old, what
+ * status, the one-line summary and the allergies — the rest is in the tabs.
+ */
 export function PatientHeader({ patient }: { patient: Patient }) {
   const { colors, spacing } = useTheme();
   const status = PATIENT_STATUS[patient.status];
   const age = formatAge(patient.birthDate, patient.ageYears);
 
-  const meta = [age !== '—' ? age : null, patient.sex ? SEX_LABELS[patient.sex] : null, patient.bloodType]
+  const meta = [
+    age !== '—' ? age : null,
+    patient.sex ? SEX_LABELS[patient.sex] : null,
+    patient.bloodType,
+    patient.fileNumber ? `پرونده ${toPersianDigits(patient.fileNumber)}` : null,
+  ]
     .filter(Boolean)
     .join(' • ');
 
   return (
-    <Card>
-      <Column gap="md">
-        <Row gap="md" align="flex-start">
+    <Card style={{ padding: spacing.md }}>
+      <Column gap="sm">
+        <Row gap="md" align="center">
           <Avatar
             first={patient.firstName}
             last={patient.lastName}
-            size={56}
+            size={48}
             tone={status.tone === 'neutral' ? 'primary' : status.tone}
           />
 
           <Column gap="xxs" style={styles.grow}>
-            <Text variant="title" numberOfLines={2}>
+            <Text variant="heading" numberOfLines={2}>
               {patient.firstName} {patient.lastName}
             </Text>
-            {meta ? (
-              <Text variant="caption" color="textMuted">
-                {meta}
-              </Text>
-            ) : null}
-            <Row gap="xs" wrap style={{ marginTop: spacing.xxs }}>
-              <Badge label={status.label} tone={status.tone} />
-              {patient.fileNumber ? (
-                <Badge label={`پرونده ${toPersianDigits(patient.fileNumber)}`} tone="neutral" />
+            <Row gap="xs" wrap>
+              {meta ? (
+                <Text variant="caption" color="textMuted">
+                  {meta}
+                </Text>
               ) : null}
+              <Badge label={status.label} tone={status.tone} />
             </Row>
           </Column>
 
@@ -85,11 +93,12 @@ export function PatientHeader({ patient }: { patient: Patient }) {
 /**
  * Allergies get their own banner rather than sitting in a list of fields.
  * It is the one piece of the record that has to be impossible to miss before
- * anything is prescribed.
+ * anything is prescribed — red, with its own icon, on one line when it fits.
  */
 export function AllergyBanner({ text }: { text: string }) {
   const { colors, radii, spacing } = useTheme();
   const isNone = /^\s*(nkda|nkfa|none|ندارد|هیچ)\s*$/i.test(text.trim());
+  const color = isNone ? colors.success : colors.danger;
 
   return (
     <Row
@@ -98,22 +107,22 @@ export function AllergyBanner({ text }: { text: string }) {
       style={{
         backgroundColor: isNone ? colors.successSoft : colors.dangerSoft,
         borderRadius: radii.md,
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
       }}
     >
       <Ionicons
         name={isNone ? 'shield-checkmark-outline' : 'warning-outline'}
         size={18}
-        color={isNone ? colors.success : colors.danger}
+        color={color}
+        style={{ marginTop: 2 }}
       />
-      <Column gap="xxs" style={styles.grow}>
-        <Text variant="captionStrong" style={{ color: isNone ? colors.success : colors.danger }}>
-          آلرژی
+      <Text variant="body" style={[styles.grow, { color }]}>
+        <Text variant="bodyStrong" style={{ color }}>
+          آلرژی:{' '}
         </Text>
-        <Text variant="body" style={{ color: isNone ? colors.success : colors.danger }}>
-          {text}
-        </Text>
-      </Column>
+        {text}
+      </Text>
     </Row>
   );
 }

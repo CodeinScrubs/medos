@@ -24,13 +24,11 @@ import { credentialsQuery } from './queries';
  */
 export function VaultScreen() {
   const router = useRouter();
-  const { spacing } = useTheme();
 
   return (
     <View style={styles.flex}>
       <CredentialList />
       <Fab label="افزودن رمز" onPress={() => router.push('/vault/edit')} />
-      <View style={{ height: spacing.md }} />
     </View>
   );
 }
@@ -58,9 +56,8 @@ function CredentialList() {
   ];
 
   return (
-    <Screen scroll>
+    <Screen scroll contentStyle={{ paddingBottom: spacing.huge * 2 }}>
       <Column gap="sm" style={{ paddingTop: spacing.md }}>
-        <Text variant="display">رمزها</Text>
         <SearchBar value={search} onChange={setSearch} placeholder="نام سامانه، یوزرنیم…" />
         <ChipSelect options={options} value={category} onChange={(v) => v && setCategory(v)} />
         <ErrorNotice error={error} what="رمزها" />

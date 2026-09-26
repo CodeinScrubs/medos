@@ -75,7 +75,7 @@ export function TopicsList() {
         />
       )}
 
-      <Fab label="مبحث جدید" onPress={() => router.push('/knowledge/topic/edit')} />
+      <Fab tabRoot label="مبحث جدید" onPress={() => router.push('/knowledge/topic/edit')} />
     </View>
   );
 }

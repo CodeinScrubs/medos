@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alertError } from '@/components/feedback';
 import { Card, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
@@ -21,6 +21,7 @@ import { MIN_TOUCH, useTheme } from '@/theme';
 export function ExtensionsScreen() {
   const router = useRouter();
   const { colors, radii, spacing, typography } = useTheme();
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const { data } = useLive(extensionsQuery({ search }), [search]);
   const rows = data ?? [];
@@ -61,7 +62,11 @@ export function ExtensionsScreen() {
         <FlatList
           data={rows}
           keyExtractor={(r) => r.extension.id}
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.huge * 2, gap: spacing.sm }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.huge * 2 + insets.bottom,
+            gap: spacing.sm,
+          }}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => <ExtensionRow extension={item.extension} place={item.place} />}
         />

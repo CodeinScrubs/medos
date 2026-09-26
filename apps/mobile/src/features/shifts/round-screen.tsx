@@ -225,6 +225,7 @@ function RoundCard({ row }: { row: RoundRow }) {
                   </Text>
                 ) : null}
                 {elapsed ? <Badge label={elapsed} /> : null}
+                {encounter?.dischargedAt ? <Badge label="ترخیص شد" tone="neutral" /> : null}
                 {member.reviewedAt ? <Badge label="دیده شد" tone="success" /> : null}
               </Row>
               {patient.summary ? (
