@@ -1,5 +1,8 @@
 import type { Patient } from '@/db/schema';
+import { formatAge } from '@/lib/jalali';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
+
+import { SEX_LABELS } from './labels';
 
 /**
  * The `searchText` index for a patient: every field someone might type to find
@@ -27,3 +30,26 @@ export function patientSearchText(
 
 /** Statuses shown in the default "current" patient list. */
 export const CURRENT_STATUSES = ['admitted', 'outpatient', 'followup'] as const;
+
+/**
+ * What tells this patient apart from another with the same name: age, sex and
+ * file number. Shown next to the name wherever a patient is chosen or
+ * confirmed — two "Ahmad Karimi"s, 35 and 62, looked identical in the capture
+ * picker, the shift picker and the duplicate warning.
+ */
+export function patientIdentity(
+  p: Pick<Patient, 'birthDate' | 'ageYears' | 'sex' | 'fileNumber'>,
+  now: Date = new Date(),
+): string {
+  const age = formatAge(p.birthDate, p.ageYears, now);
+  return [age !== '—' ? age : null, p.sex ? SEX_LABELS[p.sex] : null, p.fileNumber ? `پرونده ${p.fileNumber}` : null]
+    .filter(Boolean)
+    .join(' • ');
+}
+
+/** The picker line under a patient's name: identity first, then their one-line summary. */
+export function patientPickerSublabel(
+  p: Pick<Patient, 'birthDate' | 'ageYears' | 'sex' | 'fileNumber' | 'summary'>,
+): string | null {
+  return [patientIdentity(p), p.summary].filter(Boolean).join(' — ') || null;
+}

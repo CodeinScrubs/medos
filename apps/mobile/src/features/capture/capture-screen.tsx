@@ -11,6 +11,7 @@ import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, attachPhotos } from '@/features/attachments/capture';
 import { addAttachment } from '@/features/attachments/queries';
+import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { fullName } from '@/lib/persian';
@@ -85,7 +86,7 @@ export function CaptureScreen() {
       (patientRows ?? []).map((p) => ({
         id: p.id,
         label: fullName(p.firstName, p.lastName),
-        sublabel: p.summary,
+        sublabel: patientPickerSublabel(p),
         keywords: p.searchText,
       })),
     [patientRows],

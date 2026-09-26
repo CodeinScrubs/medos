@@ -14,6 +14,7 @@ import { ImagingTab } from '@/features/imaging/imaging-tab';
 import { KardexTab } from '@/features/kardex/kardex-tab';
 import { LabsTab } from '@/features/labs/labs-tab';
 import { NotesTab } from '@/features/notes/notes-tab';
+import { patientIdentity } from '@/features/patients/logic';
 import { OverviewTab } from '@/features/patients/overview-tab';
 import { PatientHeader } from '@/features/patients/patient-header';
 import { deletePatient, patientQuery } from '@/features/patients/queries';
@@ -107,7 +108,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
   const confirmDelete = () => {
     Alert.alert(
       'حذف پرونده',
-      `پرونده‌ی ${patient.firstName} ${patient.lastName} از لیست برداشته می‌شود. اطلاعات پاک نمی‌شود و از «بیشتر ← حذف‌شده‌ها» قابل برگرداندن است.`,
+      `پرونده‌ی ${patient.firstName} ${patient.lastName}${patientIdentity(patient) ? ` (${patientIdentity(patient)})` : ''} از لیست برداشته می‌شود. اطلاعات پاک نمی‌شود و از «بیشتر ← حذف‌شده‌ها» قابل برگرداندن است.`,
       [
         { text: 'انصراف', style: 'cancel' },
         {

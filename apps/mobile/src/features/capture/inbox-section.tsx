@@ -6,6 +6,7 @@ import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { Button, Column, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
+import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { fullName, toPersianDigits } from '@/lib/persian';
 
@@ -47,7 +48,7 @@ export function InboxSection() {
       (patientRows ?? []).map((p) => ({
         id: p.id,
         label: fullName(p.firstName, p.lastName),
-        sublabel: p.summary,
+        sublabel: patientPickerSublabel(p),
         keywords: p.searchText,
       })),
     [patientRows],

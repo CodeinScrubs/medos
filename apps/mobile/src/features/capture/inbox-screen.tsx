@@ -7,6 +7,7 @@ import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, EmptyState, Input, Screen, SectionHeader } from '@/components/ui';
 import { useLive } from '@/db/use-live';
+import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { fullName } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -54,7 +55,7 @@ export function InboxScreen() {
       (patientRows ?? []).map((p) => ({
         id: p.id,
         label: fullName(p.firstName, p.lastName),
-        sublabel: p.summary,
+        sublabel: patientPickerSublabel(p),
         keywords: p.searchText,
       })),
     [patientRows],

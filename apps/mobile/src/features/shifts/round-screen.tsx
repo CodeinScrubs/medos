@@ -104,7 +104,7 @@ function RoundScreenContent() {
             title={shift ? 'کسی روی این شیفت نیست' : 'شیفتی باز نیست'}
             description={
               shift
-                ? 'اول بیمارهای امشب را به شیفت اضافه کنید، بعد راند را شروع کنید.'
+                ? 'اول بیماران این شیفت را اضافه کنید، بعد راند را شروع کنید.'
                 : 'راند از روی بیمارهای شیفت باز ساخته می‌شود.'
             }
             action={<Button label="رفتن به شیفت" icon="arrow-back" onPress={() => router.replace('/shift')} />}
@@ -248,10 +248,10 @@ function RoundCard({ row }: { row: RoundRow }) {
           {patient.allergies ? <AllergyBanner text={patient.allergies} /> : null}
 
           <AutosaveField
-            label="امشب درباره‌ی این بیمار"
+            label="نکته‌ی این شیفت"
             initialValue={member.shiftSummary}
             onSave={(value) => updateShiftPatient(member.id, { shiftSummary: value })}
-            placeholder="یک خط که امشب مهم است"
+            placeholder="یک خط که در این شیفت مهم است"
             multiline
           />
         </Column>

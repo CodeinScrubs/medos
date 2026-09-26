@@ -12,6 +12,7 @@ import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { locationLabel } from '@/features/encounters/status';
+import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName, toPersianDigits } from '@/lib/persian';
@@ -66,11 +67,28 @@ function ShiftScreenContent() {
       (patientRows ?? []).map((p) => ({
         id: p.id,
         label: fullName(p.firstName, p.lastName),
-        sublabel: p.summary,
+        sublabel: patientPickerSublabel(p),
         keywords: p.searchText,
       })),
     [patientRows],
   );
+
+  // On a ward, the shift is usually every admitted patient: one tap instead of
+  // one picker per patient. Anyone else is still added by hand.
+  const inShift = new Set(rows.map(({ patient }) => patient.id));
+  const admittedNotInShift = (patientRows ?? []).filter((p) => p.status === 'admitted' && !inShift.has(p.id));
+
+  async function addAllAdmitted() {
+    if (!shift) return;
+    setBusy(true);
+    try {
+      for (const p of admittedNotInShift) await addPatientToShift(shift.id, p.id);
+    } catch (e) {
+      alertError('اضافه نشد', e);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function begin() {
     setBusy(true);
@@ -97,13 +115,13 @@ function ShiftScreenContent() {
         <ScreenOptions options={{ title: 'شیفت' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="شیفت" />
-          <Button label="شیفت‌های قبلی" variant="ghost" onPress={() => router.push('/shift-history')} />
           <EmptyState
             icon="time-outline"
             title="شیفتی باز نیست"
-            description="شیفت را شروع کنید تا بیمارهایی که امشب دستتان است یک‌جا جمع شوند و بدانید کدام را دیده‌اید."
+            description="شیفت را شروع کنید تا بیماران این شیفت یک‌جا جمع شوند و بدانید کدام را دیده‌اید."
             action={<Button label="شروع شیفت" icon="play" onPress={() => void begin()} loading={busy} />}
           />
+          <Button label="شیفت‌های قبلی" variant="ghost" onPress={() => router.push('/shift-history')} />
         </Column>
       </Screen>
     );
@@ -114,11 +132,6 @@ function ShiftScreenContent() {
       <ScreenOptions options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ErrorNotice error={error ?? membersError ?? patientsError} what="شیفت" />
-        <Button
-          label="شیفت‌های قبلی"
-          variant="ghost"
-          onPress={() => void scope.perform(() => router.push('/shift-history'))}
-        />
 
         {shift ? (
           <Card style={{ borderColor: colors.primary, borderWidth: 1 }}>
@@ -154,6 +167,15 @@ function ShiftScreenContent() {
                 />
               </Row>
 
+              {admittedNotInShift.length > 0 ? (
+                <Button
+                  label={`افزودن همه‌ی بستری‌ها (${toPersianDigits(admittedNotInShift.length)})`}
+                  icon="people-outline"
+                  variant="secondary"
+                  loading={busy}
+                  onPress={() => void addAllAdmitted()}
+                />
+              ) : null}
               <Button label="پایان شیفت" variant="ghost" onPress={finish} haptic={false} />
             </Column>
           </Card>
@@ -165,7 +187,7 @@ function ShiftScreenContent() {
           <EmptyState
             icon="people-outline"
             title="هنوز بیماری اضافه نشده"
-            description="بیمارهایی که امشب مسئولشان هستید را اینجا اضافه کنید."
+            description="بیمارانی که در این شیفت مسئولشان هستید را اضافه کنید؛ بستری‌ها با یک دکمه می‌آیند."
           />
         ) : null}
 
@@ -248,6 +270,11 @@ function ShiftScreenContent() {
             </Card>
           );
         })}
+        <Button
+          label="شیفت‌های قبلی"
+          variant="ghost"
+          onPress={() => void scope.perform(() => router.push('/shift-history'))}
+        />
       </Column>
 
       <PickerModal

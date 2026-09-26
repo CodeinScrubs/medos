@@ -13,6 +13,7 @@ import { isValidNationalId, toLatinDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { BLOOD_TYPES, PATIENT_STATUS, SEX_LABELS } from './labels';
+import { patientIdentity } from './logic';
 import { createPatient, findPossibleDuplicates, updatePatient, type PatientInput } from './queries';
 
 type FormState = {
@@ -130,7 +131,9 @@ export function PatientForm({ patient }: { patient?: Patient }) {
       );
 
       if (duplicates.length > 0) {
-        const names = duplicates.map((d) => `• ${d.firstName} ${d.lastName}`).join('\n');
+        const names = duplicates
+          .map((d) => `• ${d.firstName} ${d.lastName}${patientIdentity(d) ? ` (${patientIdentity(d)})` : ''}`)
+          .join('\n');
         Alert.alert('بیمار مشابه پیدا شد', `این بیماران از قبل ثبت شده‌اند:\n${names}\n\nباز هم بیمار جدید ثبت شود؟`, [
           { text: 'انصراف', style: 'cancel', onPress: () => setSaving(false) },
           {
