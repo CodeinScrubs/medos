@@ -30,7 +30,7 @@ export function MoreScreen() {
     {
       icon: 'time-outline',
       title: 'شیفت و راند',
-      subtitle: 'بیمارهای امشب، و راند یکی‌یکی',
+      subtitle: 'بیماران این شیفت، و راند یکی‌یکی',
       href: '/shift',
     },
     {
@@ -80,7 +80,7 @@ export function MoreScreen() {
   ];
 
   return (
-    <Screen scroll>
+    <Screen scroll tabRoot>
       <Column gap="none" style={{ paddingTop: spacing.md }}>
         <Text variant="display">بیشتر</Text>
 

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable } from 'react-native';
 
 import { alertError } from '@/components/feedback';
+import { useUndo } from '@/components/undo-toast';
 import { Badge, Card, Column, Row, Text } from '@/components/ui';
 import type { Patient, Task } from '@/db/schema';
 import { formatJalaliDateTime } from '@/lib/jalali';
@@ -24,12 +25,16 @@ export function TaskRow({
   showPatient?: boolean;
 }) {
   const { colors } = useTheme();
+  const offerUndo = useUndo();
   const [busy, setBusy] = useState(false);
   async function toggle() {
     if (busy) return;
     setBusy(true);
     try {
-      await setTaskStatus(task.id, task.status === 'open' ? 'done' : 'open');
+      const completing = task.status === 'open';
+      await setTaskStatus(task.id, completing ? 'done' : 'open');
+      // The row leaves the open list at once; a slip of the thumb gets a way back.
+      if (completing) offerUndo({ message: `«${task.title}» انجام شد`, undo: () => setTaskStatus(task.id, 'open') });
     } catch (e) {
       alertError('وضعیت کار تغییر نکرد', e);
     } finally {

@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { UndoProvider } from '@/components/undo-toast';
 import { useAutoBackup } from '@/features/backup/use-auto-backup';
 import { parseOccasionReminder } from '@/features/doctors/logic';
 import { parseReminderPayload } from '@/features/followups/logic';
@@ -50,7 +51,9 @@ export default function RootLayout() {
           <ThemeProvider>
             <StartupGate>
               <LockGate>
-                <AppStack />
+                <UndoProvider>
+                  <AppStack />
+                </UndoProvider>
               </LockGate>
             </StartupGate>
           </ThemeProvider>

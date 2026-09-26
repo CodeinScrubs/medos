@@ -7,6 +7,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 import {
   createTask,
   deleteTask,
+  duePatientTasksQuery,
   restoreTask,
   setTaskStatus,
   taskCountQuery,
@@ -119,5 +120,29 @@ describe('retrieving and correcting tasks', () => {
     expect((await taskQuery(id))[0]?.status).toBe('open');
     expect(t.db.select().from(auditLog).all()).toHaveLength(0);
     await expect(setTaskStatus('missing', 'done')).rejects.toThrow();
+  });
+});
+
+describe("patients' tasks on Today", () => {
+  /*
+   * A "repeat troponin" due at 09:00 for an admitted patient appeared nowhere on
+   * Today, which listed only tasks without a patient.
+   */
+  it('lists open patient tasks due by the end of today, overdue first, and nothing else', async () => {
+    const patientId = await createPatient({ firstName: 'Example', lastName: 'Patient', status: 'outpatient' });
+    const gone = await createPatient({ firstName: 'Deleted', lastName: 'Patient', status: 'outpatient' });
+    const endOfToday = new Date('2026-09-26T23:59:59');
+    await createTask({ title: 'repeat troponin', patientId, dueAt: new Date('2026-09-26T09:00:00') });
+    await createTask({ title: 'yesterday', patientId, dueAt: new Date('2026-09-25T18:00:00') });
+    await createTask({ title: 'tomorrow', patientId, dueAt: new Date('2026-09-27T09:00:00') });
+    await createTask({ title: 'undated', patientId });
+    await createTask({ title: 'no patient', dueAt: new Date('2026-09-26T08:00:00') });
+    const done = await createTask({ title: 'done', patientId, dueAt: new Date('2026-09-26T07:00:00') });
+    await setTaskStatus(done, 'done');
+    await createTask({ title: 'of a deleted patient', patientId: gone, dueAt: new Date('2026-09-26T07:00:00') });
+    await deletePatient(gone);
+
+    const rows = await duePatientTasksQuery(endOfToday);
+    expect(rows.map((r) => r.task.title)).toEqual(['yesterday', 'repeat troponin']);
   });
 });

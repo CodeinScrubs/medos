@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
+import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -17,6 +17,7 @@ export function Screen({
   scroll = false,
   padded = true,
   edges = ['top'],
+  tabRoot = false,
   style,
   contentStyle,
 }: {
@@ -24,26 +25,29 @@ export function Screen({
   scroll?: boolean;
   padded?: boolean;
   edges?: Edge[];
+  /** The root screen of a tab: the tab bar already sits above Android's navigation bar. */
+  tabRoot?: boolean;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
 }) {
   const { colors, spacing } = useTheme();
   const pad = padded ? { paddingHorizontal: spacing.lg } : null;
-  // The app draws edge to edge, so on a screen without a tab bar the last rows
-  // of a form would end up behind Android's navigation bar. `edges` decides
-  // whether SafeAreaView already handles it.
-  const insets = useSafeAreaInsets();
-  const bottomInset = edges.includes('bottom') ? 0 : insets.bottom;
+  // The app draws edge to edge. Content used to scroll on underneath Android's
+  // navigation bar, and with three-button navigation a button that sat there
+  // mid-scroll was not pressed at all — the tap went to Back or Recents. So a
+  // screen ends where the navigation bar begins; only a tab's root, which has
+  // the tab bar below it, does not take the edge.
+  const safeEdges: Edge[] = tabRoot || edges.includes('bottom') ? edges : [...edges, 'bottom'];
 
   if (scroll) {
     // Keyboard-aware: since Android 15 apps draw edge-to-edge and the window
     // no longer shrinks for the keyboard, so a plain ScrollView would leave the
     // lower fields of a long form hidden behind it.
     return (
-      <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor: colors.background }, style]}>
+      <SafeAreaView edges={safeEdges} style={[styles.flex, { backgroundColor: colors.background }, style]}>
         <KeyboardAwareScrollView
           style={styles.flex}
-          contentContainerStyle={[pad, { paddingBottom: spacing.huge + bottomInset }, contentStyle]}
+          contentContainerStyle={[pad, { paddingBottom: spacing.huge }, contentStyle]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           bottomOffset={spacing.xl}
@@ -55,13 +59,7 @@ export function Screen({
   }
 
   return (
-    <SafeAreaView
-      edges={edges}
-      // Same reason as the scrolling branch: with three-button navigation the
-      // last row of a screen that does not scroll sits under the system bar,
-      // where it cannot be tapped at all.
-      style={[styles.flex, { backgroundColor: colors.background, paddingBottom: bottomInset }, pad, style]}
-    >
+    <SafeAreaView edges={safeEdges} style={[styles.flex, { backgroundColor: colors.background }, pad, style]}>
       {children}
     </SafeAreaView>
   );

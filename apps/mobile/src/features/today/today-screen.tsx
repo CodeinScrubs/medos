@@ -7,6 +7,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Card, Column, EmptyState, Fab, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
+import { BackupNudge } from '@/features/backup/backup-nudge';
 import { RestoreTrouble } from '@/features/backup/restore-trouble';
 import { InboxSection } from '@/features/capture/inbox-section';
 import { OpenConsults } from '@/features/consults/open-consults';
@@ -18,6 +19,7 @@ import { UnfinishedNotes } from '@/features/notes/unfinished-notes';
 import { PatientCard } from '@/features/patients/patient-card';
 import { patientListQuery } from '@/features/patients/queries';
 import { ShiftCard } from '@/features/shifts/shift-card';
+import { DueTasksSection } from '@/features/tasks/due-tasks-section';
 import { TasksSection } from '@/features/tasks/tasks-section';
 import { daysBetween, formatJalaliWithWeekday, toIsoDate, toJalali } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
@@ -69,7 +71,7 @@ export function TodayScreen() {
   // far down the day goes.
   return (
     <View style={styles.grow}>
-      <Screen scroll>
+      <Screen scroll tabRoot>
         <Column gap="none" style={{ paddingTop: spacing.md }}>
           <Text variant="caption" color="textMuted">
             {formatJalaliWithWeekday(now)} {toPersianDigits(jy)}
@@ -82,6 +84,7 @@ export function TodayScreen() {
             onRetry={() => failed.forEach(({ query }) => query.retry())}
           />
           <RestoreTrouble />
+          <BackupNudge now={now.getTime()} />
 
           <Row gap="sm" style={{ marginTop: spacing.lg }}>
             <StatTile
@@ -121,6 +124,8 @@ export function TodayScreen() {
               </Column>
             </>
           )}
+
+          <DueTasksSection now={now} />
 
           {(admitted?.length ?? 0) > 0 && (
             <>

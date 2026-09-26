@@ -54,6 +54,22 @@ function taskConditions(filter: TaskFilter) {
   return and(...clauses);
 }
 
+/**
+ * Patients' open tasks that are due by `until`, overdue first — for Today.
+ *
+ * Today listed only tasks without a patient, so a "repeat troponin at 09:00"
+ * lived only inside that patient's record. A task without a due time is not
+ * here: it is waiting for nothing, and the record already shows it.
+ */
+export function duePatientTasksQuery(until: Date) {
+  return db
+    .select({ task: tasks, patient: patients })
+    .from(tasks)
+    .innerJoin(patients, and(eq(tasks.patientId, patients.id), isNull(patients.deletedAt)))
+    .where(and(alive, eq(tasks.status, 'open'), isNotNull(tasks.dueAt), lte(tasks.dueAt, until)))
+    .orderBy(asc(tasks.dueAt), desc(tasks.id));
+}
+
 export function tasksQuery(filter: TaskFilter = {}, limit?: number) {
   return db
     .select({ task: tasks, patient: patients })
