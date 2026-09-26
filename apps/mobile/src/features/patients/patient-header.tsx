@@ -82,7 +82,7 @@ export function PatientHeader({ patient }: { patient: Patient }) {
           </Text>
         ) : null}
 
-        {patient.allergies ? <AllergyBanner text={patient.allergies} /> : null}
+        <AllergyBanner text={patient.allergies} />
 
         {patient.phone ? <CallRow phone={patient.phone} label="بیمار" /> : null}
       </Column>
@@ -94,25 +94,29 @@ export function PatientHeader({ patient }: { patient: Patient }) {
  * Allergies get their own banner rather than sitting in a list of fields.
  * It is the one piece of the record that has to be impossible to miss before
  * anything is prescribed — red, with its own icon, on one line when it fits.
+ *
+ * Nothing written is its own state, shown in grey: "not recorded" is not
+ * "no known allergies", and a blank space looked exactly like the second.
  */
-export function AllergyBanner({ text }: { text: string }) {
+export function AllergyBanner({ text }: { text: string | null | undefined }) {
   const { colors, radii, spacing } = useTheme();
-  const isNone = /^\s*(nkda|nkfa|none|ندارد|هیچ)\s*$/i.test(text.trim());
-  const color = isNone ? colors.success : colors.danger;
+  const recorded = text?.trim() ?? '';
+  const isNone = /^\s*(nkda|nkfa|none|ندارد|هیچ)\s*$/i.test(recorded);
+  const color = !recorded ? colors.textMuted : isNone ? colors.success : colors.danger;
 
   return (
     <Row
       gap="sm"
       align="flex-start"
       style={{
-        backgroundColor: isNone ? colors.successSoft : colors.dangerSoft,
+        backgroundColor: !recorded ? colors.surfaceAlt : isNone ? colors.successSoft : colors.dangerSoft,
         borderRadius: radii.md,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
       }}
     >
       <Ionicons
-        name={isNone ? 'shield-checkmark-outline' : 'warning-outline'}
+        name={!recorded ? 'help-circle-outline' : isNone ? 'shield-checkmark-outline' : 'warning-outline'}
         size={18}
         color={color}
         style={{ marginTop: 2 }}
@@ -121,7 +125,7 @@ export function AllergyBanner({ text }: { text: string }) {
         <Text variant="bodyStrong" style={{ color }}>
           آلرژی:{' '}
         </Text>
-        {text}
+        {recorded || 'ثبت نشده'}
       </Text>
     </Row>
   );

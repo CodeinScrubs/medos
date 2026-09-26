@@ -138,7 +138,7 @@ function OrderForm({
         {/* The allergy line where the order is written, not only on the record's
             header. Shown, never checked: matching a drug to an allergy class is a
             clinical rule that would need its own validation (invariant 10). */}
-        {patient?.allergies ? <AllergyBanner text={patient.allergies} /> : null}
+        {patient ? <AllergyBanner text={patient.allergies} /> : null}
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
 
         <Column gap="xs">

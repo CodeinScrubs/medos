@@ -246,7 +246,7 @@ function RoundCard({ row }: { row: RoundRow }) {
             />
           </Row>
 
-          {patient.allergies ? <AllergyBanner text={patient.allergies} /> : null}
+          <AllergyBanner text={patient.allergies} />
 
           <AutosaveField
             label="نکته‌ی این شیفت"
