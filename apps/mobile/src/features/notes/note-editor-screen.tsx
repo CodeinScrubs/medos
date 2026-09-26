@@ -45,7 +45,7 @@ import {
 } from './draft-queries';
 import { NOTE_TYPE_LABELS } from './labels';
 import { CONSULT_NOTE_TYPES, SOAP_NOTE_TYPES } from './logic';
-import { noteQuery } from './queries';
+import { latestPatientNoteQuery, noteQuery } from './queries';
 
 /**
  * SOAP fields for the note types actually written that way; a single body for
@@ -233,6 +233,8 @@ function NoteEditor({
   const doctorLabel = doctorItems.find((d) => d.id === fields.doctorId)?.label ?? null;
 
   const useSoap = SOAP_NOTE_TYPES.includes(fields.type);
+  const { data: previousRows } = useLive(latestPatientNoteQuery(patientId), [patientId]);
+  const previous = previousRows?.[0] ?? null;
   const isConsult = CONSULT_NOTE_TYPES.includes(fields.type);
 
   const committing = useRef(false);
@@ -414,6 +416,17 @@ function NoteEditor({
 
         {useSoap ? (
           <>
+            {!isEdit && previous && !fields.assessment && !fields.plan && (previous.assessment || previous.plan) ? (
+              // Most of a progress note is yesterday's assessment and plan, revised.
+              // Copied only on request, into empty fields, and fully editable.
+              <Button
+                label="ادامه از نوت قبلی (Assessment و Plan)"
+                icon="copy-outline"
+                variant="ghost"
+                size="sm"
+                onPress={() => update({ assessment: previous.assessment, plan: previous.plan })}
+              />
+            ) : null}
             <Input
               label="Subjective"
               value={fields.subjective ?? ''}

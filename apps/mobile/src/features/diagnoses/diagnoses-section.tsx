@@ -3,13 +3,14 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
+import { PromptModal } from '@/components/prompt-modal';
 import { Badge, Button, Card, ChipSelect, Column, Input, Row, SectionHeader, Text } from '@/components/ui';
 import type { Diagnosis } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { useTheme } from '@/theme';
 
 import { DIAGNOSIS_KIND_LABELS, DIAGNOSIS_STATUS_LABELS } from './labels';
-import { addDiagnosis, deleteDiagnosis, patientDiagnosesQuery, setDiagnosisStatus } from './queries';
+import { addDiagnosis, deleteDiagnosis, patientDiagnosesQuery, setDiagnosisStatus, updateDiagnosis } from './queries';
 
 const KINDS: { value: Diagnosis['kind']; label: string }[] = (
   ['primary', 'secondary', 'rule_out', 'complication', 'past'] as const
@@ -40,6 +41,7 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
   const [title, setTitle] = useState('');
   const [chosenKind, setChosenKind] = useState<Diagnosis['kind'] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<Diagnosis | null>(null);
 
   const active = rows.filter((d) => d.status === 'active');
   const closed = rows.filter((d) => d.status !== 'active');
@@ -64,6 +66,7 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
 
   function askStatus(row: Diagnosis) {
     Alert.alert(row.title, undefined, [
+      { text: 'اصلاح متن', onPress: () => setEditing(row) },
       ...(row.status === 'active'
         ? [
             {
@@ -103,7 +106,10 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
           </View>
           <Button label="افزودن" icon="add" variant="secondary" onPress={() => void add()} loading={busy} />
         </Row>
-        {title.trim() ? <ChipSelect options={KINDS} value={kind} onChange={(v) => v && setChosenKind(v)} /> : null}
+        {/* Always visible, so the kind can be picked before typing: shown only while
+            typing, the chip needed a tap with the keyboard up, and a tap that only
+            closed the keyboard saved the default kind instead. */}
+        <ChipSelect options={KINDS} value={kind} onChange={(v) => v && setChosenKind(v)} />
 
         {rows.length === 0 && data !== undefined ? (
           <Text variant="tiny" color="textFaint" style={{ marginBottom: spacing.xs }}>
@@ -156,10 +162,25 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
 
         {rows.length > 0 ? (
           <Text variant="tiny" color="textFaint" style={{ color: colors.textFaint }}>
-            برای تغییر وضعیت روی تشخیص بزنید؛ برای حذف، نگه دارید.
+            برای اصلاح یا تغییر وضعیت روی تشخیص بزنید؛ برای حذف، نگه دارید.
           </Text>
         ) : null}
       </Column>
+
+      <PromptModal
+        visible={editing != null}
+        title="اصلاح تشخیص"
+        initialValue={editing?.title ?? ''}
+        submitLabel="ذخیره"
+        optional={false}
+        onCancel={() => setEditing(null)}
+        onSubmit={(text) => {
+          const row = editing;
+          setEditing(null);
+          if (row && text && text !== row.title)
+            void updateDiagnosis(row.id, { title: text }).catch((e) => alertError('اصلاح نشد', e));
+        }}
+      />
     </>
   );
 }

@@ -3,10 +3,15 @@ import { useState } from 'react';
 
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
-import { Button, ChipSelect, Column, Input, Screen, Text } from '@/components/ui';
+import { Button, Card, ChipSelect, Column, Input, Screen, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import type { Encounter, PatientStatus } from '@/db/schema';
+import { useLive } from '@/db/use-live';
+import { patientConsultsQuery } from '@/features/consults/queries';
 import { dischargeEncounter } from '@/features/encounters/queries';
+import { patientOrdersQuery } from '@/features/kardex/queries';
+import { taskCountQuery } from '@/features/tasks/queries';
+import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { DISCHARGE_TYPE_LABELS } from './labels';
@@ -26,9 +31,21 @@ const NEXT_STATUS_OPTIONS: { value: PatientStatus; label: string }[] = [
 
 /** Close an admission. Route params: `id` (patient), `encounterId`. */
 export function DischargeScreen() {
-  const { encounterId } = useLocalSearchParams<{ id: string; encounterId: string }>();
+  const { id: patientId, encounterId } = useLocalSearchParams<{ id: string; encounterId: string }>();
   const router = useRouter();
   const { spacing } = useTheme();
+
+  // What the discharge will do, and what it leaves open, said before it happens.
+  const { data: orders } = useLive(patientOrdersQuery(patientId, encounterId), [patientId, encounterId]);
+  const { data: openTasks } = useLive(taskCountQuery({ patientId, status: 'open' }), [patientId]);
+  const { data: consults } = useLive(patientConsultsQuery(patientId), [patientId]);
+  const endingOrders = (orders ?? []).filter(
+    (o) => o.encounterId === encounterId && (o.status === 'active' || o.status === 'held'),
+  ).length;
+  const stillOpenTasks = openTasks?.[0]?.total ?? 0;
+  const stillOpenConsults = (consults ?? []).filter(
+    ({ consult }) => consult.status === 'pending' || consult.status === 'requested',
+  ).length;
 
   const [dischargeType, setDischargeType] = useState<DischargeType>('improved');
   const [nextStatus, setNextStatus] = useState<PatientStatus>('discharged');
@@ -72,7 +89,7 @@ export function DischargeScreen() {
             options={NEXT_STATUS_OPTIONS}
             value={nextStatus}
             onChange={(v) => v && setNextStatus(v)}
-            hint="«ادامه‌ی پیگیری» بیمار را در صفحه‌ی امروز نگه می‌دارد"
+            hint="«ادامه‌ی پیگیری» بیمار را در فهرست «جاری» بیماران نگه می‌دارد. برای یادآور در «امروز»، بعد از ترخیص یک پیگیری با تاریخ ثبت کنید."
           />
         )}
 
@@ -96,6 +113,27 @@ export function DischargeScreen() {
         <Text variant="tiny" color="textFaint">
           برای خلاصه‌ی ترخیص کامل، بعد از ثبت یک نوت از نوع «خلاصه ترخیص» بنویسید.
         </Text>
+
+        {endingOrders + stillOpenTasks + stillOpenConsults > 0 ? (
+          <Card tone="alt">
+            <Column gap="xxs">
+              <Text variant="captionStrong">با ثبت ترخیص</Text>
+              {endingOrders > 0 ? (
+                <Text variant="caption">
+                  • {toPersianDigits(endingOrders)} دستور کاردکسِ این بستری «تمام‌شده» می‌شود.
+                </Text>
+              ) : null}
+              {stillOpenTasks > 0 ? (
+                <Text variant="caption">• {toPersianDigits(stillOpenTasks)} کار باز همچنان باز می‌ماند.</Text>
+              ) : null}
+              {stillOpenConsults > 0 ? (
+                <Text variant="caption">
+                  • {toPersianDigits(stillOpenConsults)} کانسالت بی‌پاسخ همچنان باز می‌ماند.
+                </Text>
+              ) : null}
+            </Column>
+          </Card>
+        ) : null}
 
         <Button
           label="ثبت ترخیص"

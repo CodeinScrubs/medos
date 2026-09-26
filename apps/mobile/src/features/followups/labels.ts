@@ -9,8 +9,9 @@ export const FOLLOWUP_CHANNEL_LABELS: Record<FollowUp['channel'], string> = {
   other: 'سایر',
 };
 
+/** Same order as a task's priority everywhere: most important first. */
 export const FOLLOWUP_PRIORITY_LABELS: Record<FollowUp['priority'], string> = {
-  low: 'کم',
-  normal: 'معمولی',
   high: 'مهم',
+  normal: 'معمولی',
+  low: 'کم',
 };

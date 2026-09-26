@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Column, Input, Row, Text } from '@/components/ui';
 import { useTheme } from '@/theme';
@@ -50,10 +50,24 @@ export function PromptModal({
     setText(visible ? initialValue : '');
   }
 
+  // Back and a tap outside the card are how a keyboard gets put away, too. With
+  // something typed, neither may throw the text away without asking; the
+  // «انصراف» button still cancels straight away.
+  function dismiss() {
+    if (!text.trim() || text === initialValue) {
+      onCancel();
+      return;
+    }
+    Alert.alert('نوشته دور ریخته شود؟', undefined, [
+      { text: 'ادامه‌ی نوشتن', style: 'cancel' },
+      { text: 'دور بریز', style: 'destructive', onPress: onCancel },
+    ]);
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismiss} statusBarTranslucent>
       <KeyboardAvoidingView behavior="padding" style={styles.flex}>
-        <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={onCancel}>
+        <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={dismiss}>
           <Pressable
             // Swallow taps on the card so they do not dismiss the dialog.
             onPress={() => {}}

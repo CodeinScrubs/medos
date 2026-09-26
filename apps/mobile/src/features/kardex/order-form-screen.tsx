@@ -9,6 +9,8 @@ import { Button, ChipSelect, Column, Input, Row, Screen, Text, Toggle } from '@/
 import { useDateValidation } from '@/components/use-date-validation';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { AllergyBanner } from '@/features/patients/patient-header';
+import { patientQuery } from '@/features/patients/queries';
 import { useTheme } from '@/theme';
 
 import { FREQUENCIES, ORDER_KIND_LABELS, ROUTES } from './labels';
@@ -50,6 +52,8 @@ function OrderForm({
   patientId: string;
   order: Order | null;
 }) {
+  const { data: patientRows } = useLive(patientQuery(patientId), [patientId]);
+  const patient = patientRows?.[0];
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
   const isEdit = order != null;
@@ -131,6 +135,10 @@ function OrderForm({
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
+        {/* The allergy line where the order is written, not only on the record's
+            header. Shown, never checked: matching a drug to an allergy class is a
+            clinical rule that would need its own validation (invariant 10). */}
+        {patient?.allergies ? <AllergyBanner text={patient.allergies} /> : null}
         <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
 
         <Column gap="xs">

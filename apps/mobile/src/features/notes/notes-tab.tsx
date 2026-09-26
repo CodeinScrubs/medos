@@ -50,7 +50,13 @@ export function NotesTab({ patientId }: { patientId: string }) {
         icon="add"
         variant="secondary"
         full
-        onPress={() => router.push({ pathname: '/patient/[id]/note', params: { id: patientId } })}
+        onPress={() =>
+          router.push({
+            pathname: '/patient/[id]/note',
+            // A patient's first note is almost always the history; after that, a progress note.
+            params: { id: patientId, ...(data !== undefined && notes.length === 0 ? { type: 'admission' } : {}) },
+          })
+        }
       />
 
       {notes.length === 0 ? (

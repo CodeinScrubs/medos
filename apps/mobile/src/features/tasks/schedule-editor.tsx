@@ -8,7 +8,7 @@ import { useNow } from '@/components/use-now';
 import type { Task, TaskScheduleDraft } from '@/db/schema';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { formatJalaliDateTime } from '@/lib/jalali';
-import { addDays } from '@/lib/time';
+import { addDays, formatClock } from '@/lib/time';
 
 import { taskQuery } from './queries';
 import { reconcileTaskReminder } from './reminder-queries';
@@ -160,18 +160,20 @@ function ScheduleEditor({
       <Toggle label="موعد دارد" value={fields.hasDue} disabled={busy} onChange={(hasDue) => change({ hasDue })} />
       {fields.hasDue ? (
         <>
+          {/* The usual deadlines in one tap each: a repeat level in an hour or
+              six, a job for the morning round, or later in the week. */}
           <ChipSelect<string>
             value={null}
             options={[
-              { value: '0', label: 'امروز' },
-              { value: '1', label: 'فردا' },
-              { value: '3', label: '۳ روز' },
+              { value: '+1h', label: '۱ ساعت بعد' },
+              { value: '+6h', label: '۶ ساعت بعد' },
+              { value: 'morning', label: 'فردا ۸ صبح' },
+              { value: '+3d', label: '۳ روز بعد' },
             ]}
             onChange={(value) => {
-              if (value)
-                change({
-                  dateText: scheduleDateText(addDays(new Date(now), value === '0' ? 0 : value === '1' ? 1 : 3)),
-                });
+              if (!value) return;
+              const at = quickDue(value, new Date(now));
+              change({ dateText: scheduleDateText(at), clockText: formatClock(at) });
             }}
           />
           <Input
@@ -312,4 +314,14 @@ function ScheduleEditor({
       ) : null}
     </Column>
   );
+}
+
+function quickDue(choice: string, now: Date): Date {
+  if (choice === '+1h') return new Date(now.getTime() + 3_600_000);
+  if (choice === '+6h') return new Date(now.getTime() + 6 * 3_600_000);
+  if (choice === 'morning') {
+    const tomorrow = addDays(now, 1);
+    return new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 8, 0);
+  }
+  return addDays(now, 3);
 }
