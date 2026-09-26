@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
-import { encounters, labValues, notes, orders, patients } from '@/db/schema';
+import { auditLog, encounters, labValues, notes, orders, patients } from '@/db/schema';
 import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -300,6 +300,25 @@ describe('deleting an episode', () => {
     // The one the patient is actually in still decides.
     expect(await patientStatus()).toBe('admitted');
     expect((await t.db.select().from(encounters)).find((e) => e.id === second)?.isActive).toBe(true);
+  });
+
+  // A discharge used to be written to the audit log as a deletion, and a real
+  // deletion was not written at all.
+  it('audits a discharge as a discharge and a deletion as a deletion', async () => {
+    const discharged = await openEncounter({ patientId, kind: 'admission' });
+    await dischargeEncounter(discharged, {
+      dischargedAt: new Date(),
+      dischargeType: 'improved',
+      nextStatus: 'followup',
+    });
+    const mistaken = await openEncounter({ patientId, kind: 'admission' });
+    await deleteEncounter(mistaken);
+
+    const entries = await t.db.select().from(auditLog);
+    expect(entries.map((e) => [e.action, e.entityId])).toEqual([
+      ['encounter.discharged', discharged],
+      ['encounter.deleted', mistaken],
+    ]);
   });
 });
 

@@ -19,6 +19,7 @@ import {
   type Encounter,
   type PatientStatus,
 } from '@/db/schema';
+import { refreshPatientSearchText } from '@/features/patients/search-index';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { statusAfterDischarge, statusForEncounterKind } from './logic';
@@ -136,6 +137,9 @@ export async function openEncounter(input: EncounterInput): Promise<string> {
       .set({ status: statusForEncounterKind(input.kind), ...touch(now) })
       .where(eq(patients.id, input.patientId))
       .run();
+
+    // Ward and bed are searchable while the patient is in them.
+    refreshPatientSearchText(input.patientId, tx);
   });
 
   return id;
@@ -167,6 +171,8 @@ export async function updateEncounter(id: string, patch: Partial<Omit<EncounterI
         .where(eq(patients.id, current.patientId))
         .run();
     }
+
+    refreshPatientSearchText(current.patientId, tx);
   });
 }
 
@@ -207,8 +213,11 @@ export async function dischargeEncounter(id: string, input: DischargeInput): Pro
       .set({ status: statusAfterDischarge(input.dischargeType, input.nextStatus), ...touch(now) })
       .where(eq(patients.id, current.patientId))
       .run();
+
+    // The bed they left no longer finds them.
+    refreshPatientSearchText(current.patientId, tx);
   });
-  await audit('encounter.deleted', { entityType: 'encounter', entityId: id });
+  await audit('encounter.discharged', { entityType: 'encounter', entityId: id });
 }
 
 /** The encounter has notes, orders or results filed under it; see `deleteEncounter`. */
@@ -280,5 +289,7 @@ export async function deleteEncounter(id: string): Promise<void> {
       .set({ status: statusFor(other ?? null, 'outpatient'), ...touch(now) })
       .where(eq(patients.id, current.patientId))
       .run();
+    refreshPatientSearchText(current.patientId, tx);
   });
+  await audit('encounter.deleted', { entityType: 'encounter', entityId: id });
 }

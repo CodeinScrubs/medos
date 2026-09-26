@@ -81,7 +81,7 @@ export function PatientListScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="نام، کد ملی، شماره پرونده…"
+            placeholder="نام، پرونده، تشخیص یا تخت…"
             placeholderTextColor={colors.textFaint}
             selectionColor={colors.primary}
             returnKeyType="search"
@@ -141,7 +141,7 @@ export function PatientListScreen() {
             description={
               search
                 ? tab === 'all'
-                  ? 'جستجو را کوتاه‌تر کنید؛ نام، کد ملی یا شماره پرونده.'
+                  ? 'جستجو را کوتاه‌تر کنید؛ نام، کد ملی، شماره پرونده، تشخیص یا تخت.'
                   : 'جستجو را کوتاه‌تر کنید یا فیلتر وضعیت را بردارید.'
                 : tab === 'all'
                   ? 'بیمار تازه را با دکمه‌ی + اضافه کنید. ترخیص‌شده‌ها با جستجو یا چیپ‌های بالا پیدا می‌شوند.'

@@ -11,6 +11,7 @@ import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
 
 import { patientSearchText } from './logic';
+import { patientSearchContext } from './search-index';
 
 /** Rows the user has deleted are excluded from every list in the app. */
 const alive = isNull(patients.deletedAt);
@@ -139,7 +140,7 @@ export async function updatePatient(id: string, input: Partial<PatientInput>): P
       status,
       ...touch(),
       phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
-      searchText: patientSearchText(merged),
+      searchText: patientSearchText(merged, patientSearchContext(id)),
     })
     .where(and(alive, eq(patients.id, id)));
 }
@@ -209,7 +210,7 @@ export async function reindexPatients(): Promise<number> {
   let changed = 0;
   db.transaction((tx) => {
     for (const p of rows) {
-      const next = patientSearchText(p);
+      const next = patientSearchText(p, patientSearchContext(p.id, tx));
       if (next === p.searchText) continue;
       tx.update(patients).set({ searchText: next }).where(eq(patients.id, p.id)).run();
       changed += 1;

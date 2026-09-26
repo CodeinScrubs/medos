@@ -16,6 +16,7 @@ export type AuditAction =
   | 'vital.deleted'
   | 'diagnosis.updated'
   | 'diagnosis.deleted'
+  | 'encounter.discharged'
   | 'encounter.deleted'
   | 'note.deleted'
   | 'note.restored'

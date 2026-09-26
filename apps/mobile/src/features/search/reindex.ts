@@ -26,7 +26,7 @@ import { reindexCredentials } from '@/features/vault/queries';
  * mismatch triggers a rebuild, including a stored version newer than this
  * build's — a backup from a newer build restored into this one.
  */
-export const SEARCH_INDEX_VERSION = 2;
+export const SEARCH_INDEX_VERSION = 3;
 
 const indexedVersion = defineSetting('search.indexVersion', z.number().int().min(0), 0);
 

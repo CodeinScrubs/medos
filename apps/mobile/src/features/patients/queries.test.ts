@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { auditLog, followUps, patients } from '@/db/schema';
+import { addDiagnosis, deleteDiagnosis, updateDiagnosis } from '@/features/diagnoses/queries';
+import { dischargeEncounter, openEncounter, updateEncounter } from '@/features/encounters/queries';
 import { createFollowUp } from '@/features/followups/queries';
 import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications, scheduled } from '@/test/mocks/notifications';
@@ -79,6 +81,39 @@ describe('patient search', () => {
     expect(await findPossibleDuplicates(`عل${ARABIC_YEH}`, 'رضایی')).toHaveLength(1);
     expect(await findPossibleDuplicates('نام دیگر', 'کسی', '0000000019')).toHaveLength(1);
     expect(await findPossibleDuplicates('کسی', 'دیگر')).toEqual([]);
+  });
+
+  /*
+   * On a ward a patient is "the CHF in bed 12" as often as a name. Both live
+   * outside the patient row, so the index follows diagnoses and episodes.
+   */
+  it('finds a patient by a problem on their list and by the bed they are in', async () => {
+    const [maryam] = await patientListQuery({ search: 'مریم' });
+    const id = maryam!.id;
+    const diagnosis = await addDiagnosis({ patientId: id, title: 'Cellulitis of left leg' });
+    expect(await listNames('cellulitis')).toEqual(['مریم کریمی']);
+
+    await updateDiagnosis(diagnosis, { title: 'Erysipelas' });
+    expect(await listNames('cellulitis')).toEqual([]);
+    expect(await listNames('erysipelas')).toEqual(['مریم کریمی']);
+
+    const stay = await openEncounter({ patientId: id, kind: 'admission', ward: 'داخلی ۲', bed: '۱۲' });
+    // Typed with the Persian keyboard's digits, found with either.
+    expect(await listNames('تخت 12')).toEqual(['مریم کریمی']);
+    expect(await listNames('داخلی ۲ ۱۲')).toEqual(['مریم کریمی']);
+    await updateEncounter(stay, { bed: '7' });
+    expect(await listNames('تخت 12')).toEqual([]);
+    expect(await listNames('تخت 7')).toEqual(['مریم کریمی']);
+
+    // Editing the patient keeps what the other tables contributed.
+    await updatePatient(id, { summary: 'DM' });
+    expect(await listNames('erysipelas تخت 7')).toEqual(['مریم کریمی']);
+
+    // A bed they left, or a problem deleted by mistake, no longer finds them.
+    await dischargeEncounter(stay, { dischargedAt: new Date(), dischargeType: 'improved', nextStatus: 'followup' });
+    expect(await listNames('تخت 7')).toEqual([]);
+    await deleteDiagnosis(diagnosis);
+    expect(await listNames('erysipelas')).toEqual([]);
   });
 
   it('repairs a stale search index', async () => {

@@ -4,6 +4,7 @@ import { audit } from '@/db/audit';
 import { db } from '@/db/client';
 import { diagnoses, type Diagnosis } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { refreshPatientSearchText } from '@/features/patients/search-index';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 /*
@@ -71,6 +72,8 @@ export async function addDiagnosis(input: DiagnosisInput): Promise<string> {
     notes: input.notes?.trim() || null,
     sortOrder: input.sortOrder ?? (last?.sortOrder ?? 0) + 1,
   });
+  // A patient is found by their problems too ("CHF", "cellulitis").
+  refreshPatientSearchText(input.patientId);
   return id;
 }
 
@@ -88,6 +91,7 @@ export async function updateDiagnosis(id: string, patch: Omit<Partial<DiagnosisI
       ...touch(),
     })
     .where(and(alive, eq(diagnoses.id, id)));
+  refreshPatientSearchText(current.patientId);
   await audit('diagnosis.updated', { entityType: 'diagnosis', entityId: id });
 }
 
@@ -102,10 +106,12 @@ export async function setDiagnosisStatus(id: string, status: Diagnosis['status']
 }
 
 export async function deleteDiagnosis(id: string): Promise<void> {
+  const current = (await diagnosisQuery(id))[0];
   await db
     .update(diagnoses)
     .set(softDelete())
     .where(and(alive, eq(diagnoses.id, id)));
+  if (current) refreshPatientSearchText(current.patientId);
   await audit('diagnosis.deleted', { entityType: 'diagnosis', entityId: id });
 }
 

@@ -5,6 +5,17 @@ import { buildSearchText, normalizePhone } from '@/lib/persian';
 import { SEX_LABELS } from './labels';
 
 /**
+ * What else someone types to find a patient on a ward: the problems on their
+ * list ("CHF", "cellulitis") and where they lie now (ward, service, bed).
+ * These live in other tables, so `features/patients/search-index.ts` reads
+ * them and rebuilds the index whenever a diagnosis or an episode changes.
+ */
+export type PatientSearchContext = {
+  diagnoses?: readonly string[];
+  location?: readonly (string | null | undefined)[];
+};
+
+/**
  * The `searchText` index for a patient: every field someone might type to find
  * them. Rebuilt from the full merged row on every write — never from a partial
  * patch, or editing one field would drop the others from the index. The phone
@@ -15,6 +26,7 @@ export function patientSearchText(
   p: Partial<
     Pick<Patient, 'firstName' | 'lastName' | 'nationalId' | 'fileNumber' | 'phone' | 'summary' | 'city' | 'tags'>
   >,
+  context: PatientSearchContext = {},
 ): string {
   return buildSearchText(
     p.firstName,
@@ -25,6 +37,8 @@ export function patientSearchText(
     p.summary,
     p.city,
     p.tags ?? undefined,
+    [...(context.diagnoses ?? [])],
+    (context.location ?? []).filter((part): part is string => Boolean(part?.trim())),
   );
 }
 
