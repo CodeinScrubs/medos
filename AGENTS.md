@@ -145,7 +145,8 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
 - **The app draws edge to edge.** Anything anchored to the bottom of the window — a tab
   bar, a fixed footer, the last row of a scroll view — must add `useSafeAreaInsets().bottom`
   (or let `SafeAreaView` consume that edge), or Android's navigation bar sits on top of it
-  and swallows the taps. `Screen` already does this for scrolling content. A hardcoded
+  and swallows the taps. `Screen` ends at the navigation bar by itself; a tab's root screen
+  passes `tabRoot`, because the tab bar already sits above it. A hardcoded
   `height`/`paddingBottom` on a navigator's `tabBarStyle` overrides what React Navigation
   would have added: that is how the 0.2.1 tab bar ended up under the three-button bar.
 - Persian UI strings live inline in the component. There is no i18n layer.

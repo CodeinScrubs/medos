@@ -33,6 +33,68 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-26 (review) — A physician's walk-through, checked claim by claim (0.9.2)
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** 09d4cb7, a5a9d3c, 33a2f58, 82ef99c, 04363cc, and this one (0.9.2)
+
+The owner had another AI use 0.9.1 on the emulator as a physician would (fabricated
+patients, three-button navigation) and asked for its 20 claims to be checked. Each was
+checked against the code, and the fixed ones again on the emulator.
+
+**Confirmed and fixed**
+- P0 lab "5,8" stored silently → refused by name at entry; old ones shown red "?".
+- P0 troponin/CK-MB/NT-proBNP/Mg/uric acid have no reference range → "∅" + legend in
+  the flowsheet, "no ref range" at entry. No ranges were invented (assay-specific).
+- P0 same-name patients indistinguishable → age • sex • file number in pickers,
+  duplicate warning, delete confirmation (`patientIdentity`).
+- P1 SpO2 150 accepted → physical-possibility limits per vital (not normal ranges).
+- P1 no allergy on the order form → the allergy banner is shown there (no checking).
+- P1 Today missed patients' due tasks → «کارهای موعددار بیماران».
+- P1 buttons under the three-button bar → `Screen` ends at the navigation bar
+  (`tabRoot` for Today/More). Also seen on the owner's phone.
+- P1 one tap closes a task irreversibly → undo bar for 8 s (`components/undo-toast.tsx`).
+- P1 discharge silent / misleading hint → consequences listed beforehand; hint corrected.
+- P1 first note defaults to progress → «شرح حال» when the patient has none; «ادامه از نوت
+  قبلی» copies the last A/P into empty fields.
+- P2 Back or outside tap discards typed text in one-line dialogs → asks first.
+- P2 priority order reversed between task and follow-up → both high → low.
+- P2 due time takes 7 steps → quick chips (+1 h, +6 h, tomorrow 08:00, +3 d).
+- P2 shift assumes night, manual → wording neutral; «افزودن همه‌ی بستری‌ها».
+- P2 diagnosis typo needs delete; «رد شود/رد شد» confusing → «اصلاح متن»; kind is «R/O».
+  The low-confidence "R/O saved as همراه" matches a regression of mine (kind chips shown
+  only while typing, i.e. with the keyboard up); the chips are always visible again.
+- P2 no backup prompt → a card on Today when there is no backup or it is stale.
+
+**Checked and not changed**
+- Abnormal vitals uncoloured, no allergy/drug check: deliberate (records, does not advise;
+  invariant 10 needs a sourced, reviewed rule per tool).
+- Search: the one-line summary *is* searched; diagnoses and ward/bed are not (open).
+- Kardex has suggestions from earlier orders (2+ letters) — claim was wrong.
+- "Remove Ideas", merge task/follow-up, change the tabs: owner decisions, not changed.
+- Clinical summary page (W04), discharge checklist, timeline lab values, note-type
+  strip, FLAG_SECURE for Recents, discharged patients left in a shift: open.
+- Dark-mode white navigation bar: not seen on the owner's phone.
+
+**Verified**
+- `npm run check` green (62 suites / 733 tests + 3 workflow).
+- Emulator, x86_64 build of this source over the other AI's fabricated data: flowsheet
+  "?" and "∅"; lab save refused with the analyte named; allergy banner on the order form;
+  due task on Today; tick → undo restores it; one-line dialog asks before discarding;
+  picker shows age • sex; content stops at the navigation bar; backup card on Today.
+
+**Not verified**
+- 0.9.2 on the phone (not connected). Discharge consequences card, «اصلاح متن», note
+  continuation, «افزودن همه‌ی بستری‌ها» and the vitals limits were checked by tests and
+  typecheck, not by eye.
+- `adb shell input keyevent 4` did not reach MedOS on the emulator in three-button mode
+  (the on-screen Back did; system apps got the key). On the phone the key worked on 0.9.1.
+
+**Open threads**
+- Install 0.9.2 on the phone and walk: lab entry with a comma, a task tick + undo, the
+  order-form banner, discharge of a test admission, Back on the task screen.
+- W04 patient summary; search by diagnosis and ward; discharge checklist.
+
 ## 2026-09-26 (phone) — 0.9.1 on the owner's phone: backups fixed, upgrade from 0.6.0 checked
 
 **Agent:** claude-opus-5-5 via Claude Code
