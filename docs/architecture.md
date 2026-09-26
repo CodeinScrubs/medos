@@ -607,7 +607,15 @@ list reads it on focus, parses who and when from the dialer's file name, and one
 a recording into MedOS's media storage and writes a «پیگیری تلفنی» note dated at the call,
 with the audio attached, in one transaction after the copy. The copy means backups carry
 it and deleting it from the dialer's folder loses nothing. Today counts the last two days'
-recordings not yet filed. Any single audio file can be filed the same way.
+recordings not yet filed. Any single audio file can be filed the same way, and MedOS is in
+Android's share menu for audio (`plugins/with-share-target.js`): the recorder the owner uses,
+Cube ACR, keeps its recordings in private storage, so «اشتراک‌گذاری» → MedOS → patient is how
+they arrive. The share becomes a `medos://calls?shared=<hex URI>` link before React starts; a
+file from another app's provider is copied through the content resolver.
+
+Recording inside MedOS was looked at again when the owner offered an accessibility service:
+it would capture the same microphone Cube does, so the other side would sound no better — the
+far end of a call is not available to any app that is not part of the system.
 
 **Rejected:** recording inside MedOS (not possible with a real call), reading the dialer's
 folder through broad storage permissions (`READ_MEDIA_AUDIO` reads every recording on the

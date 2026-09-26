@@ -83,7 +83,8 @@
       "./plugins/with-android-build-tuning",
       "./plugins/with-dev-variant",
       "./plugins/with-system-bars",
-      "./plugins/with-app-shortcuts"
+      "./plugins/with-app-shortcuts",
+      "./plugins/with-share-target"
     ],
     "experiments": {
       "typedRoutes": true,

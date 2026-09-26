@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { copyAsync } from 'expo-file-system/legacy';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { newId } from '@/lib/ids';
@@ -84,10 +85,28 @@ export async function storeFile(
   const dest = mediaFile(relativePath);
 
   if (move) await source.move(dest);
-  else await source.copy(dest);
+  else await copyInto(source, sourceUri, dest);
 
   const stored = mediaFile(relativePath);
   return { relativePath, sizeBytes: stored.exists ? stored.size : null };
+}
+
+/**
+ * Copy a file into app storage. The file API copies only what it can open as
+ * a file — a local path or a storage-access-framework document. A file shared
+ * from another app (a call recorder's «اشتراک‌گذاری») is a plain content URI of
+ * that app's provider, which it refuses ("Source must be a file"); for that the
+ * legacy copy streams it through the content resolver instead.
+ */
+async function copyInto(source: File, sourceUri: string, dest: File): Promise<void> {
+  try {
+    await source.copy(dest);
+  } catch (error) {
+    if (!sourceUri.startsWith('content://')) throw error;
+    // The URI exactly as it arrived: `File` normalises a content URI's path
+    // ("primary%3ARecordings" → "primary:Recordings"), which its provider rejects.
+    await copyAsync({ from: sourceUri, to: dest.uri });
+  }
 }
 
 export type StoredPhoto = StoredFile & {

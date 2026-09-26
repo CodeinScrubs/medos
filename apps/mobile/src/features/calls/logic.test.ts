@@ -1,6 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { isRecordingFile, parseRecordingName, recordingKey, recordingMimeType, unfiledRecentCount } from './logic';
+import {
+  decodeSharedUri,
+  isRecordingFile,
+  parseRecordingName,
+  recordingKey,
+  recordingMimeType,
+  unfiledRecentCount,
+} from './logic';
 
 const MODIFIED = new Date(2026, 8, 30, 9, 0, 0);
 
@@ -61,5 +68,20 @@ describe('call recording files', () => {
       'notes.txt',
     ];
     expect(unfiledRecentCount(names, new Set([recordingKey(names[1]!)]), now)).toBe(2);
+  });
+});
+
+describe('a shared file’s URI in the share link', () => {
+  const hex = (text: string) => [...text].map((ch) => ch.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+
+  it('comes back exactly, its own escapes untouched', () => {
+    const uri = 'content://com.android.externalstorage.documents/document/primary%3ARecordings%2FCall%2FA%20B.wav';
+    expect(decodeSharedUri(hex(uri))).toBe(uri);
+  });
+
+  it('refuses anything that is not what the share link sends', () => {
+    expect(decodeSharedUri('content://x')).toBeNull();
+    expect(decodeSharedUri('abc')).toBeNull();
+    expect(decodeSharedUri(null)).toBeNull();
   });
 });

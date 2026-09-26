@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable } from 'react-native';
 
@@ -17,7 +17,8 @@ import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName, joinLabels } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
-import { chooseCallsFolder, listRecordings, pickRecordingFile } from './folder';
+import { chooseCallsFolder, describeShared, listRecordings, pickRecordingFile } from './folder';
+import { decodeSharedUri } from './logic';
 import { fileCallRecording, type CallRecording } from './queries';
 import { callsFiled, callsFolderUri } from './settings';
 
@@ -42,6 +43,25 @@ export function CallsScreen() {
   const [busy, setBusy] = useState(false);
 
   const folderUri = folder.value;
+
+  // A recording shared from another app (a call recorder's «اشتراک‌گذاری» → MedOS)
+  // arrives as ?shared=<uri>&name=<file name>: go straight to choosing the patient.
+  const { shared, name } = useLocalSearchParams<{ shared?: string; name?: string }>();
+  const [handledShare, setHandledShare] = useState<string | null>(null);
+  const incoming = useMemo(() => {
+    const uri = shared && shared !== handledShare ? decodeSharedUri(shared) : null;
+    return uri ? describeShared(uri, name, new Date()) : null;
+  }, [shared, name, handledShare]);
+  const pending = filing ?? incoming;
+
+  /** Done with whatever the picker was showing; a share is answered once. */
+  function closePicker() {
+    setFiling(null);
+    if (incoming && shared) {
+      setHandledShare(shared);
+      router.setParams({ shared: undefined, name: undefined });
+    }
+  }
   useFocusEffect(
     useCallback(() => {
       setRecordings(folderUri ? listRecordings(folderUri) : undefined);
@@ -144,14 +164,14 @@ export function CallsScreen() {
       </Column>
 
       <PickerModal
-        visible={filing != null && !busy}
+        visible={pending != null && !busy}
         title="این تماس با کدام بیمار بود؟"
         items={patientItems}
         emptyText="بیماری نیست. اول بیمار را بسازید."
-        onClose={() => setFiling(null)}
+        onClose={closePicker}
         onSelect={(item) => {
-          const recording = filing;
-          setFiling(null);
+          const recording = pending;
+          closePicker();
           if (recording) void file(item.id, recording);
         }}
       />
@@ -183,13 +203,13 @@ function Setup({
         <Row gap="sm">
           <Ionicons name="call-outline" size={20} color={colors.primary} />
           <Text variant="subheading" style={{ flex: 1 }}>
-            {lost ? 'پوشه‌ی ضبط تماس‌ها باز نشد' : 'ضبط تماس، با اپ «تلفن»'}
+            {lost ? 'پوشه‌ی ضبط تماس‌ها باز نشد' : 'ضبط تماس'}
           </Text>
         </Row>
         <Text variant="body" color="textMuted">
           {lost
             ? 'دسترسی به پوشه از دست رفته (مثلاً بعد از بازگردانی روی گوشی دیگر). دوباره انتخابش کنید.'
-            : 'اندروید ضبط تماس را فقط به اپ «تلفن» گوشی یا به اپ‌های ضبط تماس می‌دهد؛ MedOS خودش تماس را ضبط نمی‌کند، ضبط‌های آن‌ها را به پرونده می‌آورد. اگر اپ «تلفن» گوشی «ضبط تماس‌ها» دارد، روشنش کنید (ضبط‌ها در Recordings/Call می‌آیند)؛ اگر ندارد — سامسونگ آن را برای بعضی کشورها برداشته — یک اپ ضبط تماس لازم است. بعد از اولین تماسِ ضبط‌شده، پوشه‌ی ضبط‌ها را اینجا انتخاب کنید.'}
+            : 'اندروید ضبط تماس را فقط به اپ «تلفن» گوشی یا به اپ‌های ضبط تماس می‌دهد؛ MedOS خودش تماس را ضبط نمی‌کند، ضبط‌های آن‌ها را به پرونده می‌آورد. اگر اپ «تلفن» گوشی «ضبط تماس‌ها» دارد، روشنش کنید (ضبط‌ها در Recordings/Call می‌آیند)؛ اگر ندارد — سامسونگ آن را برای بعضی کشورها برداشته — یک اپ ضبط تماس لازم است. بعد از اولین تماسِ ضبط‌شده، پوشه‌ی ضبط‌ها را اینجا انتخاب کنید. اگر اپ ضبط، ضبط‌ها را پیش خودش نگه می‌دارد (مثل Cube ACR)، هر ضبط را از همان اپ «اشتراک‌گذاری» کنید و MedOS را انتخاب کنید.'}
         </Text>
         {lost ? null : (
           <Text variant="caption" color="textFaint">

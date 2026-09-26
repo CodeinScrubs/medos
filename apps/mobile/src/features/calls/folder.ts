@@ -87,3 +87,29 @@ export function listRecordingNames(folderUri: string): string[] | null {
     return null;
   }
 }
+
+/**
+ * A recording shared to MedOS from another app (plugins/with-share-target.js).
+ * The provider's own file name carries the time when the recorder put it
+ * there; without one, the call is taken as just now — it is shared right after.
+ */
+export function describeShared(uri: string, name: string | null | undefined, now: Date): CallRecording {
+  let sizeBytes: number | null = null;
+  let fileName = name?.trim() || '';
+  try {
+    const file = new File(uri);
+    sizeBytes = file.size ?? null;
+    if (!fileName) fileName = file.name;
+  } catch {
+    // The copy will say so if the file cannot be read; the list only needs a label.
+  }
+  const parsed = parseRecordingName(fileName || 'recording.m4a', now);
+  return {
+    uri,
+    name: fileName || 'recording.m4a',
+    sizeBytes,
+    recordedAt: parsed.recordedAt,
+    who: parsed.who,
+    key: recordingKey(fileName || uri),
+  };
+}

@@ -149,3 +149,16 @@ export function unfiledRecentCount(
 
 /** Samsung's dialer keeps call recordings here; the folder picker starts there. */
 export const CALL_FOLDER_HINT = 'content://com.android.externalstorage.documents/document/primary%3ARecordings%2FCall';
+
+/**
+ * The shared file's URI as the share link carries it: hex of its UTF-8
+ * bytes (see plugins/with-share-target.js). Null for anything that is not.
+ */
+export function decodeSharedUri(hex: string | null | undefined): string | null {
+  if (!hex || hex.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(hex)) return null;
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  // Content URIs are ASCII (their own escapes included); anything else is not one.
+  if (bytes.some((b) => b > 0x7e || b < 0x20)) return null;
+  return String.fromCharCode(...bytes);
+}
