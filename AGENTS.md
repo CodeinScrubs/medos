@@ -145,8 +145,8 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
 - **The app draws edge to edge.** Anything anchored to the bottom of the window — a tab
   bar, a fixed footer, the last row of a scroll view — must add `useSafeAreaInsets().bottom`
   (or let `SafeAreaView` consume that edge), or Android's navigation bar sits on top of it
-  and swallows the taps. `Screen` ends at the navigation bar by itself; a tab's root screen
-  passes `tabRoot`, because the tab bar already sits above it. A hardcoded
+  and swallows the taps. `Screen` and `Fab` end at the navigation bar by themselves; on a
+  tab's root screen both take `tabRoot`, because the tab bar already sits above it. A hardcoded
   `height`/`paddingBottom` on a navigator's `tabBarStyle` overrides what React Navigation
   would have added: that is how the 0.2.1 tab bar ended up under the three-button bar.
 - Persian UI strings live inline in the component. There is no i18n layer.
@@ -184,7 +184,8 @@ misses, a backup that cannot be opened a year from now.
   builds are a separate app id so they can never trigger the uninstall-wipes-data prompt;
   release signing comes from `<repo>/private/keystore.properties`, which is gitignored and
   must never be committed. `android/` is generated — anything that must survive
-  `prebuild --clean` belongs in a config plugin.
+  `prebuild --clean` belongs in a config plugin (`plugins/`: signing, build tuning, the dev
+  variant, and `with-system-bars` for the Recents thumbnail and the navigation bar's theme).
 - **The repository is public.** No patient data, no keys, and no personal details of the
   owner (city, workplace, local phone prefixes) in code, tests, comments or commits.
 - **`npm run apk` takes minutes.** A clean `android/` is a ~14-minute build; an incremental

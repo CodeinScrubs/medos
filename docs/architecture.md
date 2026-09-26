@@ -273,6 +273,11 @@ editing a phone number wipes the name out of the index. When the folding rules o
 indexed fields change, `SEARCH_INDEX_VERSION` is bumped and every row is re-indexed once at
 the next launch (also after restoring a backup made under a different version).
 
+A patient's index also carries what lives in other tables but is how they are remembered on
+a ward: every live diagnosis, and the open episode's ward, service and bed (as `تخت 12`, so a
+bare `12` does not match every national id). `features/patients/search-index.ts` rebuilds it
+whenever a diagnosis or an episode is written, inside the same transaction where there is one.
+
 **Rejected: SQLite FTS5.** Better ranking, but it needs its own virtual table, triggers,
 and a second migration path, and it does not solve the normalisation problem on its own.
 For a personal dataset of hundreds to a few thousand rows, a scan is instant.
@@ -542,6 +547,11 @@ app-private storage that the owner can read and share from Settings. Everything 
 through `redactErrorText` first: drizzle puts a failed query's parameter values into its
 error message, and those can be a patient's name or national id. Nothing is ever sent
 anywhere automatically.
+
+The same concern covers what Android shows outside the app. Since 0.10.0 the Recents screen
+gets no screenshot of MedOS on Android 13 and later (`plugins/with-system-bars.js`); its
+thumbnail used to be whatever record was last open. Screenshots stay allowed, which is why
+this is not `FLAG_SECURE`: that would have blocked them as well.
 
 ---
 

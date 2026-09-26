@@ -23,6 +23,13 @@ import { ThemeProvider, useTheme } from '@/theme';
 /** A screen that throws renders this instead of taking the whole app down. */
 export { RouteErrorBoundary as ErrorBoundary } from '@/features/diagnostics/error-boundary';
 
+/**
+ * A screen opened straight from outside — a home-screen shortcut, a link —
+ * gets the tabs underneath it. Without them «ثبت سریع» opened from the app
+ * icon was the only screen: saving tried to go back to nothing and stayed put.
+ */
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 installGlobalErrorLogging();
 void SplashScreen.preventAutoHideAsync();
 
