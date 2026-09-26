@@ -22,7 +22,6 @@ import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
 import { computeFlag, FLAG_LABEL, flagTone, formatRange, parseLabValue, parseRangeInput } from './flags';
-
 import { isUnreadableNumber, parsePastedTable } from './logic';
 import { analyteDef, LAB_PRESETS, rangeFor } from './presets';
 import { createLabPanel, labPanelQuery, panelValuesQuery, updateLabPanel } from './queries';
