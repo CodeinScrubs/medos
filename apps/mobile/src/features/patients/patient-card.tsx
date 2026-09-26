@@ -5,6 +5,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { Avatar, Badge, Card, Column, Row, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
 import { formatAge, formatRelativeTime } from '@/lib/jalali';
+import { joinLabels } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { PATIENT_STATUS, SEX_LABELS } from './labels';
@@ -23,9 +24,7 @@ export function PatientCard({ patient, location }: { patient: Patient; location?
 
   // Ward and bed come first for someone on a ward: on a round it is the field
   // that decides where to walk next, and looking it up meant opening the file.
-  const meta = [location, age !== '—' ? age : null, patient.sex ? SEX_LABELS[patient.sex] : null]
-    .filter(Boolean)
-    .join(' • ');
+  const meta = joinLabels([location, age !== '—' ? age : null, patient.sex ? SEX_LABELS[patient.sex] : null]);
 
   return (
     <Link href={{ pathname: '/patient/[id]', params: { id: patient.id } }} asChild>

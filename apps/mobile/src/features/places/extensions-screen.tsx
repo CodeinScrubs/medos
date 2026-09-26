@@ -10,7 +10,7 @@ import type { Extension, Place } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { callExtension, copyExtension } from '@/features/places/actions';
 import { deleteExtension, extensionsQuery, setExtensionStarred } from '@/features/places/queries';
-import { toPersianDigits } from '@/lib/persian';
+import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
 /**
@@ -112,9 +112,11 @@ function ExtensionRow({ extension, place }: { extension: Extension; place: Place
               </Text>
             </Row>
             <Text variant="caption" color="textMuted" numberOfLines={1}>
-              {place.name}
-              {extension.floor ? ` • طبقه ${toPersianDigits(extension.floor)}` : ''}
-              {extension.contactPerson ? ` • ${extension.contactPerson}` : ''}
+              {joinLabels([
+                place.name,
+                extension.floor ? `طبقه ${toPersianDigits(extension.floor)}` : null,
+                extension.contactPerson,
+              ])}
             </Text>
             {extension.notes ? (
               <Text variant="tiny" color="textFaint" numberOfLines={2}>

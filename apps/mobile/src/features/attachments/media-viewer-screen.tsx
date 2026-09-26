@@ -102,7 +102,7 @@ export function MediaViewerScreen() {
             ) : null}
             <Text variant="tiny" style={styles.dim}>
               {ATTACHMENT_KIND_LABELS[item.kind]}
-              {item.bodySite ? ` • ${item.bodySite}` : ''} • {formatJalaliDateTime(item.capturedAt)}
+              {item.bodySite ? `، ${item.bodySite}` : ''}، {formatJalaliDateTime(item.capturedAt)}
             </Text>
           </Column>
         </SafeAreaView>

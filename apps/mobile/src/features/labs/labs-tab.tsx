@@ -11,7 +11,7 @@ import { useLive } from '@/db/use-live';
 import { askPhotoSource, pickPhotos, storeAndAttach } from '@/features/attachments/capture';
 import { patientMediaQuery } from '@/features/attachments/queries';
 import { formatJalali, formatJalaliDateTime, formatTime, toJalali } from '@/lib/jalali';
-import { hasPersianLetters, ltrIsolate, toPersianDigits } from '@/lib/persian';
+import { hasPersianLetters, joinLabels, ltrIsolate, toPersianDigits } from '@/lib/persian';
 import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
@@ -369,8 +369,7 @@ function PanelList({
                     {p.name || 'آزمایش'}
                   </Text>
                   <Text variant="caption" color="textMuted">
-                    {formatJalali(p.collectedAt)} • {formatTime(p.collectedAt)}
-                    {p.labName ? ` • ${p.labName}` : ''}
+                    {joinLabels([formatJalali(p.collectedAt), formatTime(p.collectedAt), p.labName])}
                   </Text>
                   <Row gap="xs" wrap style={{ marginTop: spacing.xxs }}>
                     {counts ? (

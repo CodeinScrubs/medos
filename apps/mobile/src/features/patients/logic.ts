@@ -1,6 +1,6 @@
 import type { Patient } from '@/db/schema';
 import { formatAge } from '@/lib/jalali';
-import { buildSearchText, normalizePhone } from '@/lib/persian';
+import { buildSearchText, joinLabels, normalizePhone } from '@/lib/persian';
 
 import { SEX_LABELS } from './labels';
 
@@ -56,9 +56,11 @@ export function patientIdentity(
   now: Date = new Date(),
 ): string {
   const age = formatAge(p.birthDate, p.ageYears, now);
-  return [age !== '—' ? age : null, p.sex ? SEX_LABELS[p.sex] : null, p.fileNumber ? `پرونده ${p.fileNumber}` : null]
-    .filter(Boolean)
-    .join(' • ');
+  return joinLabels([
+    age !== '—' ? age : null,
+    p.sex ? SEX_LABELS[p.sex] : null,
+    p.fileNumber ? `پرونده ${p.fileNumber}` : null,
+  ]);
 }
 
 /** The picker line under a patient's name: identity first, then their one-line summary. */

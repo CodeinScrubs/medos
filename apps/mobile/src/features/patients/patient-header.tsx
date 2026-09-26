@@ -7,7 +7,7 @@ import { notify } from '@/components/feedback';
 import { Avatar, Badge, Card, Column, Row, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
 import { formatAge } from '@/lib/jalali';
-import { formatPhone, normalizePhone, toPersianDigits } from '@/lib/persian';
+import { formatPhone, joinLabels, normalizePhone, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { PATIENT_STATUS, SEX_LABELS } from './labels';
@@ -25,14 +25,12 @@ export function PatientHeader({ patient }: { patient: Patient }) {
   const status = PATIENT_STATUS[patient.status];
   const age = formatAge(patient.birthDate, patient.ageYears);
 
-  const meta = [
+  const meta = joinLabels([
     age !== '—' ? age : null,
     patient.sex ? SEX_LABELS[patient.sex] : null,
     patient.bloodType,
     patient.fileNumber ? `پرونده ${toPersianDigits(patient.fileNumber)}` : null,
-  ]
-    .filter(Boolean)
-    .join(' • ');
+  ]);
 
   return (
     <Card style={{ padding: spacing.md }}>

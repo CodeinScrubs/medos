@@ -15,7 +15,7 @@ import { locationLabel } from '@/features/encounters/status';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { formatJalaliDateTime } from '@/lib/jalali';
-import { fullName, toPersianDigits } from '@/lib/persian';
+import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import {
@@ -138,7 +138,7 @@ function ShiftScreenContent() {
             <Column gap="sm">
               <Row justify="space-between" align="flex-start">
                 <Column gap="xxs" style={styles.grow}>
-                  <Text variant="subheading">{[shift.ward, 'شیفت باز'].filter(Boolean).join(' • ')}</Text>
+                  <Text variant="subheading">{joinLabels([shift.ward, 'شیفت باز'])}</Text>
                   <Text variant="caption" color="textMuted">
                     از {formatJalaliDateTime(shift.startAt)}
                   </Text>

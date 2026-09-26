@@ -6,7 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Button, Card, Column, Row, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { formatJalaliDateTime } from '@/lib/jalali';
-import { toPersianDigits } from '@/lib/persian';
+import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { activeShiftQuery, shiftPatientsQuery, shiftProgress } from './queries';
@@ -34,7 +34,7 @@ export function ShiftCard() {
             </Text>
             <Text variant="caption" color="textMuted">
               {shift
-                ? [shift.ward, `از ${formatJalaliDateTime(shift.startAt)}`].filter(Boolean).join(' • ')
+                ? joinLabels([shift.ward, `از ${formatJalaliDateTime(shift.startAt)}`])
                 : error
                   ? 'برای مشاهده بزنید'
                   : shifts === undefined

@@ -26,7 +26,7 @@ import { useLive } from '@/db/use-live';
 import { useSetting } from '@/db/use-setting';
 import { formatBytes } from '@/lib/format';
 import { formatJalaliDateTime, formatRelativeTime } from '@/lib/jalali';
-import { toPersianDigits } from '@/lib/persian';
+import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import {
@@ -419,8 +419,11 @@ export function BackupScreen() {
                     <Column gap="xxs" style={{ flex: 1 }}>
                       <Text variant="caption">{formatJalaliDateTime(run.startedAt)}</Text>
                       <Text variant="tiny" color="textFaint">
-                        {run.trigger === 'auto' ? 'خودکار' : 'دستی'} • {run.includesMedia ? 'کامل' : 'فقط دیتابیس'}
-                        {run.sizeBytes ? ` • ${formatBytes(run.sizeBytes)}` : ''}
+                        {joinLabels([
+                          run.trigger === 'auto' ? 'خودکار' : 'دستی',
+                          run.includesMedia ? 'کامل' : 'فقط دیتابیس',
+                          run.sizeBytes ? formatBytes(run.sizeBytes) : null,
+                        ])}
                       </Text>
                       {run.errorText ? (
                         <Text variant="tiny" color="danger">

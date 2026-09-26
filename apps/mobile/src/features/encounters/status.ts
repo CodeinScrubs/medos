@@ -3,7 +3,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { encounters, patients, type PatientStatus } from '@/db/schema';
 import { touch } from '@/lib/ids';
-import { toPersianDigits } from '@/lib/persian';
+import { joinLabels, toPersianDigits } from '@/lib/persian';
 
 import { statusForEncounterKind } from './logic';
 
@@ -140,10 +140,9 @@ export function activeLocationsQuery() {
 
 export type ActiveLocation = { ward: string | null; bed: string | null };
 
-/** "داخلی ۲ • تخت ۴", or nothing when neither is recorded. */
+/** "داخلی ۲، تخت ۴", or nothing when neither is recorded. */
 export function locationLabel(location: ActiveLocation | undefined): string | null {
   if (!location) return null;
   const parts = [location.ward?.trim(), location.bed?.trim() ? `تخت ${toPersianDigits(location.bed.trim())}` : null];
-  const label = parts.filter(Boolean).join(' • ');
-  return label || null;
+  return joinLabels(parts) || null;
 }

@@ -7,6 +7,7 @@ import {
   hasPersianLetters,
   initials,
   isValidNationalId,
+  joinLabels,
   ltrIsolate,
   normalizePersian,
   normalizePhone,
@@ -193,5 +194,27 @@ describe('ltrIsolate', () => {
   it('leaves nothing behind for an empty value', () => {
     expect(ltrIsolate('')).toBe('');
     expect(ltrIsolate(null)).toBe('');
+  });
+});
+
+describe('joinLabels', () => {
+  /*
+   * "•" is the same small dot as the Persian zero in the app's font: on the
+   * phone "• ۱ دستور" read as ten orders. And a first label in Latin turned
+   * the line left-to-right, moving a ward called "CCU" to the end.
+   */
+  it('joins with a Persian comma, never a bullet, and fixes the line right-to-left', () => {
+    const line = joinLabels(['CCU', 'تخت ۴', null, '', '  ', false, '۶۲ ساله']);
+    expect(line.codePointAt(0)).toBe(0x200f);
+    expect(line.slice(1)).toBe('CCU، تخت ۴، ۶۲ ساله');
+    expect(line).not.toContain('•');
+  });
+
+  it('is empty when there is nothing to show', () => {
+    expect(joinLabels([null, undefined, ''])).toBe('');
+  });
+
+  it('adds nothing a search would see', () => {
+    expect(normalizePersian(joinLabels(['داخلی ۲', 'تخت ۴']))).toBe('داخلی 2، تخت 4');
   });
 });

@@ -10,7 +10,7 @@ import { Badge, Card, Column, Row, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import type { FollowUp, Patient } from '@/db/schema';
 import { formatJalaliWithWeekday, formatRelative, formatTime } from '@/lib/jalali';
-import { normalizePhone } from '@/lib/persian';
+import { joinLabels, normalizePhone } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { FOLLOWUP_CHANNEL_LABELS } from './labels';
@@ -157,7 +157,7 @@ export function FollowUpCard({
               <Badge label={FOLLOWUP_CHANNEL_LABELS[followUp.channel]} tone="neutral" />
               {followUp.priority === 'high' && <Badge label="مهم" tone="accent" icon="flag" />}
               <Text variant="tiny" color="textFaint">
-                {formatJalaliWithWeekday(followUp.dueAt)} • {formatTime(followUp.dueAt)}
+                {joinLabels([formatJalaliWithWeekday(followUp.dueAt), formatTime(followUp.dueAt)])}
               </Text>
             </Row>
 

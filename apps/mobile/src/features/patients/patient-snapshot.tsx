@@ -21,7 +21,7 @@ import { latestPatientNoteQuery } from '@/features/notes/queries';
 import { vitalChips } from '@/features/vitals/logic';
 import { patientVitalsQuery } from '@/features/vitals/queries';
 import { formatRelativeTime } from '@/lib/jalali';
-import { toPersianDigits } from '@/lib/persian';
+import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 type RecordTab = 'vitals' | 'labs' | 'kardex';
@@ -114,7 +114,8 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
       <SnapshotRow
         key="kardex"
         icon="medical-outline"
-        title={`کاردکس • ${toPersianDigits(running.length)} دستور جاری`}
+        title="کاردکس"
+        when={`${toPersianDigits(running.length)} دستور جاری`}
         onPress={() => open('kardex')}
       >
         <Row gap="sm" wrap>
@@ -134,7 +135,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
       <SnapshotRow
         key="note"
         icon="document-text-outline"
-        title={`آخرین نوت • ${NOTE_TYPE_LABELS[lastNote.type]}`}
+        title={joinLabels(['آخرین نوت', NOTE_TYPE_LABELS[lastNote.type]])}
         when={formatRelativeTime(lastNote.noteDate, now)}
         onPress={() => router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId: lastNote.id } })}
       >

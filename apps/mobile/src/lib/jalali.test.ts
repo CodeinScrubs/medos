@@ -100,7 +100,7 @@ describe('formatting', () => {
     expect(formatJalali(day)).toBe('۱۴۰۳/۰۵/۱۲');
     expect(formatJalaliLong(day)).toBe('۱۲ مرداد ۱۴۰۳');
     expect(formatJalaliWithWeekday(day)).toBe('جمعه ۱۲ مرداد');
-    expect(formatJalaliDateTime(day)).toBe('۱۲ مرداد ۱۴۰۳ • ۱۴:۳۰');
+    expect(formatJalaliDateTime(day)).toBe('۱۲ مرداد ۱۴۰۳، ۱۴:۳۰');
   });
 
   it('accepts the storage formats: Date, unix ms, ISO date, ISO date-time', () => {

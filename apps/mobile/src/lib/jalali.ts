@@ -1,6 +1,6 @@
 import { isValidJalaaliDate, jalaaliMonthLength, jalaaliToDateObject, toJalaali } from 'jalaali-js';
 
-import { toLatinDigits, toPersianDigits } from './persian';
+import { LABEL_SEPARATOR, toLatinDigits, toPersianDigits } from './persian';
 import { startOfDay } from './time';
 
 /**
@@ -163,11 +163,11 @@ export function formatTime(value: DateInput): string {
   return toPersianDigits(`${h}:${m}`);
 }
 
-/** `۱۲ مرداد ۱۴۰۳ • ۱۴:۳۰` */
+/** `۱۲ مرداد ۱۴۰۳، ۱۴:۳۰` — a comma, not "•", which reads as a Persian zero between digits. */
 export function formatJalaliDateTime(value: DateInput): string {
   const date = coerce(value);
   if (!date) return '—';
-  return `${formatJalaliLong(date)} • ${formatTime(date)}`;
+  return `${formatJalaliLong(date)}${LABEL_SEPARATOR}${formatTime(date)}`;
 }
 
 /* -------------------------------------------------------------------------- */

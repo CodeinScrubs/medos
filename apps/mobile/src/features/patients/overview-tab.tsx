@@ -18,7 +18,7 @@ import { isHighlighted } from '@/features/notes/logic';
 import { patientNotesQuery } from '@/features/notes/queries';
 import { TasksSection } from '@/features/tasks/tasks-section';
 import { formatJalali, formatJalaliDateTime, formatJalaliLong, formatRelative } from '@/lib/jalali';
-import { toPersianDigits } from '@/lib/persian';
+import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { CallRow } from './patient-header';
@@ -218,9 +218,11 @@ function AdmissionCard({ patientId }: { patientId: string }) {
 
   const { encounter, place, attending } = current;
   const elapsed = formatAdmissionElapsed(admissionElapsed(encounter.admittedAt, encounter.admittedAtHasTime));
-  const location = [place?.name, encounter.ward, encounter.bed ? `تخت ${toPersianDigits(encounter.bed)}` : null]
-    .filter(Boolean)
-    .join(' • ');
+  const location = joinLabels([
+    place?.name,
+    encounter.ward,
+    encounter.bed ? `تخت ${toPersianDigits(encounter.bed)}` : null,
+  ]);
   const isAdmission = isInpatient(encounter.kind);
 
   return (

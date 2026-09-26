@@ -1,5 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
+import { RLM } from '@/lib/persian';
+
 import { patientIdentity, patientPickerSublabel } from './logic';
 
 const NOW = new Date(2026, 8, 26);
@@ -9,8 +11,8 @@ describe('patientIdentity', () => {
   it('tells two patients with the same name apart', () => {
     const older = { birthDate: null, ageYears: 62, sex: 'male' as const, fileNumber: '4471' };
     const younger = { birthDate: null, ageYears: 35, sex: 'male' as const, fileNumber: null };
-    expect(patientIdentity(older, NOW)).toBe('۶۲ ساله • مرد • پرونده 4471');
-    expect(patientIdentity(younger, NOW)).toBe('۳۵ ساله • مرد');
+    expect(patientIdentity(older, NOW)).toBe(`${RLM}۶۲ ساله، مرد، پرونده 4471`);
+    expect(patientIdentity(younger, NOW)).toBe(`${RLM}۳۵ ساله، مرد`);
   });
 
   it('says nothing it does not know', () => {
@@ -20,7 +22,7 @@ describe('patientIdentity', () => {
   it('puts identity before the summary in a picker', () => {
     expect(
       patientPickerSublabel({ birthDate: null, ageYears: 62, sex: 'male', fileNumber: null, summary: 'DM, HTN' }),
-    ).toMatch(/^۶۲ ساله • مرد — DM, HTN$/);
+    ).toBe(`${RLM}۶۲ ساله، مرد — DM, HTN`);
     expect(
       patientPickerSublabel({ birthDate: null, ageYears: null, sex: null, fileNumber: null, summary: null }),
     ).toBeNull();

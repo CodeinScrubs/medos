@@ -131,6 +131,28 @@ export function buildSearchText(...parts: (string | null | undefined | string[])
   return normalizePersian(flat.join(' '));
 }
 
+/** Between labels on one line; see `joinLabels`. */
+export const LABEL_SEPARATOR = '، ';
+
+/** Right-to-left mark: invisible, strongly right-to-left. */
+export const RLM = '\u200F';
+
+/**
+ * Short labels on one line — "داخلی ۲، تخت ۴، ۶۲ ساله" — for display only.
+ *
+ * The separator is the Persian comma. It used to be "•", which in the app's
+ * font is the same small mid-height dot as the Persian zero: on the phone
+ * "• ۱ دستور" read as "۱۰ دستور", ten orders instead of one.
+ *
+ * The line starts with a right-to-left mark, so a first label in Latin (a ward
+ * called "CCU") does not turn the whole line left-to-right and move itself to
+ * the end. Search normalisation strips the mark (`STRIP_RE`).
+ */
+export function joinLabels(parts: readonly (string | null | undefined | false)[]): string {
+  const kept = parts.filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+  return kept.length > 0 ? RLM + kept.join(LABEL_SEPARATOR) : '';
+}
+
 /** Whether text contains Persian or Arabic letters — for choosing the direction of mixed-language content. */
 export function hasPersianLetters(text: string | null | undefined): boolean {
   return !!text && /[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);

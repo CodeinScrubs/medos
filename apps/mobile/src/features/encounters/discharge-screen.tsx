@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
-import { Button, Card, ChipSelect, Column, Input, Screen, Text } from '@/components/ui';
+import { Button, Card, ChipSelect, Column, Input, Row, Screen, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import type { Encounter, PatientStatus } from '@/db/schema';
 import { useLive } from '@/db/use-live';
@@ -116,20 +117,16 @@ export function DischargeScreen() {
 
         {endingOrders + stillOpenTasks + stillOpenConsults > 0 ? (
           <Card tone="alt">
-            <Column gap="xxs">
+            <Column gap="xs">
               <Text variant="captionStrong">با ثبت ترخیص</Text>
               {endingOrders > 0 ? (
-                <Text variant="caption">
-                  • {toPersianDigits(endingOrders)} دستور کاردکسِ این بستری «تمام‌شده» می‌شود.
-                </Text>
+                <Consequence>{toPersianDigits(endingOrders)} دستور کاردکسِ این بستری «تمام‌شده» می‌شود.</Consequence>
               ) : null}
               {stillOpenTasks > 0 ? (
-                <Text variant="caption">• {toPersianDigits(stillOpenTasks)} کار باز همچنان باز می‌ماند.</Text>
+                <Consequence>{toPersianDigits(stillOpenTasks)} کار باز همچنان باز می‌ماند.</Consequence>
               ) : null}
               {stillOpenConsults > 0 ? (
-                <Text variant="caption">
-                  • {toPersianDigits(stillOpenConsults)} کانسالت بی‌پاسخ همچنان باز می‌ماند.
-                </Text>
+                <Consequence>{toPersianDigits(stillOpenConsults)} کانسالت بی‌پاسخ همچنان باز می‌ماند.</Consequence>
               ) : null}
             </Column>
           </Card>
@@ -148,3 +145,24 @@ export function DischargeScreen() {
     </Screen>
   );
 }
+
+/**
+ * One line of the list, with its marker drawn rather than typed: a "•" next to
+ * a Persian digit reads as a zero, and "• ۱ دستور" looked like ten orders.
+ */
+function Consequence({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <Row gap="sm" align="center">
+      <View style={[styles.marker, { backgroundColor: colors.textMuted }]} />
+      <Text variant="caption" style={styles.grow}>
+        {children}
+      </Text>
+    </Row>
+  );
+}
+
+const styles = StyleSheet.create({
+  grow: { flex: 1 },
+  marker: { width: 6, height: 6, borderRadius: 3 },
+});
