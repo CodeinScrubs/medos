@@ -33,6 +33,53 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-26 (0.11.0) — 0.10.0 walked on the phone; call recordings; a "۱" that read as "۱۰"
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** 53a7106, fb8a590, and this one (0.11.0)
+
+**On the phone (SM-A528B, Android 14, One UI, dark mode, three-button bar), 0.10.0**
+- Installed over 0.9.1, same signer, no crash. The phone had no live patients (the owner
+  had moved theirs to the trash); a test patient was created from the launcher shortcut.
+- Worked: Samsung launcher icon and the four shortcuts; «آلرژی: ثبت نشده»; admission;
+  diagnosis; search by diagnosis, ward and bed (and bed gone after discharge); SpO2 150
+  refused inline; lab "5,8" refused by name, then K 5.8 H / Cr 1.9 H; order form banner;
+  first note defaults to «شرح حال», header save; «در یک نگاه»; task tick → «برگرداندن»
+  restores it; discharge consequences card; Recents card blank (One UI).
+- Found: "• ۱ دستور" (discharge) and "کاردکس • ۱ دستور جاری" (glance) read as «۱۰» — the
+  bullet is the Persian zero's twin in Vazirmatn. Also a Latin first label ("TestWard")
+  turned a meta line left-to-right. Fixed in 53a7106 (`joinLabels`: Persian comma + RLM);
+  a throwaway emulator screen showed that no bidi mark alone fixes the "۱۰".
+- Not done on the phone: runtime theme switch (a system setting — left to the owner),
+  notification tap, backup/restore.
+
+**Call recordings (C05)** — see architecture.md. The dialer records (the owner's firmware
+has «ضبط خودکار تماس‌ها», currently off: `record_calls_automatically_on_off=0`); MedOS lists
+`Recordings/Call` through a one-time SAF grant and files a recording as a dated
+«پیگیری تلفنی» note with the audio copied in; Today counts unfiled calls of the last two
+days. Also: ChipSelect scrolls the selected chip into view once (RTL needed a deferred
+scroll); "MedOS …" sentences start with an RLM.
+
+**Verified**
+- `npm run check` green (65 suites / 755 tests + 3 workflow).
+- Emulator (x86_64 build of this source), with two fake WAV "recordings" pushed to
+  `Recordings/Call`: the picker opened at that folder; list with parsed name/time/size;
+  playback (audio session PLAYING); filing → note editor with title «تماس — …», time
+  14:30 from the name, voice attached; «در پرونده» badge; Today card "۲ تماسِ ضبط‌شده…";
+  the note-type strip opens on «پیگیری تلفنی».
+- `dist/MedOS-0.11.0.apk`: versionCode 16, arm64-v8a, signer 1119f776…7e0c.
+
+**Not verified**
+- 0.11.0 on the phone: the phone disconnected before it could be installed.
+- A real Samsung call recording: the file-name format is parsed from Samsung's documented
+  pattern ("Call recording <who>_<yyMMdd>_<HHmmss>.m4a") and unit-tested, not seen on this
+  phone yet. Files without a time in the name fall back to the file time.
+
+**Open threads**
+- Phone: install 0.11.0; delete the test patient «Device Test» created today (it is live,
+  discharged); check the fixed "۱" lines; owner turns on the dialer's call recording, makes
+  one recorded call, and files it from «ضبط تماس‌ها».
+
 ## 2026-09-26 (0.10.0) — Patient at a glance, search by diagnosis and bed, an icon of its own
 
 **Agent:** claude-opus-5-5 via Claude Code
