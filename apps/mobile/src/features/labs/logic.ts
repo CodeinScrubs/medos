@@ -1,3 +1,5 @@
+import { parseLabValue } from './flags';
+
 /**
  * Rows copied from Excel, Google Sheets or a CSV, as [analyte, value, unit?].
  *
@@ -100,3 +102,22 @@ const HEADER_WORDS = /^(test|analyte|name|result|value|آزمایش|نام|نت�
 function isHeaderRow(first: string, second: string): boolean {
   return HEADER_WORDS.test(first) && HEADER_WORDS.test(second);
 }
+
+/**
+ * A result that was meant as a number but cannot be read as one.
+ *
+ * `5,8` is the common case: a decimal comma, which `parseDecimal` refuses
+ * rather than guesses (it could be 5.8 or a typo of 58). Refusing silently was
+ * worse — the value was stored as text, got no flag, and a potassium of 5.8
+ * sat in the flowsheet looking normal. For an analyte that is always numeric
+ * any unreadable value counts; for a row the user named themselves, only text
+ * that looks like a number does, since "negative" is a real result there.
+ */
+export function isUnreadableNumber(value: string, alwaysNumeric: boolean): boolean {
+  const text = value.trim();
+  if (!text) return false;
+  if (parseLabValue(text) != null) return false;
+  return alwaysNumeric || LOOKS_NUMERIC.test(text);
+}
+
+const LOOKS_NUMERIC = /^(?:<=|>=|<|>|≤|≥)?\s*[-+]?[\d.,٫٬،۰-۹٠-٩]+$/;

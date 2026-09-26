@@ -16,6 +16,7 @@ import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
 import { FLAG_LABEL, flagTone } from './flags';
+import { isUnreadableNumber } from './logic';
 import { ANALYTE_ORDER } from './presets';
 import { createLabPanel, deleteLabPanel, patientLabPanelsQuery, patientLabValuesQuery } from './queries';
 
@@ -133,12 +134,18 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
     const colMap = new Map<string, Date>();
     const nameMap = new Map<string, string>();
     const cells = new Map<string, LabValue>();
+    // Analytes with numbers but no reference range anywhere: their lack of an
+    // H/L says nothing, and the table has to say so.
+    const numeric = new Set<string>();
+    const ranged = new Set<string>();
 
     for (const r of rows) {
       colMap.set(r.panelId, r.collectedAt);
       const key = r.value.analyte.toLowerCase();
       if (!nameMap.has(key)) nameMap.set(key, r.value.analyte);
       cells.set(`${key}|${r.panelId}`, r.value);
+      if (r.value.valueNum != null) numeric.add(key);
+      if (r.value.refLow != null || r.value.refHigh != null) ranged.add(key);
     }
 
     // Newest draw first: on a phone, the latest value belongs next to the name.
@@ -152,7 +159,7 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
         const ob = ANALYTE_ORDER.get(b[0]) ?? Number.MAX_SAFE_INTEGER;
         return oa - ob || a[0].localeCompare(b[0]);
       })
-      .map(([key, label]) => ({ key, label }));
+      .map(([key, label]) => ({ key, label, noRange: numeric.has(key) && !ranged.has(key) }));
 
     return { columns: cols, analytes: names, cell: (k: string, p: string) => cells.get(`${k}|${p}`) };
   }, [rows]);
@@ -201,6 +208,11 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
             >
               <Text variant="captionStrong" ltr numberOfLines={1} color="primary">
                 {a.label}
+                {a.noRange ? (
+                  <Text variant="tiny" color="textFaint">
+                    {' ∅'}
+                  </Text>
+                ) : null}
               </Text>
             </Pressable>
           ))}
@@ -240,8 +252,16 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
                       ]}
                     >
                       {v ? (
-                        <Text numeric numberOfLines={1} align="center" style={{ color, fontSize: 13 }}>
-                          {ltrIsolate(v.value + (v.flag && v.flag !== 'normal' ? ` ${FLAG_LABEL[v.flag]}` : ''))}
+                        <Text
+                          numeric
+                          numberOfLines={1}
+                          align="center"
+                          style={{ color: unreadable(v) ? colors.danger : color, fontSize: 13 }}
+                        >
+                          {ltrIsolate(
+                            (v.value ?? '') +
+                              (unreadable(v) ? ' ?' : v.flag && v.flag !== 'normal' ? ` ${FLAG_LABEL[v.flag]}` : ''),
+                          )}
                         </Text>
                       ) : (
                         <Text variant="tiny" color="textFaint" align="center">
@@ -256,8 +276,27 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
           </View>
         </ScrollView>
       </View>
+      {analytes.some((a) => a.noRange) || rows.some((r) => unreadable(r.value)) ? (
+        <View style={{ padding: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+          {analytes.some((a) => a.noRange) ? (
+            <Text variant="tiny" color="textFaint">
+              ∅ محدوده‌ی مرجع ثبت نشده؛ نبودِ H یا L برای این‌ها یعنی «سنجیده نشده»، نه «طبیعی».
+            </Text>
+          ) : null}
+          {rows.some((r) => unreadable(r.value)) ? (
+            <Text variant="tiny" color="danger">
+              ؟ عدد خوانا نیست (مثلاً 5,8 به‌جای 5.8)؛ نوبت را باز کنید و اصلاحش کنید.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
     </Card>
   );
+}
+
+/** Stored before the entry screen refused these: a number that never parsed, so it was never flagged. */
+function unreadable(v: LabValue): boolean {
+  return v.valueNum == null && isUnreadableNumber(v.value ?? '', false);
 }
 
 /* -------------------------------------------------------------------------- */

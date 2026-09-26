@@ -22,7 +22,8 @@ import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
 import { computeFlag, FLAG_LABEL, flagTone, formatRange, parseLabValue, parseRangeInput } from './flags';
-import { parsePastedTable } from './logic';
+
+import { isUnreadableNumber, parsePastedTable } from './logic';
 import { analyteDef, LAB_PRESETS, rangeFor } from './presets';
 import { createLabPanel, labPanelQuery, panelValuesQuery, updateLabPanel } from './queries';
 
@@ -216,6 +217,14 @@ function LabEntry({
       notify('هیچ مقداری وارد نشده');
       return;
     }
+    const unreadable = rows.filter((r) => !r.qualitative && isUnreadableNumber(r.value, !r.custom));
+    if (unreadable.length > 0) {
+      notify(
+        'این مقدارها عدد خوانا نیستند',
+        `${unreadable.map((r) => `${r.analyte}: ${r.value.trim()}`).join('\n')}\n\nاعشار را با نقطه بنویسید (مثلاً 5.8). نتیجه‌ی متنی مثل «hemolyzed» را در یادداشت برگه بنویسید.`,
+      );
+      return;
+    }
     setSaving(true);
     const payload = {
       collectedAt,
@@ -404,9 +413,17 @@ function LabRowEditor({
   const { colors, radii, spacing, typography } = useTheme();
   const parsed = row.qualitative ? null : parseLabValue(row.value);
   const flag = row.qualitative ? null : computeFlag(parsed, row.refLow, row.refHigh);
+  const unreadable = !row.qualitative && isUnreadableNumber(row.value, !row.custom);
   const tone = flagTone(flag);
-  const flagColor =
-    tone === 'danger' ? colors.danger : tone === 'warning' ? colors.warning : tone === 'info' ? colors.info : null;
+  const flagColor = unreadable
+    ? colors.danger
+    : tone === 'danger'
+      ? colors.danger
+      : tone === 'warning'
+        ? colors.warning
+        : tone === 'info'
+          ? colors.info
+          : null;
   const range = formatRange(row.refLow, row.refHigh);
 
   return (
@@ -431,7 +448,7 @@ function LabRowEditor({
           )}
           <Pressable onPress={onEditRange} hitSlop={6}>
             <Text variant="tiny" color="textFaint" ltr>
-              {[row.unit, range ? `ref ${range}` : 'ref —'].filter(Boolean).join(' · ')}
+              {[row.unit, range ? `ref ${range}` : row.qualitative ? null : 'no ref range'].filter(Boolean).join(' · ')}
             </Text>
           </Pressable>
         </View>
@@ -461,7 +478,11 @@ function LabRowEditor({
         />
 
         <View style={{ width: 22, alignItems: 'center' }}>
-          {flag && flag !== 'normal' ? (
+          {unreadable ? (
+            <Text variant="captionStrong" ltr style={{ color: colors.danger }} accessibilityLabel="عدد خوانا نیست">
+              ?
+            </Text>
+          ) : flag && flag !== 'normal' ? (
             <Text variant="captionStrong" ltr style={{ color: flagColor ?? colors.text }}>
               {FLAG_LABEL[flag]}
             </Text>

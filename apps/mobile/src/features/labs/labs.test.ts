@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { computeFlag, flagTone, formatRange, parseLabNumber, parseLabValue, parseRangeInput } from './flags';
-import { parsePastedTable, sameUnitSeries } from './logic';
+import { isUnreadableNumber, parsePastedTable, sameUnitSeries } from './logic';
 import { analyteDef, ANALYTE_ORDER, LAB_PRESETS, rangeFor } from './presets';
 
 describe('parseLabNumber', () => {
@@ -220,5 +220,27 @@ describe('sameUnitSeries', () => {
     expect(sameUnitSeries([row(null, 1), row(null, 2)]).unit).toBeNull();
     expect(sameUnitSeries([row(null, 1), row(null, 2)]).unlabelled).toBe(0);
     expect(sameUnitSeries([])).toEqual({ series: [], unit: null, excluded: 0, unlabelled: 0 });
+  });
+});
+
+describe('isUnreadableNumber', () => {
+  /*
+   * A potassium typed as "5,8" was stored as text, got no flag and sat in the
+   * flowsheet looking normal. The entry screen now refuses it by name.
+   */
+  it('catches a decimal comma in an analyte that is always a number', () => {
+    expect(isUnreadableNumber('5,8', true)).toBe(true);
+    expect(isUnreadableNumber('۵٫۸', true)).toBe(false);
+    expect(isUnreadableNumber('5.8', true)).toBe(false);
+    expect(isUnreadableNumber('7,500', true)).toBe(false);
+    expect(isUnreadableNumber('<0.01', true)).toBe(false);
+    expect(isUnreadableNumber('hemolyzed', true)).toBe(true);
+    expect(isUnreadableNumber('', true)).toBe(false);
+  });
+
+  it('lets a row the user named keep a text result, but not a broken number', () => {
+    expect(isUnreadableNumber('negative', false)).toBe(false);
+    expect(isUnreadableNumber('5,8', false)).toBe(true);
+    expect(isUnreadableNumber('>1,2', false)).toBe(true);
   });
 });
