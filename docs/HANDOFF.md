@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-26 (0.11.1) — The phone has no call recording; the calls screen stops promising it
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** the calls-screen correction, and this one (0.11.1)
+
+The owner could not find call recording in the Phone app and asked for it to be found and
+turned on. It does not exist on this phone: the firmware's CSC is XSG (UAE), and Phone →
+Call settings (opened by `android.telecom.action.SHOW_CALL_SETTINGS`, without showing the
+call log) lists no «Record calls», nor does «Other call settings». The previous entry's
+"setting exists, off" came from the `record_calls_*` keys in `Settings.System`, which every
+firmware carries — that claim was wrong, and the owner was told so. Nothing was changed on
+the phone's settings (a region-locked feature cannot be switched on, and writing system
+settings is not ours to do).
+
+**Changed**
+- Calls screen text: the dialer records only where the region allows it; otherwise a
+  recorder app is needed; any recorder's folder can be chosen. New «بدون ضبط: خلاصه‌ی صوتی
+  بعد از تماس» → quick capture. File names with a run-on stamp and "Call@…" now parse.
+- architecture.md / IMPLEMENTATION C05 corrected.
+
+**Verified**
+- `npm run check` green (65 suites / 755 tests + 3 workflow).
+- `dist/MedOS-0.11.1.apk`: versionCode 17, arm64-v8a, signer 1119f776…7e0c.
+
+**Not verified**
+- 0.11.1 on the phone: it disconnected again before the install.
+
+**Left on the phone, to clean up next time it is connected**
+- `/sdcard/Recordings/MedOS-test/` with one fake WAV (pushed for the calls-screen test).
+- The live test patient «Device Test» (created, admitted, discharged today).
+
+**Open threads**
+- Owner's choice of recorder (options given in chat: a recorder app with an accessibility
+  connector, CallApp — already installed, but a cloud caller-ID service — a region reflash
+  that wipes the phone, or a spoken summary after each call). Then one real recorded call
+  filed from «ضبط تماس‌ها» on the phone.
+
 ## 2026-09-26 (0.11.0) — 0.10.0 walked on the phone; call recordings; a "۱" that read as "۱۰"
 
 **Agent:** claude-opus-5-5 via Claude Code
