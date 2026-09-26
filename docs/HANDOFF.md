@@ -33,6 +33,27 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-26 (0.11.2, phone) — Sharing a recording to MedOS, walked on the phone
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** this one (handoff only)
+
+**Verified on the phone (0.11.2)**
+- No «Share Test» had been left by the earlier interrupted attempt (search over all statuses).
+- A fake WAV in Download, shared from Samsung «My Files» → Android's chooser, Personal tab
+  → «More» → MedOS: MedOS opened on the patient picker; a temporary patient was chosen;
+  the note opened as «پیگیری تلفنی», title from the file name, 20:30 read from the run-on
+  stamp, recording attached (0:04), and it plays (AudioTrack started for MedOS's pid). This
+  is a provider content URI with a share grant — the same path Cube's share takes.
+- Cleaned up: the temporary patient (→ trash), the test file. No crash in the crash log.
+
+**Not verified**
+- Sharing from Cube itself (the owner's own recordings; left to the owner).
+
+**Gotchas**
+- On this phone the share sheet has Personal/Work tabs (the second Android user); a sideways
+  swipe on the app row switches tabs. MedOS is under Personal → «More».
+
 ## 2026-09-26 (0.11.2) — Share a recording to MedOS; why MedOS does not record calls itself
 
 **Agent:** claude-opus-5-5 via Claude Code
