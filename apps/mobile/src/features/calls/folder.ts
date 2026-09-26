@@ -4,8 +4,9 @@ import { CALL_FOLDER_HINT, isRecordingFile, parseRecordingName, recordingKey } f
 import type { CallRecording } from './queries';
 
 /**
- * Ask for the dialer's recordings folder through Android's own picker, opened
- * at Recordings/Call. The grant is persistable, so the list keeps working
+ * Ask for the recordings folder through Android's own picker, opened at
+ * Recordings/Call (the dialer's, where it records) — any recorder's folder
+ * can be chosen instead. The grant is persistable, so the list keeps working
  * after restarts; nothing outside that one folder becomes readable.
  */
 export async function chooseCallsFolder(): Promise<string | null> {

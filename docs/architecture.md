@@ -596,9 +596,12 @@ dialer may capture call audio (`VOICE_CALL` needs a system permission); an ordin
 holds the microphone during a call gets silence or is refused, and the workarounds
 (accessibility services, speakerphone capture) are one-sided, fragile across OEM updates and
 exactly the kind of permission a clinical app should not ask for. Samsung's dialer records
-both sides itself, into `Recordings/Call`.
+both sides itself, into `Recordings/Call` — but only where the region allows it: the owner's
+phone runs a Gulf (XSG) firmware whose call settings have no «ضبط تماس» at all (checked on the
+phone; the `record_calls_*` keys in `Settings.System` exist on every firmware and prove
+nothing). There a call-recorder app has to do the recording, and MedOS files its files.
 
-So MedOS files what the dialer wrote (`features/calls/`). The owner grants that one folder
+So MedOS files what a recorder wrote (`features/calls/`). The owner grants that one folder
 once through Android's picker (persistable SAF grant, nothing else becomes readable); the
 list reads it on focus, parses who and when from the dialer's file name, and one tap copies
 a recording into MedOS's media storage and writes a «پیگیری تلفنی» note dated at the call,

@@ -24,6 +24,10 @@ describe('call recording names', () => {
       new Date(2026, 8, 26, 14, 30, 12),
     );
     expect(parseRecordingName('20260926_1430 ward.amr', MODIFIED).recordedAt).toEqual(new Date(2026, 8, 26, 14, 30));
+    expect(parseRecordingName('Call@Test Contact(09120000001)_20260926143012.amr', MODIFIED)).toEqual({
+      who: 'Test Contact(09120000001)',
+      recordedAt: new Date(2026, 8, 26, 14, 30, 12),
+    });
     expect(parseRecordingName('Voice 001.m4a', MODIFIED)).toEqual({ who: 'Voice 001', recordedAt: MODIFIED });
   });
 

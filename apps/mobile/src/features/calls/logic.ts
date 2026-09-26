@@ -3,9 +3,10 @@
  *
  * MedOS cannot record a call. Since Android 10 only the system dialer may
  * capture call audio; an ordinary app holding the microphone during a call
- * gets silence or is refused. What MedOS can do is take the file the dialer
- * wrote — Samsung's «ضبط تماس» saves both sides to Recordings/Call — and file
- * it under a patient, with a note to write what was said.
+ * gets silence or is refused. What MedOS can do is take the file a recorder
+ * wrote — Samsung's dialer where the region allows it (Recordings/Call), or a
+ * call-recorder app — and file it under a patient, with a note to write what
+ * was said.
  */
 
 const AUDIO_EXTENSIONS = new Set(['m4a', 'amr', 'awb', '3gp', 'mp3', 'aac', 'wav', 'ogg', 'opus']);
@@ -38,9 +39,11 @@ export function recordingMimeType(name: string): string | null {
 
 /*
  * Timestamps as recorders write them, the last one in the name wins:
- * "…_260926_143012" (Samsung), "…_20260926_143012", "…2026-09-26_14-30-12".
+ * "…_260926_143012" (Samsung), "…_20260926_143012", "…_20260926143012",
+ * "…2026-09-26_14-30-12".
  */
 const COMPACT = /(^|\D)(\d{8}|\d{6})[ _-](\d{6}|\d{4})(?!\d)/g;
+const RUN_ON = /(^|\D)(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?!\d)/g;
 const DASHED = /(^|\D)(\d{4})-(\d{2})-(\d{2})[ _T](\d{2})[-.:](\d{2})(?:[-.:](\d{2}))?/g;
 
 type Stamp = { at: Date; index: number; length: number };
@@ -72,7 +75,7 @@ function lastStamp(base: string): Stamp | null {
     const index = m.index! + m[1]!.length;
     if (at && (!found || index >= found.index)) found = { at, index, length: m[0].length - m[1]!.length };
   }
-  for (const m of base.matchAll(DASHED)) {
+  for (const m of [...base.matchAll(DASHED), ...base.matchAll(RUN_ON)]) {
     const [y, mo, d, h, mi, s] = [m[2], m[3], m[4], m[5], m[6], m[7] ?? '0'].map(Number) as [
       number,
       number,
@@ -106,7 +109,7 @@ export function parseRecordingName(name: string, modifiedAt: Date): RecordingNam
   const stamp = lastStamp(base);
   const rest = stamp ? base.slice(0, stamp.index) + base.slice(stamp.index + stamp.length) : base;
   const who = rest
-    .replace(/^\s*(call[\s_-]*recording|recording|record)(?=[\s_-]|$)/i, '')
+    .replace(/^\s*(call[\s_-]*recording|recording|record|call)(?=[\s_@-]|$)@?/i, '')
     .replace(/[\s_-]+/g, ' ')
     .trim();
   return { who: who || null, recordedAt: stamp?.at ?? modifiedAt };

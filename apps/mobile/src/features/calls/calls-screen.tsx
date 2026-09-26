@@ -96,7 +96,12 @@ export function CallsScreen() {
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {!folderUri || recordings === null ? (
-          <Setup lost={recordings === null} onChoose={() => void chooseFolder()} onPickOne={() => void pickOne()} />
+          <Setup
+            lost={recordings === null}
+            onChoose={() => void chooseFolder()}
+            onPickOne={() => void pickOne()}
+            onSummary={() => router.push('/capture')}
+          />
         ) : (
           <>
             <SectionHeader
@@ -154,7 +159,23 @@ export function CallsScreen() {
   );
 }
 
-function Setup({ lost, onChoose, onPickOne }: { lost: boolean; onChoose: () => void; onPickOne: () => void }) {
+/**
+ * How recordings get here, and what to do without one. The dialer's own
+ * recording is region-locked: on the owner's phone (a Gulf firmware) Samsung
+ * removed it, which is why the text does not promise it.
+ */
+function Setup({
+  lost,
+  onChoose,
+  onPickOne,
+  onSummary,
+}: {
+  lost: boolean;
+  onChoose: () => void;
+  onPickOne: () => void;
+  /** Without a recording: say what was agreed into a quick capture, right after the call. */
+  onSummary: () => void;
+}) {
   const { colors } = useTheme();
   return (
     <Card>
@@ -168,7 +189,7 @@ function Setup({ lost, onChoose, onPickOne }: { lost: boolean; onChoose: () => v
         <Text variant="body" color="textMuted">
           {lost
             ? 'دسترسی به پوشه از دست رفته (مثلاً بعد از بازگردانی روی گوشی دیگر). دوباره انتخابش کنید.'
-            : 'اندروید ضبط تماس را فقط به اپ «تلفن» گوشی اجازه می‌دهد؛ MedOS خودش نمی‌تواند تماس را ضبط کند، ولی ضبط‌های آن را برمی‌دارد. در اپ «تلفن» سامسونگ: منوی سه‌نقطه ← تنظیمات ← ضبط تماس‌ها ← «ضبط خودکار تماس‌ها» را روشن کنید. بعد از اولین تماسِ ضبط‌شده، پوشه‌ی Recordings/Call را اینجا انتخاب کنید.'}
+            : 'اندروید ضبط تماس را فقط به اپ «تلفن» گوشی یا به اپ‌های ضبط تماس می‌دهد؛ MedOS خودش تماس را ضبط نمی‌کند، ضبط‌های آن‌ها را به پرونده می‌آورد. اگر اپ «تلفن» گوشی «ضبط تماس‌ها» دارد، روشنش کنید (ضبط‌ها در Recordings/Call می‌آیند)؛ اگر ندارد — سامسونگ آن را برای بعضی کشورها برداشته — یک اپ ضبط تماس لازم است. بعد از اولین تماسِ ضبط‌شده، پوشه‌ی ضبط‌ها را اینجا انتخاب کنید.'}
         </Text>
         {lost ? null : (
           <Text variant="caption" color="textFaint">
@@ -177,6 +198,15 @@ function Setup({ lost, onChoose, onPickOne }: { lost: boolean; onChoose: () => v
         )}
         <Button label="انتخاب پوشه‌ی ضبط تماس‌ها" icon="folder-open-outline" full onPress={onChoose} />
         <Button label="یک فایل صوتی را انتخاب کنید" icon="document-outline" variant="ghost" full onPress={onPickOne} />
+        {lost ? null : (
+          <Button
+            label="بدون ضبط: خلاصه‌ی صوتی بعد از تماس"
+            icon="mic-outline"
+            variant="ghost"
+            full
+            onPress={onSummary}
+          />
+        )}
       </Column>
     </Card>
   );
