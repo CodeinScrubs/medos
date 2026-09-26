@@ -39,6 +39,12 @@ export function MoreScreen() {
       subtitle: 'هرچه سریع ثبت کرده‌اید و هنوز جایش مشخص نیست',
       href: '/inbox',
     },
+    {
+      icon: 'call-outline',
+      title: 'ضبط تماس‌ها',
+      subtitle: 'ضبطِ اپ «تلفن»، با یک لمس در پرونده‌ی بیمار',
+      href: '/calls',
+    },
   ];
 
   const reference: Item[] = [

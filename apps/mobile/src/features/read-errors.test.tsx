@@ -85,6 +85,7 @@ jest.mock('@/components/autosave-scope', () => ({
   useAutosaveScope: () => ({ perform: (action: () => void) => action() }),
 }));
 jest.mock('./backup/restore-trouble', () => ({ RestoreTrouble: 'RestoreTrouble' }));
+jest.mock('./calls/recent-calls-card', () => ({ RecentCallsCard: 'RecentCallsCard' }));
 jest.mock('./capture/capture-card', () => ({ CaptureCard: 'CaptureCard', groupMedia: () => new Map(), NO_MEDIA: [] }));
 jest.mock('./patients/patient-card', () => ({ PatientCard: 'PatientCard' }));
 jest.mock('./followups/follow-up-card', () => ({ FollowUpCard: 'FollowUpCard' }));

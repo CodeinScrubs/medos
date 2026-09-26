@@ -11,6 +11,7 @@ import { useNow } from '@/components/use-now';
 import type { Occasion } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { formatJalaliLong, toJalali } from '@/lib/jalali';
+import { RLM } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { OCCASION_KIND_LABELS } from './labels';
@@ -206,7 +207,7 @@ function OccasionForm({
           hint="می‌توانید {نام} و {مناسبت} بنویسید تا خودکار پر شوند. خالی بگذارید تا متن پیش‌فرض استفاده شود."
         />
         <Text variant="tiny" color="textFaint">
-          MedOS خودش پیامی نمی‌فرستد. سر موعد نوتیفیکیشن می‌دهد و متن را آماده می‌کند؛ فرستادن با خودتان است.
+          {RLM}MedOS خودش پیامی نمی‌فرستد. سر موعد نوتیفیکیشن می‌دهد و متن را آماده می‌کند؛ فرستادن با خودتان است.
         </Text>
 
         <Button

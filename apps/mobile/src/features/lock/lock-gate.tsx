@@ -8,6 +8,7 @@ import { Button, Column, Text } from '@/components/ui';
 import { audit } from '@/db/audit';
 import { writeSetting } from '@/db/settings';
 import { useSetting } from '@/db/use-setting';
+import { RLM } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { lockEnabled, lockGraceSeconds } from './settings';
@@ -128,7 +129,7 @@ export function LockGate({ children }: { children: ReactNode }) {
           {enabled.loaded ? (
             <Column gap="md" style={{ alignItems: 'center', padding: spacing.xxl }}>
               <Ionicons name="lock-closed" size={48} color={colors.primary} />
-              <Text variant="title">MedOS قفل است</Text>
+              <Text variant="title">{RLM}MedOS قفل است</Text>
               <Text variant="caption" color="textMuted" align="center">
                 با اثر انگشت یا قفل صفحه‌ی گوشی باز کنید.
               </Text>

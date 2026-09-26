@@ -9,6 +9,7 @@ import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { BackupNudge } from '@/features/backup/backup-nudge';
 import { RestoreTrouble } from '@/features/backup/restore-trouble';
+import { RecentCallsCard } from '@/features/calls/recent-calls-card';
 import { InboxSection } from '@/features/capture/inbox-section';
 import { OpenConsults } from '@/features/consults/open-consults';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
@@ -86,6 +87,7 @@ export function TodayScreen() {
           />
           <RestoreTrouble />
           <BackupNudge now={now.getTime()} />
+          <RecentCallsCard now={now} />
 
           <Row gap="sm" style={{ marginTop: spacing.lg }}>
             <StatTile

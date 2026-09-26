@@ -7,6 +7,7 @@ import { Linking } from 'react-native';
 import { Badge, Button, Card, Column, Divider, Row, Text } from '@/components/ui';
 import { useSetting } from '@/db/use-setting';
 import { backupFolderUri } from '@/features/backup/settings';
+import { RLM } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 /*
@@ -159,7 +160,7 @@ export function PermissionsCard() {
           onPress={() => void Linking.openSettings()}
         />
         <Text variant="tiny" style={{ color: colors.textFaint }}>
-          MedOS به حافظه‌ی گوشی دسترسی کلی نمی‌خواهد؛ فقط همان پوشه‌ای که خودتان برای بکاپ انتخاب می‌کنید.
+          {RLM}MedOS به حافظه‌ی گوشی دسترسی کلی نمی‌خواهد؛ فقط همان پوشه‌ای که خودتان برای بکاپ انتخاب می‌کنید.
         </Text>
       </Column>
     </Card>

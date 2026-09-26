@@ -589,6 +589,30 @@ requiring `semver` is the case that surfaced it.
 
 ---
 
+## Call recordings come from the dialer, not from MedOS
+
+The owner wanted calls recorded and kept with the patient. Since Android 10 only the system
+dialer may capture call audio (`VOICE_CALL` needs a system permission); an ordinary app that
+holds the microphone during a call gets silence or is refused, and the workarounds
+(accessibility services, speakerphone capture) are one-sided, fragile across OEM updates and
+exactly the kind of permission a clinical app should not ask for. Samsung's dialer records
+both sides itself, into `Recordings/Call`.
+
+So MedOS files what the dialer wrote (`features/calls/`). The owner grants that one folder
+once through Android's picker (persistable SAF grant, nothing else becomes readable); the
+list reads it on focus, parses who and when from the dialer's file name, and one tap copies
+a recording into MedOS's media storage and writes a «پیگیری تلفنی» note dated at the call,
+with the audio attached, in one transaction after the copy. The copy means backups carry
+it and deleting it from the dialer's folder loses nothing. Today counts the last two days'
+recordings not yet filed. Any single audio file can be filed the same way.
+
+**Rejected:** recording inside MedOS (not possible with a real call), reading the dialer's
+folder through broad storage permissions (`READ_MEDIA_AUDIO` reads every recording on the
+phone), and filing automatically by matching the phone number to a patient (a relative's or
+colleague's number, a shared line — the physician picks the patient).
+
+---
+
 ## Scope boundary: records and validated physician-reviewed tools
 
 The original records-only boundary excluded clinical calculators. On 2026-09-23 the owner
