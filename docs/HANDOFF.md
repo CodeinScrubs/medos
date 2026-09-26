@@ -33,6 +33,46 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-26 (0.11.2) — Share a recording to MedOS; why MedOS does not record calls itself
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** 77db0dd, and this one (0.11.2)
+
+The owner installed Cube ACR: their own voice clear, the other side low. They offered an
+accessibility service inside MedOS "if it brings good stuff". It would not here: an
+accessibility recorder captures the microphone, exactly as Cube does, so the far end would
+sound the same; the call's own audio is only for system apps. Not built (architecture.md).
+What was missing instead: Cube keeps recordings in its private storage (none in shared
+storage), so MedOS could not see them. MedOS is now a share target for audio.
+
+**On the phone (0.11.1, then 0.11.2 installed)**
+- 0.11.1: picking a single audio file → patient → «پیگیری تلفنی» note with the call's time,
+  audio attached; the note-type strip opens on «پیگیری تلفنی»; glance card shows
+  «کاردکس … ۱ دستور جاری» (the "۱۰" misread is gone); identity lines with «،».
+- Cleaned up: test patients «Device Test» (→ trash), `/sdcard/Recordings/MedOS-test`, the
+  test file in Download.
+- While opening Cube's menu one tap landed on one of the owner's recordings and played a few
+  seconds; stopped at once, Cube was reopened so it keeps receiving calls. No Cube setting
+  was changed.
+- 0.11.2's share flow was not walked on the phone: the phone locked (cannot be unlocked
+  from here). A temporary patient «Share Test» may or may not have been created before the
+  lock — check the list and delete it if it is there.
+
+**Verified**
+- `npm run check` green (66 suites / 759 tests + 3 workflow).
+- Emulator: share from the Files app → MedOS → patient → note with title from the file
+  name, 09:15 from it, recording attached; cold and warm starts.
+- `dist/MedOS-0.11.2.apk`: versionCode 18, arm64-v8a, signer 1119f776…7e0c, manifest has the
+  SEND filter.
+
+**Open threads**
+- Owner: in Cube, tap a recording → share → MedOS → patient. Report if Cube's share offers
+  MedOS and whether the note gets the audio (Cube's provider URI takes the new
+  content-resolver copy path, which the emulator's Files share does not exercise).
+- Cube quality (owner's choice, in Cube → Settings → Recording): try audio source "Voice
+  call"; raise "Phone calls clarity improvement"; "Maximize in-call volume"; speakerphone
+  for calls that must be recorded clearly.
+
 ## 2026-09-26 (0.11.1) — The phone has no call recording; the calls screen stops promising it
 
 **Agent:** claude-opus-5-5 via Claude Code
