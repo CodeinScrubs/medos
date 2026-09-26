@@ -33,6 +33,69 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-26 (0.10.0) — Patient at a glance, search by diagnosis and bed, an icon of its own
+
+**Agent:** claude-opus-5-5 via Claude Code
+**Commits:** 319b7f8, ef20373, 14e1695, ad438d1, 647db1b, and this one (0.10.0)
+
+The owner asked for the app to be as ready for use as it can be, and for design ideas.
+Old APKs were deleted from `dist/` (owner's go-ahead); 0.9.1 (on the phone) and 0.10.0
+remain. The owner does not want history rewritten for the name in f3e3431.
+
+**Changed**
+- W04: «در یک نگاه» on the record's first tab — last vitals, newest lab result per analyte
+  that is flagged or unreadable (`labsToReview`), running orders, last note's A/P, each with
+  its age and a tap to its tab. Allergies show «ثبت نشده» (grey) when blank, distinct from
+  NKDA, on the header, round card and order form. Header is one block shorter.
+- Search finds patients by diagnosis and by the open episode's ward/service/bed
+  (`features/patients/search-index.ts`, `SEARCH_INDEX_VERSION` 3).
+- Bug: every discharge was audited as `encounter.deleted` and deletions were not audited
+  (misplaced call since 08f0818). Now `encounter.discharged` / `encounter.deleted`.
+- `Fab` adds the bottom inset unless `tabRoot`: on Vault/Places/Extensions it sat half
+  under the three-button bar. Today's list ends clear of its button.
+- Timeline lab entries show the results; shift and round mark a discharged patient.
+- Launcher icon, themed icon and splash were Expo's template: now MedOS's own
+  (`scripts/draw-icons.ps1`). Home-screen shortcuts (long-press): capture, new patient,
+  patients, shift (`plugins/with-app-shortcuts.js`). Deep-linked screens get the tabs
+  underneath (`unstable_settings`) — capture opened from outside could not be left.
+- `plugins/with-system-bars.js`: navigation bar follows a light/dark switch while running
+  (the other reviewer's "white bar in dark mode" — reproduced on the emulator by switching
+  the theme with the app open); Recents gets no screenshot on Android 13+.
+
+**Verified**
+- `npm run check` green (63 suites / 743 tests + 3 workflow).
+- Emulator, x86_64 build of this source (fabricated data): the glance card (vitals, K "5,8 ?",
+  Cr/FBS H, last note), the shorter header, «آلرژی: ثبت نشده» on a new patient, search
+  "nstemi" finds the patient after the startup re-index, timeline lab line, «ترخیص شد» in
+  the shift, Vault's "+" above the bar, new splash and launcher icon, the four shortcuts
+  (capture cold → save → lands on Today; shift warm), dark↔light switch with the app open
+  (bar follows both ways), Recents tile blank when entered from the home screen.
+- `dist/MedOS-0.10.0.apk`: versionCode 15, arm64-v8a, signer 1119f776…7e0c (same as 0.9.1
+  on the phone), 52.6 MB; the bundle contains the new strings and the manifest the shortcuts.
+  `dist/` now holds 0.9.1 and 0.10.0 only.
+
+**Not verified**
+- Anything on the phone (not connected): Samsung's launcher shortcuts and icon mask, One
+  UI's Recents, the theme switch under a sunset schedule.
+- Recents while MedOS itself is in front shows the live screen (that is not a screenshot;
+  only `FLAG_SECURE` would hide it, and it would also block screenshots).
+- Shortcuts in a debug build open the release package by design.
+
+**Open threads**
+- Install 0.10.0 on the phone; walk the glance card, a shortcut, the theme switch, Recents,
+  plus the 0.9.2 list (lab comma, task undo, order-form banner, test discharge).
+- Design ideas offered to the owner, not built: see the chat of this session and below.
+  Sticky name/allergy bar while scrolling a record; swipe to complete/snooze tasks and
+  follow-ups; owner-written note snippets; shift/round sorted by bed; editable patient
+  tags (the column exists, no UI); undo instead of confirm for deletes.
+
+**Gotchas**
+- `expo prebuild` clears `android/`; a Gradle daemon still holding a dex file makes it fail
+  half-way (EBUSY). Stop the Java daemons first; the next build is a full native one
+  (~13–15 min for x86_64).
+- A component test that reads through `useLive` needs `expo-sqlite`'s change listener
+  mocked (`{ remove }`) and real-timer waits: sql.js answers after a macrotask.
+
 ## 2026-09-26 (review) — A physician's walk-through, checked claim by claim (0.9.2)
 
 **Agent:** claude-opus-5-5 via Claude Code
