@@ -33,6 +33,67 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-27 — Atomic audio imports and truthful shift recovery (0.11.3)
+
+**Agent:** GPT-6 via Codex
+**Commits:** `28585b4` (calls), `5796701` (shift/round); release/evidence entry in this commit.
+
+**Changed**
+- Rechecked the builder's current base `26f67ea` and its successful hosted CI before edits;
+  baseline `npm run check`: 66 suites / 759 app tests + 3 workflow tests. No subagents.
+- Audio import now commits note/version/attachment/filed hint together, refuses a patient
+  deleted during copying, and does not assign historical audio to today's encounter.
+  Unknown or file-derived time is labelled in the note and attachment. Failed imports
+  retain the source and patient selection; duplicate taps are blocked; newer incoming
+  shares survive completion of an earlier copy. Post-commit navigation errors say saved.
+- Shift/round reads expose retry and withhold false empty/completion claims, preserving
+  loaded handoff text. Round note/consult lookups have retry. Failed patient-add keeps its
+  selection; start/add actions guard overlapping taps. No schema or dependency changes.
+- Version 0.11.3 / code 19; synchronized stale lockfile workspace version/engine metadata.
+  `IMPLEMENTATION.md` and `architecture.md` record the boundaries, not just the fixes.
+
+**Verified**
+- Regression failures reproduced before fixes; focused calls/read-recovery: 5 suites / 53
+  tests. Full isolated `npm run check`: 67 suites / 786 app tests + 3 workflow tests.
+- `npm run apk` succeeded. `dist/MedOS-0.11.3.apk`: code 19, arm64-v8a only,
+  52,630,487 bytes; aapt metadata and apksigner verification passed. Its signing certificate
+  matches 0.11.2 (SHA-256 `1119f776...be87e0c`). APK SHA-256:
+  `d8cb1eb8ecd4d27c82c1e3ac208001711bb087fc3fec25e0fad9cb1a239785b5`.
+- API 36.1 x86_64 release emulator: synthetic audio picked through Android's real Files
+  provider -> patient -> phone-follow-up note with a one-second attachment and the explicit
+  file-time provenance; header Save exited without a MedOS crash. Added the synthetic
+  patient to the active shift, opened the round, entered handoff text, waited for autosave,
+  force-stopped the app, reopened the round and read the same text and latest imported note.
+  Synthetic patient moved to trash; source WAV removed; existing shift membership restored.
+  No playback/acoustic claim: the generated WAV was silent.
+
+**Not verified**
+- Physical phone, actual Cube audio/share, native injected read/write errors, interruption
+  before autosave/while copying or committing, low-disk/interrupted restore and real
+  reminder delivery in this session. Waiting for autosave then force-stopping is narrower
+  than proving recovery of every pending edit.
+
+**Open threads**
+- Continue the full ordered scope in `IMPLEMENTATION.md`; these fixes do not complete it.
+- D08: key/reset membership query state when active-shift identity changes; audit other
+  auxiliary lookups and retained manual-form drafts. Tests here inject reads with a hook
+  stand-in; real useLive dependency transitions need their own regression/acceptance.
+- C05: durable import identity/journaling across process death; orphan file recovery;
+  filename marker collisions. The marker remains a bounded display hint, and deliberate
+  reimport still creates another note. Actual Cube-provider acceptance remains open.
+- D05/D10: native exit/process-death and interrupted backup/restore acceptance; then
+  W02/W05-W10 everyday flows. Rich text and the C01-C04 clinical/AI scope remain in the
+  ledger with their validation gates; do not replace them with speculative infrastructure.
+
+**Gotchas**
+- Concurrent Gradle + emulator + Jest exhausted test time budgets: follow-up UI and scrypt
+  each exceeded 5 seconds. The same full check passed unchanged with those jobs stopped.
+  Avoid concurrent heavy validation; do not raise timeouts to hide this evidence.
+- First cold native build failed at packageRelease without a cause in the ordinary log;
+  incremental retry with `--stacktrace --max-workers=2` passed unchanged. Gradle warned
+  about its 512 MiB metaspace; do not label the original failure as proven OOM. The emulator
+  also showed a System UI ANR during boot/installation, dismissed with Wait before app tests.
+
 ## 2026-09-26 (0.11.2, phone) — Sharing a recording to MedOS, walked on the phone
 
 **Agent:** claude-opus-5-5 via Claude Code

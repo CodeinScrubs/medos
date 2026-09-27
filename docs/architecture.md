@@ -604,14 +604,30 @@ nothing). There a call-recorder app has to do the recording, and MedOS files its
 So MedOS files what a recorder wrote (`features/calls/`). The owner grants that one folder
 once through Android's picker (persistable SAF grant, nothing else becomes readable); the
 list reads it on focus, parses who and when from the dialer's file name, and one tap copies
-a recording into MedOS's media storage and writes a «پیگیری تلفنی» note dated at the call,
-with the audio attached, in one transaction after the copy. The copy means backups carry
+a recording into MedOS's media storage and writes a «پیگیری تلفنی» note with the audio attached.
+The note, initial version, attachment and filed marker commit in one synchronous transaction
+after the copy. The transaction rechecks that the patient is alive; a failed transaction
+removes only its newly copied file. It does not infer an encounter from today's admission.
+The copy means backups carry
 it and deleting it from the dialer's folder loses nothing. Today counts the last two days'
 recordings not yet filed. Any single audio file can be filed the same way, and MedOS is in
 Android's share menu for audio (`plugins/with-share-target.js`): the recorder the owner uses,
 Cube ACR, keeps its recordings in private storage, so «اشتراک‌گذاری» → MedOS → patient is how
 they arrive. The share becomes a `medos://calls?shared=<hex URI>` link before React starts; a
 file from another app's provider is copied through the content resolver.
+
+Time provenance matters: a filename timestamp is a parsed source, not a verified clinical
+time. A file-modification fallback is labelled as such. A shared recording without a
+recognizable timestamp has unknown call time; its note uses import time with that distinction
+in the body and attachment caption. The physician can review and correct the note.
+
+The picker retains its source and selected patient on failure, blocks overlapping submits,
+and offers retry for patient-read errors. A newer share arriving during a copy is not consumed
+by completion of the previous import. Navigation failures after commit report that the file
+was saved. The filename-based filed marker is a bounded display hint, not a unique import
+identity: intentional reimport is available, equal names can collide, and process death
+between file copy and commit can leave an orphan file. Durable import identities/journaling
+remain separate work; the transaction does not make the filesystem atomic.
 
 Recording inside MedOS was looked at again when the owner offered an accessibility service:
 it would capture the same microphone Cube does, so the other side would sound no better — the
