@@ -36,7 +36,7 @@ wrong, never rewrite them to look better.
 ## 2026-09-27 — Atomic audio imports and truthful shift recovery (0.11.3)
 
 **Agent:** GPT-6 via Codex
-**Commits:** `28585b4` (calls), `5796701` (shift/round); release/evidence entry in this commit.
+**Commits:** `28585b4` (calls), `5796701` (shift/round), `05036fb` (release); test-worker limit in this commit.
 
 **Changed**
 - Rechecked the builder's current base `26f67ea` and its successful hosted CI before edits;
@@ -51,10 +51,14 @@ wrong, never rewrite them to look better.
   selection; start/add actions guard overlapping taps. No schema or dependency changes.
 - Version 0.11.3 / code 19; synchronized stale lockfile workspace version/engine metadata.
   `IMPLEMENTATION.md` and `architecture.md` record the boundaries, not just the fixes.
+- Capped Jest at two workers: the default seven on this host repeated a 5-second
+  follow-up UI timeout in the pre-push check. All tests and their time limits remain
+  enabled; concurrency is bounded at the cost of less parallelism. No APK runtime change.
 
 **Verified**
 - Regression failures reproduced before fixes; focused calls/read-recovery: 5 suites / 53
-  tests. Full isolated `npm run check`: 67 suites / 786 app tests + 3 workflow tests.
+  tests. Final `npm run check` with two workers: 67 suites / 786 app tests + 3 workflow
+  tests; Jest completed in 35.5 seconds. Assertions and the 5-second time limit are unchanged.
 - `npm run apk` succeeded. `dist/MedOS-0.11.3.apk`: code 19, arm64-v8a only,
   52,630,487 bytes; aapt metadata and apksigner verification passed. Its signing certificate
   matches 0.11.2 (SHA-256 `1119f776...be87e0c`). APK SHA-256:
@@ -88,11 +92,16 @@ wrong, never rewrite them to look better.
 **Gotchas**
 - Concurrent Gradle + emulator + Jest exhausted test time budgets: follow-up UI and scrypt
   each exceeded 5 seconds. The same full check passed unchanged with those jobs stopped.
-  Avoid concurrent heavy validation; do not raise timeouts to hide this evidence.
+  The default-worker pre-push run later repeated the follow-up timeout, so serializing
+  our own build jobs alone was insufficient. Avoid concurrent heavy validation and keep
+  the bounded test-worker default; no timeout was increased or pre-push hook bypassed.
 - First cold native build failed at packageRelease without a cause in the ordinary log;
   incremental retry with `--stacktrace --max-workers=2` passed unchanged. Gradle warned
   about its 512 MiB metaspace; do not label the original failure as proven OOM. The emulator
   also showed a System UI ANR during boot/installation, dismissed with Wait before app tests.
+- During that loaded emulator session, a long `adb input text` name lost its suffix before
+  changing focus; the later short handoff string was verified exactly before/after restart.
+  App versus IME/input-injection cause is unverified; fast physical typing needs acceptance.
 
 ## 2026-09-26 (0.11.2, phone) — Sharing a recording to MedOS, walked on the phone
 

@@ -6,6 +6,9 @@
  */
 module.exports = {
   preset: 'jest-expo',
+  // Each worker loads React Native transforms and SQLite/WASM. Unbounded CPU-based
+  // parallelism can time out otherwise fast tests on a shared development machine.
+  maxWorkers: 2,
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
   moduleNameMapper: {
