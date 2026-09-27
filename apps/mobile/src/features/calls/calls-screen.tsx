@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { Badge, Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
@@ -41,6 +42,8 @@ export function CallsScreen() {
   const [listening, setListening] = useState<string | null>(null);
   const [filing, setFiling] = useState<CallRecording | null>(null);
   const [busy, setBusy] = useState(false);
+  const saving = useRef(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   const folderUri = folder.value;
 
@@ -50,13 +53,18 @@ export function CallsScreen() {
   const [handledShare, setHandledShare] = useState<string | null>(null);
   const incoming = useMemo(() => {
     const uri = shared && shared !== handledShare ? decodeSharedUri(shared) : null;
-    return uri ? describeShared(uri, name, new Date()) : null;
+    return uri ? describeShared(uri, name) : null;
   }, [shared, name, handledShare]);
   const pending = filing ?? incoming;
+  const latestPending = useRef(pending);
+  useEffect(() => {
+    latestPending.current = pending;
+  }, [pending]);
 
   /** Done with whatever the picker was showing; a share is answered once. */
   function closePicker() {
     setFiling(null);
+    setSelectedPatientId(null);
     if (incoming && shared) {
       setHandledShare(shared);
       router.setParams({ shared: undefined, name: undefined });
@@ -68,7 +76,8 @@ export function CallsScreen() {
     }, [folderUri]),
   );
 
-  const { data: patientRows } = useLive(patientListQuery());
+  const patients = useLive(patientListQuery());
+  const { data: patientRows } = patients;
   const patientItems: PickerItem[] = useMemo(
     () =>
       (patientRows ?? []).map((p) => ({
@@ -97,16 +106,28 @@ export function CallsScreen() {
   }
 
   async function file(patientId: string, recording: CallRecording) {
+    if (saving.current || patients.error || patients.loading || !patientRows?.some((p) => p.id === patientId)) return;
+    saving.current = true;
+    setSelectedPatientId(patientId);
     setBusy(true);
+    let noteId: string;
     try {
-      const noteId = await fileCallRecording(patientId, recording);
-      setListening(null);
-      // The note is empty: what was said is written now, while it is fresh.
-      router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
+      noteId = await fileCallRecording(patientId, recording);
     } catch (e) {
       alertError('به پرونده اضافه نشد', e);
+      return;
     } finally {
+      saving.current = false;
       setBusy(false);
+    }
+    // A navigation failure must not be reported as a failed clinical write.
+    try {
+      setListening(null);
+      // A newer share may arrive during the copy. Do not consume that request.
+      if (latestPending.current === recording) closePicker();
+      router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
+    } catch (e) {
+      alertError('فایل ذخیره شد؛ نوت باز نشد', e);
     }
   }
 
@@ -115,10 +136,16 @@ export function CallsScreen() {
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {pending ? <ErrorNotice error={patients.error} what="فهرست بیماران" onRetry={patients.retry} /> : null}
+        {busy ? (
+          <Text variant="caption" color="textMuted">
+            در حال وارد کردن فایل…
+          </Text>
+        ) : null}
         {!folderUri || recordings === null ? (
           <Setup
             lost={recordings === null}
-            onChoose={() => void chooseFolder()}
+            onChoose={() => void chooseFolder().catch((e) => alertError('پوشه ثبت نشد', e))}
             onPickOne={() => void pickOne()}
             onSummary={() => router.push('/capture')}
           />
@@ -128,7 +155,7 @@ export function CallsScreen() {
               title="ضبط‌های اخیر"
               count={recordings?.length}
               action={
-                <Pressable hitSlop={8} onPress={() => void chooseFolder()}>
+                <Pressable hitSlop={8} onPress={() => void chooseFolder().catch((e) => alertError('پوشه ثبت نشد', e))}>
                   <Text variant="captionStrong" color="primary">
                     تغییر پوشه
                   </Text>
@@ -164,14 +191,14 @@ export function CallsScreen() {
       </Column>
 
       <PickerModal
-        visible={pending != null && !busy}
+        visible={pending != null && !busy && !patients.error}
         title="این تماس با کدام بیمار بود؟"
-        items={patientItems}
-        emptyText="بیماری نیست. اول بیمار را بسازید."
+        items={patients.error ? [] : patientItems}
+        selectedId={selectedPatientId}
+        emptyText={patients.loading ? 'در حال خواندن…' : 'بیماری نیست. اول بیمار را بسازید.'}
         onClose={closePicker}
         onSelect={(item) => {
           const recording = pending;
-          closePicker();
           if (recording) void file(item.id, recording);
         }}
       />
@@ -257,7 +284,9 @@ function RecordingCard({
             </Text>
             <Text variant="caption" color="textMuted">
               {joinLabels([
-                recording.recordedAt.getTime() > 0 ? formatJalaliDateTime(recording.recordedAt) : null,
+                recording.recordedAt
+                  ? `${recording.timeSource === 'file' ? 'زمان فایل: ' : ''}${formatJalaliDateTime(recording.recordedAt)}`
+                  : 'زمان تماس مشخص نیست',
                 recording.sizeBytes != null ? formatBytes(recording.sizeBytes) : null,
               ])}
             </Text>

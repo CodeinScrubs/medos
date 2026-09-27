@@ -41,7 +41,7 @@ export function listRecordings(folderUri: string, limit = 60): CallRecording[] |
   return entries
     .filter((entry): entry is File => entry instanceof File && isRecordingFile(entry.name))
     .map(describe)
-    .sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime())
+    .sort((a, b) => (b.recordedAt?.getTime() ?? 0) - (a.recordedAt?.getTime() ?? 0))
     .slice(0, limit);
 }
 
@@ -62,7 +62,8 @@ function describe(file: File): CallRecording {
     uri: file.uri,
     name: file.name,
     sizeBytes,
-    recordedAt,
+    recordedAt: recordedAt === UNKNOWN ? null : recordedAt,
+    timeSource: parsed.recordedAt !== UNKNOWN ? 'filename' : recordedAt !== UNKNOWN ? 'file' : 'unknown',
     who: parsed.who,
     key: recordingKey(file.name),
   };
@@ -71,7 +72,7 @@ function describe(file: File): CallRecording {
 function modifiedAt(file: File): Date {
   try {
     const time = file.info().modificationTime;
-    return time ? new Date(time) : UNKNOWN;
+    return time && Number.isFinite(time) && time > 0 ? new Date(time) : UNKNOWN;
   } catch {
     return UNKNOWN;
   }
@@ -91,9 +92,9 @@ export function listRecordingNames(folderUri: string): string[] | null {
 /**
  * A recording shared to MedOS from another app (plugins/with-share-target.js).
  * The provider's own file name carries the time when the recorder put it
- * there; without one, the call is taken as just now — it is shared right after.
+ * there. Sharing is not evidence of when a call occurred: missing time stays unknown.
  */
-export function describeShared(uri: string, name: string | null | undefined, now: Date): CallRecording {
+export function describeShared(uri: string, name: string | null | undefined): CallRecording {
   let sizeBytes: number | null = null;
   let fileName = name?.trim() || '';
   try {
@@ -103,12 +104,13 @@ export function describeShared(uri: string, name: string | null | undefined, now
   } catch {
     // The copy will say so if the file cannot be read; the list only needs a label.
   }
-  const parsed = parseRecordingName(fileName || 'recording.m4a', now);
+  const parsed = parseRecordingName(fileName || 'recording.m4a', UNKNOWN);
   return {
     uri,
     name: fileName || 'recording.m4a',
     sizeBytes,
-    recordedAt: parsed.recordedAt,
+    recordedAt: parsed.recordedAt === UNKNOWN ? null : parsed.recordedAt,
+    timeSource: parsed.recordedAt === UNKNOWN ? 'unknown' : 'filename',
     who: parsed.who,
     key: recordingKey(fileName || uri),
   };

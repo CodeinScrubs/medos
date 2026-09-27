@@ -1,5 +1,8 @@
-import { db } from '@/db/client';
-import { readSetting, writeSetting } from '@/db/settings';
+import { and, eq, isNull } from 'drizzle-orm';
+
+import { db, type DbTransaction } from '@/db/client';
+import { patients, settings } from '@/db/schema';
+import { parseSetting } from '@/db/settings';
 import { addAttachmentInTransaction } from '@/features/attachments/queries';
 import { createNoteInTransaction } from '@/features/notes/queries';
 import { extensionOf, mediaFile, storeFile } from '@/platform/media';
@@ -12,9 +15,10 @@ export type CallRecording = {
   uri: string;
   name: string;
   sizeBytes: number | null;
-  recordedAt: Date;
+  recordedAt: Date | null;
+  timeSource: 'filename' | 'file' | 'unknown';
   who: string | null;
-  /** `recordingKey(name, sizeBytes)`. */
+  /** `recordingKey(name)`; a display hint, not a unique import identity. */
   key: string;
 };
 
@@ -24,20 +28,41 @@ export type CallRecording = {
  *
  * The audio is copied into MedOS's own storage first — so it is in the
  * backups, and deleting it from the dialer's folder later loses nothing — and
- * only then are the note and the attachment written, together. A failed write
- * removes the copy it made. The note starts empty on purpose: what was said
- * is the physician's to write, and the screen opens it for that.
+ * only then are the note, attachment and filed marker written together. A failed write
+ * removes the copy it made. An unknown or file-derived time is explained in
+ * the note; the clinical content is the physician's to write.
  */
-export async function fileCallRecording(patientId: string, recording: CallRecording): Promise<string> {
+export async function fileCallRecording(
+  patientId: string,
+  recording: CallRecording,
+  now: Date = new Date(),
+): Promise<string> {
+  const time = recording.recordedAt;
+  const hasTime = time != null && Number.isFinite(time.getTime()) && recording.timeSource !== 'unknown';
+  const noteDate = hasTime ? time : now;
+  const timeNote = !hasTime
+    ? 'زمان تماس مشخص نیست؛ تاریخ نوت، زمان ورود فایل است.'
+    : recording.timeSource === 'file'
+      ? 'تاریخ نوت از زمان فایل گرفته شده؛ زمان تماس تأیید نشده است.'
+      : null;
   const stored = await storeFile(recording.uri, extensionOf(recording.name, 'm4a'));
-  let noteId: string;
   try {
-    noteId = db.transaction((tx) => {
+    return db.transaction((tx) => {
+      // The picker may be stale by the time a provider finishes copying the audio.
+      const patient = tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+        .get();
+      if (!patient) throw new Error('بیمار در دسترس نیست؛ فایل وارد نشد.');
       const id = createNoteInTransaction(tx, {
         patientId,
+        // An imported call is not evidence that it belongs to today's admission.
+        encounterId: null,
         type: 'phone_followup',
         title: recording.who ? `تماس — ${recording.who}` : 'تماس',
-        noteDate: recording.recordedAt,
+        noteDate,
+        body: timeNote,
       });
       addAttachmentInTransaction(tx, {
         entityType: 'note',
@@ -47,9 +72,14 @@ export async function fileCallRecording(patientId: string, recording: CallRecord
         relativePath: stored.relativePath,
         sizeBytes: stored.sizeBytes,
         mimeType: recordingMimeType(recording.name),
-        caption: 'ضبط تماس',
-        capturedAt: recording.recordedAt,
+        caption: !hasTime
+          ? 'ضبط تماس؛ زمان ورود فایل'
+          : recording.timeSource === 'file'
+            ? 'ضبط تماس؛ زمان فایل'
+            : 'ضبط تماس؛ زمان از نام فایل',
+        capturedAt: noteDate,
       });
+      markFiled(tx, recording.key, now);
       return id;
     });
   } catch (error) {
@@ -60,12 +90,14 @@ export async function fileCallRecording(patientId: string, recording: CallRecord
     }
     throw error;
   }
-  await markFiled(recording.key);
-  return noteId;
 }
 
-async function markFiled(key: string): Promise<void> {
-  const filed = await readSetting(callsFiled);
+function markFiled(tx: DbTransaction, key: string, updatedAt: Date): void {
+  const filed = parseSetting(callsFiled, tx.select().from(settings).where(eq(settings.key, callsFiled.key)).get());
   if (filed.includes(key)) return;
-  await writeSetting(callsFiled, [...filed, key].slice(-CALLS_FILED_LIMIT));
+  const value = JSON.stringify(callsFiled.schema.parse([...filed, key].slice(-CALLS_FILED_LIMIT)));
+  tx.insert(settings)
+    .values({ key: callsFiled.key, value, updatedAt })
+    .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt } })
+    .run();
 }

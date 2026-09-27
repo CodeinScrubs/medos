@@ -17,23 +17,23 @@ jest.mock('expo-file-system', () => ({
   },
 }));
 
-const NOW = new Date(2026, 8, 26, 20, 30, 0);
-
 describe('a recording shared to MedOS', () => {
   it('takes who and when from the name the sharing app gave', () => {
     mockFiles.set('content://recorder/1', { name: '1', size: 60_000 });
-    expect(describeShared('content://recorder/1', 'Call@Test Contact_20260926193012.amr', NOW)).toMatchObject({
+    expect(describeShared('content://recorder/1', 'Call@Test Contact_20260926193012.amr')).toMatchObject({
       uri: 'content://recorder/1',
       name: 'Call@Test Contact_20260926193012.amr',
       sizeBytes: 60_000,
       who: 'Test Contact',
       recordedAt: new Date(2026, 8, 26, 19, 30, 12),
+      timeSource: 'filename',
     });
   });
 
-  it('counts a recording with no time in its name as made just now, and survives an unreadable file', () => {
-    const shared = describeShared('content://recorder/missing', 'voice message.ogg', NOW);
-    expect(shared.recordedAt).toBe(NOW);
+  it('keeps unknown call time unknown and survives an unreadable file', () => {
+    const shared = describeShared('content://recorder/missing', 'voice message.ogg');
+    expect(shared.recordedAt).toBeNull();
+    expect(shared.timeSource).toBe('unknown');
     expect(shared.sizeBytes).toBeNull();
     expect(shared.name).toBe('voice message.ogg');
   });

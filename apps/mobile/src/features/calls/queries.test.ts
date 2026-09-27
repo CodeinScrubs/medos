@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { attachments, notes } from '@/db/schema';
+import { attachments, notes, noteVersions } from '@/db/schema';
 import { readSetting } from '@/db/settings';
-import { createPatient } from '@/features/patients/queries';
+import { openEncounter } from '@/features/encounters/queries';
+import { createPatient, deletePatient } from '@/features/patients/queries';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -30,6 +31,7 @@ const recording: CallRecording = {
   name: 'Call recording Test_260926_143012.m4a',
   sizeBytes: 2048,
   recordedAt: new Date(2026, 8, 26, 14, 30, 12),
+  timeSource: 'filename',
   who: 'Test',
   key: recordingKey('Call recording Test_260926_143012.m4a'),
 };
@@ -82,4 +84,61 @@ describe('filing a call recording', () => {
     expect(await t.db.select().from(attachments)).toEqual([]);
     expect(await readSetting(callsFiled)).toEqual([]);
   });
+
+  it('rolls back the note, history and audio when remembering the import fails; retry creates one note', async () => {
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_filed BEFORE INSERT ON settings WHEN NEW.key = 'calls.filed' BEGIN SELECT RAISE(ABORT, 'synthetic marker failure'); END;",
+    );
+    await expect(fileCallRecording(patientId, recording)).rejects.toThrow('synthetic marker failure');
+    expect(t.db.select().from(notes).all()).toEqual([]);
+    expect(t.db.select().from(noteVersions).all()).toEqual([]);
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+    expect(mockDelete).toHaveBeenCalledTimes(1);
+    t.sqlite.exec('DROP TRIGGER fail_filed');
+    await fileCallRecording(patientId, recording);
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+    expect(await readSetting(callsFiled)).toEqual([recording.key]);
+  });
+
+  it('keeps both filed markers when independent recordings finish copying together', async () => {
+    const other = { ...recording, name: 'Other.m4a', key: 'Other.m4a' };
+    await Promise.all([fileCallRecording(patientId, recording), fileCallRecording(patientId, other)]);
+    expect(await readSetting(callsFiled)).toEqual([recording.key, other.key]);
+  });
+
+  it('refuses a patient deleted while the audio was being copied', async () => {
+    mockStoreFile.mockImplementationOnce(async () => {
+      await deletePatient(patientId);
+      return { relativePath: 'media/2026/09/call.m4a', sizeBytes: 2048 };
+    });
+    await expect(fileCallRecording(patientId, recording)).rejects.toThrow();
+    expect(t.db.select().from(notes).all()).toEqual([]);
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+    expect(mockDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not silently link a historical call to the current admission', async () => {
+    await openEncounter({ patientId, kind: 'admission' });
+    await fileCallRecording(patientId, recording);
+    expect(t.db.select().from(notes).get()!.encounterId).toBeNull();
+  });
+
+  it.each(['unknown', 'file'] as const)(
+    'preserves %s time provenance instead of claiming a confirmed call time',
+    async (timeSource) => {
+      const now = new Date('2026-09-27T12:00:00Z');
+      await fileCallRecording(
+        patientId,
+        { ...recording, recordedAt: timeSource === 'unknown' ? null : recording.recordedAt, timeSource },
+        now,
+      );
+      const note = t.db.select().from(notes).get()!;
+      expect(note.noteDate).toEqual(timeSource === 'unknown' ? now : recording.recordedAt);
+      expect(note.body).toContain(timeSource === 'unknown' ? 'زمان ورود فایل' : 'زمان تماس تأیید نشده');
+      expect(t.db.select().from(attachments).get()!.caption).toContain(
+        timeSource === 'unknown' ? 'زمان ورود فایل' : 'زمان فایل',
+      );
+      expect(t.db.select().from(noteVersions).get()!.body).toBe(note.body);
+    },
+  );
 });
