@@ -51,9 +51,13 @@ function RoundScreenContent() {
   const router = useRouter();
   const { spacing } = useTheme();
 
-  const { data: shifts, error } = useLive(activeShiftQuery());
+  const { data: shifts, error, retry: retryShift } = useLive(activeShiftQuery());
   const shift = shifts?.[0] ?? null;
-  const { data: members, error: membersError } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
+  const {
+    data: members,
+    error: membersError,
+    retry: retryMembers,
+  } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
   const rows = useMemo(() => (members ?? []).filter((row) => row.member.shiftId === shift?.id), [members, shift?.id]);
 
   // The cursor follows a person, not a position: somebody can be added to or
@@ -63,7 +67,12 @@ function RoundScreenContent() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const index = indexOfMember(rows, currentId) ?? startIndex(rows);
   const current = index == null ? null : rows[index];
-  const progress = roundProgress(rows);
+  const progress = error || membersError || members === undefined ? null : roundProgress(rows);
+
+  function retryReads() {
+    if (error) retryShift();
+    if (membersError) retryMembers();
+  }
 
   function goTo(next: number | null) {
     setCurrentId(next == null ? null : (rows[next]?.member.id ?? null));
@@ -84,21 +93,42 @@ function RoundScreenContent() {
     goTo(nextIndex(rows, at, { includeCurrent: true }));
   }
 
-  if ((error || membersError) && (shifts === undefined || members === undefined)) {
+  if (error && !shift) {
     return (
       <Screen>
         <ScreenOptions options={{ title: 'راند' }} />
-        <ErrorNotice error={error ?? membersError} what="راند" />
+        <ErrorNotice error={error} what="راند" onRetry={retryReads} />
       </Screen>
     );
   }
 
-  if (members !== undefined && rows.length === 0) {
+  if (membersError && rows.length === 0) {
+    return (
+      <Screen>
+        <ScreenOptions options={{ title: 'راند' }} />
+        <ErrorNotice error={membersError} what="بیماران راند" onRetry={retryReads} />
+      </Screen>
+    );
+  }
+
+  if (shifts === undefined || members === undefined) {
+    return (
+      <Screen>
+        <ScreenOptions options={{ title: 'راند' }} />
+        <ErrorNotice error={error} what="راند" onRetry={retryReads} />
+        <Text variant="caption" color="textMuted">
+          در حال خواندن…
+        </Text>
+      </Screen>
+    );
+  }
+
+  if (!error && !membersError && rows.length === 0) {
     return (
       <Screen scroll>
         <ScreenOptions options={{ title: 'راند' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
-          <ErrorNotice error={error} what="راند" />
+          <ErrorNotice error={error} what="راند" onRetry={retryReads} />
           <EmptyState
             icon="walk-outline"
             title={shift ? 'کسی روی این شیفت نیست' : 'شیفتی باز نیست'}
@@ -114,7 +144,7 @@ function RoundScreenContent() {
     );
   }
 
-  if (progress.done) {
+  if (progress?.done) {
     return (
       <Screen scroll>
         <ScreenOptions options={{ title: 'راند' }} />
@@ -134,6 +164,7 @@ function RoundScreenContent() {
     return (
       <Screen>
         <ScreenOptions options={{ title: 'راند' }} />
+        <ErrorNotice error={error ?? membersError} what="وضعیت راند" onRetry={retryReads} />
       </Screen>
     );
   }
@@ -142,15 +173,15 @@ function RoundScreenContent() {
     <Screen scroll>
       <ScreenOptions options={{ title: 'راند' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error ?? membersError} what="راند" />
+        <ErrorNotice error={error ?? membersError} what="راند" onRetry={retryReads} />
 
         <Row justify="space-between" align="center">
           <Text variant="caption" color="textMuted">
-            بیمار {toPersianDigits(index + 1)} از {toPersianDigits(progress.total)}
+            بیمار {toPersianDigits(index + 1)} از {toPersianDigits(progress?.total ?? rows.length)}
           </Text>
           <Badge
-            label={`${toPersianDigits(progress.seen)} دیده‌شده`}
-            tone={progress.seen > 0 ? 'success' : 'neutral'}
+            label={progress ? `${toPersianDigits(progress.seen)} دیده‌شده` : 'وضعیت بیماران نامشخص'}
+            tone={progress && progress.seen > 0 ? 'success' : 'neutral'}
           />
         </Row>
 
@@ -199,8 +230,16 @@ function RoundCard({ row }: { row: RoundRow }) {
   const { member, patient, encounter } = row;
   const now = useNow();
 
-  const { data: notes, error: notesError } = useLive(latestPatientNoteQuery(patient.id), [patient.id]);
-  const { data: consults, error: consultsError } = useLive(patientConsultsQuery(patient.id), [patient.id]);
+  const {
+    data: notes,
+    error: notesError,
+    retry: retryNotes,
+  } = useLive(latestPatientNoteQuery(patient.id), [patient.id]);
+  const {
+    data: consults,
+    error: consultsError,
+    retry: retryConsults,
+  } = useLive(patientConsultsQuery(patient.id), [patient.id]);
   const lastNote = (notes ?? [])[0] ?? null;
   const where = locationLabel(encounter ?? undefined);
   const elapsed = formatAdmissionElapsed(
@@ -258,7 +297,7 @@ function RoundCard({ row }: { row: RoundRow }) {
         </Column>
       </Card>
 
-      <ErrorNotice error={notesError} what="آخرین نوت" />
+      <ErrorNotice error={notesError} what="آخرین نوت" onRetry={retryNotes} />
       {notesError || notes === undefined ? null : lastNote ? (
         <Card tone="alt">
           <Column gap="xxs">
@@ -282,7 +321,7 @@ function RoundCard({ row }: { row: RoundRow }) {
         </Row>
       )}
 
-      <ErrorNotice error={consultsError} what="کانسالت‌ها" />
+      <ErrorNotice error={consultsError} what="کانسالت‌ها" onRetry={retryConsults} />
       {!consultsError && consults !== undefined ? <ConsultsBrief rows={consults} /> : null}
 
       <TasksSection patientId={patient.id} shiftId={member.shiftId} title="کارهای این بیمار" limit={6} />

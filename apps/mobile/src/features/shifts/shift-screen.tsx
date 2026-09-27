@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AutosaveField } from '@/components/autosave-field';
@@ -51,16 +51,27 @@ function ShiftScreenContent() {
   const scope = useAutosaveScope()!;
   const router = useRouter();
   const { colors, spacing } = useTheme();
-  const { data: shifts, error } = useLive(activeShiftQuery());
+  const { data: shifts, error, retry: retryShift } = useLive(activeShiftQuery());
   const shift = shifts?.[0] ?? null;
 
-  const { data: members, error: membersError } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
+  const {
+    data: members,
+    error: membersError,
+    retry: retryMembers,
+  } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
   const rows = useMemo(() => (members ?? []).filter((row) => row.member.shiftId === shift?.id), [members, shift?.id]);
-  const progress = shiftProgress(rows);
+  const progress = error || membersError || members === undefined ? null : shiftProgress(rows);
 
   const [picking, setPicking] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const { data: patientRows, error: patientsError } = useLive(patientListQuery());
+  const writing = useRef(false);
+  const {
+    data: patientRows,
+    error: patientsError,
+    loading: patientsLoading,
+    retry: retryPatients,
+  } = useLive(patientListQuery());
 
   const patientItems: PickerItem[] = useMemo(
     () =>
@@ -76,40 +87,65 @@ function ShiftScreenContent() {
   // On a ward, the shift is usually every admitted patient: one tap instead of
   // one picker per patient. Anyone else is still added by hand.
   const inShift = new Set(rows.map(({ patient }) => patient.id));
-  const admittedNotInShift = (patientRows ?? []).filter((p) => p.status === 'admitted' && !inShift.has(p.id));
+  const admittedNotInShift = patientsError
+    ? []
+    : (patientRows ?? []).filter((p) => p.status === 'admitted' && !inShift.has(p.id));
+
+  function retryReads() {
+    if (error) retryShift();
+    if (membersError) retryMembers();
+    if (patientsError) retryPatients();
+  }
 
   async function addAllAdmitted() {
-    if (!shift) return;
+    if (!shift || !progress || patientsError || patientsLoading || writing.current) return;
+    writing.current = true;
     setBusy(true);
     try {
       for (const p of admittedNotInShift) await addPatientToShift(shift.id, p.id);
     } catch (e) {
       alertError('اضافه نشد', e);
     } finally {
+      writing.current = false;
       setBusy(false);
     }
   }
 
   async function begin() {
+    if (writing.current) return;
+    writing.current = true;
     setBusy(true);
     try {
       await startShift();
     } catch (e) {
       alertError('شیفت شروع نشد', e);
     } finally {
+      writing.current = false;
       setBusy(false);
     }
   }
 
   function finish() {
-    if (!shift) return;
+    if (!shift || error) return;
     Alert.alert('پایان شیفت؟', 'لیست بیماران این شیفت می‌ماند و بعداً هم می‌توانید ببینیدش.', [
       { text: 'انصراف', style: 'cancel' },
       { text: 'پایان شیفت', onPress: () => void scope.perform(() => endShift(shift.id)) },
     ]);
   }
 
-  if (shifts !== undefined && !shift) {
+  if (error && !shift) {
+    return (
+      <Screen scroll>
+        <ScreenOptions options={{ title: 'شیفت' }} />
+        <Column gap="md" style={{ paddingTop: spacing.md }}>
+          <ErrorNotice error={error} what="شیفت" onRetry={retryReads} />
+          <Button label="شیفت‌های قبلی" variant="ghost" onPress={() => router.push('/shift-history')} />
+        </Column>
+      </Screen>
+    );
+  }
+
+  if (shifts !== undefined && !shift && !error) {
     return (
       <Screen scroll>
         <ScreenOptions options={{ title: 'شیفت' }} />
@@ -131,7 +167,12 @@ function ShiftScreenContent() {
     <Screen scroll>
       <ScreenOptions options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error ?? membersError ?? patientsError} what="شیفت" />
+        <ErrorNotice error={error ?? membersError ?? patientsError} what="شیفت" onRetry={retryReads} />
+        {!error && !membersError && (shifts === undefined || (shift && members === undefined)) ? (
+          <Text variant="caption" color="textMuted">
+            در حال خواندن…
+          </Text>
+        ) : null}
 
         {shift ? (
           <Card style={{ borderColor: colors.primary, borderWidth: 1 }}>
@@ -144,8 +185,12 @@ function ShiftScreenContent() {
                   </Text>
                 </Column>
                 <Badge
-                  label={`${toPersianDigits(progress.seen)} از ${toPersianDigits(progress.total)} دیده‌شده`}
-                  tone={progress.total > 0 && progress.seen === progress.total ? 'success' : 'neutral'}
+                  label={
+                    progress
+                      ? `${toPersianDigits(progress.seen)} از ${toPersianDigits(progress.total)} دیده‌شده`
+                      : 'وضعیت بیماران نامشخص'
+                  }
+                  tone={progress && progress.total > 0 && progress.seen === progress.total ? 'success' : 'neutral'}
                 />
               </Row>
 
@@ -155,7 +200,7 @@ function ShiftScreenContent() {
                     label="شروع راند"
                     icon="walk-outline"
                     onPress={() => void scope.perform(() => router.push('/round'))}
-                    disabled={rows.length === 0}
+                    disabled={rows.length === 0 || progress === null}
                     full
                   />
                 </View>
@@ -163,11 +208,12 @@ function ShiftScreenContent() {
                   label="افزودن بیمار"
                   icon="person-add-outline"
                   variant="secondary"
+                  disabled={busy || error != null}
                   onPress={() => setPicking(true)}
                 />
               </Row>
 
-              {admittedNotInShift.length > 0 ? (
+              {progress && admittedNotInShift.length > 0 ? (
                 <Button
                   label={`افزودن همه‌ی بستری‌ها (${toPersianDigits(admittedNotInShift.length)})`}
                   icon="people-outline"
@@ -176,14 +222,14 @@ function ShiftScreenContent() {
                   onPress={() => void addAllAdmitted()}
                 />
               ) : null}
-              <Button label="پایان شیفت" variant="ghost" onPress={finish} haptic={false} />
+              <Button label="پایان شیفت" variant="ghost" onPress={finish} disabled={error != null} haptic={false} />
             </Column>
           </Card>
         ) : null}
 
-        <SectionHeader title="بیماران این شیفت" count={rows.length} />
+        <SectionHeader title="بیماران این شیفت" count={progress?.total} />
 
-        {rows.length === 0 && members !== undefined ? (
+        {progress?.total === 0 ? (
           <EmptyState
             icon="people-outline"
             title="هنوز بیماری اضافه نشده"
@@ -282,14 +328,38 @@ function ShiftScreenContent() {
       </Column>
 
       <PickerModal
-        visible={picking}
+        visible={picking && !error && !patientsError && !busy}
         title="افزودن بیمار به شیفت"
         items={patientItems}
-        selectedId={null}
-        onClose={() => setPicking(false)}
-        onSelect={(item) => {
+        selectedId={selectedPatientId}
+        emptyText={patientsLoading ? 'در حال خواندن…' : 'بیماری پیدا نشد'}
+        onClose={() => {
           setPicking(false);
-          if (shift) void addPatientToShift(shift.id, item.id).catch((e) => alertError('اضافه نشد', e));
+          setSelectedPatientId(null);
+        }}
+        onSelect={(item) => {
+          if (
+            !shift ||
+            error ||
+            patientsError ||
+            patientsLoading ||
+            writing.current ||
+            !patientRows?.some((p) => p.id === item.id)
+          )
+            return;
+          setSelectedPatientId(item.id);
+          writing.current = true;
+          setBusy(true);
+          void addPatientToShift(shift.id, item.id)
+            .then(() => {
+              setPicking(false);
+              setSelectedPatientId(null);
+            })
+            .catch((e) => alertError('اضافه نشد', e))
+            .finally(() => {
+              writing.current = false;
+              setBusy(false);
+            });
         }}
       />
     </Screen>

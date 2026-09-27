@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cloneElement, type ReactElement } from 'react';
+import { cloneElement, type ReactElement, type ReactNode } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { PickerModal } from '@/components/picker-modal';
-import { Badge, EmptyState, SectionHeader, Text } from '@/components/ui';
+import { Badge, Button, EmptyState, Input, SectionHeader, Text } from '@/components/ui';
 import { tablesOf } from '@/db/query-tables';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase } from '@/test/sqljs';
@@ -20,12 +20,15 @@ import { openEncounter } from './encounters/queries';
 import { dueFollowUpsQuery } from './followups/queries';
 import { patientLabPanelsQuery } from './labs/queries';
 import { openNoteDraftsQuery } from './notes/draft-queries';
-import { createNote } from './notes/queries';
+import { createNote, latestPatientNoteQuery } from './notes/queries';
 import { UnfinishedNotes } from './notes/unfinished-notes';
 import { PatientCard } from './patients/patient-card';
 import { createPatient, patientListQuery } from './patients/queries';
 import { activeShiftQuery, addPatientToShift, shiftPatientsQuery, startShift } from './shifts/queries';
+import * as shiftQueries from './shifts/queries';
+import { RoundScreen } from './shifts/round-screen';
 import { ShiftCard } from './shifts/shift-card';
+import { ShiftScreen } from './shifts/shift-screen';
 import { taskCountQuery } from './tasks/queries';
 import { TasksSection } from './tasks/tasks-section';
 import { TimelineTab } from './timeline/timeline-tab';
@@ -68,6 +71,7 @@ jest.mock('@/components/ui', () => ({
   Column: 'Column',
   EmptyState: 'EmptyState',
   Fab: 'Fab',
+  Input: 'Input',
   Row: 'Row',
   Screen: 'Screen',
   SectionHeader: 'SectionHeader',
@@ -76,13 +80,15 @@ jest.mock('@/components/ui', () => ({
 jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii: {} }) }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
 jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
+jest.mock('@/components/screen-options', () => ({ ScreenOptions: () => null }));
 jest.mock('@/components/feedback', () => ({
   alertError: jest.fn(),
   notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
 }));
 jest.mock('@/components/use-now', () => ({ useNow: () => new Date('2026-09-25T12:00:00Z').getTime() }));
 jest.mock('@/components/autosave-scope', () => ({
-  useAutosaveScope: () => ({ perform: (action: () => void) => action() }),
+  AutosaveScope: ({ children }: { children: ReactNode }) => children,
+  useAutosaveScope: () => ({ perform: (action: () => void) => action(), group: { register: () => () => {} } }),
 }));
 jest.mock('./backup/restore-trouble', () => ({ RestoreTrouble: 'RestoreTrouble' }));
 jest.mock('./calls/recent-calls-card', () => ({ RecentCallsCard: 'RecentCallsCard' }));
@@ -220,6 +226,146 @@ describe('Today read failures', () => {
     await retryAll();
     await refresh(<TasksSection patientId={null} />);
     expect(text()).toContain('کاری باز نیست');
+  });
+});
+
+describe('shift and round read recovery', () => {
+  it.each([ShiftScreen, RoundScreen])(
+    'does not present a failed cached-empty shift read as no active shift (%p)',
+    async (Component) => {
+      await render(<Component />);
+      expect(tree.root.findByType(EmptyState).props.title).toBe('شیفتی باز نیست');
+      fail(activeShiftQuery());
+      await refresh(<Component />);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+      expect(notices()).toHaveLength(1);
+      await retryAll();
+      await refresh(<Component />);
+      expect(tree.root.findByType(EmptyState).props.title).toBe('شیفتی باز نیست');
+    },
+  );
+
+  it.each([ShiftScreen, RoundScreen])(
+    'withholds empty membership claims until a failed read succeeds (%p)',
+    async (Component) => {
+      const id = await startShift();
+      await render(<Component />);
+      fail(shiftPatientsQuery(id));
+      await refresh(<Component />);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+      expect(notices()).toHaveLength(1);
+      await retryAll();
+      await refresh(<Component />);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(1);
+    },
+  );
+
+  it.each([ShiftScreen, RoundScreen])(
+    'does not claim all patients have been seen after a failed membership refresh (%p)',
+    async (Component) => {
+      const id = await startShift();
+      const memberId = await addPatientToShift(id, patientId);
+      await shiftQueries.setShiftPatientReviewed(memberId, true);
+      await render(<Component />);
+      fail(shiftPatientsQuery(id));
+      await refresh(<Component />);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+      expect(tree.root.findAllByType(Badge).some((n) => n.props.tone === 'success')).toBe(false);
+      expect(notices()).toHaveLength(1);
+    },
+  );
+
+  it.each([ShiftScreen, RoundScreen])(
+    'withholds completion and empty claims after a failed active-shift refresh (%p)',
+    async (Component) => {
+      const id = await startShift();
+      const memberId = await addPatientToShift(id, patientId);
+      await shiftQueries.setShiftPatientReviewed(memberId, true);
+      await render(<Component />);
+      fail(activeShiftQuery());
+      await refresh(<Component />);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+      expect(tree.root.findAllByType(Badge).some((n) => n.props.tone === 'success')).toBe(false);
+      expect(notices()).toHaveLength(1);
+      await shiftQueries.removePatientFromShift(memberId);
+      await refresh(<Component />);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+      await retryAll();
+      await refresh(<Component />);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(1);
+    },
+  );
+
+  it.each([ShiftScreen, RoundScreen])('shows loading instead of zero members (%p)', async (Component) => {
+    const id = await startShift();
+    mockLoading.add(tableOf(shiftPatientsQuery(id)));
+    await render(<Component />);
+    expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(tree.root.findAllByType(SectionHeader).every((n) => n.props.count === undefined)).toBe(true);
+    expect(text()).toContain('در حال خواندن');
+    expect(tree.root.findAllByType(Badge).some((n) => n.props.label.includes('۰'))).toBe(false);
+  });
+
+  it('retries last-note and consult reads without resetting round handoff input', async () => {
+    const id = await startShift();
+    await addPatientToShift(id, patientId);
+    await render(<RoundScreen />);
+    const handoff = () => tree.root.findAllByType(Input).find((n) => n.props.label === 'یادداشت تحویل شیفت')!;
+    await act(async () => {
+      handoff().props.onChangeText('Keep this handoff');
+    });
+    fail(latestPatientNoteQuery(patientId));
+    fail(patientConsultsQuery(patientId));
+    await refresh(<RoundScreen />);
+    expect(notices()).toHaveLength(2);
+    await retryAll();
+    await refresh(<RoundScreen />);
+    expect(notices()).toHaveLength(0);
+    expect(handoff().props.value).toBe('Keep this handoff');
+  });
+
+  it.each([ShiftScreen, RoundScreen])(
+    'keeps handoff input through failed refresh and retry (%p)',
+    async (Component) => {
+      const id = await startShift();
+      await addPatientToShift(id, patientId);
+      await render(<Component />);
+      const handoff = () => tree.root.findAllByType(Input).find((n) => n.props.label === 'یادداشت تحویل شیفت')!;
+      await act(async () => {
+        handoff().props.onChangeText('Current handoff text');
+      });
+      fail(shiftPatientsQuery(id));
+      await refresh(<Component />);
+      expect(handoff().props.value).toBe('Current handoff text');
+      expect(notices()).toHaveLength(1);
+      await retryAll();
+      await refresh(<Component />);
+      expect(handoff().props.value).toBe('Current handoff text');
+    },
+  );
+
+  it('keeps the add-patient picker after a failed write and ignores rapid repeat taps', async () => {
+    const id = await startShift();
+    await render(<ShiftScreen />);
+    await act(async () => {
+      tree.root
+        .findAllByType(Button)
+        .find((n) => n.props.label === 'افزودن بیمار')!
+        .props.onPress();
+    });
+    const add = jest.spyOn(shiftQueries, 'addPatientToShift').mockRejectedValueOnce(new Error('Synthetic failure'));
+    await act(async () => {
+      tree.root.findByType(PickerModal).props.onSelect({ id: patientId });
+    });
+    expect(tree.root.findByType(PickerModal).props.visible).toBe(true);
+    await act(async () => {
+      const select = tree.root.findByType(PickerModal).props.onSelect;
+      select({ id: patientId });
+      select({ id: patientId });
+    });
+    expect(add).toHaveBeenCalledTimes(2);
+    expect(await shiftPatientsQuery(id)).toHaveLength(1);
+    expect(tree.root.findByType(PickerModal).props.visible).toBe(false);
   });
 });
 
