@@ -83,6 +83,14 @@ and device behavior. Another AI's statement or a successful build is insufficien
 
 ## Priority 3: usability and release evidence
 
+- 2026-09-30 (0.11.6): shift identity changes preserve keyed text before
+  adoption; patient edit retains input on read failure and validates whole-year
+  age. Final software gate: 76 suites / 868 app tests + 3 workflows, source CI
+  passed. [Validation evidence](validation-0.11.6.md) records signed arm64 and
+  separate x86_64 artifacts, an upgrade from 0.11.4, bounded offline editor,
+  round/history and font/keyboard/navigation checks. Manual-form raw drafts,
+  concurrent editors, native failure/recovery and target-phone acceptance remain
+  open; these changes add no dependencies, schema or clinical-tool scope.
 - 2026-09-30 (0.11.4): [plans/001-005](../plans/README.md) implemented and software
   verified (76 suites / 832 app tests + 3 workflow tests). Exact filtered destinations,
   honest draft/inbox labels, readable controls, shift-first Today, full follow-up

@@ -33,6 +33,50 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Signed 0.11.6 release and bounded native verification
+
+**Agent:** GPT-6 via Codex
+**Commits:** this evidence commit; source `2edf9e5` and `a285afa`.
+
+**Changed**
+- Recorded [0.11.6 evidence](validation-0.11.6.md) with exact source, artifact
+  hashes, software regressions, native observations and remaining limits.
+  Updated IMPLEMENTATION; no source/dependency/schema changes in this entry.
+
+**Verified**
+- `npm run check`: 76 suites / 868 app tests + 3 workflows, typecheck/lint/format
+  green on final source; source CI passed and checkout gate rerun for these docs.
+- Signed arm64 0.11.6/code22 APK built; signature matches preceding release.
+  Separate signed x86_64 artifact stayed in private/. Both hashes in evidence.
+- Upgraded the synthetic 0.11.4 AVD without uninstall: patients/star/notes/shift
+  retained. Invalid age stayed visible with an error; correction saved and reopened.
+  Round summary/handoff survived header exit, completed-save relaunch and shift
+  closure/history. New shift did not inherit old text. Offline, dark/font1.6,
+  Gboard and three-button checks passed within the bounded protocol.
+
+**Not verified**
+- No physical phone, full forty-patient/accessibility/performance matrix, native
+  failure injection, uncommitted process death, interrupted restore, low-space,
+  camera/call recording, alarm/reboot/battery or power-loss acceptance.
+- Patient forms still use manual Save; raw draft/guarded-exit/concurrent-edit
+  recovery remains open. Shift text has no full version/conflict mechanism.
+
+**Open threads** (what the next session should pick up)
+- D08: durable raw patient/form drafts, valid/invalid date and age text, guarded
+  exit and duplicate-submit/concurrent-field recovery. Reuse existing draft/save
+  machinery; do not silently persist invalid clinical facts.
+- C05: durable audio import identity/orphans; D05/D10 interrupted native recovery
+  and restore. Wider W/C scope, original media, rich text and physician/AI gates
+  remain in IMPLEMENTATION. Use exact-build phone acceptance when available.
+
+**Gotchas**
+- The arm64 owner APK cannot run on the x86_64 AVD. Do not replace dist/ with
+  the emulator APK. Stop compilation before booting this host's AVD.
+- System UI showed a boot ANR; the captured MedOS error filters were empty.
+  Fresh dumps reject missing/offscreen nodes. On this image input key events
+  needed explicit display 0; verify visible text after each action.
+
+
 ## 2026-09-30 — Patient editor read safety and age validation (0.11.6)
 
 **Agent:** GPT-6 via Codex
