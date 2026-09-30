@@ -84,10 +84,12 @@ and device behavior. Another AI's statement or a successful build is insufficien
 ## Priority 3: usability and release evidence
 
 - 2026-09-30 (0.11.4): [plans/001-005](../plans/README.md) implemented and software
-  verified (75 suites / 830 app tests + 3 workflow tests). Exact filtered destinations,
+  verified (76 suites / 832 app tests + 3 workflow tests). Exact filtered destinations,
   honest draft/inbox labels, readable controls, shift-first Today, full follow-up
-  lists and an autosave-preserving round footer. Native acceptance is tracked
-  separately in HANDOFF; this does not close D08/C05 or the wider clinical backlog.
+  lists and an autosave-preserving round footer. The record star also reports failed
+  writes. [Validation evidence](ux-validation-0.11.4.md) distinguishes signed arm64
+  packaging, bounded x86_64 emulator runs and remaining native/phone acceptance;
+  this does not close D08/C05 or the wider clinical backlog.
 - Packaging cleanup verified: direct Ionicons imports removed 18 unrelated fonts and
   4,017,947 combined font/bytecode bytes from the Android export. ESLint blocks the old
   barrel import. APK size, startup improvement and visual/device acceptance are unmeasured.

@@ -21,7 +21,7 @@ usability, physical touch areas, typing, camera behavior or phone performance.
 |---|---|---|---|---|---|
 | [001](001-direct-destinations.md) | Exact admitted/starred lists and consult answer; synchronized URL filters with retained return search and explicit fresh-search reset. | M | Medium: route/state transitions | High: actual SQLite/useLive tests | SOFTWARE VERIFIED |
 | [002](002-save-language.md) | Distinct draft/chart-publication, recovered draft and inbox/audio-import labels. Save handlers unchanged. | S | Low: wording only | High: source and existing persistence tests | SOFTWARE VERIFIED |
-| [003](003-readable-touch-controls.md) | Minimum 48dp chips/segments/checkboxes; small text contrast tests; wrapping record destinations/buttons with font scaling. | M | Medium: shared layout | High: sizes/color calculation; native bounds still unverified | SOFTWARE VERIFIED |
+| [003](003-readable-touch-controls.md) | Minimum 48dp chips/segments/checkboxes; small text contrast tests; wrapping record destinations/buttons with font scaling. | M | Medium: shared layout | High: sizes/color calculation and sampled emulator bounds; complete native matrix pending | SOFTWARE VERIFIED |
 | [004](004-today-work-and-overflow.md) | Shift first, complete counts before previews, direct full patient/follow-up lists and protected outcome prompts. | M | Medium: layout/counts/navigation | High: real SQLite/useLive tests; native acceptance separate | SOFTWARE VERIFIED |
 | [005](005-round-action-footer.md) | Footer outside scroll; hides during keyboard editing, retains savers, blocks failed flush/write and duplicate actions. | M | Medium: keyboard/insets/save boundaries | High: real autosave/SQLite component tests; native separate | SOFTWARE VERIFIED |
 
@@ -30,13 +30,15 @@ not claims of a data-loss emergency. Plan 004 depends on 001's patient-list rout
 contract; 005 follows 003's control sizing. Other plans can be reviewed independently.
 Do not have concurrent executors edit the same Today, patient-list or shift files.
 
-Execution notes: all 75 suites / 830 app tests + 3 workflow tests passed, including
+Execution notes: all 76 suites / 832 app tests + 3 workflow tests passed, including
 new route, real-useLive read/retry, 40-row counts and actual SaveGroup failure tests.
 Quick patient creation also fixes an omitted-status admission bug without changing
 the schema. Scope expanded narrowly to Button wrapping/accessibility hint and
 FollowUpCard touch sizing/prompt-lifetime reporting; completion/reminder semantics
-are unchanged. No dependency added. See the newest HANDOFF for native build evidence
-and open gates; do not replay these implemented plans blindly.
+are unchanged. Native inspection also led to a 48dp record star with visible write
+failure feedback and two SQLite regressions. No dependency added. See
+[0.11.4 validation](../docs/ux-validation-0.11.4.md) for exact builds, bounded
+emulator observations and remaining acceptance; do not replay these plans blindly.
 
 Status values: TODO, IN PROGRESS, SOFTWARE VERIFIED, NATIVE VERIFIED, BLOCKED
 (reason), REJECTED (reason). Use SOFTWARE VERIFIED when automated checks pass but

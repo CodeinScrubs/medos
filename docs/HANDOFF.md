@@ -33,6 +33,55 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Signed 0.11.4 builds and bounded native UX evidence
+
+**Agent:** GPT-6 via Codex
+**Commits:** app `ee9c49f` and `3c2c215`; this evidence commit changes documentation only.
+
+**Changed**
+- Recorded exact code sources, APK ABIs/hashes, signing compatibility, observed
+  scenarios and limits in [0.11.4 validation](ux-validation-0.11.4.md). Updated the
+  execution ledger/plan index to 832 tests and the roadmap's current inbox label.
+- No further app edits after `3c2c215`; no schema/dependency additions or subagents.
+
+**Verified**
+- `npm run check`: 76 suites / 832 app tests + 3 workflow tests, typecheck/lint/format
+  green. Signed `dist/MedOS-0.11.4.apk` is arm64 only, version/code 0.11.4/20;
+  signature verification passed and the certificate matches 0.11.3.
+- Installed the separately built x86_64 release from `3c2c215` on a dedicated
+  API 36.1 emulator, offline. Verified record-star bounds/persistence, repeated
+  admitted/starred destinations and retained/fresh search, sixth follow-up access
+  with honest totals, retained outcome text across a requested route change,
+  direct consult/Back, and note draft recovery plus explicit publication.
+- Dark/font-scale-1.6/three-button samples: all eight record destinations visible;
+  round footer stays above navigation after scroll, hides for Gboard without
+  discarding the lower handoff field, restores after dismissal, and preserves the
+  field after exit/reopen. Skip on the last unseen member does not falsely mark
+  them seen; Seen completes the two-member round. Import route labels agree.
+
+**Not verified**
+- No physical-phone run, full forty-patient/equal-name/overflow matrix, speed
+  benchmark, TalkBack, camera/actual recording/import/alarms, interrupted restore
+  or power-loss acceptance. Two synthetic patients are not forty-patient evidence.
+  Native SQL write failure was not injected. Emulator execution used x86_64, not
+  the owner's arm64 APK. Plans 001-005 therefore remain SOFTWARE VERIFIED.
+
+**Open threads** (what the next session should pick up)
+- D08 shift identity transitions and raw drafts for manual patient/other forms;
+  C05 persistent audio import identity/orphan recovery; D05/D10 interruption and
+  restore/device acceptance. See IMPLEMENTATION for the wider W/C backlog.
+- Complete the remaining native matrix on the target phone when available.
+  Existing patient context, rich text, original media, clinical/AI gates remain
+  separate work; this UX release does not establish full product completion.
+
+**Gotchas**
+- System UI/launcher ANRs occurred at emulator boot even after an isolated restart;
+  do not report them as MedOS ANRs or infer a phone performance result.
+- Fresh dump per action; never reuse a failed dump. Gboard may be absent from its
+  XML despite covering app controls; inspect IME state before lower taps. Back may
+  dismiss the keyboard before navigating. Quote multi-parameter deep links for
+  the device shell. Local synthetic proofs stay in ignored `private/ux-0.11.4`.
+
 ## 2026-09-30 — Consistent import labels and a reliable record star (0.11.4)
 
 **Agent:** GPT-6 via Codex
