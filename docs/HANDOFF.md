@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Bounded UX plans for faster ward work (analysis only)
+
+**Agent:** GPT-6 via Codex
+**Commits:** this documentation commit; app source remains at `7c8a1bd`.
+
+**Changed**
+- Recorded five self-contained proposed UX changes in `plans/README.md` and
+  `plans/001-005`: filtered/direct destinations, honest draft/inbox language,
+  readable touch controls, shift-first Today with reachable overflow, and a round
+  action footer that preserves autosave. All statuses are TODO; no app code changed.
+- Plans name source evidence, scope, tradeoffs, focused tests, drift checks and
+  native acceptance. Keep the five bottom tabs and eight record destinations;
+  avoid speculative frameworks, extra dashboards or unmeasured speed claims.
+
+**Verified**
+- Clean app base `7c8a1bd`; `npm run brief` and `npm run check` passed: 67 suites /
+  786 app tests + 3 workflow tests. Current source reviewed; no subagents.
+- Independently calculated palette contrast: light small `textFaint` on white
+  2.90:1, on background 2.68:1, on surfaceAlt 2.55:1; dark on surface 4.01:1.
+  Checked Android's official 48dp / small-text 4.5:1 accessibility guidance.
+
+**Not verified**
+- Proposed UI changes are not implemented. No native UI test, target-phone speed
+  measurement, new APK, new clinical-content review or new restore acceptance.
+
+**Open threads**
+- Execute/reconcile the UX plans one at a time within `IMPLEMENTATION.md` priorities;
+  mark software and native verification separately. They do not replace safety work.
+- D08: active-shift query identity transitions, other auxiliary read failures and
+  manual-form drafts; real useLive transitions still need regression/acceptance.
+- C05: durable audio-import identity/journaling across process death, orphan-copy
+  recovery, filename-marker collisions and actual Cube-provider acceptance.
+- D05/D10: native exits/process death and interrupted backup/restore acceptance;
+  W02/W05-W10, rich text and C01-C04 retain their existing scope and validation gates.
+- Later UX candidates: patient/encounter context in editors and cards; safe folding
+  of per-patient handoff editors; measured large-list/search behavior. See plan index.
+
+**Gotchas**
+- `useLive` intentionally retains loaded rows through dependency changes. A route
+  filter must not relabel old results as a new complete list. Manual filter choices
+  need URL synchronization so a repeat external destination still applies.
+- Hiding editable sections can unregister unsaved fields. A fixed footer must have
+  one safe-area owner and preserve the lifetime save guard; tests alone cannot prove
+  Android keyboard/header/navigation-bar behavior.
+
 ## 2026-09-27 — Atomic audio imports and truthful shift recovery (0.11.3)
 
 **Agent:** GPT-6 via Codex
