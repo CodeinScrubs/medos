@@ -72,7 +72,7 @@ order; do not treat a successful test suite as acceptance of the entire product.
 | C02 | Versioned clinical library | Common complaints, conditions, precautions, screening, algorithms and broad score catalogue. Each tool has primary source, version, target population/exclusions, units, freshness rules, inputs, deterministic logic, reference examples and boundary tests. |
 | C03 | Physician-reviewed calculation | Show actual inputs, missing/stale data, source and limits. No missing=false assumptions. Save immutable input/output/tool-version snapshot only after physician confirmation. Clinical review per tool before it is enabled. |
 | C04 | Personal AI assistance | Persian/English transcription, semantic retrieval, knowledge organization, progress/discharge drafts from existing data with provenance. Drafts never become clinical facts automatically. Benchmark device/local-server options; cloud requires explicit configured permission and data-flow review. |
-| C05 | Call workflow | Partial: post-call capture and user-selected folder/file/share import work without a built-in call recorder. Note/history/attachment/filename hint commit together, patient liveness is checked, historical audio retains time/encounter provenance, and failures retain source/selection. 0.11.8 adds a durable UUID journal/path reservation before copy, streamed SHA-256, verified-copy retry without the provider, atomic retry links, simultaneous-retry serialization, pending recovery and confirmed cancellation/cleanup on the existing Calls screen. Ready retries refuse changed bytes; deleted clinical records are not recreated. Cancelled cleanup remains visible until finished. Filename hints and Today counts no longer claim content identity; equal-name folder rows/playback use URI identity. Remaining: real Cube recording/share and grant/recreation acceptance, native interruption/power/low-space, interrupted encrypted restore and concurrent restore/import, older orphan copies and content-based duplicate detection. A fresh explicit import deliberately creates a new operation. |
+| C05 | Call workflow | Partial: post-call capture and user-selected folder/file/share import work without a built-in call recorder. Note/history/attachment/filename hint commit together, patient liveness is checked, historical audio retains time/encounter provenance, and failures retain source/selection. 0.11.8 adds a durable UUID journal/path reservation before copy, streamed SHA-256, verified-copy retry without the provider, atomic retry links, simultaneous-retry serialization, pending recovery and confirmed cancellation/cleanup on the existing Calls screen. Ready retries refuse changed bytes; deleted clinical records are not recreated. Cancelled cleanup remains visible until finished. Filename hints and Today counts no longer claim content identity; equal-name folder rows/playback use URI identity. The existing DocumentPicker now preserves the provider's display name; failure feedback remains visible inside its patient picker. Bounded isolated-emulator evidence covers staged upgrade, offline WAV import, failed-request recovery/retry/cancel, same-UUID replay after force-stop reopening an edited note, original-file preservation and large-font recovery actions; see validation-0.11.8.md. Remaining: real Cube recording/share and grant/recreation acceptance, native interruption/power/low-space, interrupted encrypted restore and concurrent restore/import, older orphan copies and content-based duplicate detection. A fresh explicit import deliberately creates a new operation. |
 
 The WHO SMART publications separate data dictionaries, decision logic and functional
 requirements: [WHO SMART](https://smart.who.int/). This is an engineering reference,
@@ -83,6 +83,16 @@ and device behavior. Another AI's statement or a successful build is insufficien
 
 ## Priority 3: usability and release evidence
 
+- 2026-10-01 (0.11.8): resumable audio imports with same-operation retry,
+  confirmed cancellation, honest filename/time labels and visible failed-import
+  feedback on the existing screen. Final source gate: 82 suites / 966 app tests
+  + 3 workflows; exact-source CI passed. [Validation evidence](validation-0.11.8.md)
+  records signed final arm64/x86_64 artifacts and bounded isolated offline
+  import/replay/recovery/cancel/large-font checks. APK delivery now rejects missing
+  essential native libraries and wrong/mixed ABIs. Real-recorder grants, native
+  interruption/restore and physical-phone acceptance remain open. No dependency,
+  permission, route, backup format or clinical-tool scope change; migration 0017
+  adds the import journal.
 - 2026-09-30 (0.11.7): durable raw create/edit patient drafts, explicit validated
   atomic publication, idempotent retry, guarded exit, duplicate/conflict handling
   and confirmed soft discard. Final gate: 78 suites / 907 app tests + 3 workflows;

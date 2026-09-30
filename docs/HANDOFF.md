@@ -33,6 +33,48 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Accept the final 0.11.8 audio-import release on an isolated emulator
+
+**Agent:** GPT-6 via Codex
+**Commits:** evidence in this commit; final application source `e82a622`,
+native-entry/name fix `2710648`, queued-share fix `09d2762`, foundation `77a7501`.
+
+**Changed**
+- Recorded final source/artifact hashes, native failures and bounded acceptance
+  in validation-0.11.8.md; updated the execution ledger. This checkout changes
+  documentation only. The final application source stayed frozen during builds.
+
+**Verified**
+- `npm run check`: 82 suites / 966 app tests + 3 workflows; type/lint/format green.
+  Final application-source CI passed. Migration regeneration was unchanged.
+- Final signed arm64 owner APK and separate x86_64 APK passed native-entry and
+  signature checks; the signing certificate matches the preceding release.
+- Isolated offline Android 16 AVD: staged 0.11.7 -> 09d2762 -> e82a622 upgrade;
+  original WAV filename/duration, post-force-stop note/attachment and failed-job
+  recovery, same-operation retry, confirmed cancellation, visible modal failure
+  and dark/font-1.6 recovery actions. Replaying a successful UUID after force-stop
+  reopened an edited note; the complete list remained three notes. The source
+  WAV stayed byte-identical. Final cold-launch/replay error/crash logs were empty.
+
+**Not verified**
+- No physical phone, actual recorder SEND/expired grant/recreation, large file,
+  native copy/cleanup interruption, low-space/power-loss or encrypted/concurrent
+  restore-import acceptance. This does not complete the other manual forms,
+  app-wide accessibility, clinical tools or AI. Detailed limits are in validation.
+
+**Open threads** (what the next session should pick up)
+- D08/D05: remaining auxiliary reads and recoverable manual forms, including
+  raw invalid dates; D10: native backup/restore and interrupted recovery.
+- C05: real recorder/grants and interruption/restore acceptance; keep filename
+  hints distinct from content identity. C01: visible patient context in clinical
+  editors (the note header is still generic), then per-tool clinical/AI gates.
+
+**Gotchas**
+- A native alert can sit behind a reopened Modal; the inline failure notice
+  supplies visible feedback. Existing document-id titles are not rewritten.
+- Use a separate AVD/serial. Shared-AVD evidence was excluded; x86 APKs stay
+  private. Gradle success alone is insufficient; use the native-entry gate.
+
 ## 2026-10-01 — Keep failed-import feedback visible inside the patient picker
 
 **Agent:** GPT-6 via Codex
