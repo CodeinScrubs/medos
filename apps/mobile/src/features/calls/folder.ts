@@ -50,7 +50,7 @@ const UNKNOWN = new Date(0);
 function describe(file: File): CallRecording {
   let sizeBytes: number | null = null;
   try {
-    sizeBytes = file.size ?? null;
+    sizeBytes = file.size > 0 ? file.size : null;
   } catch {
     // A provider that cannot say the size still hands over the file.
   }
@@ -99,7 +99,7 @@ export function describeShared(uri: string, name: string | null | undefined): Ca
   let fileName = name?.trim() || '';
   try {
     const file = new File(uri);
-    sizeBytes = file.size ?? null;
+    sizeBytes = file.size > 0 ? file.size : null;
     if (!fileName) fileName = file.name;
   } catch {
     // The copy will say so if the file cannot be read; the list only needs a label.

@@ -12,6 +12,7 @@ export type AuditAction =
   | 'patient.deleted'
   | 'patient.restored'
   | 'patient.draftDiscarded'
+  | 'call.importDiscarded'
   | 'attachment.deleted'
   | 'vital.updated'
   | 'vital.deleted'

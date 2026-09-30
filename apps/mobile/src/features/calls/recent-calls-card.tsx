@@ -13,9 +13,8 @@ import { unfiledRecentCount } from './logic';
 import { callsFiled, callsFolderUri } from './settings';
 
 /**
- * On Today after a recorded call: how many of the last two days' recordings
- * are not in a record yet, one tap from filing them. Silent until the
- * recordings folder has been chosen, and when there is nothing to file.
+ * Recent folder candidates after filtering legacy filename hints, not an
+ * exact count of unfiled content. Silent until a folder has been chosen.
  */
 export function RecentCallsCard({ now }: { now: Date }) {
   const router = useRouter();
@@ -41,7 +40,7 @@ export function RecentCallsCard({ now }: { now: Date }) {
         <Row gap="md">
           <Ionicons name="call-outline" size={20} color={colors.primary} />
           <Text variant="bodyStrong" style={{ flex: 1 }}>
-            {toPersianDigits(count)} تماسِ ضبط‌شده هنوز در پرونده نیست
+            {toPersianDigits(count)} فایل تماس برای بررسی
           </Text>
           <Ionicons name="chevron-back" size={18} color={colors.textFaint} />
         </Row>

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable } from 'react-native';
+import { Alert, Pressable } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
@@ -14,13 +14,21 @@ import { useSetting } from '@/db/use-setting';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { formatBytes } from '@/lib/format';
+import { newId } from '@/lib/ids';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName, joinLabels } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { chooseCallsFolder, describeShared, listRecordings, pickRecordingFile } from './folder';
+import { decodeCallSource, importIdIsValid } from './import-logic';
 import { decodeSharedUri } from './logic';
-import { fileCallRecording, type CallRecording } from './queries';
+import {
+  discardCallImport,
+  fileCallRecording,
+  pendingCallImportsQuery,
+  resumeCallImport,
+  type CallRecording,
+} from './queries';
 import { callsFiled, callsFolderUri } from './settings';
 
 /**
@@ -49,12 +57,15 @@ export function CallsScreen() {
 
   // A recording shared from another app (a call recorder's «اشتراک‌گذاری» → MedOS)
   // arrives as ?shared=<uri>&name=<file name>: go straight to choosing the patient.
-  const { shared, name } = useLocalSearchParams<{ shared?: string; name?: string }>();
+  const { shared, name, request } = useLocalSearchParams<{ shared?: string; name?: string; request?: string }>();
+  const shareKey = shared ? `${shared}:${request ?? ''}` : null;
   const [handledShare, setHandledShare] = useState<string | null>(null);
   const incoming = useMemo(() => {
-    const uri = shared && shared !== handledShare ? decodeSharedUri(shared) : null;
-    return uri ? describeShared(uri, name) : null;
-  }, [shared, name, handledShare]);
+    const uri = shared && shareKey !== handledShare ? decodeSharedUri(shared) : null;
+    return uri
+      ? { ...describeShared(uri, name), importId: request && importIdIsValid(request) ? request : newId() }
+      : null;
+  }, [shared, name, request, shareKey, handledShare]);
   const pending = filing ?? incoming;
   const latestPending = useRef(pending);
   useEffect(() => {
@@ -66,8 +77,8 @@ export function CallsScreen() {
     setFiling(null);
     setSelectedPatientId(null);
     if (incoming && shared) {
-      setHandledShare(shared);
-      router.setParams({ shared: undefined, name: undefined });
+      setHandledShare(shareKey);
+      router.setParams({ shared: undefined, name: undefined, request: undefined });
     }
   }
   useFocusEffect(
@@ -77,6 +88,7 @@ export function CallsScreen() {
   );
 
   const patients = useLive(patientListQuery());
+  const imports = useLive(pendingCallImportsQuery());
   const { data: patientRows } = patients;
   const patientItems: PickerItem[] = useMemo(
     () =>
@@ -99,7 +111,7 @@ export function CallsScreen() {
   async function pickOne() {
     try {
       const picked = await pickRecordingFile();
-      if (picked) setFiling(picked);
+      if (picked) setFiling({ ...picked, importId: newId() });
     } catch (e) {
       alertError('فایل باز نشد', e);
     }
@@ -131,11 +143,107 @@ export function CallsScreen() {
     }
   }
 
+  async function resume(id: string, patientId: string) {
+    if (saving.current || imports.error) return;
+    saving.current = true;
+    setBusy(true);
+    let noteId: string;
+    try {
+      noteId = await resumeCallImport(id);
+    } catch (e) {
+      alertError('ورود فایل کامل نشد', e);
+      return;
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
+    try {
+      if (latestPending.current?.importId === id) closePicker();
+      router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
+    } catch (e) {
+      alertError('فایل ذخیره شد؛ نوت باز نشد', e);
+    }
+  }
+
+  function removeIncomplete(id: string) {
+    if (saving.current || imports.error) return;
+    saving.current = true;
+    setBusy(true);
+    void discardCallImport(id)
+      .then(() => {
+        if (latestPending.current?.importId === id) closePicker();
+      })
+      .catch((e) => alertError('لغو ورود کامل نشد', e))
+      .finally(() => {
+        saving.current = false;
+        setBusy(false);
+      });
+  }
+
+  function discard(id: string) {
+    if (saving.current || imports.error) return;
+    let answered = false;
+    Alert.alert(
+      'لغو ورود فایل؟',
+      'فقط این ورود ناتمام کنار گذاشته می‌شود؛ فایل اصلی و نوت‌های ثبت‌شده حفظ می‌شوند.',
+      [
+        { text: 'انصراف', style: 'cancel' },
+        {
+          text: 'لغو ورود',
+          style: 'destructive',
+          onPress: () => {
+            if (answered || saving.current) return;
+            answered = true;
+            removeIncomplete(id);
+          },
+        },
+      ],
+      { cancelable: false },
+    );
+  }
+
   if (!folder.loaded) return <Screen>{null}</Screen>;
 
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <ErrorNotice error={imports.error} what="ورودهای ناتمام" onRetry={imports.retry} />
+        {(imports.data ?? []).map((item) => {
+          let fileName = 'فایل صوتی';
+          try {
+            fileName = decodeCallSource(item.import.sourceBody).name;
+          } catch {
+            /* Retry exposes a safe codec error. */
+          }
+          return (
+            <Card key={item.import.id}>
+              <Column gap="sm">
+                <Text variant="bodyStrong">{item.import.deletedAt ? 'ورود لغو شده' : 'ورود ناتمام'}</Text>
+                <Text>{item.firstName ? fullName(item.firstName, item.lastName) : 'بیمار در دسترس نیست'}</Text>
+                <Text variant="caption" color="textMuted" numberOfLines={1}>
+                  {fileName}
+                </Text>
+                <Row gap="sm">
+                  {item.import.deletedAt ? null : (
+                    <Button
+                      label="ادامهٔ ورود"
+                      size="sm"
+                      disabled={busy || !!imports.error || !item.firstName}
+                      onPress={() => void resume(item.import.id, item.import.patientId)}
+                    />
+                  )}
+                  <Button
+                    label={item.import.deletedAt ? 'پاک‌کردن کپی ناتمام' : 'لغو ورود'}
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy || !!imports.error}
+                    onPress={() => (item.import.deletedAt ? removeIncomplete(item.import.id) : discard(item.import.id))}
+                  />
+                </Row>
+              </Column>
+            </Card>
+          );
+        })}
         {pending ? <ErrorNotice error={patients.error} what="فهرست بیماران" onRetry={patients.retry} /> : null}
         {busy ? (
           <Text variant="caption" color="textMuted">
@@ -171,12 +279,12 @@ export function CallsScreen() {
             ) : null}
             {(recordings ?? []).map((r) => (
               <RecordingCard
-                key={r.key}
+                key={r.uri}
                 recording={r}
                 filed={filedSet.has(r.key)}
-                listening={listening === r.key}
-                onListen={() => setListening((current) => (current === r.key ? null : r.key))}
-                onFile={() => setFiling(r)}
+                listening={listening === r.uri}
+                onListen={() => setListening((current) => (current === r.uri ? null : r.uri))}
+                onFile={() => setFiling({ ...r, importId: newId() })}
               />
             ))}
             <Button
@@ -276,7 +384,7 @@ function RecordingCard({
               ])}
             </Text>
           </Column>
-          {filed ? <Badge label="در پرونده" tone="success" /> : null}
+          {filed ? <Badge label="این نام قبلاً وارد شده" tone="neutral" /> : null}
         </Row>
         {listening ? <VoiceNotePlayer uri={recording.uri} caption="پیش‌شنیدن" /> : null}
         <Row gap="sm">

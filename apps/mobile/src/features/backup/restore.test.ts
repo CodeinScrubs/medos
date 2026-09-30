@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import {
+  attachments,
   auditLog,
   backupRuns,
+  callImports,
   consultations,
   consultRequestDrafts,
   doctors,
@@ -436,6 +438,94 @@ describe('importTables', () => {
       birthDate: '2001-08-03',
       summary: null,
     });
+  });
+
+  it('restores pending, filed and cancelled audio-import journals with their exact links and metadata', async () => {
+    const patientId = await addPatient(backup, 'Import target');
+    const captured = new Date('2026-10-01T10:00:00Z');
+    const importIds = {
+      ready: 'b7bd233e-16f3-48a5-a0b5-45327df23686',
+      filed: '29b3c8b1-edc0-4f40-82b1-ad8ab50aa8a9',
+      discarding: '4618c48f-8ddb-402e-913b-914eff380fdc',
+    };
+    const sourceBody = JSON.stringify({
+      version: 1,
+      uri: 'content://example/audio',
+      name: 'Example.m4a',
+      sizeBytes: 2048,
+      recordedAt: null,
+      timeSource: 'unknown',
+      who: null,
+      key: 'Example.m4a',
+    });
+    await backup.db
+      .insert(notes)
+      .values({ id: 'import-note', ...stamps(captured), patientId, type: 'phone_followup', noteDate: captured });
+    await backup.db.insert(attachments).values({
+      id: 'import-audio',
+      ...stamps(captured),
+      patientId,
+      entityType: 'note',
+      entityId: 'import-note',
+      kind: 'voice',
+      relativePath: `media/imports/${importIds.filed}.m4a`,
+    });
+    for (const state of ['ready', 'filed', 'discarding'] as const) {
+      await backup.db.insert(callImports).values({
+        id: importIds[state],
+        ...stamps(captured),
+        patientId,
+        sourceBody,
+        relativePath: `media/imports/${importIds[state]}.m4a`,
+        state,
+        revision: 3,
+        checksum: 'a'.repeat(64),
+        sizeBytes: 2048,
+        noteId: state === 'filed' ? 'import-note' : null,
+        attachmentId: state === 'filed' ? 'import-audio' : null,
+        deletedAt: state === 'discarding' ? captured : null,
+      });
+    }
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    const rows = live.db.select().from(callImports).all();
+    expect(rows).toHaveLength(3);
+    expect(rows.find((row) => row.state === 'ready')).toMatchObject({
+      sourceBody,
+      revision: 3,
+      createdAt: captured,
+      checksum: 'a'.repeat(64),
+      noteId: null,
+    });
+    expect(rows.find((row) => row.state === 'filed')).toMatchObject({
+      noteId: 'import-note',
+      attachmentId: 'import-audio',
+    });
+    expect(rows.find((row) => row.state === 'discarding')!.deletedAt).toEqual(captured);
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
+  });
+
+  it('restores a pre-journal backup without retaining import operations from the replaced dataset', async () => {
+    const patientId = await addPatient(live, 'Old dataset');
+    await live.db
+      .insert(callImports)
+      .values({ id: 'old-import', ...stamps(), patientId, sourceBody: '{}', relativePath: 'media/imports/old.m4a' });
+    await addPatient(backup, 'Backup patient');
+    backup.conn.execSync('DROP TABLE call_imports');
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(callImports).all()).toEqual([]);
+    expect(await names(live)).toEqual(['Backup patient']);
   });
 
   it('restores an older backup without patient form drafts and clears drafts from the replaced dataset', async () => {

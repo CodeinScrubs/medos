@@ -18,6 +18,10 @@ jest.mock('expo-file-system', () => ({
 }));
 
 describe('a recording shared to MedOS', () => {
+  it('keeps an unreadable zero-size provider hint unknown instead of requiring a zero-byte copy', () => {
+    mockFiles.set('content://recorder/zero', { name: 'Example.m4a', size: 0 });
+    expect(describeShared('content://recorder/zero', undefined).sizeBytes).toBeNull();
+  });
   it('takes who and when from the name the sharing app gave', () => {
     mockFiles.set('content://recorder/1', { name: '1', size: 60_000 });
     expect(describeShared('content://recorder/1', 'Call@Test Contact_20260926193012.amr')).toMatchObject({

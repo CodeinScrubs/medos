@@ -7,7 +7,7 @@
  * at a time is the way out. Voice messages from a messenger arrive the same way.
  *
  * The shared file is turned into a link the router already knows —
- * medos://calls?shared=<content uri as hex>&name=<file name> — before React
+ * medos://calls?shared=<content uri as hex>&name=<file name>&request=<UUID> — before React
  * sees the intent, so no native module is needed. The URI travels as hex
  * because the link's query is decoded more than once on its way to the
  * screen, and a content URI's own escapes ("primary%3ARecordings") must reach
@@ -31,7 +31,25 @@ function insertBefore(contents, anchor, text) {
 }
 
 function applyShareTarget(contents) {
-  if (contents.includes(MARKER)) return contents;
+  if (contents.includes(MARKER)) {
+    // Upgrade already-generated activities; a clean prebuild is not required.
+    const upgraded = contents
+      .replace(
+        'medosShareToLink(intent)\n    super.onNewIntent(intent)',
+        'medosShareToLink(intent)\n    setIntent(intent)\n    super.onNewIntent(intent)',
+      )
+      .replace(
+        'Uri.encode(name ?: ""))',
+        'Uri.encode(name ?: "") + "&request=" + java.util.UUID.randomUUID().toString())',
+      );
+    if (
+      !upgraded.includes('setIntent(intent)') ||
+      !upgraded.includes('"&request=" + java.util.UUID.randomUUID().toString()')
+    ) {
+      throw new Error(`[${MARKER}] unsupported existing share hooks in MainActivity.kt`);
+    }
+    return upgraded;
+  }
 
   let next = insertAfter(
     contents,
@@ -46,9 +64,10 @@ function applyShareTarget(contents) {
   return (
     next.slice(0, classEnd) +
     `
-  // ${MARKER}: audio shared to MedOS arrives as medos://calls?shared=…&name=…
+  // ${MARKER}: audio shared to MedOS arrives as medos://calls?shared=…&name=…&request=…
   override fun onNewIntent(intent: Intent) {
     medosShareToLink(intent)
+    setIntent(intent)
     super.onNewIntent(intent)
   }
 
@@ -64,7 +83,7 @@ function applyShareTarget(contents) {
     }
     intent.action = Intent.ACTION_VIEW
     val hex = stream.toString().toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) }
-    intent.data = Uri.parse("medos://calls?shared=" + hex + "&name=" + Uri.encode(name ?: ""))
+    intent.data = Uri.parse("medos://calls?shared=" + hex + "&name=" + Uri.encode(name ?: "") + "&request=" + java.util.UUID.randomUUID().toString())
   }
 ` +
     next.slice(classEnd)

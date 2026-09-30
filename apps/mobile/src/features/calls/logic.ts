@@ -116,10 +116,9 @@ export function parseRecordingName(name: string, modifiedAt: Date): RecordingNam
 }
 
 /**
- * The same recording seen again in the folder; see `callsFiled`. The name is
- * enough: a dialer names each recording by its second of the day, and asking
- * the storage provider for every file's size only to tell two apart costs a
- * call per file.
+ * A bounded legacy filename hint; it does not prove that this file was filed.
+ * Equal names can belong to different files or folders. Import/retry identity
+ * comes from the durable request id, never this hint.
  */
 export function recordingKey(name: string): string {
   return name;

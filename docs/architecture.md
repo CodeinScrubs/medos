@@ -605,12 +605,14 @@ So MedOS files what a recorder wrote (`features/calls/`). The owner grants that 
 once through Android's picker (persistable SAF grant, nothing else becomes readable); the
 list reads it on focus, parses who and when from the dialer's file name, and one tap copies
 a recording into MedOS's media storage and writes a «پیگیری تلفنی» note with the audio attached.
-The note, initial version, attachment and filed marker commit in one synchronous transaction
-after the copy. The transaction rechecks that the patient is alive; a failed transaction
-removes only its newly copied file. It does not infer an encounter from today's admission.
+The note, initial version, attachment, filed hint and durable retry link commit in one
+synchronous transaction after the copy. The transaction rechecks that the patient is alive;
+a failed transaction retains its verified copy for retry. It does not infer an encounter
+from today's admission.
 The copy means backups carry
 it and deleting it from the dialer's folder loses nothing. Today counts the last two days'
-recordings not yet filed. Any single audio file can be filed the same way, and MedOS is in
+recording candidates using bounded filename hints, not an exact count of unfiled content.
+Any single audio file can be filed the same way, and MedOS is in
 Android's share menu for audio (`plugins/with-share-target.js`): the recorder the owner uses,
 Cube ACR, keeps its recordings in private storage, so «اشتراک‌گذاری» → MedOS → patient is how
 they arrive. The share becomes a `medos://calls?shared=<hex URI>` link before React starts; a
@@ -625,9 +627,47 @@ The picker retains its source and selected patient on failure, blocks overlappin
 and offers retry for patient-read errors. A newer share arriving during a copy is not consumed
 by completion of the previous import. Navigation failures after commit report that the file
 was saved. The filename-based filed marker is a bounded display hint, not a unique import
-identity: intentional reimport is available, equal names can collide, and process death
-between file copy and commit can leave an orphan file. Durable import identities/journaling
-remain separate work; the transaction does not make the filesystem atomic.
+identity: intentional reimport is available and equal names can collide. The badge now
+says that this *name* was imported, never that the current bytes are filed. Folder rows and
+playback use URI identity to avoid equal-name UI collisions.
+
+### Durable audio-import operations (0.11.8)
+
+Migration 0017 adds `call_imports`; no existing migration, backup format, route or
+dependency changes. One explicit share/pick gets one UUID. It is not a content-deduplication
+key: a deliberate fresh pick/share gets a new UUID and can create another note. Android's
+share transform adds this UUID only while converting SEND to VIEW, keeps the converted
+intent on `onNewIntent`, and retains that UUID through activity recreation. Invalid/legacy
+links get a screen-local id; their process-recreation identity is not guaranteed.
+
+The journal reserves patient, versioned source metadata and an owned
+`media/imports/<UUID>.<extension>` path **before** native copy. `copying` can restart into
+that unpublished destination; `ready` stores nonempty byte count and streamed SHA-256.
+New copies are hashed once in 64 KiB chunks; ready retries re-read and compare the stored
+bytes before publication, without requiring the old provider grant. A corrupt/absent copy
+stays pending with an error; it is not silently replaced. Unknown call time uses the first
+persisted import timestamp, not the later retry time.
+
+An in-memory map serializes simultaneous retries of the same id. Persisted state/revision,
+source/path and link comparisons reject stale or redirected work. `filed` links the one
+note/attachment; retry returns that note, and a soft-deleted note is not recreated.
+Copying never overwrites a path referenced by an attachment, including deleted attachments.
+
+The existing calls screen shows recovery cards only for unfinished work. Resume needs no
+second patient selection. Confirmed cancellation soft-deletes the operation as `discarding`,
+waits for its in-flight copy to settle, then rechecks ownership/references before deleting
+only its unpublished destination. Physical deletion followed by `discarded` is a separate
+step: failure/process interruption leaves cleanup visible and retryable. Already-filed
+clinical records and source files are not removed. Cancelled/filed journals are retained;
+there is no general orphan sweep or automatic history pruning.
+
+This is a resumable filesystem/SQLite protocol, **not** a filesystem transaction, fsync
+guarantee, full restore-concurrency guard or independent backup. An interrupted copy still
+needs a valid source grant; a grant from another phone is not portable. Providers may not
+expose a size, so unknown-size verification proves the stored bytes can be read and later
+compared, not that they match an independently hashed source. Unselected shares, physical
+power-loss/low-space/native fault, real recorder permissions and encrypted restore remain
+separate acceptance gates. Native errors never repeat private source URI/name/path.
 
 Recording inside MedOS was looked at again when the owner offered an accessibility service:
 it would capture the same microphone Cube does, so the other side would sound no better — the

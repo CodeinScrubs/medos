@@ -13,3 +13,4 @@ export * from './knowledge';
 export * from './vault';
 export * from './media';
 export * from './system';
+export * from './calls';

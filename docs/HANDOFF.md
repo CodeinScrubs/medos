@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Resumable audio imports without duplicate retry notes (0.11.8)
+
+**Agent:** GPT-6 via Codex
+**Commits:** this implementation commit.
+
+**Changed**
+- C05 reserves one UUID/source/patient/owned path in `call_imports` before copy.
+  Streamed SHA-256 and byte count protect ready-copy retries; publication links
+  note/history/attachment/filename hint/journal atomically. Same-id retries
+  return one note; explicit fresh imports remain allowed.
+- Pending recovery and confirmed cancellation/cleanup live on the existing
+  Calls screen. Failed/interrupted cleanup stays visible. Source grants may
+  expire; source files and filed clinical records are never removed by cleanup.
+- Native SEND conversion adds a stable request UUID and retains the latest
+  intent. Filename badges/counts no longer claim content identity; URI-keyed
+  folder rows avoid equal-name playback collisions. Provider size 0 is unknown.
+- Version/code 0.11.8/24; additive migration 0017. No dependency, new route,
+  permission, calculator or backup-format change. Architecture/ledger updated.
+
+**Verified**
+- Two retry-identity witnesses failed on the previous implementation.
+- `npm run check`: 81 suites / 957 app tests + 3 workflows, type/lint/format
+  green. Migration regeneration reports no further changes.
+- Migrated-SQLite failure/rollback, retry, stale/deleted scope, cancellation and
+  current/older backup tests; component recovery/navigation tests; bounded file
+  reads checked against independent Node SHA-256; config generation/upgrade tests.
+
+**Not verified**
+- Signed native build, activity/grant/restart/device acceptance and source CI
+  pending at this commit. No physical phone connected. Software stand-ins do
+  not prove native file/grant behavior or power/low-space/interrupted restore.
+
+**Open threads** (what the next session should pick up)
+- Build/accept this frozen source; then D08 remaining forms/auxiliary reads,
+  D05/D10 native interruption/restore and wider W/C/clinical/AI gates.
+- C05: real Cube recording/sharing, expired grants, full restore/import races,
+  older orphan copies and content deduplication. Invalid/legacy links only have
+  a screen-local fallback id; re-picking deliberately creates a new operation.
+
+**Gotchas**
+- Hashing is copy integrity, not global deduplication or source equivalence.
+  Do not replace the UUID with a filename, delete a verified copy after a DB
+  failure, or mark physical cleanup complete before its own DB write succeeds.
+- Filesystem and SQLite do not share a transaction. Keep arm64 owner artifacts
+  separate from x86_64 acceptance builds; use JDK 21 and freeze build source.
+
 ## 2026-09-30 — Signed 0.11.7 and bounded patient-draft acceptance
 
 **Agent:** GPT-6 via Codex

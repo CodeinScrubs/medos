@@ -11,8 +11,9 @@ import { defineSetting } from '@/db/settings';
 export const callsFolderUri = defineSetting('calls.folderUri', z.string().min(1).nullable(), null);
 
 /**
- * Recordings already filed under a patient (`recordingKey`), newest last, so
- * the list can say so. Only a hint: filing the same call twice is allowed.
+ * Bounded legacy filename hints (`recordingKey`), newest last. Equal names
+ * can describe different files; this is neither import identity nor proof
+ * of a clinical record. Explicit reimport uses a new journal id.
  */
 export const callsFiled = defineSetting('calls.filed', z.array(z.string().max(600)).max(2000), []);
 
