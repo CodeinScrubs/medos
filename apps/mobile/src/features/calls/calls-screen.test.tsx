@@ -21,6 +21,7 @@ const mockParams: { shared?: string; name?: string; request?: string } = {};
 const mockPush = jest.fn();
 const mockSetParams = jest.fn();
 const mockRetry = jest.fn();
+const mockPickRecording = jest.fn<() => Promise<queries.CallRecording | null>>();
 let mockReadError: Error | undefined;
 let mockImportError: Error | undefined;
 let mockLoading = false;
@@ -61,6 +62,7 @@ jest.mock('@/components/ui', () => ({
 }));
 jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {} }) }));
 jest.mock('./folder', () => ({
+  pickRecordingFile: () => mockPickRecording(),
   describeShared: (uri: string, name: string) => ({
     uri,
     name,
@@ -206,6 +208,47 @@ describe('filing a shared recording from the screen', () => {
     await act(async () => {
       finish('second-note');
     });
+  });
+
+  it('does not clear queued shares while an independently picked file finishes copying', async () => {
+    delete mockParams.shared;
+    delete mockParams.name;
+    let picked!: (recording: queries.CallRecording) => void;
+    let finish!: (id: string) => void;
+    mockPickRecording.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          picked = resolve;
+        }),
+    );
+    jest.spyOn(queries, 'fileCallRecording').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await render();
+    await act(async () => {
+      tree.root
+        .findAllByType(Button)
+        .find((node) => node.props.label === 'افزودن فایل صوتی')!
+        .props.onPress();
+    });
+    share('content://example/queued-before', 'Before.m4a');
+    await refresh();
+    await act(async () => {
+      picked(describeShared('content://example/picked', 'Picked.m4a'));
+    });
+    await act(async () => {
+      picker().props.onSelect({ id: patientId });
+    });
+    share('content://example/queued-after', 'After.m4a');
+    await refresh();
+    await act(async () => {
+      finish('picked-note');
+    });
+    expect(mockSetParams).not.toHaveBeenCalled();
+    expect(picker().props.visible).toBe(true);
   });
 
   it('keeps the native request identity through screen recreation', async () => {

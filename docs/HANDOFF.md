@@ -33,6 +33,41 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Do not consume a queued share when a picked file completes
+
+**Agent:** GPT-6 via Codex
+**Commits:** this correction; base implementation `77a7501`.
+
+**Changed**
+- A new failing component witness reproduced a picked-file/queued-share race:
+  closing the completed picker cleared an unrelated current share's params.
+  Picker close now consumes only the exact source being answered and clears
+  only that picked file. No new queue, route, dependency or schema change.
+- README describes import recovery. Version/code remain 0.11.8/24; the first
+  arm64 build from 77a7501 is superseded and retained only in private storage.
+
+**Verified**
+- The queued-share witness failed before this fix. Base 77a7501 passed its
+  957 app tests + 3 workflows, exact-source CI and arm64 compilation.
+- Corrected source: `npm run check` green, 81 suites / 958 app tests +
+  3 workflows, typecheck/lint/format without warnings.
+
+**Not verified**
+- Final push/CI and native rebuild/acceptance pending at this edit;
+  final evidence must name this corrected source, not the preceding APK.
+- No physical phone, real Cube recording/grant, power/low-space or interrupted
+  encrypted restore acceptance.
+
+**Open threads** (what the next session should pick up)
+- Finish final checks/build/acceptance for this correction, then D08 forms/
+  auxiliary reads, D05/D10 native restore/interruption and remaining C05/wider
+  clinical/AI gates. Do not close those from software or emulator evidence alone.
+
+**Gotchas**
+- Completing a picked file and answering an incoming share are separate actions.
+  An async closure may contain a different share from the router's current params.
+  Rebuild after any source edit; the APK bundle was captured before this fix.
+
 ## 2026-10-01 — Resumable audio imports without duplicate retry notes (0.11.8)
 
 **Agent:** GPT-6 via Codex

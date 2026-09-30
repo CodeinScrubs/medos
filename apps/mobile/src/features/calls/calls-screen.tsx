@@ -73,10 +73,11 @@ export function CallsScreen() {
   }, [pending]);
 
   /** Done with whatever the picker was showing; a share is answered once. */
-  function closePicker() {
-    setFiling(null);
+  function closePicker(answered: CallRecording | null) {
+    setFiling((current) => (current === answered ? null : current));
     setSelectedPatientId(null);
-    if (incoming && shared) {
+    // A picked file may sit ahead of an unrelated incoming share.
+    if (answered === incoming && incoming && shared) {
       setHandledShare(shareKey);
       router.setParams({ shared: undefined, name: undefined, request: undefined });
     }
@@ -136,7 +137,7 @@ export function CallsScreen() {
     try {
       setListening(null);
       // A newer share may arrive during the copy. Do not consume that request.
-      if (latestPending.current === recording) closePicker();
+      if (latestPending.current === recording) closePicker(recording);
       router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
     } catch (e) {
       alertError('فایل ذخیره شد؛ نوت باز نشد', e);
@@ -158,7 +159,7 @@ export function CallsScreen() {
       setBusy(false);
     }
     try {
-      if (latestPending.current?.importId === id) closePicker();
+      if (latestPending.current?.importId === id) closePicker(latestPending.current);
       router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
     } catch (e) {
       alertError('فایل ذخیره شد؛ نوت باز نشد', e);
@@ -171,7 +172,7 @@ export function CallsScreen() {
     setBusy(true);
     void discardCallImport(id)
       .then(() => {
-        if (latestPending.current?.importId === id) closePicker();
+        if (latestPending.current?.importId === id) closePicker(latestPending.current);
       })
       .catch((e) => alertError('لغو ورود کامل نشد', e))
       .finally(() => {
@@ -304,7 +305,7 @@ export function CallsScreen() {
         items={patients.error ? [] : patientItems}
         selectedId={selectedPatientId}
         emptyText={patients.loading ? 'در حال خواندن…' : 'بیماری نیست. اول بیمار را بسازید.'}
-        onClose={closePicker}
+        onClose={() => closePicker(pending)}
         onSelect={(item) => {
           const recording = pending;
           if (recording) void file(item.id, recording);
