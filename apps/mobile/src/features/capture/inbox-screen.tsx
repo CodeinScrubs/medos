@@ -79,7 +79,7 @@ export function InboxScreen() {
 
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: 'صندوق ثبت سریع' }} />
+      <ScreenOptions options={{ title: 'ورودی‌ها' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ErrorNotice
           error={error ?? filedError ?? openCountError ?? filedCountError ?? mediaError}

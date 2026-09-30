@@ -3,8 +3,8 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Linking, Pressable, StyleSheet } from 'react-native';
 
-import { notify } from '@/components/feedback';
-import { Avatar, Badge, Card, Column, Row, Text } from '@/components/ui';
+import { alertError, notify } from '@/components/feedback';
+import { Avatar, Badge, Card, Column, IconButton, Row, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
 import { formatAge } from '@/lib/jalali';
 import { formatPhone, joinLabels, normalizePhone, toPersianDigits } from '@/lib/persian';
@@ -57,21 +57,16 @@ export function PatientHeader({ patient }: { patient: Patient }) {
             </Row>
           </Column>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={patient.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
-            hitSlop={12}
+          <IconButton
+            label={patient.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
+            icon={patient.starred ? 'star' : 'star-outline'}
+            size={22}
+            color={patient.starred ? colors.accent : colors.textFaint}
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              void setPatientStarred(patient.id, !patient.starred);
+              void setPatientStarred(patient.id, !patient.starred).catch((e) => alertError('ستاره ثبت نشد', e));
             }}
-          >
-            <Ionicons
-              name={patient.starred ? 'star' : 'star-outline'}
-              size={22}
-              color={patient.starred ? colors.accent : colors.textFaint}
-            />
-          </Pressable>
+          />
         </Row>
 
         {patient.summary ? (

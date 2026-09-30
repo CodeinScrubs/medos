@@ -33,6 +33,49 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Consistent import labels and a reliable record star (0.11.4)
+
+**Agent:** GPT-6 via Codex
+**Commits:** this follow-up to `ee9c49f`; version/code remain 0.11.4/20.
+
+**Changed**
+- Matched inbox/audio route titles to the navigation labels. Replaced the long
+  call-recording setup paragraph with the actual file/share action and one clear
+  statement that MedOS does not record calls itself. Import handlers are unchanged.
+- Native inspection found the record star had a 22dp visible target (46dp including
+  hitSlop). Reused the standard 48dp IconButton and report a rejected star write;
+  the old handler silently dropped its promise. No schema or dependency change.
+
+**Verified**
+- `ee9c49f` is pushed; hosted CI succeeded. Fresh `npm run check`: 76 suites /
+  832 app tests + 3 workflow tests, typecheck/lint/format green.
+- The new SQLite trigger regression failed on the old star handler, then passed
+  with the fix. Successful toggle/reverse writes affect only the displayed patient.
+- Preflight x86_64 release (parent plus import-label edits) starts offline on the
+  dedicated API 36.1 emulator. Round keyboard hides only the footer, skip leaves
+  seen count at zero, return retains the patient's summary, and seen advances its
+  count. All eight record destinations are visible with font scale 1.6.
+
+**Not verified**
+- This commit's new star still needs rebuilding/native bounds verification.
+  Preflight is not acceptance of a later artifact. No physical-phone run, speed
+  benchmark, TalkBack, camera/audio/alarms or restore acceptance in this step.
+
+**Open threads** (what the next session should pick up)
+- Finish the release builds and bounded native checks; record exact source/ABI/hash.
+  Plans 001-005 stay SOFTWARE VERIFIED until their complete acceptance matrix runs.
+- D08 shift identity/manual-form drafts, C05 audio import durability, D05/D10 native
+  interruption/recovery and W/C feature gates retain their IMPLEMENTATION scope.
+
+**Gotchas**
+- Run builds and expensive diagnostics separately. A diagnostic follow-up test
+  timed out during compilation/emulator boot; it passed in isolation (5 tests),
+  and the subsequent full check passed without a worker-exit warning.
+- On this image uiautomator can dump app bounds behind Gboard. Check keyboard
+  visibility/hide it before tapping a lower control; do not treat a missed tap
+  through the keyboard as an app write failure. Test-only SQL injection uses
+  TestDatabase.sqlite, not a production db/client import from a .tsx test.
+
 ## 2026-09-30 — Direct ward workflows and safer, readable controls (0.11.4)
 
 **Agent:** GPT-6 via Codex

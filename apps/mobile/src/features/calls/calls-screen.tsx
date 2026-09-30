@@ -24,7 +24,7 @@ import { fileCallRecording, type CallRecording } from './queries';
 import { callsFiled, callsFolderUri } from './settings';
 
 /**
- * «ضبط تماس‌ها»: the calls the phone's dialer recorded, newest first, each one
+ * Import previously recorded calls, newest first, each one
  * tap from a patient's record.
  *
  * The folder is read again whenever the screen comes into view, so a call
@@ -152,7 +152,7 @@ export function CallsScreen() {
         ) : (
           <>
             <SectionHeader
-              title="ضبط‌های اخیر"
+              title="فایل‌های اخیر"
               count={recordings?.length}
               action={
                 <Pressable hitSlop={8} onPress={() => void chooseFolder().catch((e) => alertError('پوشه ثبت نشد', e))}>
@@ -165,8 +165,8 @@ export function CallsScreen() {
             {recordings?.length === 0 ? (
               <EmptyState
                 icon="call-outline"
-                title="هنوز ضبطی در این پوشه نیست"
-                description="بعد از تماس، ضبطِ اپ «تلفن» اینجا می‌آید."
+                title="فایل صوتی در این پوشه نیست"
+                description="پوشهٔ فایل‌های ضبط‌شده را انتخاب کنید یا یک فایل اضافه کنید."
               />
             ) : null}
             {(recordings ?? []).map((r) => (
@@ -180,7 +180,7 @@ export function CallsScreen() {
               />
             ))}
             <Button
-              label="یک فایل صوتی دیگر"
+              label="افزودن فایل صوتی"
               icon="document-outline"
               variant="ghost"
               full
@@ -206,11 +206,7 @@ export function CallsScreen() {
   );
 }
 
-/**
- * How recordings get here, and what to do without one. The dialer's own
- * recording is region-locked: on the owner's phone (a Gulf firmware) Samsung
- * removed it, which is why the text does not promise it.
- */
+/** Import existing recordings without promising a built-in call recorder. */
 function Setup({
   lost,
   onChoose,
@@ -230,29 +226,18 @@ function Setup({
         <Row gap="sm">
           <Ionicons name="call-outline" size={20} color={colors.primary} />
           <Text variant="subheading" style={{ flex: 1 }}>
-            {lost ? 'پوشه‌ی ضبط تماس‌ها باز نشد' : 'ضبط تماس'}
+            {lost ? 'پوشه باز نشد' : 'فایل‌های تماس'}
           </Text>
         </Row>
         <Text variant="body" color="textMuted">
           {lost
-            ? 'دسترسی به پوشه از دست رفته (مثلاً بعد از بازگردانی روی گوشی دیگر). دوباره انتخابش کنید.'
-            : 'اندروید ضبط تماس را فقط به اپ «تلفن» گوشی یا به اپ‌های ضبط تماس می‌دهد؛ MedOS خودش تماس را ضبط نمی‌کند، ضبط‌های آن‌ها را به پرونده می‌آورد. اگر اپ «تلفن» گوشی «ضبط تماس‌ها» دارد، روشنش کنید (ضبط‌ها در Recordings/Call می‌آیند)؛ اگر ندارد — سامسونگ آن را برای بعضی کشورها برداشته — یک اپ ضبط تماس لازم است. بعد از اولین تماسِ ضبط‌شده، پوشه‌ی ضبط‌ها را اینجا انتخاب کنید. اگر اپ ضبط، ضبط‌ها را پیش خودش نگه می‌دارد (مثل Cube ACR)، هر ضبط را از همان اپ «اشتراک‌گذاری» کنید و MedOS را انتخاب کنید.'}
+            ? 'دسترسی به پوشه از دست رفته است. دوباره انتخابش کنید.'
+            : 'فایل صوتی را انتخاب کنید یا از برنامهٔ ضبط، «اشتراک‌گذاری ← MedOS» را بزنید. MedOS خودش تماس را ضبط نمی‌کند.'}
         </Text>
+        <Button label="انتخاب پوشه" icon="folder-open-outline" full onPress={onChoose} />
+        <Button label="افزودن فایل صوتی" icon="document-outline" variant="ghost" full onPress={onPickOne} />
         {lost ? null : (
-          <Text variant="caption" color="textFaint">
-            ضبط مکالمه ممکن است به اطلاع یا رضایت طرف مقابل نیاز داشته باشد.
-          </Text>
-        )}
-        <Button label="انتخاب پوشه‌ی ضبط تماس‌ها" icon="folder-open-outline" full onPress={onChoose} />
-        <Button label="یک فایل صوتی را انتخاب کنید" icon="document-outline" variant="ghost" full onPress={onPickOne} />
-        {lost ? null : (
-          <Button
-            label="بدون ضبط: خلاصه‌ی صوتی بعد از تماس"
-            icon="mic-outline"
-            variant="ghost"
-            full
-            onPress={onSummary}
-          />
+          <Button label="خلاصهٔ صوتی بعد از تماس" icon="mic-outline" variant="ghost" full onPress={onSummary} />
         )}
       </Column>
     </Card>
