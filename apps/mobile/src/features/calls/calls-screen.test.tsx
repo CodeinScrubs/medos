@@ -137,6 +137,7 @@ describe('filing a shared recording from the screen', () => {
     });
     expect(picker().props.visible).toBe(true);
     expect(picker().props.selectedId).toBe(patientId);
+    expect(picker().props.notice).toBeTruthy();
     expect(mockSetParams).not.toHaveBeenCalled();
     expect(alertError).toHaveBeenCalled();
     await act(async () => {
@@ -148,7 +149,21 @@ describe('filing a shared recording from the screen', () => {
     expect(file.mock.calls[1]![1].importId).toBe(file.mock.calls[0]![1].importId);
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(picker().props.visible).toBe(false);
+    expect(picker().props.notice).toBeNull();
     expect(mockSetParams).toHaveBeenCalledWith({ shared: undefined, name: undefined, request: undefined });
+  });
+
+  it('does not show the previous failed import notice on a different incoming share', async () => {
+    jest.spyOn(queries, 'fileCallRecording').mockRejectedValueOnce(new Error('Copy failed'));
+    await render();
+    await act(async () => {
+      picker().props.onSelect({ id: patientId });
+    });
+    expect(picker().props.notice).toBeTruthy();
+    share('content://example/another', 'Another.m4a');
+    await refresh();
+    expect(picker().props.visible).toBe(true);
+    expect(picker().props.notice).toBeNull();
   });
 
   it.each([false, true])(

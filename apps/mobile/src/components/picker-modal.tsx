@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,6 +34,7 @@ export function PickerModal({
   createLabel = 'افزودن',
   emptyText = 'موردی پیدا نشد',
   placeholder = 'جستجو…',
+  notice,
 }: {
   visible: boolean;
   title: string;
@@ -46,6 +47,8 @@ export function PickerModal({
   createLabel?: string;
   emptyText?: string;
   placeholder?: string;
+  /** Context that must remain visible inside the modal, such as a failed action. */
+  notice?: ReactNode;
 }) {
   const { colors, radii, spacing, typography } = useTheme();
   const [query, setQuery] = useState('');
@@ -115,6 +118,8 @@ export function PickerModal({
             />
           </Row>
         </View>
+
+        {notice ? <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>{notice}</View> : null}
 
         {canCreate && (
           <Pressable

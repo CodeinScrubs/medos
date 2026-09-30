@@ -671,6 +671,14 @@ step: failure/process interruption leaves cleanup visible and retryable. Already
 clinical records and source files are not removed. Cancelled/filed journals are retained;
 there is no general orphan sweep or automatic history pruning.
 
+A native missing-source test returned to the patient picker without a visible
+failure message, although retrying from the recovery card showed its dialog.
+Alert invocation alone is not visible-error evidence across a modal transition.
+The picker has an optional generic notice slot; Calls shows one short failed-write
+message there, scoped to the exact pending source. Starting a retry clears it;
+success, closing that source or a different incoming share cannot inherit it.
+No diagnostic text or private source metadata is added to the notice.
+
 This is a resumable filesystem/SQLite protocol, **not** a filesystem transaction, fsync
 guarantee, full restore-concurrency guard or independent backup. An interrupted copy still
 needs a valid source grant; a grant from another phone is not portable. Providers may not

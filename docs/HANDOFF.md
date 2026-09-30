@@ -33,6 +33,40 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Keep failed-import feedback visible inside the patient picker
+
+**Agent:** GPT-6 via Codex
+**Commits:** this correction; native-entry/display-name correction `2710648`.
+
+**Changed**
+- A reopened patient picker now shows one short failed-write notice for its
+  exact source. Retry clears it; success/close/new incoming shares cannot
+  inherit it. Generic PickerModal gets an optional notice slot; other pickers
+  keep their existing behavior. Error logging/dialogs remain. No new route,
+  schema, dependency or clinical behavior.
+
+**Verified**
+- Native 09d2762: missing-source card retry showed a dialog, while selection
+  returned to its modal with no visible error. The same handlers/picker existed
+  on 2710648; two component witnesses failed there before this correction.
+- `npm run check`: 82 suites / 966 app tests + 3 workflows; type/lint/format green.
+- 2710648 source/pre-push/CI passed and its arm64 build passed native-entry
+  inspection. That same-version artifact is superseded by this UI correction.
+
+**Not verified**
+- Final correction push/CI, rebuilt signed artifacts and corrected native
+  notice/display-name/retry acceptance are pending at this source commit.
+- No physical phone, real Cube/grant/recreation, power/low-space or interrupted
+  encrypted restore/concurrent restore-import acceptance.
+
+**Open threads** (what the next session should pick up)
+- Build and accept this frozen source; finish validation-0.11.8.md, then D08
+  other forms/auxiliary reads, D05/D10 native restore and remaining C05/clinical/AI gates.
+
+**Gotchas**
+- Alert spies do not prove visible feedback across a native Modal transition.
+  Use the isolated MedOS_Calls_0_11_8 AVD/serial; shared-AVD UI evidence is excluded.
+
 ## 2026-10-01 — Fix native-delivery gaps exposed by audio-import testing
 
 **Agent:** GPT-6 via Codex

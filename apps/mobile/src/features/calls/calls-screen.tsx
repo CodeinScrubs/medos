@@ -49,6 +49,7 @@ export function CallsScreen() {
   const [recordings, setRecordings] = useState<CallRecording[] | null | undefined>(undefined);
   const [listening, setListening] = useState<string | null>(null);
   const [filing, setFiling] = useState<CallRecording | null>(null);
+  const [failedRecording, setFailedRecording] = useState<CallRecording | null>(null);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -75,6 +76,7 @@ export function CallsScreen() {
   /** Done with whatever the picker was showing; a share is answered once. */
   function closePicker(answered: CallRecording | null) {
     setFiling((current) => (current === answered ? null : current));
+    setFailedRecording((current) => (current === answered ? null : current));
     setSelectedPatientId(null);
     // A picked file may sit ahead of an unrelated incoming share.
     if (answered === incoming && incoming && shared) {
@@ -121,12 +123,14 @@ export function CallsScreen() {
   async function file(patientId: string, recording: CallRecording) {
     if (saving.current || patients.error || patients.loading || !patientRows?.some((p) => p.id === patientId)) return;
     saving.current = true;
+    setFailedRecording(null);
     setSelectedPatientId(patientId);
     setBusy(true);
     let noteId: string;
     try {
       noteId = await fileCallRecording(patientId, recording);
     } catch (e) {
+      setFailedRecording(recording);
       alertError('به پرونده اضافه نشد', e);
       return;
     } finally {
@@ -304,6 +308,13 @@ export function CallsScreen() {
         title="این تماس با کدام بیمار بود؟"
         items={patients.error ? [] : patientItems}
         selectedId={selectedPatientId}
+        notice={
+          failedRecording && failedRecording === pending ? (
+            <Text color="danger" accessibilityRole="alert">
+              به پرونده اضافه نشد. برای تلاش دوباره روی همین بیمار بزنید.
+            </Text>
+          ) : null
+        }
         emptyText={patients.loading ? 'در حال خواندن…' : 'بیماری نیست. اول بیمار را بسازید.'}
         onClose={() => closePicker(pending)}
         onSelect={(item) => {
