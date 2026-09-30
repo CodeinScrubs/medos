@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Fix native-delivery gaps exposed by audio-import testing
+
+**Agent:** GPT-6 via Codex
+**Commits:** this correction; application base `09d2762`, import foundation `77a7501`.
+
+**Changed**
+- One real Downloads pick named the note after a document id (`msf:17`).
+  Use the installed DocumentPicker's display name, with automatic cache copy
+  disabled. Its fallback clock is not call-time evidence. Existing titles stay
+  unchanged; no dependency, permission, schema, route or version change.
+- APK entry inspection rejects missing essential native libraries and mixed/
+  wrong ABIs before copying the owner artifact to dist. AGENTS documents the
+  explicit emulator check and bounded generated-app clean repair.
+
+**Verified**
+- Provider-name witness failed on 09d2762; name/time/cancel regressions pass.
+- `npm run check`: 82 suites / 965 app tests + 3 workflows; typecheck,
+  lint and formatting green without warnings.
+- The gate rejected the actual incomplete x86 package. Generated-app clean
+  produced a signed valid x86 package from 09d2762; native startup succeeded.
+- Isolated AVD: 0.11.7-to-09d2762 upgrade retained a synthetic patient; a WAV
+  imported with a readable 2-second duration; a selected missing-source operation
+  remained visible after force-stop. Earlier shared-AVD UI evidence is excluded.
+
+**Not verified**
+- Final correction CI, rebuilt arm64/x86 artifacts and final native acceptance
+  are pending at this source commit. Earlier same-version artifacts are superseded.
+- No physical phone, real Cube recording/grant, power/low-space or interrupted
+  encrypted restore/concurrent restore-import acceptance.
+
+**Open threads** (what the next session should pick up)
+- Finish builds/acceptance of this frozen correction; then D08 other manual
+  forms/auxiliary reads, D05/D10 native recovery/restore and remaining C05/
+  clinical/AI gates. Full native evidence belongs in validation-0.11.8.md.
+
+**Gotchas**
+- Gradle success once delivered an x86 APK without Expo/Reanimated/Worklets.
+  Inspect ZIP entries. A changing shared AVD needs a separate AVD/ADB serial.
+
 ## 2026-10-01 — Do not consume a queued share when a picked file completes
 
 **Agent:** GPT-6 via Codex

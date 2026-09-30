@@ -205,6 +205,14 @@ misses, a backup that cannot be opened a year from now.
   that; never copy it to `dist/`. If the install says "not enough space", `adb shell pm
   uninstall-system-updates` frees gigabytes on the emulator image. The emulator found the
   note-save crash that tests could not.
+- **Inspect the actual APK.** `npm run apk` checks essential native libraries and the
+  owner ABI before copying to `dist/`. For an emulator artifact, run from the repo root
+  `node apps/mobile/scripts/apk-native-check.js <apk-path> x86_64` before installing.
+  A successful incremental build after an ABI switch once omitted Expo/Reanimated/
+  Worklets libraries; `:app:clean :app:assembleRelease -PreactNativeArchitectures=x86_64`
+  rebuilt a valid package. Clean only the generated app build, never app data or source.
+  Use a separate AVD/serial when another session is driving the emulator; changing
+  pages or data from a concurrent session is not acceptance evidence.
 - **Run Prettier from the repository root.** Run inside `apps/mobile`, it misses the root
   `.prettierignore` and rewrites the generated migration snapshots.
 - **Do not reformat or "tidy" files you are not changing.** It buries the real diff.

@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File } from 'expo-file-system';
 
 import { CALL_FOLDER_HINT, isRecordingFile, parseRecordingName, recordingKey } from './logic';
@@ -19,9 +20,18 @@ export async function chooseCallsFolder(): Promise<string | null> {
 
 /** One audio file from anywhere — another recorder, a messenger's voice message. */
 export async function pickRecordingFile(): Promise<CallRecording | null> {
-  const picked = await File.pickFileAsync({ mimeTypes: 'audio/*', initialUri: CALL_FOLDER_HINT });
+  // File.name is a URI basename, not the provider's DISPLAY_NAME (e.g. msf:17).
+  // Reuse the installed picker, but reserve our journal before making any copy.
+  const picked = await DocumentPicker.getDocumentAsync({
+    type: 'audio/*',
+    multiple: false,
+    copyToCacheDirectory: false,
+  });
   if (picked.canceled) return null;
-  return describe(picked.result);
+  const source = picked.assets[0];
+  if (!source) return null;
+  // Picker lastModified can silently fall back to now; use actual File metadata.
+  return describe(new File(source.uri), source.name.trim() || 'recording', source.size);
 }
 
 /**
@@ -40,32 +50,33 @@ export function listRecordings(folderUri: string, limit = 60): CallRecording[] |
   }
   return entries
     .filter((entry): entry is File => entry instanceof File && isRecordingFile(entry.name))
-    .map(describe)
+    .map((file) => describe(file))
     .sort((a, b) => (b.recordedAt?.getTime() ?? 0) - (a.recordedAt?.getTime() ?? 0))
     .slice(0, limit);
 }
 
 const UNKNOWN = new Date(0);
 
-function describe(file: File): CallRecording {
+function describe(file: File, name = file.name, providerSize?: number): CallRecording {
   let sizeBytes: number | null = null;
   try {
-    sizeBytes = file.size > 0 ? file.size : null;
+    const size = providerSize ?? file.size;
+    sizeBytes = size > 0 ? size : null;
   } catch {
     // A provider that cannot say the size still hands over the file.
   }
-  const parsed = parseRecordingName(file.name, UNKNOWN);
+  const parsed = parseRecordingName(name, UNKNOWN);
   // The file's own time is read only when the name has none: one more call per
   // file to the storage provider, for a folder that can hold hundreds.
   const recordedAt = parsed.recordedAt === UNKNOWN ? modifiedAt(file) : parsed.recordedAt;
   return {
     uri: file.uri,
-    name: file.name,
+    name,
     sizeBytes,
     recordedAt: recordedAt === UNKNOWN ? null : recordedAt,
     timeSource: parsed.recordedAt !== UNKNOWN ? 'filename' : recordedAt !== UNKNOWN ? 'file' : 'unknown',
     who: parsed.who,
-    key: recordingKey(file.name),
+    key: recordingKey(name),
   };
 }
 

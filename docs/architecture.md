@@ -640,6 +640,16 @@ share transform adds this UUID only while converting SEND to VIEW, keeps the con
 intent on `onNewIntent`, and retains that UUID through activity recreation. Invalid/legacy
 links get a screen-local id; their process-recreation identity is not guaranteed.
 
+Single-file selection reuses the already-installed DocumentPicker to obtain the
+provider's display name. Expo File.name is just the URI basename: a Downloads
+document can otherwise become `msf:17` in the note title and lose its audio
+extension/date metadata. `copyToCacheDirectory: false` leaves copying behind the
+durable reservation. The picker remembers its own location rather than accepting
+our initial-folder hint. Its `lastModified` may silently fall back to the current
+clock, so that value is not evidence of call time; only name/actual file metadata
+are used. Source grants may expire; no new permission or native dependency was
+added, and existing imported titles are not retrospectively guessed or rewritten.
+
 The journal reserves patient, versioned source metadata and an owned
 `media/imports/<UUID>.<extension>` path **before** native copy. `copying` can restart into
 that unpublished destination; `ready` stores nonempty byte count and streamed SHA-256.

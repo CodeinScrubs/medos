@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { androidEnv, explainMissing, spawnCommand } = require('./android-env');
+const { checkApkNativeLibraries } = require('./apk-native-check');
 
 const mobileRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(mobileRoot, '..', '..');
@@ -84,6 +85,12 @@ run(
 
 const version = app.version;
 const built = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
+try {
+  checkApkNativeLibraries(built, 'arm64-v8a', env);
+} catch (error) {
+  console.error(`\n[MedOS] ${error.message}\n[MedOS] Refusing to copy an incomplete or wrong-ABI APK to dist/.`);
+  process.exit(1);
+}
 const dist = path.join(repoRoot, 'dist');
 fs.mkdirSync(dist, { recursive: true });
 const out = path.join(dist, `MedOS-${version}.apk`);
