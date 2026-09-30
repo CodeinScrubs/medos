@@ -2,9 +2,30 @@ import { describe, expect, it } from '@jest/globals';
 
 import { RLM } from '@/lib/persian';
 
-import { patientIdentity, patientPickerSublabel } from './logic';
+import { parseAgeYears, patientIdentity, patientPickerSublabel } from './logic';
 
 const NOW = new Date(2026, 8, 26);
+
+describe('whole-year fallback age', () => {
+  it.each(['', '   '])('keeps unknown age distinct from zero (%p)', (input) => {
+    expect(parseAgeYears(input)).toEqual({ valid: true, value: null });
+  });
+  it.each([
+    ['0', 0],
+    ['۲۴', 24],
+    ['٢٤', 24],
+    [' 24 ', 24],
+    ['1e2', 100],
+  ])('parses a valid whole-year value (%s)', (input, value) => {
+    expect(parseAgeYears(input)).toEqual({ valid: true, value });
+  });
+  it.each(['24.5', '-1', '12,5', '24 years', '24-5', 'NaN', 'Infinity', '9007199254740992'])(
+    'rejects instead of guessing (%s)',
+    (input) => {
+      expect(parseAgeYears(input)).toEqual({ valid: false, value: null });
+    },
+  );
+});
 
 describe('patientIdentity', () => {
   /* Two patients with the same name, 35 and 62, looked identical in every picker. */

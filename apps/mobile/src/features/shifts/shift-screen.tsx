@@ -232,7 +232,7 @@ function ShiftScreenContent() {
           const seen = member.reviewedAt != null;
           const where = locationLabel(encounter ?? undefined);
           return (
-            <Card key={`${member.shiftId}:${member.id}:${patient.id}`} style={{ opacity: seen ? 0.65 : 1 }}>
+            <Card key={`${member.shiftId}:${member.id}:${patient.id}`}>
               <Column gap="sm">
                 <Row gap="sm" align="flex-start">
                   <Pressable

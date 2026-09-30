@@ -35,7 +35,8 @@ import { createLabPanel, labPanelQuery, panelValuesQuery } from './labs/queries'
 import { noteDraftQuery } from './notes/draft-queries';
 import { NoteEditorScreen } from './notes/note-editor-screen';
 import { createNote, noteQuery } from './notes/queries';
-import { createPatient } from './patients/queries';
+import { EditPatientScreen } from './patients/edit-patient-screen';
+import * as patientQueries from './patients/queries';
 import { ExtensionFormScreen } from './places/extension-form-screen';
 import { PlaceFormScreen } from './places/place-form-screen';
 import { extensionQuery, placeQuery } from './places/queries';
@@ -95,6 +96,7 @@ jest.mock('@/components/ui', () => ({
   Screen: 'Screen',
   SectionHeader: 'SectionHeader',
   SelectField: 'SelectField',
+  Segmented: 'Segmented',
   Text: 'Text',
   Toggle: 'Toggle',
 }));
@@ -112,6 +114,9 @@ jest.mock('@/components/voice-note-player', () => ({ VoiceNotePlayer: 'VoiceNote
 jest.mock('@/components/voice-recorder', () => ({ VoiceRecorder: 'VoiceRecorder' }));
 jest.mock('@/components/quick-date-field', () => ({ QuickDateField: 'QuickDateField' }));
 jest.mock('@/components/jalali-date-field', () => ({ JalaliDateField: 'JalaliDateField' }));
+jest.mock('@/components/collapsible-section', () => ({
+  CollapsibleSection: ({ children }: { children: ReactElement }) => children,
+}));
 jest.mock('@/features/attachments/voice-notes', () => ({ VoiceNotesSection: 'VoiceNotesSection' }));
 jest.mock('@/features/consults/consults-brief', () => ({ ConsultsBrief: 'ConsultsBrief' }));
 jest.mock('@/features/patients/patient-header', () => ({ AllergyBanner: 'AllergyBanner' }));
@@ -150,7 +155,7 @@ function expectReadError() {
 }
 beforeEach(async () => {
   t = useTestDatabase(await createTestDatabase());
-  patientId = await createPatient({ firstName: 'Test', lastName: 'Patient', status: 'outpatient' });
+  patientId = await patientQueries.createPatient({ firstName: 'Test', lastName: 'Patient', status: 'outpatient' });
   mockParams = { id: patientId };
   mockCache.clear();
   mockErrors.clear();
@@ -169,6 +174,92 @@ afterEach(async () => {
 });
 
 describe('editors survive database read failures', () => {
+  it('retries the initial patient read before mounting an edit form', async () => {
+    mockCache.set('patients', undefined);
+    mockErrors.set('patients', new Error('Synthetic initial read failure'));
+    await render(<EditPatientScreen />);
+    expect(tree.root.findAllByType(Input)).toHaveLength(0);
+    expectReadError();
+    await act(async () => {
+      tree.root
+        .findAllByType(ErrorNotice)
+        .find((node) => node.props.error)!
+        .props.onRetry();
+      await settle();
+    });
+    await refresh(<EditPatientScreen />);
+    expect(input('نام').props.value).toBe('Test');
+    expect(tree.root.findAllByType(ErrorNotice).some((node) => node.props.error)).toBe(false);
+  });
+
+  it('stores a Persian whole-year age without turning unknown age into zero', async () => {
+    await render(<EditPatientScreen />);
+    await type('سن', '۲۴');
+    await act(async () => {
+      tree.root
+        .findAllByType(Button)
+        .find((node) => node.props.label === 'ذخیره تغییرات')!
+        .props.onPress();
+      await settle();
+    });
+    expect((await patientQueries.patientQuery(patientId))[0]?.ageYears).toBe(24);
+  });
+
+  it('retains manual patient input through a failed refresh and explicit retry', async () => {
+    await render(<EditPatientScreen />);
+    await type('خلاصه‌ی یک‌خطی', 'Manual text to keep');
+    mockErrors.set('patients', new Error('Synthetic read failure'));
+    await refresh(<EditPatientScreen />);
+    expect(input('خلاصه‌ی یک‌خطی').props.value).toBe('Manual text to keep');
+    expectReadError();
+    await act(async () => {
+      tree.root
+        .findAllByType(ErrorNotice)
+        .find((node) => node.props.error)!
+        .props.onRetry();
+      await settle();
+    });
+    await refresh(<EditPatientScreen />);
+    expect(input('خلاصه‌ی یک‌خطی').props.value).toBe('Manual text to keep');
+    expect(tree.root.findAllByType(ErrorNotice).some((node) => node.props.error)).toBe(false);
+  });
+
+  it('does not let the manual patient form overwrite a background star or tag edit', async () => {
+    await render(<EditPatientScreen />);
+    await type('خلاصه‌ی یک‌خطی', 'Edited summary');
+    await patientQueries.updatePatient(patientId, { starred: true, tags: ['background tag'] });
+    await act(async () => {
+      tree.root
+        .findAllByType(Button)
+        .find((node) => node.props.label === 'ذخیره تغییرات')!
+        .props.onPress();
+      await settle();
+    });
+    expect((await patientQueries.patientQuery(patientId))[0]).toMatchObject({
+      summary: 'Edited summary',
+      starred: true,
+      tags: ['background tag'],
+    });
+  });
+
+  it.each(['24.5', '-1', '12,5', '24 years'])(
+    'does not silently strip invalid whole-year age input (%s)',
+    async (age) => {
+      await render(<EditPatientScreen />);
+      await type('سن', age);
+      await act(async () => {
+        tree.root
+          .findAllByType(Button)
+          .find((node) => node.props.label === 'ذخیره تغییرات')!
+          .props.onPress();
+        await settle();
+      });
+      expect(input('سن').props.error).toBeTruthy();
+      expect(input('سن').props.value).toBe(age);
+      expect((await patientQueries.patientQuery(patientId))[0]?.ageYears).toBeNull();
+    },
+  );
+
   it.each<[string, string, (id: string) => unknown, () => ReactElement]>([
     ['doctor', 'doctorId', doctorQuery, () => <DoctorFormScreen />],
     ['encounter', 'encounterId', encounterQuery, () => <EncounterFormScreen />],

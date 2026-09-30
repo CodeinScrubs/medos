@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Patient editor read safety and age validation (0.11.6)
+
+**Agent:** GPT-6 via Codex
+**Commits:** this implementation commit; preceding shift fixes `2edf9e5`.
+
+**Changed**
+- Patient edit now uses the existing EditGate/error-retry contract and keeps typed
+  form fields on a failed refresh. It no longer writes non-editable star/tags.
+- Whole-year fallback age uses parseDecimal and explicit validation; blank stays
+  unknown. Fractional/negative/ambiguous/text input is retained with an error,
+  rather than silently changing 24.5 into 245 or -1 into 1. Birth-date age stays separate.
+- Reviewed shift cards keep normal text opacity; the checkbox conveys seen state.
+- Version/code 0.11.6/22. Added a scoped version-bump rule after self-review caught
+  an unrelated dependency version in a global replacement before commit.
+  Dependencies/schema/clinical-tool scope are unchanged; no subagents.
+
+**Verified**
+- Six new editor regression cases failed on the old handlers; corrected initial
+  read/retry, retained manual text, independent metadata and invalid-age paths.
+- `npm run check`: 76 suites / 868 app tests + 3 workflows, typecheck/lint/format
+  green before checkout; pre-push reruns the gate on this final source.
+- Preceding `2edf9e5` CI passed. Signed arm64 0.11.5/21 APK built successfully,
+  52,640,959 bytes; SHA-256 c638c02660f6cc6e24d6349aab286fb3857263c3f3ced680662bee27be4ac528.
+  Signature verified. That APK precedes these patient edits; do not use it as 0.11.6 evidence.
+
+**Not verified**
+- Native 0.11.6 build/device acceptance still pending at this source commit.
+  No physical-phone, process-death, low-space, restore or power-loss acceptance.
+- Manual patient forms still need durable raw drafts and guarded exit. Independent
+  editors can still conflict on shared editable fields; no full form/version completion claim.
+
+**Open threads** (what the next session should pick up)
+- Build/test this exact final source on Android. Then durable raw patient/form
+  drafts (including invalid date/age text), safe exit and duplicate-submit/concurrent-edit
+  recovery; C05 durable audio identities/orphans; D05/D10 native interruption/restore.
+- Keep the wider W/C scope, original media, rich text and physician/AI validation
+  gates visible in IMPLEMENTATION. Forty-patient and target-phone acceptance remain.
+
+**Gotchas**
+- Age is this form's explicit whole-year fallback, not an inferred pediatric age.
+  Do not strip characters or silently round a decimal. Shared parseDecimal also
+  accepts valid scientific notation; a whole-valued expression is unambiguous.
+- Version edits in package-lock must touch root/workspace metadata only. The final
+  diff changes no dependency entry. Version bumps can force native regeneration.
+
+
 ## 2026-09-30 — Preserve shift inputs through external workspace changes (0.11.5)
 
 **Agent:** GPT-6 via Codex

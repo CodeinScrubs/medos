@@ -1,6 +1,6 @@
 import type { Patient } from '@/db/schema';
 import { formatAge } from '@/lib/jalali';
-import { buildSearchText, joinLabels, normalizePhone } from '@/lib/persian';
+import { buildSearchText, joinLabels, normalizePhone, parseDecimal } from '@/lib/persian';
 
 import { SEX_LABELS } from './labels';
 
@@ -44,6 +44,14 @@ export function patientSearchText(
 
 /** Statuses shown in the default "current" patient list. */
 export const CURRENT_STATUSES = ['admitted', 'outpatient', 'followup'] as const;
+
+/** This form's fallback age is whole years; never turn 24.5 into 245 or -1 into 1. */
+export function parseAgeYears(input: string): { valid: boolean; value: number | null } {
+  if (!input.trim()) return { valid: true, value: null };
+  const value = parseDecimal(input);
+  const valid = value !== null && Number.isSafeInteger(value) && value >= 0;
+  return { valid, value: valid ? value : null };
+}
 
 /**
  * What tells this patient apart from another with the same name: age, sex and

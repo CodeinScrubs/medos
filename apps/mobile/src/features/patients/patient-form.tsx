@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
@@ -13,7 +13,7 @@ import { isValidNationalId, toLatinDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { BLOOD_TYPES, PATIENT_STATUS, SEX_LABELS } from './labels';
-import { patientIdentity } from './logic';
+import { parseAgeYears, patientIdentity } from './logic';
 import { createPatient, findPossibleDuplicates, updatePatient, type PatientInput } from './queries';
 
 type FormState = {
@@ -67,7 +67,7 @@ function initialState(patient?: Patient): FormState {
  * folded into sections, because a patient often has to be entered in the
  * thirty seconds between being told about them and walking into the room.
  */
-export function PatientForm({ patient }: { patient?: Patient }) {
+export function PatientForm({ patient, readNotice }: { patient?: Patient; readNotice?: ReactNode }) {
   const router = useRouter();
   const { spacing } = useTheme();
   const isEdit = Boolean(patient);
@@ -83,18 +83,20 @@ export function PatientForm({ patient }: { patient?: Patient }) {
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!form.firstName.trim()) next.firstName = 'نام لازم است';
     if (!form.lastName.trim()) next.lastName = 'نام خانوادگی لازم است';
+    if (!parseAgeYears(form.ageYears).valid) next.ageYears = 'سن را به سال کامل و غیرمنفی بنویسید';
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
   function toInput(): PatientInput {
-    const age = toLatinDigits(form.ageYears).replace(/\D/g, '');
+    const age = parseAgeYears(form.ageYears);
     return {
+      // Flags and tags have their own controls; omit them to preserve current values.
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       sex: form.sex,
       birthDate: form.birthDate,
-      ageYears: age ? Number(age) : null,
+      ageYears: age.value,
       status: form.status,
       summary: form.summary.trim() || null,
       nationalId: toLatinDigits(form.nationalId).replace(/\D/g, '') || null,
@@ -108,8 +110,6 @@ export function PatientForm({ patient }: { patient?: Patient }) {
       drugHistory: form.drugHistory.trim() || null,
       habitualHistory: form.habitualHistory.trim() || null,
       familyHistory: form.familyHistory.trim() || null,
-      starred: patient?.starred ?? false,
-      tags: patient?.tags ?? null,
     };
   }
 
@@ -173,6 +173,7 @@ export function PatientForm({ patient }: { patient?: Patient }) {
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <Row gap="md">
           <View style={{ flex: 1 }}>
             <Input
@@ -223,9 +224,10 @@ export function PatientForm({ patient }: { patient?: Patient }) {
               label="سن"
               value={form.ageYears}
               onChangeText={(v) => set('ageYears', v)}
+              error={errors.ageYears}
               keyboardType="number-pad"
               numericFold
-              placeholder="سال"
+              placeholder="سال کامل"
             />
           </View>
         </Row>

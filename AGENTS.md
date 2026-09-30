@@ -210,6 +210,10 @@ misses, a backup that cannot be opened a year from now.
 - **Do not reformat or "tidy" files you are not changing.** It buries the real diff.
 - **Do not add dependencies casually.** Each one is a native build risk and a supply-chain
   risk on a machine behind a filtered network. If you add one, say why in the handoff.
+- **Version bumps are scoped edits.** Update root/mobile package versions, app.json and
+  its Android versionCode. In package-lock.json update only the root `version`,
+  `packages[""].version` and `packages["apps/mobile"].version`. Never globally replace
+  version strings: an unrelated dependency can have the same version as MedOS.
 
 ---
 
