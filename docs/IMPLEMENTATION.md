@@ -83,6 +83,15 @@ and device behavior. Another AI's statement or a successful build is insufficien
 
 ## Priority 3: usability and release evidence
 
+- 2026-09-30 (0.11.7): durable raw create/edit patient drafts, explicit validated
+  atomic publication, idempotent retry, guarded exit, duplicate/conflict handling
+  and confirmed soft discard. Final gate: 78 suites / 907 app tests + 3 workflows;
+  exact-source CI passed. [Validation evidence](validation-0.11.7.md) records
+  signed final arm64/x86_64 artifacts and bounded offline upgrade, completed-save
+  recovery, invalid-input rejection, edit/publication/discard and large-font
+  navigation checks. Other manual forms, permanent patient-field history,
+  uncommitted/native interruption, restore and physical-phone acceptance remain
+  open. Migration 0016 is additive; backup format/dependencies/routes unchanged.
 - 2026-09-30 (0.11.6): shift identity changes preserve keyed text before
   adoption; patient edit retains input on read failure and validates whole-year
   age. Final software gate: 76 suites / 868 app tests + 3 workflows, source CI

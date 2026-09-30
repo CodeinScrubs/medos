@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Signed 0.11.7 and bounded patient-draft acceptance
+
+**Agent:** GPT-6 via Codex
+**Commits:** this evidence commit; implementation `adc54e3`, final source `2cb27e4`.
+
+**Changed**
+- Recorded [0.11.7 evidence](validation-0.11.7.md) and updated IMPLEMENTATION.
+  This entry changes documentation only; no source/dependency/schema changes.
+
+**Verified**
+- Final source check/pre-push: 78 suites / 907 app tests + 3 workflows,
+  typecheck/lint/format green; exact-source CI passed. Checkout gate rerun.
+- Final signed arm64 owner and separate x86_64 emulator APKs built from 2cb27e4;
+  signatures match the preceding release. Exact hashes/bytes are in evidence.
+- Offline emulator: intermediate-to-final upgrade recovered the raw patient
+  draft; completed-save header exit/force-stop retained incomplete date/age.
+  Invalid publication was rejected, correction created one patient, edit drafts
+  left the chart unchanged until Save, and confirmed discard kept prior facts.
+  Dark/font1.6/three-button Save/Close checked; runtime error filters empty.
+
+**Not verified**
+- No physical phone, uncommitted process death, native read/write fault,
+  power/low-space, interrupted encrypted restore or full accessibility/40-patient
+  performance acceptance. The two-step upgrade is documented exactly.
+- Revision tokens are not full patient-field history; other manual forms and
+  independent shift-editor conflicts remain open.
+
+**Open threads** (what the next session should pick up)
+- D08 remaining manual forms/auxiliary reads; C05 persistent audio-import
+  identity and orphan recovery; D05/D10 native interruption/restore acceptance.
+  Keep wider W/C, original media, rich text and physician/AI gates in the ledger.
+
+**Gotchas**
+- Run heavy checks before builds on this host. Final arm64 belongs in dist/;
+  x86_64 stays private. Rebuild if application source changes during compilation.
+- UI dump bounds can lie behind Gboard: check its presence and dismiss before
+  scrolling/tapping lower actions. Verify the resulting text after ADB input;
+  this image needs explicit display 0 for key events. System UI had a boot ANR.
+
 ## 2026-09-30 — Consistent date clock before 0.11.7 delivery
 
 **Agent:** GPT-6 via Codex
