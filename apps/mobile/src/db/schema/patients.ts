@@ -62,6 +62,27 @@ export const patients = sqliteTable(
   ],
 );
 
+/** Raw form input is recoverable without publishing an incomplete clinical record. */
+export const patientFormDrafts = sqliteTable(
+  'patient_form_drafts',
+  {
+    ...baseColumns,
+    scopeKey: text('scope_key').notNull(),
+    patientId: text('patient_id').references(() => patients.id),
+    /** Versioned document, including raw date/age text and the original editable values. */
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    /** Publication and retirement share one transaction; retries return this patient. */
+    committedPatientId: text('committed_patient_id').references(() => patients.id),
+  },
+  (t) => [
+    uniqueIndex('patient_form_drafts_open_scope_idx')
+      .on(t.scopeKey)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type PatientFormDraft = typeof patientFormDrafts.$inferSelect;
+
 /** Companions and next of kin. A patient usually has more than one useful number. */
 export const patientContacts = sqliteTable(
   'patient_contacts',

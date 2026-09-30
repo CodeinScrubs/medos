@@ -27,6 +27,29 @@ afterEach(() => {
 });
 
 describe('date fields block stale-value saves', () => {
+  it('restores invalid controlled raw text and reports invalidity without falling back to the last ISO value', () => {
+    const changed = jest.fn<(iso: string | null) => void>();
+    const validity = jest.fn<(valid: boolean) => void>();
+    const rawChanged = jest.fn<(text: string) => void>();
+    act(() => {
+      tree = create(
+        <JalaliDateField
+          label="date"
+          value="2026-09-16"
+          rawText="1405/07/"
+          onRawTextChange={rawChanged}
+          onChange={changed}
+          onValidityChange={validity}
+        />,
+      );
+    });
+    expect(tree.root.findByType(Input).props.value).toBe('1405/07/');
+    expect(validity).toHaveBeenLastCalledWith(false);
+    expect(tree.root.findAllByType(Text)).toHaveLength(0);
+    act(() => tree.root.findByType(Input).props.onChangeText('1405/06/25'));
+    expect(rawChanged).toHaveBeenLastCalledWith('1405/06/25');
+    expect(changed).toHaveBeenLastCalledWith('2026-09-16');
+  });
   it('blocks invalid date immediately, hides the old preview, and allows a corrected or optional empty value', () => {
     const saved = jest.fn<(value: string | null) => void>();
     const alerts = jest.spyOn(Alert, 'alert').mockImplementation(() => {});

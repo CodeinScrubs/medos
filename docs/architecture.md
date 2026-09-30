@@ -718,3 +718,49 @@ ward list is small, and it prevents an inconsistent pair of reads. No generic
 sync framework, schema or dependency was added. This does not supply full shift
 text revision history, resolve two independent editors' competing text writes,
 or prove crash/power-loss durability; those remain separate acceptance work.
+
+---
+
+## Raw patient-form drafts and explicit publication (0.11.7)
+
+Migration 0016 adds `patient_form_drafts`, with one open `new` scope and one per
+patient. Opening an untouched form creates nothing. The version-1 JSON document
+stores every raw field, including incomplete Jalali birth-date text and invalid
+age, plus the original editable values for an existing patient. The codec rejects
+unknown/malformed documents with a generic error; it never falls back to a blank
+editor or logs the document. Raw Jalali text is input, not a stored clinical date.
+Published birth dates remain Gregorian ISO.
+
+The gate reads the draft before mounting a keyed editor. Later read failures show
+retry inside that same editor. `usePatientFormDraft` uses the existing Autosave
+queue (800 ms quiet period, 3 s ceiling), background flush and always-on removal
+guard. A failed write retains input and blocks leaving. Inputs and repeat submit
+are locked through publication and duplicate confirmation. The optional controlled
+raw-text contract on JalaliDateField preserves invalid text without altering its
+existing uncontrolled consumers.
+
+`form-draft-queries.ts` owns synchronous SQLite transactions. Draft revisions are
+compare-and-swap tokens, not full history. Save does not touch a clinical record.
+Publication validates the persisted raw fields, checks target liveness and creates
+or updates the patient together with soft retirement and its retry link. A retry
+of the same token returns the same patient; retirement failure rolls back the
+clinical write. The shared transaction helpers in patients/queries.ts preserve
+encounter-derived status, phone normalization and the merged search index.
+
+For edits, a three-way comparison publishes only locally changed fields. Other
+background fields, stars and tags survive. A conflicting edit to the same field
+requires an explicit comparison. Keep mine rebases only local changes, checking
+both the displayed draft revision and current editable chart values in the same
+transaction. Another intervening change conflicts again. Loading the stored
+version and discarding a draft require confirmation and wait for in-flight saves.
+Discard is soft and audited by id, without clinical text. A final autosave can
+retain text for a soft-deleted patient but cannot publish or revive that patient.
+
+Tradeoff: a separate draft row/codec costs one additive table and an explicit
+publish action. It avoids incomplete patients in lists and silently converting
+invalid text into facts. Existing backup table discovery includes these drafts;
+restoring an older backup clears drafts from the replaced dataset. No new route,
+dependency, general sync framework or clinical calculator was added. The stored
+revision does not give permanent history of every patient field. Uncommitted
+keystrokes, disk/power failure and native recovery remain bounded by the separate
+release evidence; other manual forms still need their own recovery work.

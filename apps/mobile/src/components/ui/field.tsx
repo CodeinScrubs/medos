@@ -214,11 +214,13 @@ export function Segmented<T extends string>({
   value,
   onChange,
   label,
+  disabled = false,
 }: {
   options: { value: T; label: string }[];
   value: T | null;
   onChange: (v: T) => void;
   label?: string;
+  disabled?: boolean;
 }) {
   const { colors, radii, spacing } = useTheme();
   return (
@@ -237,7 +239,8 @@ export function Segmented<T extends string>({
             <Pressable
               key={o.value}
               accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
+              accessibilityState={{ selected: active, disabled }}
+              disabled={disabled}
               onPress={() => onChange(o.value)}
               style={[
                 styles.segment,

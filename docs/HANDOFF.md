@@ -33,6 +33,56 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Recoverable patient forms and atomic publication (0.11.7)
+
+**Agent:** GPT-6 via Codex
+**Commits:** this implementation commit.
+
+**Changed**
+- D08 patient slice: separate versioned raw create/edit drafts (migration 0016),
+  initial-read gate, retained loaded form on read failure, background/guarded
+  flush and short inline state. Invalid age/date input remains recoverable.
+- Explicit publication validates persisted input and atomically updates/creates
+  the patient and retires its draft with an idempotent retry link. Shared patient
+  write helpers keep status, normalization and search inside that transaction.
+- Three-way edits preserve unrelated current fields/star/tags. Same-field
+  conflicts require a displayed-revision comparison; further changes reject
+  replacement. Confirmed discard is soft/audited; double submit/confirmation and
+  post-commit navigation retry cannot create duplicate patients.
+- Existing Autosave and Zod reused; no dependency, new route or clinical tool.
+  Version/code 0.11.7/23. Architecture and D08 ledger describe the contract.
+
+**Verified**
+- Baseline: 76 suites / 868 app tests + 3 workflows. Two recovery regressions
+  first failed on the old patient screens and pass with the new implementation.
+- Software gate: 78 suites / 905 app tests + 3 workflows, typecheck/lint/format.
+  Migrated SQLite fault injection checks rollback, stale drafts, chart conflicts,
+  deleted targets, idempotent/duplicate publication and private codec errors.
+  Real useLive/form/date-field handlers cover recovery, failed reads/writes,
+  background/exit flush, locked confirmation, discard and navigation retry.
+- Current/older backup table-import tests preserve raw drafts or remove drafts
+  from the replaced dataset. Regeneration reports no further schema changes.
+
+**Not verified**
+- Native 0.11.7 build and acceptance pending at this source commit. No physical
+  phone, uncommitted kill, native fault injection, power/low-space or interrupted
+  restore evidence in this entry. Test results do not prove these behaviors.
+- Draft revision is a conflict token, not permanent patient-field history.
+  Other manual forms and independent shift text editors retain their backlog.
+
+**Open threads** (what the next session should pick up)
+- Build and verify this exact source on Android; keep x86_64 emulator artifacts
+  separate from the arm64 owner APK and record bounded native evidence.
+- Continue D08 remaining manual forms/auxiliary reads, C05 persistent audio-import
+  identity/orphans and D05/D10 native recovery. Wider W/C scope remains in ledger.
+
+**Gotchas**
+- Raw date text is intentional draft content. Never turn an invalid raw field
+  into the last parsed clinical value; only explicit validated publication writes
+  the chart. Unknown document versions block the form instead of resetting it.
+- Rebase must compare the displayed draft revision AND current editable chart
+  values. A failed compare keeps local text; do not auto-load another editor.
+
 ## 2026-09-30 — Signed 0.11.6 release and bounded native verification
 
 **Agent:** GPT-6 via Codex

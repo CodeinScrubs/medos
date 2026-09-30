@@ -1,10 +1,10 @@
 import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { db, type Database, type DbTransaction } from '@/db/client';
 import { patientContacts, patients, type NewPatient, type Patient, type PatientStatus } from '@/db/schema';
 import { contains, matchesSearch } from '@/db/search';
-import { activeEncounter, reconcilePatientStatus, statusFor } from '@/features/encounters/status';
+import { activeEncounterQuery, reconcilePatientStatus, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
 import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -76,23 +76,31 @@ export function patientContactsQuery(patientId: string) {
 }
 
 /** Used by the duplicate check when creating a patient. */
-export async function findPossibleDuplicates(
+export function possibleDuplicatesQuery(
   firstName: string,
   lastName: string,
   nationalId?: string | null,
-): Promise<Patient[]> {
+  handle: Pick<Database, 'select'> = db,
+) {
   const byName = buildSearchText(firstName, lastName);
-  if (!byName && !nationalId) return [];
 
   const clauses: SQL[] = [];
   if (byName) clauses.push(contains(patients.searchText, byName));
   if (nationalId) clauses.push(eq(patients.nationalId, nationalId));
 
-  return db
+  return handle
     .select()
     .from(patients)
-    .where(and(alive, or(...clauses)))
+    .where(and(alive, clauses.length ? or(...clauses) : eq(patients.id, '')))
     .limit(5);
+}
+
+export async function findPossibleDuplicates(
+  firstName: string,
+  lastName: string,
+  nationalId?: string | null,
+): Promise<Patient[]> {
+  return possibleDuplicatesQuery(firstName, lastName, nationalId);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -101,48 +109,57 @@ export async function findPossibleDuplicates(
 
 export type PatientInput = Omit<NewPatient, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'searchText'>;
 
-export async function createPatient(input: PatientInput): Promise<string> {
+export function createPatientInTransaction(tx: DbTransaction, input: PatientInput): string {
   const id = newId();
-  await db.insert(patients).values({
-    ...input,
-    id,
-    ...stamps(),
-    // A patient being created has no episode yet, so nothing can make them
-    // admitted. Coerced rather than refused: the value can also arrive from an
-    // import or an older backup, and losing the patient over it would be worse.
-    status: input.status === undefined || input.status === 'admitted' ? 'outpatient' : input.status,
-    phone: input.phone ? normalizePhone(input.phone) : null,
-    searchText: patientSearchText(input),
-  });
+  tx.insert(patients)
+    .values({
+      ...input,
+      id,
+      ...stamps(),
+      // A patient being created has no episode yet, so nothing can make them
+      // admitted. Coerced rather than refused: the value can also arrive from an
+      // import or an older backup, and losing the patient over it would be worse.
+      status: input.status === undefined || input.status === 'admitted' ? 'outpatient' : input.status,
+      phone: input.phone ? normalizePhone(input.phone) : null,
+      searchText: patientSearchText(input),
+    })
+    .run();
   return id;
 }
 
-export async function updatePatient(id: string, input: Partial<PatientInput>): Promise<void> {
+export async function createPatient(input: PatientInput): Promise<string> {
+  return db.transaction((tx) => createPatientInTransaction(tx, input));
+}
+
+export function updatePatientInTransaction(tx: DbTransaction, id: string, input: Partial<PatientInput>): void {
   // `searchText` is derived, so it has to be rebuilt from the merged row rather
   // than from the patch alone — otherwise editing only the phone would wipe the
   // name out of the search index.
-  const current = (
-    await db
-      .select()
-      .from(patients)
-      .where(and(alive, eq(patients.id, id)))
-      .limit(1)
-  )[0];
-  if (!current) throw new Error(`Patient ${id} not found`);
+  const current = tx
+    .select()
+    .from(patients)
+    .where(and(alive, eq(patients.id, id)))
+    .get();
+  if (!current) throw new Error('پروندهٔ بیمار پیدا نشد.');
 
   const merged = { ...current, ...input };
   // Whether they are on a ward is the episode's answer, not this form's.
-  const status = input.status === undefined ? undefined : statusFor(await activeEncounter(id), input.status);
-  await db
-    .update(patients)
+  const status =
+    input.status === undefined ? undefined : statusFor(activeEncounterQuery(id, tx).get() ?? null, input.status);
+  tx.update(patients)
     .set({
       ...input,
       status,
       ...touch(),
       phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
-      searchText: patientSearchText(merged, patientSearchContext(id)),
+      searchText: patientSearchText(merged, patientSearchContext(id, tx)),
     })
-    .where(and(alive, eq(patients.id, id)));
+    .where(and(alive, eq(patients.id, id)))
+    .run();
+}
+
+export async function updatePatient(id: string, input: Partial<PatientInput>): Promise<void> {
+  db.transaction((tx) => updatePatientInTransaction(tx, id, input));
 }
 
 export async function setPatientStarred(id: string, starred: boolean): Promise<void> {

@@ -23,6 +23,9 @@ export function JalaliDateField({
   hint,
   required,
   allowFuture = false,
+  rawText,
+  onRawTextChange,
+  editable,
 }: {
   label: string;
   /** Gregorian ISO `YYYY-MM-DD`, or null. */
@@ -33,8 +36,10 @@ export function JalaliDateField({
   required?: boolean;
   /** Birth dates cannot be in the future; follow-up dates usually are. */
   allowFuture?: boolean;
-}) {
-  const [text, setText] = useState(() => isoToJalaliText(value));
+  editable?: boolean;
+} & ({ rawText?: never; onRawTextChange?: never } | { rawText: string; onRawTextChange: (text: string) => void })) {
+  const [localText, setText] = useState(() => isoToJalaliText(value));
+  const text = rawText ?? localText;
   const [blurred, setBlurred] = useState(false);
   const now = useNow();
   const result = validateDateInput(text, { required: !!required, allowFuture, now: new Date(now) });
@@ -56,11 +61,12 @@ export function JalaliDateField({
   if (value !== seenValue) {
     setSeenValue(value);
     const parsed = parseJalaliInput(text);
-    if ((parsed ? toIsoDate(parsed) : null) !== value) setText(isoToJalaliText(value));
+    if (rawText === undefined && (parsed ? toIsoDate(parsed) : null) !== value) setText(isoToJalaliText(value));
   }
 
   function handleChange(next: string) {
-    setText(next);
+    if (onRawTextChange) onRawTextChange(next);
+    else setText(next);
     setBlurred(false);
     const nextResult = validateDateInput(next, { required: !!required, allowFuture, now: new Date(now) });
     onValidityChange(nextResult.valid);
@@ -75,6 +81,7 @@ export function JalaliDateField({
         label={label}
         value={text}
         onChangeText={handleChange}
+        editable={editable}
         onBlur={() => setBlurred(true)}
         placeholder={toPersianDigits('1370/05/12')}
         keyboardType="numbers-and-punctuation"

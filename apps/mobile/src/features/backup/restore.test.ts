@@ -11,10 +11,12 @@ import {
   notes,
   occasions,
   patients,
+  patientFormDrafts,
   settings,
   taskDrafts,
   tasks,
 } from '@/db/schema';
+import { encodePatientForm, initialPatientFields } from '@/features/patients/form-draft';
 import { newId, stamps } from '@/lib/ids';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -406,6 +408,49 @@ describe('importTables', () => {
     importTables(live.conn);
 
     expect(await live.db.select().from(imagingStudies)).toEqual([]);
+  });
+
+  it('restores exact raw patient form drafts without publishing their invalid fields', async () => {
+    const patientId = await addPatient(backup, 'Draft target', { ageYears: 24, birthDate: '2001-08-03' });
+    const patient = backup.db.select().from(patients).get()!;
+    const base = initialPatientFields(patient);
+    const body = encodePatientForm({
+      version: 1,
+      base,
+      fields: { ...base, ageYears: '24.5', birthDateText: '1405/07/', summary: 'Unpublished raw text' },
+    });
+    await backup.db
+      .insert(patientFormDrafts)
+      .values({ id: 'raw-form', ...stamps(), scopeKey: `patient:${patientId}`, patientId, body, revision: 3 });
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(patientFormDrafts).get()).toMatchObject({
+      id: 'raw-form',
+      patientId,
+      body,
+      revision: 3,
+      deletedAt: null,
+    });
+    expect(live.db.select().from(patients).get()).toMatchObject({
+      ageYears: 24,
+      birthDate: '2001-08-03',
+      summary: null,
+    });
+  });
+
+  it('restores an older backup without patient form drafts and clears drafts from the replaced dataset', async () => {
+    const body = encodePatientForm({
+      version: 1,
+      base: null,
+      fields: { ...initialPatientFields(), firstName: 'Old dataset draft' },
+    });
+    await live.db.insert(patientFormDrafts).values({ id: 'old-form', ...stamps(), scopeKey: 'new', body, revision: 1 });
+    await addPatient(backup, 'Backup patient');
+    backup.conn.execSync('DROP TABLE patient_form_drafts');
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(live.db.select().from(patientFormDrafts).all()).toEqual([]);
+    expect(await names(live)).toEqual(['Backup patient']);
   });
 
   it('refuses a backup whose rows point at something that is not there', async () => {

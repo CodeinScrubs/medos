@@ -17,6 +17,7 @@ import m0012 from './0012_cynical_lady_vermin.sql';
 import m0013 from './0013_eager_madame_hydra.sql';
 import m0014 from './0014_fair_taskmaster.sql';
 import m0015 from './0015_chilly_ser_duncan.sql';
+import m0016 from './0016_pale_mole_man.sql';
 
   export default {
     journal,
@@ -36,7 +37,8 @@ m0011,
 m0012,
 m0013,
 m0014,
-m0015
+m0015,
+m0016
     }
   }
   

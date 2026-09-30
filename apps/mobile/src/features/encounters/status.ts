@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type Database } from '@/db/client';
 import { encounters, patients, type PatientStatus } from '@/db/schema';
 import { touch } from '@/lib/ids';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
@@ -37,14 +37,17 @@ export function isChoosableStatus(status: PatientStatus): boolean {
 }
 
 /** The live episode a patient is in, if any. */
-export async function activeEncounter(patientId: string) {
-  const rows = await db
+export function activeEncounterQuery(patientId: string, handle: Pick<Database, 'select'> = db) {
+  return handle
     .select()
     .from(encounters)
     .where(and(isNull(encounters.deletedAt), eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
     .orderBy(desc(encounters.admittedAt))
     .limit(1);
-  return rows[0] ?? null;
+}
+
+export async function activeEncounter(patientId: string) {
+  return (await activeEncounterQuery(patientId))[0] ?? null;
 }
 
 /**

@@ -36,6 +36,7 @@ import { noteDraftQuery } from './notes/draft-queries';
 import { NoteEditorScreen } from './notes/note-editor-screen';
 import { createNote, noteQuery } from './notes/queries';
 import { EditPatientScreen } from './patients/edit-patient-screen';
+import { NewPatientScreen } from './patients/new-patient-screen';
 import * as patientQueries from './patients/queries';
 import { ExtensionFormScreen } from './places/extension-form-screen';
 import { PlaceFormScreen } from './places/place-form-screen';
@@ -174,6 +175,35 @@ afterEach(async () => {
 });
 
 describe('editors survive database read failures', () => {
+  it('recovers an unpublished patient edit after reopening without changing the chart', async () => {
+    await render(<EditPatientScreen />);
+    await type('خلاصه‌ی یک‌خطی', 'Unpublished patient summary');
+    expect((await patientQueries.patientQuery(patientId))[0]?.summary).toBeNull();
+    await act(async () => {
+      tree.unmount();
+      await settle();
+    });
+    mockCache.delete('patient_form_drafts');
+    await render(<EditPatientScreen />);
+    expect(input('خلاصه‌ی یک‌خطی').props.value).toBe('Unpublished patient summary');
+  });
+
+  it('recovers a partial new patient without putting a blank patient on the list', async () => {
+    await render(<NewPatientScreen />);
+    await type('نام', 'Partial');
+    await type('سن', '24.5');
+    expect(await patientQueries.patientListQuery()).toHaveLength(1);
+    await act(async () => {
+      tree.unmount();
+      await settle();
+    });
+    mockCache.delete('patient_form_drafts');
+    await render(<NewPatientScreen />);
+    expect(input('نام').props.value).toBe('Partial');
+    expect(input('سن').props.value).toBe('24.5');
+    expect(await patientQueries.patientListQuery()).toHaveLength(1);
+  });
+
   it('retries the initial patient read before mounting an edit form', async () => {
     mockCache.set('patients', undefined);
     mockErrors.set('patients', new Error('Synthetic initial read failure'));

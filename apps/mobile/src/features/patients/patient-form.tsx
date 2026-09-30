@@ -1,169 +1,75 @@
-import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
-import { alertError } from '@/components/feedback';
+import { ErrorNotice } from '@/components/error-notice';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, Column, Input, Row, Screen, Segmented, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
-import type { Patient, PatientStatus } from '@/db/schema';
+import type { Patient } from '@/db/schema';
+import { useLive } from '@/db/use-live';
 import { CHOOSABLE_STATUSES, isChoosableStatus } from '@/features/encounters/status';
+import { parseJalaliInput, toIsoDate } from '@/lib/jalali';
 import { isValidNationalId, toLatinDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
+import { PatientFormDraftNotice } from './form-draft-notice';
+import { patientFormDraftQuery } from './form-draft-queries';
 import { BLOOD_TYPES, PATIENT_STATUS, SEX_LABELS } from './labels';
-import { parseAgeYears, patientIdentity } from './logic';
-import { createPatient, findPossibleDuplicates, updatePatient, type PatientInput } from './queries';
+import { patientFormSeed, usePatientFormDraft, type PatientFormSeed } from './use-form-draft';
 
-type FormState = {
-  firstName: string;
-  lastName: string;
-  sex: 'male' | 'female' | 'other' | null;
-  birthDate: string | null;
-  ageYears: string;
-  status: PatientStatus;
-  summary: string;
-  nationalId: string;
-  fileNumber: string;
-  phone: string;
-  city: string;
-  address: string;
-  bloodType: string;
-  allergies: string;
-  pastMedicalHistory: string;
-  drugHistory: string;
-  habitualHistory: string;
-  familyHistory: string;
-};
-
-function initialState(patient?: Patient): FormState {
-  return {
-    firstName: patient?.firstName ?? '',
-    lastName: patient?.lastName ?? '',
-    sex: patient?.sex ?? null,
-    birthDate: patient?.birthDate ?? null,
-    ageYears: patient?.ageYears != null ? String(patient.ageYears) : '',
-    status: patient?.status ?? 'outpatient',
-    summary: patient?.summary ?? '',
-    nationalId: patient?.nationalId ?? '',
-    fileNumber: patient?.fileNumber ?? '',
-    phone: patient?.phone ?? '',
-    city: patient?.city ?? '',
-    address: patient?.address ?? '',
-    bloodType: patient?.bloodType ?? '',
-    allergies: patient?.allergies ?? '',
-    pastMedicalHistory: patient?.pastMedicalHistory ?? '',
-    drugHistory: patient?.drugHistory ?? '',
-    habitualHistory: patient?.habitualHistory ?? '',
-    familyHistory: patient?.familyHistory ?? '',
-  };
+/** Read the draft before mounting an editor; read failures must never look like an empty form. */
+export function PatientForm({ patient, readNotice }: { patient?: Patient; readNotice?: ReactNode }) {
+  const { data, error, retry } = useLive(patientFormDraftQuery(patient?.id ?? null), [patient?.id]);
+  const [seed, setSeed] = useState<{ value: PatientFormSeed; generation: number } | null>(null);
+  let decodeError: Error | undefined;
+  if (!seed && data) {
+    try {
+      setSeed({ value: patientFormSeed(patient, data[0] ?? null), generation: 0 });
+    } catch (e) {
+      decodeError = e instanceof Error ? e : new Error('پیش‌نویس قابل خواندن نیست.');
+    }
+  }
+  const notice = (
+    <>
+      {readNotice}
+      <ErrorNotice error={error ?? decodeError} what="پیش‌نویس بیمار" onRetry={retry} />
+    </>
+  );
+  if (!seed)
+    return (
+      <Screen>
+        <Column>
+          {notice}
+          {!error && !decodeError ? <Text>بارگذاری پیش‌نویس…</Text> : null}
+        </Column>
+      </Screen>
+    );
+  return (
+    <PatientFormEditor
+      key={seed.generation}
+      seed={seed.value}
+      readNotice={notice}
+      onReset={(value) => setSeed({ value, generation: seed.generation + 1 })}
+    />
+  );
 }
 
-/**
- * Create and edit form for a patient.
- *
- * Only the first and last name are required. Everything else is optional and
- * folded into sections, because a patient often has to be entered in the
- * thirty seconds between being told about them and walking into the room.
- */
-export function PatientForm({ patient, readNotice }: { patient?: Patient; readNotice?: ReactNode }) {
-  const router = useRouter();
+function PatientFormEditor({
+  seed,
+  readNotice,
+  onReset,
+}: {
+  seed: PatientFormSeed;
+  readNotice: ReactNode;
+  onReset: (seed: PatientFormSeed) => void;
+}) {
   const { spacing } = useTheme();
-  const isEdit = Boolean(patient);
-
-  const [form, setForm] = useState<FormState>(() => initialState(patient));
-  const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(seed.patient);
+  const editing = usePatientFormDraft(seed, onReset);
+  const { form, set, errors, busy: saving } = editing;
   const dateValidation = useDateValidation();
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-
-  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
-
-  function validate(): boolean {
-    const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.firstName.trim()) next.firstName = 'نام لازم است';
-    if (!form.lastName.trim()) next.lastName = 'نام خانوادگی لازم است';
-    if (!parseAgeYears(form.ageYears).valid) next.ageYears = 'سن را به سال کامل و غیرمنفی بنویسید';
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  }
-
-  function toInput(): PatientInput {
-    const age = parseAgeYears(form.ageYears);
-    return {
-      // Flags and tags have their own controls; omit them to preserve current values.
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      sex: form.sex,
-      birthDate: form.birthDate,
-      ageYears: age.value,
-      status: form.status,
-      summary: form.summary.trim() || null,
-      nationalId: toLatinDigits(form.nationalId).replace(/\D/g, '') || null,
-      fileNumber: form.fileNumber.trim() || null,
-      phone: form.phone.trim() || null,
-      city: form.city.trim() || null,
-      address: form.address.trim() || null,
-      bloodType: form.bloodType || null,
-      allergies: form.allergies.trim() || null,
-      pastMedicalHistory: form.pastMedicalHistory.trim() || null,
-      drugHistory: form.drugHistory.trim() || null,
-      habitualHistory: form.habitualHistory.trim() || null,
-      familyHistory: form.familyHistory.trim() || null,
-    };
-  }
-
-  async function save() {
-    if (!dateValidation.check()) return;
-    if (!validate()) return;
-    setSaving(true);
-    try {
-      if (isEdit && patient) {
-        await updatePatient(patient.id, toInput());
-        router.back();
-        return;
-      }
-
-      const duplicates = await findPossibleDuplicates(
-        form.firstName.trim(),
-        form.lastName.trim(),
-        toLatinDigits(form.nationalId).replace(/\D/g, '') || null,
-      );
-
-      if (duplicates.length > 0) {
-        const names = duplicates
-          .map((d) => `• ${d.firstName} ${d.lastName}${patientIdentity(d) ? ` (${patientIdentity(d)})` : ''}`)
-          .join('\n');
-        Alert.alert('بیمار مشابه پیدا شد', `این بیماران از قبل ثبت شده‌اند:\n${names}\n\nباز هم بیمار جدید ثبت شود؟`, [
-          { text: 'انصراف', style: 'cancel', onPress: () => setSaving(false) },
-          {
-            text: 'ثبت کن',
-            onPress: () => {
-              void commitNew();
-            },
-          },
-        ]);
-        return;
-      }
-
-      await commitNew();
-    } catch (e) {
-      setSaving(false);
-      alertError('ثبت نشد', e);
-    }
-  }
-
-  async function commitNew() {
-    try {
-      const id = await createPatient(toInput());
-      router.replace({ pathname: '/patient/[id]', params: { id } });
-    } catch (e) {
-      alertError('ثبت نشد', e);
-    } finally {
-      setSaving(false);
-    }
-  }
-
+  const parsedBirthDate = parseJalaliInput(form.birthDateText);
   const nationalIdDigits = toLatinDigits(form.nationalId).replace(/\D/g, '');
   const nationalIdWarning =
     nationalIdDigits.length === 10 && !isValidNationalId(nationalIdDigits)
@@ -174,9 +80,11 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
+        <PatientFormDraftNotice editing={editing} initial={seed} />
         <Row gap="md">
           <View style={{ flex: 1 }}>
             <Input
+              editable={!saving && !editing.completedId}
               label="نام"
               required
               value={form.firstName}
@@ -188,6 +96,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
           </View>
           <View style={{ flex: 1 }}>
             <Input
+              editable={!saving && !editing.completedId}
               label="نام خانوادگی"
               required
               value={form.lastName}
@@ -199,6 +108,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
         </Row>
 
         <Segmented
+          disabled={saving || !!editing.completedId}
           label="جنسیت"
           value={form.sex}
           onChange={(v) => set('sex', v)}
@@ -214,13 +124,17 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
             <JalaliDateField
               onValidityChange={dateValidation.setValid}
               label="تاریخ تولد"
-              value={form.birthDate}
-              onChange={(iso) => set('birthDate', iso)}
+              value={parsedBirthDate ? toIsoDate(parsedBirthDate) : null}
+              rawText={form.birthDateText}
+              onRawTextChange={(text) => set('birthDateText', text)}
+              editable={!saving && !editing.completedId}
+              onChange={() => {}}
               hint="اگر نمی‌دانید، فقط سن را بنویسید"
             />
           </View>
           <View style={{ flex: 1 }}>
             <Input
+              editable={!saving && !editing.completedId}
               label="سن"
               value={form.ageYears}
               onChangeText={(v) => set('ageYears', v)}
@@ -239,6 +153,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
           admission time and no kardex behind them.
         */}
         <Segmented
+          disabled={saving || !!editing.completedId}
           label="وضعیت"
           value={isChoosableStatus(form.status) ? form.status : 'outpatient'}
           onChange={(v) => set('status', v)}
@@ -258,6 +173,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
         )}
 
         <Input
+          editable={!saving && !editing.completedId}
           label="خلاصه‌ی یک‌خطی"
           value={form.summary}
           onChangeText={(v) => set('summary', v)}
@@ -272,6 +188,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
           filledCount={[form.nationalId, form.fileNumber, form.phone, form.city, form.address].filter(Boolean).length}
         >
           <Input
+            editable={!saving && !editing.completedId}
             label="کد ملی"
             value={form.nationalId}
             onChangeText={(v) => set('nationalId', v)}
@@ -280,8 +197,15 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
             ltr
             hint={nationalIdWarning}
           />
-          <Input label="شماره پرونده" value={form.fileNumber} onChangeText={(v) => set('fileNumber', v)} ltr />
           <Input
+            editable={!saving && !editing.completedId}
+            label="شماره پرونده"
+            value={form.fileNumber}
+            onChangeText={(v) => set('fileNumber', v)}
+            ltr
+          />
+          <Input
+            editable={!saving && !editing.completedId}
             label="شماره تماس بیمار"
             value={form.phone}
             onChangeText={(v) => set('phone', v)}
@@ -289,8 +213,19 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
             numericFold
             ltr
           />
-          <Input label="شهر" value={form.city} onChangeText={(v) => set('city', v)} />
-          <Input label="آدرس" value={form.address} onChangeText={(v) => set('address', v)} multiline />
+          <Input
+            editable={!saving && !editing.completedId}
+            label="شهر"
+            value={form.city}
+            onChangeText={(v) => set('city', v)}
+          />
+          <Input
+            editable={!saving && !editing.completedId}
+            label="آدرس"
+            value={form.address}
+            onChangeText={(v) => set('address', v)}
+            multiline
+          />
           <Text variant="tiny" color="textFaint">
             شماره‌ی همراهان بیمار را بعد از ثبت، از داخل پرونده اضافه کنید.
           </Text>
@@ -312,6 +247,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
           }
         >
           <Input
+            editable={!saving && !editing.completedId}
             label="آلرژی"
             value={form.allergies}
             onChangeText={(v) => set('allergies', v)}
@@ -319,6 +255,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
             hint="اگر آلرژی ندارد، NKDA بنویسید تا بعداً معلوم باشد پرسیده‌اید"
           />
           <Input
+            editable={!saving && !editing.completedId}
             label="گروه خونی"
             value={form.bloodType}
             onChangeText={(v) => set('bloodType', v.toUpperCase())}
@@ -327,19 +264,28 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
             autoCapitalize="characters"
           />
           <Input
+            editable={!saving && !editing.completedId}
             label="سابقه بیماری (PMH)"
             value={form.pastMedicalHistory}
             onChangeText={(v) => set('pastMedicalHistory', v)}
             multiline
           />
-          <Input label="سابقه دارویی" value={form.drugHistory} onChangeText={(v) => set('drugHistory', v)} multiline />
           <Input
+            editable={!saving && !editing.completedId}
+            label="سابقه دارویی"
+            value={form.drugHistory}
+            onChangeText={(v) => set('drugHistory', v)}
+            multiline
+          />
+          <Input
+            editable={!saving && !editing.completedId}
             label="عادات (سیگار، تریاک، الکل)"
             value={form.habitualHistory}
             onChangeText={(v) => set('habitualHistory', v)}
             multiline
           />
           <Input
+            editable={!saving && !editing.completedId}
             label="سابقه خانوادگی"
             value={form.familyHistory}
             onChangeText={(v) => set('familyHistory', v)}
@@ -348,14 +294,26 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
         </CollapsibleSection>
 
         <Button
-          label={isEdit ? 'ذخیره تغییرات' : 'ثبت بیمار'}
+          label={editing.completedId ? 'بازکردن پرونده' : isEdit ? 'ذخیره تغییرات' : 'ثبت بیمار'}
           icon="checkmark"
-          onPress={() => void save()}
+          onPress={() => {
+            if (dateValidation.check()) void editing.save();
+          }}
           loading={saving}
           full
           style={{ marginTop: spacing.sm }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="بستن" variant="ghost" onPress={editing.close} disabled={saving} full haptic={false} />
+        {editing.hasDraft && !editing.completedId ? (
+          <Button
+            label="حذف پیش‌نویس"
+            variant="ghost"
+            onPress={editing.discard}
+            disabled={saving}
+            full
+            haptic={false}
+          />
+        ) : null}
       </Column>
     </Screen>
   );
