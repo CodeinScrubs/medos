@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { encounters, shiftPatients, shifts } from '@/db/schema';
+import { tablesOf } from '@/db/query-tables';
+import { auditLog, encounters, shiftPatients, shifts } from '@/db/schema';
 import { createNote, deleteNote, latestPatientNoteQuery, patientNotesQuery } from '@/features/notes/queries';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -8,9 +9,11 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 import {
   addPatientToShift,
   activeShiftQuery,
+  activeShiftWorkspaceQuery,
   deleteShift,
   endShift,
   removePatientFromShift,
+  saveShiftPatientText,
   setShiftPatientReviewed,
   shiftHistoryPatientsQuery,
   shiftQuery,
@@ -36,6 +39,64 @@ beforeEach(async () => {
 });
 
 describe('a shift', () => {
+  it('reads one complete active workspace and watches every joined table', async () => {
+    expect(await activeShiftWorkspaceQuery()).toEqual([]);
+    const old = await startShift();
+    await addPatientToShift(old, patientId);
+    const current = await startShift();
+    const empty = await activeShiftWorkspaceQuery();
+    expect(empty).toHaveLength(1);
+    expect(empty[0]?.shift.id).toBe(current);
+    expect(empty[0]?.member).toBeNull();
+    const episode = await openEncounter({ patientId, kind: 'admission', ward: 'CURRENT' });
+    const member = await addPatientToShift(current, patientId);
+    const [row] = await activeShiftWorkspaceQuery();
+    expect(row?.shift.id).toBe(current);
+    expect(row?.member?.id).toBe(member);
+    expect(row?.patient?.id).toBe(patientId);
+    expect(row?.encounter?.id).toBe(episode);
+    expect(tablesOf(activeShiftWorkspaceQuery())).toEqual(['shifts', 'shift_patients', 'patients', 'encounters']);
+    await deleteEncounter(episode);
+    expect((await activeShiftWorkspaceQuery())[0]?.encounter).toBeNull();
+    await deletePatient(patientId);
+    expect((await activeShiftWorkspaceQuery())[0]?.shift.id).toBe(current);
+    expect((await activeShiftWorkspaceQuery())[0]?.patient).toBeNull();
+    await endShift(current);
+    expect(await activeShiftWorkspaceQuery()).toEqual([]);
+  });
+
+  it('refuses adding a patient or marking reviewed through a stale closed-shift action', async () => {
+    const id = await startShift();
+    const member = await addPatientToShift(id, patientId);
+    await endShift(id);
+    const closedAt = (await shiftQuery(id))[0]?.endAt;
+    await expect(endShift(id, new Date('2030-01-01'))).rejects.toThrow();
+    expect((await shiftQuery(id))[0]?.endAt).toEqual(closedAt);
+    await expect(addPatientToShift(id, patientId)).rejects.toThrow();
+    await expect(setShiftPatientReviewed(member, true)).rejects.toThrow();
+    expect((await shiftPatientsQuery(id))[0]?.member.reviewedAt).toBeNull();
+    // Closing a shift must still allow a mounted field's final handoff flush.
+    await updateShiftPatient(member, { handoffNote: 'Final handoff' });
+    expect((await shiftPatientsQuery(id))[0]?.member.handoffNote).toBe('Final handoff');
+  });
+
+  it('rejects reviewed writes for a removed membership or deleted patient instead of reporting success', async () => {
+    const id = await startShift();
+    const member = await addPatientToShift(id, patientId);
+    await removePatientFromShift(member);
+    await expect(setShiftPatientReviewed(member, true)).rejects.toThrow();
+    const next = await addPatientToShift(id, patientId);
+    await deletePatient(patientId);
+    await expect(setShiftPatientReviewed(next, true)).rejects.toThrow();
+    expect(
+      t.db
+        .select()
+        .from(shiftPatients)
+        .all()
+        .every((row) => row.reviewedAt === null),
+    ).toBe(true);
+  });
+
   it('can browse past the first 30 shifts without reopening any of them', async () => {
     for (let i = 0; i < 32; i += 1) await startShift();
     const active = await activeShiftQuery();
@@ -217,6 +278,53 @@ describe('a shift', () => {
     await removePatientFromShift(memberId);
     await expect(updateShiftPatient(memberId, { handoffNote: 'not stored' })).rejects.toThrow();
     expect(t.db.select().from(shiftPatients).all()[0]?.handoffNote).toBe('stored');
+  });
+
+  it('preserves a mounted field on its removed membership, never a re-added row', async () => {
+    const shiftId = await startShift();
+    const id = await addPatientToShift(shiftId, patientId);
+    const target = (await shiftPatientsQuery(shiftId))[0]!.member;
+    await removePatientFromShift(id);
+    const next = await addPatientToShift(shiftId, patientId);
+    const text = '  Keep indentation\n\nSecond line\n';
+    await saveShiftPatientText(target, { handoffNote: text });
+    const history = await shiftHistoryPatientsQuery(shiftId);
+    expect(history.find(({ member }) => member.id === id)?.member).toMatchObject({
+      handoffNote: text,
+      reviewedAt: null,
+    });
+    expect(history.find(({ member }) => member.id === id)?.member.deletedAt).toBeInstanceOf(Date);
+    expect(history.find(({ member }) => member.id === next)?.member.handoffNote).toBeNull();
+    const log = t.db
+      .select()
+      .from(auditLog)
+      .all()
+      .find((row) => row.action === 'shift.textRecovered');
+    expect(log?.entityId).toBe(id);
+    expect(log?.summary).toBeNull();
+    expect(log?.detail).toBeNull();
+  });
+
+  it('rejects a retargeted membership without writing under another patient or shift', async () => {
+    const shiftId = await startShift();
+    const id = await addPatientToShift(shiftId, patientId);
+    const target = (await shiftPatientsQuery(shiftId))[0]!.member;
+    const other = await createPatient({ firstName: 'Other', lastName: 'Patient' });
+    t.sqlite.run('UPDATE shift_patients SET patient_id = ? WHERE id = ?', [other, id]);
+    await expect(saveShiftPatientText(target, { handoffNote: 'wrong patient' })).rejects.toThrow();
+    t.sqlite.run('UPDATE shift_patients SET patient_id = ?, shift_id = ? WHERE id = ?', [
+      patientId,
+      await startShift(),
+      id,
+    ]);
+    await expect(saveShiftPatientText(target, { shiftSummary: 'wrong shift' })).rejects.toThrow();
+    expect(
+      t.db
+        .select()
+        .from(shiftPatients)
+        .all()
+        .find((row) => row.id === id),
+    ).toMatchObject({ handoffNote: null, shiftSummary: null });
   });
 });
 

@@ -686,3 +686,35 @@ require reliable membership reads; skip never marks reviewed. Larger touch targe
 and wrapping text cost vertical space, but do not hide any record destination or
 cap font scaling. No new dependency, schema, generic dashboard or navigation layer
 was required. Software and native acceptance are separate in HANDOFF and plans.
+
+---
+
+## Shift read snapshots and final handoff writes (0.11.5)
+
+Shift and round use one `activeShiftWorkspaceQuery` instead of separately reading
+the active shift and its members. Its left joins preserve the difference between
+no active shift and an active shift with no visible patients. All four source
+tables are watched. The active-shift selector has a deterministic id tie-break.
+
+`useShiftWorkspace` retains the displayed snapshot while a change to shift,
+membership identity/order or reviewed state could unmount an autosave field or
+move the round cursor. The mounted fields must flush successfully before the new
+snapshot is adopted. Read failures retain the old view with retry; stale totals,
+completion claims and membership/status actions are withheld. A newer snapshot
+cancels adoption of an older one, not the pending writes. Inputs remain keyed by
+shift/member/patient; this gate never copies incoming text into local form state.
+
+`saveShiftPatientText` verifies the shift/member/patient identity captured on mount
+and preserves exact whitespace. A final write to an already removed membership
+updates only its text, retaining `deletedAt` and the original links. The handoff
+remains readable in shift history; a re-added patient gets a separate membership.
+Recovery is audited with the membership id, never text. The strict general update
+API continues to refuse removed memberships. Closed shifts reject late additions,
+reviewed actions and a repeated close that would overwrite their end time.
+
+Tradeoff: structural refresh can briefly wait for local storage, with a small
+retry notice on failure. One join repeats shift columns per member; the intended
+ward list is small, and it prevents an inconsistent pair of reads. No generic
+sync framework, schema or dependency was added. This does not supply full shift
+text revision history, resolve two independent editors' competing text writes,
+or prove crash/power-loss durability; those remain separate acceptance work.

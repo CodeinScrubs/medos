@@ -40,7 +40,13 @@ import { ExtensionFormScreen } from './places/extension-form-screen';
 import { PlaceFormScreen } from './places/place-form-screen';
 import { extensionQuery, placeQuery } from './places/queries';
 import { ShiftHistoryScreen } from './shifts/history-screen';
-import { addPatientToShift, shiftPatientsQuery, shiftQuery, startShift } from './shifts/queries';
+import {
+  activeShiftWorkspaceQuery,
+  addPatientToShift,
+  shiftPatientsQuery,
+  shiftQuery,
+  startShift,
+} from './shifts/queries';
 import { RoundScreen } from './shifts/round-screen';
 import { createTask, taskQuery } from './tasks/queries';
 import { TaskScreen } from './tasks/task-screen';
@@ -357,7 +363,7 @@ describe('editors survive database read failures', () => {
       "CREATE TRIGGER fail_write BEFORE UPDATE ON shift_patients BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
     );
     await type('یادداشت تحویل شیفت', 'Latest handoff');
-    mockErrors.set('shift_patients', new Error('Synthetic read failure'));
+    mockErrors.set(tablesOf(activeShiftWorkspaceQuery())[0]!, new Error('Synthetic read failure'));
     await refresh(<RoundScreen />);
     expect(input('یادداشت تحویل شیفت').props.value).toBe('Latest handoff');
     expectReadError();

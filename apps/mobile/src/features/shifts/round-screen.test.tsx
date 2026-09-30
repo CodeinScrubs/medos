@@ -12,6 +12,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import * as queries from './queries';
 import { RoundScreen } from './round-screen';
+import { ShiftScreen } from './shift-screen';
 
 const mockListeners = new Set<(event: { tableName: string }) => void>();
 jest.mock('expo-sqlite', () => ({
@@ -38,8 +39,10 @@ jest.mock('@/components/ui', () => ({
   Input: 'Input',
   Row: 'Row',
   Screen: 'Screen',
+  SectionHeader: 'SectionHeader',
   Text: 'Text',
 }));
+jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
 jest.mock('@/features/consults/consults-brief', () => ({ ConsultsBrief: 'ConsultsBrief' }));
 jest.mock('@/features/patients/patient-header', () => ({ AllergyBanner: 'AllergyBanner' }));
 jest.mock('@/features/tasks/tasks-section', () => ({ TasksSection: 'TasksSection' }));
@@ -60,9 +63,16 @@ const member = (id: string) =>
 async function settle() {
   for (let i = 0; i < 40; i++) await Promise.resolve();
 }
-async function render() {
+async function render(Component = RoundScreen) {
   await act(async () => {
-    tree = create(<RoundScreen />);
+    tree = create(<Component />);
+    await settle();
+  });
+}
+async function refreshTable(tableName: string) {
+  await act(async () => {
+    mockListeners.forEach((listener) => listener({ tableName }));
+    await new Promise((resolve) => setTimeout(resolve, 80));
     await settle();
   });
 }
@@ -105,15 +115,130 @@ afterEach(async () => {
 });
 
 describe('round footer with real autosave scope, useLive and SQLite', () => {
-  it('awaits pending text before advancing and makes repeated taps one reviewed write', async () => {
+  it.each([RoundScreen, ShiftScreen])(
+    'saves the exact last text before an externally removed member disappears (%p)',
+    async (Component) => {
+      await render(Component);
+      const text = '  Pending handoff\n\nKeep this last line\n';
+      await type(text);
+      await queries.removePatientFromShift(firstMember);
+      await refreshTable('shift_patients');
+      expect(member(firstMember).deletedAt).not.toBeNull();
+      expect(member(firstMember).handoffNote).toBe(text);
+      expect(member(secondMember).handoffNote).toBeNull();
+      expect(input().props.value).toBe('');
+    },
+  );
+
+  it.each([RoundScreen, ShiftScreen])(
+    'retains text while an externally closed shift cannot yet flush (%p)',
+    async (Component) => {
+      await render(Component);
+      await type('Final text before closing');
+      db.sqlite.exec(
+        "CREATE TRIGGER fail_handoff BEFORE UPDATE OF handoff_note ON shift_patients BEGIN SELECT RAISE(ABORT, 'synthetic write failure'); END;",
+      );
+      await queries.endShift(member(firstMember).shiftId);
+      await refreshTable('shifts');
+      expect(input().props.value).toBe('Final text before closing');
+      expect(tree!.root.findAllByType(EmptyState)).toHaveLength(0);
+      db.sqlite.exec('DROP TRIGGER fail_handoff;');
+      await press('ذخیره و ادامه');
+      expect(member(firstMember).handoffNote).toBe('Final text before closing');
+      expect(tree!.root.findByType(EmptyState).props.title).toBe('شیفتی باز نیست');
+    },
+  );
+
+  it('does not unmount the round input on external completion until storage succeeds', async () => {
     await render();
-    await type('Handoff to keep');
-    const original = queries.updateShiftPatient;
+    await type('Before another screen marked seen');
+    db.sqlite.exec(
+      "CREATE TRIGGER fail_handoff BEFORE UPDATE OF handoff_note ON shift_patients BEGIN SELECT RAISE(ABORT, 'synthetic write failure'); END;",
+    );
+    await queries.setShiftPatientReviewed(firstMember, true);
+    await queries.setShiftPatientReviewed(secondMember, true);
+    await refreshTable('shift_patients');
+    expect(input().props.value).toBe('Before another screen marked seen');
+    expect(button('دیدم و بعدی').props.disabled).toBe(true);
+    expect(tree!.root.findAllByType(EmptyState)).toHaveLength(0);
+    db.sqlite.exec('DROP TRIGGER fail_handoff;');
+    await press('ذخیره و ادامه');
+    expect(member(firstMember).handoffNote).toBe('Before another screen marked seen');
+    expect(tree!.root.findByType(EmptyState).props.title).toBe('راند تمام شد');
+  });
+
+  it('adopts only the latest shift when a second switch arrives during a slow write', async () => {
+    await render();
+    const original = queries.saveShiftPatientText;
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    jest.spyOn(queries, 'updateShiftPatient').mockImplementation(async (id, patch) => {
+    jest.spyOn(queries, 'saveShiftPatientText').mockImplementation(async (target, patch) => {
+      await gate;
+      await original(target, patch);
+    });
+    await type('Belongs to first');
+    const intermediateShift = await queries.startShift();
+    const intermediatePatient = await createPatient({ firstName: 'Intermediate', lastName: 'Patient' });
+    const intermediateMember = await queries.addPatientToShift(intermediateShift, intermediatePatient, {
+      shiftSummary: 'Intermediate context',
+    });
+    await refreshTable('shifts');
+    expect(input().props.value).toBe('Belongs to first');
+    expect(button('بعدی').props.disabled).toBe(true);
+    const lastShift = await queries.startShift();
+    const lastPatient = await createPatient({ firstName: 'Last', lastName: 'Patient' });
+    const lastMember = await queries.addPatientToShift(lastShift, lastPatient, { shiftSummary: 'Last context' });
+    await refreshTable('shifts');
+    // A change typed while the first write waits must also reach the original row.
+    await type('Newest words still belong to first');
+    await act(async () => {
+      release();
+      await settle();
+    });
+    if (button('ذخیره و ادامه')) await press('ذخیره و ادامه');
+    expect(input('نکته‌ی این شیفت').props.value).toBe('Last context');
+    expect(member(firstMember).handoffNote).toBe('Newest words still belong to first');
+    expect(member(intermediateMember).handoffNote).toBeNull();
+    expect(member(lastMember).handoffNote).toBeNull();
+  });
+
+  it.each([RoundScreen, ShiftScreen])(
+    'retains the previous shift text when a new shift arrives during a failed save (%p)',
+    async (Component) => {
+      await render(Component);
+      await type('Text belongs to the previous shift');
+      db.sqlite.exec(
+        "CREATE TRIGGER fail_handoff BEFORE UPDATE OF handoff_note ON shift_patients BEGIN SELECT RAISE(ABORT, 'synthetic write failure'); END;",
+      );
+      const nextShift = await queries.startShift();
+      const nextPatient = await createPatient({ firstName: 'Example', lastName: 'Next' });
+      const nextMember = await queries.addPatientToShift(nextShift, nextPatient, {
+        shiftSummary: 'Next shift context',
+      });
+      await refreshTable('shifts');
+      expect(input().props.value).toBe('Text belongs to the previous shift');
+      expect(tree!.root.findAllByType(EmptyState)).toHaveLength(0);
+      expect(member(firstMember).handoffNote).toBeNull();
+      expect(member(nextMember).handoffNote).toBeNull();
+      db.sqlite.exec('DROP TRIGGER fail_handoff;');
+      await press('ذخیره و ادامه');
+      expect(member(firstMember).handoffNote).toBe('Text belongs to the previous shift');
+      expect(member(nextMember).handoffNote).toBeNull();
+      expect(input().props.value).toBe('');
+    },
+  );
+
+  it('awaits pending text before advancing and makes repeated taps one reviewed write', async () => {
+    await render();
+    await type('Handoff to keep');
+    const original = queries.saveShiftPatientText;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.spyOn(queries, 'saveShiftPatientText').mockImplementation(async (id, patch) => {
       await gate;
       await original(id, patch);
     });
@@ -190,7 +315,7 @@ describe('round footer with real autosave scope, useLive and SQLite', () => {
     const prepare = db.sqlite.prepare.bind(db.sqlite);
     let broken = true;
     jest.spyOn(db.sqlite, 'prepare').mockImplementation((sql, params) => {
-      if (broken && sql.includes('from "shift_patients"')) throw new Error('synthetic membership read failure');
+      if (broken && sql.includes('left join "shift_patients"')) throw new Error('synthetic membership read failure');
       return prepare(sql, params);
     });
     await act(async () => {

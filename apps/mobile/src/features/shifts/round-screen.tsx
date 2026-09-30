@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
@@ -25,8 +25,9 @@ import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
-import { activeShiftQuery, setShiftPatientReviewed, shiftPatientsQuery, updateShiftPatient } from './queries';
+import { saveShiftPatientText, setShiftPatientReviewed } from './queries';
 import { indexOfMember, nextIndex, roundProgress, startIndex } from './round';
+import { ShiftWorkspaceNotice, useShiftWorkspace } from './workspace';
 
 /**
  * The round: one patient filling the screen, in the order of the shift.
@@ -64,14 +65,7 @@ function RoundScreenContent() {
     };
   }, []);
 
-  const { data: shifts, error, retry: retryShift } = useLive(activeShiftQuery());
-  const shift = shifts?.[0] ?? null;
-  const {
-    data: members,
-    error: membersError,
-    retry: retryMembers,
-  } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
-  const rows = useMemo(() => (members ?? []).filter((row) => row.member.shiftId === shift?.id), [members, shift?.id]);
+  const { shift, rows, error, loading, blocked, changing, saving, retry } = useShiftWorkspace();
 
   // The cursor follows a person, not a position: somebody can be added to or
   // taken off the shift from another screen while this one is open, and
@@ -80,12 +74,7 @@ function RoundScreenContent() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const index = indexOfMember(rows, currentId) ?? startIndex(rows);
   const current = index == null ? null : rows[index];
-  const progress = error || membersError || members === undefined ? null : roundProgress(rows);
-
-  function retryReads() {
-    if (error) retryShift();
-    if (membersError) retryMembers();
-  }
+  const progress = blocked ? null : roundProgress(rows);
 
   function goTo(next: number | null) {
     setCurrentId(next == null ? null : (rows[next]?.member.id ?? null));
@@ -122,25 +111,16 @@ function RoundScreenContent() {
     return (
       <Screen>
         <ScreenOptions options={{ title: 'راند' }} />
-        <ErrorNotice error={error} what="راند" onRetry={retryReads} />
+        <ErrorNotice error={error} what="راند" onRetry={retry} />
       </Screen>
     );
   }
 
-  if (membersError && rows.length === 0) {
+  if (loading) {
     return (
       <Screen>
         <ScreenOptions options={{ title: 'راند' }} />
-        <ErrorNotice error={membersError} what="بیماران راند" onRetry={retryReads} />
-      </Screen>
-    );
-  }
-
-  if (shifts === undefined || members === undefined) {
-    return (
-      <Screen>
-        <ScreenOptions options={{ title: 'راند' }} />
-        <ErrorNotice error={error} what="راند" onRetry={retryReads} />
+        <ErrorNotice error={error} what="راند" onRetry={retry} />
         <Text variant="caption" color="textMuted">
           در حال خواندن…
         </Text>
@@ -148,12 +128,12 @@ function RoundScreenContent() {
     );
   }
 
-  if (!error && !membersError && rows.length === 0) {
+  if (!blocked && rows.length === 0) {
     return (
       <Screen scroll>
         <ScreenOptions options={{ title: 'راند' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
-          <ErrorNotice error={error} what="راند" onRetry={retryReads} />
+          <ErrorNotice error={error} what="راند" onRetry={retry} />
           <EmptyState
             icon="walk-outline"
             title={shift ? 'کسی روی این شیفت نیست' : 'شیفتی باز نیست'}
@@ -189,7 +169,8 @@ function RoundScreenContent() {
     return (
       <Screen>
         <ScreenOptions options={{ title: 'راند' }} />
-        <ErrorNotice error={error ?? membersError} what="وضعیت راند" onRetry={retryReads} />
+        <ErrorNotice error={error} what="وضعیت راند" onRetry={retry} />
+        <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
       </Screen>
     );
   }
@@ -205,7 +186,8 @@ function RoundScreenContent() {
         bottomOffset={spacing.xl}
       >
         <Column gap="md">
-          <ErrorNotice error={error ?? membersError} what="راند" onRetry={retryReads} />
+          <ErrorNotice error={error} what="راند" onRetry={retry} />
+          <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
 
           <Row justify="space-between" align="center">
             <Text variant="caption" color="textMuted">
@@ -217,7 +199,7 @@ function RoundScreenContent() {
             />
           </Row>
 
-          <RoundCard key={current.member.id} row={current} />
+          <RoundCard key={`${current.member.shiftId}:${current.member.id}:${current.patient.id}`} row={current} />
         </Column>
       </KeyboardAwareScrollView>
 
@@ -345,7 +327,7 @@ function RoundCard({ row }: { row: RoundRow }) {
           <AutosaveField
             label="نکته‌ی این شیفت"
             initialValue={member.shiftSummary}
-            onSave={(value) => updateShiftPatient(member.id, { shiftSummary: value })}
+            onSave={(value) => saveShiftPatientText(member, { shiftSummary: value })}
             placeholder="یک خط که در این شیفت مهم است"
             multiline
           />
@@ -407,7 +389,7 @@ function RoundCard({ row }: { row: RoundRow }) {
       <AutosaveField
         label="یادداشت تحویل شیفت"
         initialValue={member.handoffNote}
-        onSave={(value) => updateShiftPatient(member.id, { handoffNote: value })}
+        onSave={(value) => saveShiftPatientText(member, { handoffNote: value })}
         placeholder="چیزی که نفر بعد باید بداند"
         multiline
       />

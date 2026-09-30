@@ -19,16 +19,15 @@ import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
 import {
-  activeShiftQuery,
   addPatientToShift,
   endShift,
   removePatientFromShift,
+  saveShiftPatientText,
   setShiftPatientReviewed,
-  shiftPatientsQuery,
   shiftProgress,
   startShift,
-  updateShiftPatient,
 } from './queries';
+import { ShiftWorkspaceNotice, useShiftWorkspace } from './workspace';
 
 /**
  * The shift: who is being carried right now, and who has been seen.
@@ -51,16 +50,8 @@ function ShiftScreenContent() {
   const scope = useAutosaveScope()!;
   const router = useRouter();
   const { colors, spacing } = useTheme();
-  const { data: shifts, error, retry: retryShift } = useLive(activeShiftQuery());
-  const shift = shifts?.[0] ?? null;
-
-  const {
-    data: members,
-    error: membersError,
-    retry: retryMembers,
-  } = useLive(shiftPatientsQuery(shift?.id ?? ''), [shift?.id]);
-  const rows = useMemo(() => (members ?? []).filter((row) => row.member.shiftId === shift?.id), [members, shift?.id]);
-  const progress = error || membersError || members === undefined ? null : shiftProgress(rows);
+  const { shift, rows, error, loading, blocked, changing, shiftChanging, saving, retry } = useShiftWorkspace();
+  const progress = blocked ? null : shiftProgress(rows);
 
   const [picking, setPicking] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -92,8 +83,7 @@ function ShiftScreenContent() {
     : (patientRows ?? []).filter((p) => p.status === 'admitted' && !inShift.has(p.id));
 
   function retryReads() {
-    if (error) retryShift();
-    if (membersError) retryMembers();
+    retry();
     if (patientsError) retryPatients();
   }
 
@@ -126,7 +116,7 @@ function ShiftScreenContent() {
   }
 
   function finish() {
-    if (!shift || error) return;
+    if (!shift || blocked) return;
     Alert.alert('پایان شیفت؟', 'لیست بیماران این شیفت می‌ماند و بعداً هم می‌توانید ببینیدش.', [
       { text: 'انصراف', style: 'cancel' },
       { text: 'پایان شیفت', onPress: () => void scope.perform(() => endShift(shift.id)) },
@@ -145,7 +135,7 @@ function ShiftScreenContent() {
     );
   }
 
-  if (shifts !== undefined && !shift && !error) {
+  if (!loading && !shift && !error && !changing) {
     return (
       <Screen scroll>
         <ScreenOptions options={{ title: 'شیفت' }} />
@@ -167,8 +157,9 @@ function ShiftScreenContent() {
     <Screen scroll>
       <ScreenOptions options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error ?? membersError ?? patientsError} what="شیفت" onRetry={retryReads} />
-        {!error && !membersError && (shifts === undefined || (shift && members === undefined)) ? (
+        <ErrorNotice error={error ?? patientsError} what="شیفت" onRetry={retryReads} />
+        <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
+        {loading ? (
           <Text variant="caption" color="textMuted">
             در حال خواندن…
           </Text>
@@ -179,7 +170,7 @@ function ShiftScreenContent() {
             <Column gap="sm">
               <Row justify="space-between" align="flex-start">
                 <Column gap="xxs" style={styles.grow}>
-                  <Text variant="subheading">{joinLabels([shift.ward, 'شیفت باز'])}</Text>
+                  <Text variant="subheading">{joinLabels([shift.ward, shiftChanging ? 'شیفت قبلی' : 'شیفت باز'])}</Text>
                   <Text variant="caption" color="textMuted">
                     از {formatJalaliDateTime(shift.startAt)}
                   </Text>
@@ -208,7 +199,7 @@ function ShiftScreenContent() {
                   label="افزودن بیمار"
                   icon="person-add-outline"
                   variant="secondary"
-                  disabled={busy || error != null}
+                  disabled={busy || blocked}
                   onPress={() => setPicking(true)}
                 />
               </Row>
@@ -222,7 +213,7 @@ function ShiftScreenContent() {
                   onPress={() => void addAllAdmitted()}
                 />
               ) : null}
-              <Button label="پایان شیفت" variant="ghost" onPress={finish} disabled={error != null} haptic={false} />
+              <Button label="پایان شیفت" variant="ghost" onPress={finish} disabled={blocked} haptic={false} />
             </Column>
           </Card>
         ) : null}
@@ -241,12 +232,13 @@ function ShiftScreenContent() {
           const seen = member.reviewedAt != null;
           const where = locationLabel(encounter ?? undefined);
           return (
-            <Card key={member.id} style={{ opacity: seen ? 0.65 : 1 }}>
+            <Card key={`${member.shiftId}:${member.id}:${patient.id}`} style={{ opacity: seen ? 0.65 : 1 }}>
               <Column gap="sm">
                 <Row gap="sm" align="flex-start">
                   <Pressable
                     accessibilityRole="checkbox"
-                    accessibilityState={{ checked: seen }}
+                    accessibilityState={{ checked: seen, disabled: blocked }}
+                    disabled={blocked}
                     accessibilityLabel={seen ? 'برگرداندن به دیده‌نشده' : 'دیدم'}
                     style={{
                       minWidth: MIN_TOUCH,
@@ -296,7 +288,7 @@ function ShiftScreenContent() {
                 <AutosaveField
                   label="یادداشت تحویل شیفت"
                   initialValue={member.handoffNote}
-                  onSave={(value) => updateShiftPatient(member.id, { handoffNote: value })}
+                  onSave={(value) => saveShiftPatientText(member, { handoffNote: value })}
                   placeholder="چیزی که نفر بعد باید بداند"
                   multiline
                 />
@@ -318,6 +310,7 @@ function ShiftScreenContent() {
                     variant="ghost"
                     size="sm"
                     haptic={false}
+                    disabled={blocked}
                     onPress={() => void scope.perform(() => removePatientFromShift(member.id))}
                   />
                 </Row>
@@ -333,7 +326,7 @@ function ShiftScreenContent() {
       </Column>
 
       <PickerModal
-        visible={picking && !error && !patientsError && !busy}
+        visible={picking && !blocked && !patientsError && !busy}
         title="افزودن بیمار به شیفت"
         items={patientItems}
         selectedId={selectedPatientId}
@@ -345,7 +338,7 @@ function ShiftScreenContent() {
         onSelect={(item) => {
           if (
             !shift ||
-            error ||
+            blocked ||
             patientsError ||
             patientsLoading ||
             writing.current ||

@@ -33,6 +33,48 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Preserve shift inputs through external workspace changes (0.11.5)
+
+**Agent:** GPT-6 via Codex
+**Commits:** this implementation commit; version/code 0.11.5/21.
+
+**Changed**
+- Shift/round read their active workspace in one joined snapshot. Structural
+  refresh waits for all mounted fields; failed reads/writes retain input and
+  withhold totals/status actions. Replaced identities include shift/member/patient.
+- Final autosave to a removed membership preserves exact text in its original
+  history without revival or retargeting, and records an id-only recovery audit.
+- Closed shifts reject late additions/review actions and repeated closure that
+  would overwrite end time. No dependency, schema, calculator or subagent added.
+
+**Verified**
+- Baseline: 76 suites / 832 tests + 3 workflows. Two new component cases failed
+  against the old screens, which replaced the pending text with an empty field.
+- `npm run check`: 76 suites / 845 tests + 3 workflows, typecheck/lint/format green.
+  Real SQLite/useLive/SaveGroup tests cover changed/closed shifts, removed members,
+  external round completion, slow writes with newer text and consecutive shifts,
+  failed refresh/retry, archived identity/whitespace/audit and stale actions.
+
+**Not verified**
+- Native 0.11.5 APK build and emulator/physical-phone behavior not yet checked at
+  this source commit. No process-death, low-space, restore or power-loss acceptance.
+- Competing independent shift text editors still lack revision-conflict handling;
+  this change does not provide full shift text version history or full product completion.
+
+**Open threads** (what the next session should pick up)
+- Build and run this exact source on Android; then D08 manual-form raw drafts,
+  C05 persistent audio import identity/orphan recovery, D05/D10 interruption and
+  restore/device acceptance. Wider W/C scope remains in IMPLEMENTATION.
+- Finish the remaining forty-patient/RTL/font/keyboard/native matrix on the target
+  phone when available; keep original media, rich text, clinical and AI gates visible.
+
+**Gotchas**
+- `saveShiftPatientText` is deliberately text-only and bound to mounted identity;
+  `updateShiftPatient` still rejects removed memberships. Never revive a row to save.
+- Do not change useLive's retained-list behavior globally. The shift-specific gate
+  waits for storage while preserving the old editors; read errors cancel adoption.
+
+
 ## 2026-09-30 — Signed 0.11.4 builds and bounded native UX evidence
 
 **Agent:** GPT-6 via Codex

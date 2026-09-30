@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { PickerModal } from '@/components/picker-modal';
 import { Badge, Button, EmptyState, Input, SectionHeader, Text } from '@/components/ui';
 import { tablesOf } from '@/db/query-tables';
+import { SaveGroup } from '@/lib/save-before-leave';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase } from '@/test/sqljs';
 
@@ -24,7 +25,13 @@ import { createNote, latestPatientNoteQuery } from './notes/queries';
 import { UnfinishedNotes } from './notes/unfinished-notes';
 import { PatientCard } from './patients/patient-card';
 import { createPatient, patientListQuery } from './patients/queries';
-import { activeShiftQuery, addPatientToShift, shiftPatientsQuery, startShift } from './shifts/queries';
+import {
+  activeShiftQuery,
+  activeShiftWorkspaceQuery,
+  addPatientToShift,
+  shiftPatientsQuery,
+  startShift,
+} from './shifts/queries';
 import * as shiftQueries from './shifts/queries';
 import { RoundScreen } from './shifts/round-screen';
 import { ShiftCard } from './shifts/shift-card';
@@ -41,13 +48,17 @@ const mockCache = new Map<string, unknown[]>();
 const mockErrors = new Map<string, Error>();
 const mockLoading = new Set<string>();
 const mockRetried: string[] = [];
+const mockScope = { perform: (action: () => void) => action(), group: new SaveGroup() };
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[]; toSQL(): unknown }) => {
     const { tablesOf: tables } = jest.requireActual<typeof import('@/db/query-tables')>('@/db/query-tables');
     const table = tables(query)[0]!;
     const key = JSON.stringify(query.toSQL());
     const error = mockErrors.get(table);
-    if (!error && !mockLoading.has(table)) mockCache.set(key, query.all());
+    if (!error && !mockLoading.has(table)) {
+      const rows = query.all();
+      if (JSON.stringify(rows) !== JSON.stringify(mockCache.get(key))) mockCache.set(key, rows);
+    }
     const data = mockCache.get(key);
     return {
       data,
@@ -89,7 +100,7 @@ jest.mock('@/components/feedback', () => ({
 jest.mock('@/components/use-now', () => ({ useNow: () => new Date('2026-09-25T12:00:00Z').getTime() }));
 jest.mock('@/components/autosave-scope', () => ({
   AutosaveScope: ({ children }: { children: ReactNode }) => children,
-  useAutosaveScope: () => ({ perform: (action: () => void) => action(), group: { register: () => () => {} } }),
+  useAutosaveScope: () => mockScope,
 }));
 jest.mock('./backup/restore-trouble', () => ({ RestoreTrouble: 'RestoreTrouble' }));
 jest.mock('./calls/recent-calls-card', () => ({ RecentCallsCard: 'RecentCallsCard' }));
@@ -249,9 +260,9 @@ describe('shift and round read recovery', () => {
   it.each([ShiftScreen, RoundScreen])(
     'withholds empty membership claims until a failed read succeeds (%p)',
     async (Component) => {
-      const id = await startShift();
+      await startShift();
       await render(<Component />);
-      fail(shiftPatientsQuery(id));
+      fail(activeShiftWorkspaceQuery());
       await refresh(<Component />);
       expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
       expect(notices()).toHaveLength(1);
@@ -268,7 +279,7 @@ describe('shift and round read recovery', () => {
       const memberId = await addPatientToShift(id, patientId);
       await shiftQueries.setShiftPatientReviewed(memberId, true);
       await render(<Component />);
-      fail(shiftPatientsQuery(id));
+      fail(activeShiftWorkspaceQuery());
       await refresh(<Component />);
       expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
       expect(tree.root.findAllByType(Badge).some((n) => n.props.tone === 'success')).toBe(false);
@@ -298,8 +309,8 @@ describe('shift and round read recovery', () => {
   );
 
   it.each([ShiftScreen, RoundScreen])('shows loading instead of zero members (%p)', async (Component) => {
-    const id = await startShift();
-    mockLoading.add(tableOf(shiftPatientsQuery(id)));
+    await startShift();
+    mockLoading.add(tableOf(activeShiftWorkspaceQuery()));
     await render(<Component />);
     expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
     expect(tree.root.findAllByType(SectionHeader).every((n) => n.props.count === undefined)).toBe(true);
@@ -335,7 +346,7 @@ describe('shift and round read recovery', () => {
       await act(async () => {
         handoff().props.onChangeText('Current handoff text');
       });
-      fail(shiftPatientsQuery(id));
+      fail(activeShiftWorkspaceQuery());
       await refresh(<Component />);
       expect(handoff().props.value).toBe('Current handoff text');
       expect(notices()).toHaveLength(1);

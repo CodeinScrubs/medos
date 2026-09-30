@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, isNull } from 'drizzle-orm';
 
+import { audit } from '@/db/audit';
 import { db } from '@/db/client';
-import { encounters, patients, shiftPatients, shifts, type Shift } from '@/db/schema';
+import { encounters, patients, shiftPatients, shifts, type Shift, type ShiftPatient } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -26,9 +27,36 @@ export function activeShiftQuery() {
     .select()
     .from(shifts)
     .where(and(alive, eq(shifts.isActive, true)))
-    .orderBy(desc(shifts.startAt))
+    .orderBy(desc(shifts.startAt), desc(shifts.id))
     .limit(1);
 }
+
+/** One SQLite snapshot, including an open shift with no visible members. */
+export function activeShiftWorkspaceQuery() {
+  const activeId = db
+    .select({ id: shifts.id })
+    .from(shifts)
+    .where(and(alive, eq(shifts.isActive, true)))
+    .orderBy(desc(shifts.startAt), desc(shifts.id))
+    .limit(1);
+  return db
+    .select({ shift: shifts, member: shiftPatients, patient: patients, encounter: encounters })
+    .from(shifts)
+    .leftJoin(shiftPatients, and(eq(shiftPatients.shiftId, shifts.id), memberAlive))
+    .leftJoin(patients, and(eq(shiftPatients.patientId, patients.id), isNull(patients.deletedAt)))
+    .leftJoin(
+      encounters,
+      and(
+        eq(shiftPatients.encounterId, encounters.id),
+        eq(encounters.patientId, patients.id),
+        isNull(encounters.deletedAt),
+      ),
+    )
+    .where(eq(shifts.id, activeId))
+    .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt), asc(shiftPatients.id));
+}
+
+export type ActiveShiftWorkspaceRow = Awaited<ReturnType<typeof activeShiftWorkspaceQuery>>[number];
 
 export function shiftsQuery(limit = 30) {
   return db.select().from(shifts).where(alive).orderBy(desc(shifts.startAt), desc(shifts.id)).limit(limit);
@@ -120,10 +148,12 @@ export async function updateShift(id: string, patch: ShiftInput): Promise<void> 
 
 /** Close a shift. It stays in the list; it is simply over. */
 export async function endShift(id: string, endAt: Date = new Date()): Promise<void> {
-  await db
+  const result = await db
     .update(shifts)
     .set({ isActive: false, endAt, ...touch() })
-    .where(and(alive, eq(shifts.id, id)));
+    .where(and(alive, eq(shifts.isActive, true), eq(shifts.id, id)))
+    .returning({ id: shifts.id });
+  if (result.length === 0) throw new Error('این شیفت دیگر باز نیست.');
 }
 
 export async function deleteShift(id: string): Promise<void> {
@@ -157,7 +187,7 @@ export async function addPatientToShift(
     const shift = tx
       .select({ id: shifts.id })
       .from(shifts)
-      .where(and(alive, eq(shifts.id, shiftId)))
+      .where(and(alive, eq(shifts.isActive, true), eq(shifts.id, shiftId)))
       .get();
     const patient = tx
       .select({ id: patients.id })
@@ -219,10 +249,29 @@ export async function removePatientFromShift(memberId: string): Promise<void> {
 
 /** Mark a patient seen on this shift, or un-mark them. */
 export async function setShiftPatientReviewed(memberId: string, reviewed: boolean): Promise<void> {
-  await db
+  const result = await db
     .update(shiftPatients)
     .set({ reviewedAt: reviewed ? new Date() : null, ...touch() })
-    .where(and(memberAlive, eq(shiftPatients.id, memberId)));
+    .where(
+      and(
+        memberAlive,
+        eq(shiftPatients.id, memberId),
+        exists(
+          db
+            .select({ id: shifts.id })
+            .from(shifts)
+            .where(and(alive, eq(shifts.isActive, true), eq(shifts.id, shiftPatients.shiftId))),
+        ),
+        exists(
+          db
+            .select({ id: patients.id })
+            .from(patients)
+            .where(and(isNull(patients.deletedAt), eq(patients.id, shiftPatients.patientId))),
+        ),
+      ),
+    )
+    .returning({ id: shiftPatients.id });
+  if (result.length === 0) throw new Error('بیمار یا شیفت تغییر کرده است؛ دیده‌شدن ثبت نشد.');
 }
 
 export async function updateShiftPatient(
@@ -240,6 +289,34 @@ export async function updateShiftPatient(
     .where(and(memberAlive, eq(shiftPatients.id, memberId)))
     .returning({ id: shiftPatients.id });
   if (result.length === 0) throw new Error('این بیمار دیگر روی شیفت نیست؛ نوشته ذخیره نشد.');
+}
+
+/**
+ * A field mounted before removal still owns its last text. Save it on that
+ * original membership, even if archived; never revive or retarget it. The
+ * strict update API above still rejects edits of a removed member. This API
+ * accepts text only and verifies the identity captured when the field mounted.
+ */
+export async function saveShiftPatientText(
+  target: Pick<ShiftPatient, 'id' | 'shiftId' | 'patientId'>,
+  patch: { shiftSummary?: string | null; handoffNote?: string | null },
+): Promise<void> {
+  const recovered = db.transaction((tx) => {
+    const row = tx.select().from(shiftPatients).where(eq(shiftPatients.id, target.id)).get();
+    if (!row || row.shiftId !== target.shiftId || row.patientId !== target.patientId) {
+      throw new Error('بیمار این نوشته تغییر کرده است؛ نوشته روی صفحه نگه داشته شد.');
+    }
+    tx.update(shiftPatients)
+      .set({
+        shiftSummary: patch.shiftSummary === undefined ? undefined : patch.shiftSummary || null,
+        handoffNote: patch.handoffNote === undefined ? undefined : patch.handoffNote || null,
+        ...touch(),
+      })
+      .where(eq(shiftPatients.id, target.id))
+      .run();
+    return row.deletedAt !== null;
+  });
+  if (recovered) await audit('shift.textRecovered', { entityType: 'shift_patient', entityId: target.id });
 }
 
 /** How far through the round this shift is. */

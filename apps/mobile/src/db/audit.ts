@@ -37,6 +37,8 @@ export type AuditAction =
   | 'lock.enabled'
   | 'lock.disabled'
   | 'search.reindexed'
+  // Final autosave on the original removed membership; never revive it or log text.
+  | 'shift.textRecovered'
   // Stored H/L flags worked out again after a change to the rule.
   | 'labs.reflagged'
   // A patient's status put back in step with their episodes.
