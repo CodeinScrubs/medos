@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
 import { alertError } from '@/components/feedback';
@@ -11,7 +11,7 @@ import { useNow } from '@/components/use-now';
 import type { FollowUp, Patient } from '@/db/schema';
 import { formatJalaliWithWeekday, formatRelative, formatTime } from '@/lib/jalali';
 import { joinLabels, normalizePhone } from '@/lib/persian';
-import { useTheme } from '@/theme';
+import { MIN_TOUCH, useTheme } from '@/theme';
 
 import { FOLLOWUP_CHANNEL_LABELS } from './labels';
 import { postponedDueDate, urgencyOf } from './logic';
@@ -38,16 +38,23 @@ export function FollowUpCard({
   followUp,
   patient,
   showPatient = false,
+  onPromptChange,
 }: {
   followUp: FollowUp;
   patient?: Patient;
   showPatient?: boolean;
+  onPromptChange?: (id: string, open: boolean) => void;
 }) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
   const [prompting, setPrompting] = useState(false);
   const busy = useRef(false);
   const now = new Date(useNow());
+
+  useEffect(() => {
+    onPromptChange?.(followUp.id, prompting);
+    return () => onPromptChange?.(followUp.id, false);
+  }, [onPromptChange, followUp.id, prompting]);
 
   const pending = followUp.status === 'pending';
   const urgency = urgencyOf(followUp, now);
@@ -181,7 +188,7 @@ export function FollowUpCard({
             )}
 
             {pending && (
-              <Row gap="sm" style={{ marginTop: spacing.xs }}>
+              <Row gap="sm" wrap style={{ marginTop: spacing.xs }}>
                 <Action icon="checkmark" label="انجام شد" tone="success" onPress={() => setPrompting(true)} />
                 <Action icon="time-outline" label="تعویق" onPress={postpone} />
                 {phone && followUp.channel === 'call' ? (
@@ -235,14 +242,15 @@ function Action({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      hitSlop={6}
       style={({ pressed }) => [
         {
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.xxs,
           paddingHorizontal: spacing.sm,
-          height: 32,
+          minHeight: MIN_TOUCH,
+          minWidth: MIN_TOUCH,
+          paddingVertical: spacing.xs,
           borderRadius: radii.sm,
           backgroundColor: tone === 'success' ? colors.successSoft : colors.surfaceAlt,
         },
@@ -250,7 +258,7 @@ function Action({
       ]}
     >
       <Ionicons name={icon} size={14} color={fg} />
-      <Text variant="tiny" style={{ color: fg }}>
+      <Text variant="caption" style={{ color: fg }}>
         {label}
       </Text>
     </Pressable>

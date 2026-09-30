@@ -110,7 +110,7 @@ export async function createPatient(input: PatientInput): Promise<string> {
     // A patient being created has no episode yet, so nothing can make them
     // admitted. Coerced rather than refused: the value can also arrive from an
     // import or an older backup, and losing the patient over it would be worse.
-    status: input.status === 'admitted' ? 'outpatient' : input.status,
+    status: input.status === undefined || input.status === 'admitted' ? 'outpatient' : input.status,
     phone: input.phone ? normalizePhone(input.phone) : null,
     searchText: patientSearchText(input),
   });

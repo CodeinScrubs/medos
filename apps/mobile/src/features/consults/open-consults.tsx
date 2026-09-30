@@ -32,7 +32,7 @@ export function OpenConsults() {
           <Pressable
             key={consult.id}
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/patient/[id]', params: { id: patient.id } })}
+            onPress={() => router.push({ pathname: '/consult-answer', params: { consultId: consult.id } })}
           >
             <Card>
               <Row justify="space-between" align="flex-start">

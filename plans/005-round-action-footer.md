@@ -4,7 +4,7 @@
 
 - Priority P2; effort M; risk Medium; confidence High for current layout.
 - Depends on plan 003's touch sizing; planned on 2026-09-30 at app commit `7c8a1bd`.
-- Status TODO. Native keyboard/safe-area behavior has not been verified for this design.
+- Status SOFTWARE VERIFIED (0.11.4); native acceptance pending. Native keyboard/safe-area behavior has not been verified for this design.
 
 MedOS is a Persian RTL Android workspace for one physician. A round's next action
 should remain available while reviewing a long patient card. A fixed footer consumes
@@ -76,7 +76,7 @@ Run from the root:
 npm run brief
 npm run check
 git diff --stat 7c8a1bd..HEAD -- apps/mobile/src/features/shifts/round-screen.tsx apps/mobile/src/components/autosave-scope.tsx apps/mobile/src/lib/save-before-leave.ts
-npm run test -- --runInBand src/features/shifts/round-screen.test.tsx src/features/shifts/round.test.ts src/features/read-errors.test.tsx src/lib/save-before-leave.test.ts
+npm run test --workspace=@medos/mobile -- --runInBand src/features/shifts/round-screen.test.tsx src/features/shifts/round.test.ts src/features/read-errors.test.tsx src/lib/save-before-leave.test.ts
 npm run check
 git diff --check
 ```

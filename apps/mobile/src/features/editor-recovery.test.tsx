@@ -70,6 +70,7 @@ jest.mock('@/db/use-live', () => ({
   },
 }));
 jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
+jest.mock('react-native-keyboard-controller', () => ({ KeyboardAwareScrollView: 'KeyboardAwareScrollView' }));
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),

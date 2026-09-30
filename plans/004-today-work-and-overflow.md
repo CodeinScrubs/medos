@@ -4,7 +4,7 @@
 
 - Priority P2; effort M; risk Medium; confidence High for current behavior.
 - Depends on plan 001's filtered patient-list route contract.
-- Planned on 2026-09-30 at app commit `7c8a1bd`; status TODO.
+- Planned on 2026-09-30 at app commit `7c8a1bd`; status SOFTWARE VERIFIED (0.11.4); native acceptance pending.
 
 MedOS is a personal offline Android clinical workspace. Today should lead to current
 shift work without requiring a scroll through several patient cards. Short previews
@@ -83,7 +83,7 @@ Run from the root:
 npm run brief
 npm run check
 git diff --stat 7c8a1bd..HEAD -- apps/mobile/src/features/today apps/mobile/src/features/followups apps/mobile/src/app/followups.tsx
-npm run test -- --runInBand src/features/today/today-screen.test.tsx src/features/followups/list-logic.test.ts src/features/followups/follow-up-list-screen.test.tsx src/features/followups/queries.test.ts src/features/followups/follow-up-card.test.tsx src/features/read-errors.test.tsx
+npm run test --workspace=@medos/mobile -- --runInBand src/features/today/today-screen.test.tsx src/features/followups/list-logic.test.ts src/features/followups/follow-up-list-screen.test.tsx src/features/followups/queries.test.ts src/features/followups/follow-up-card.test.tsx src/features/read-errors.test.tsx
 npm run check
 git diff --check
 ```

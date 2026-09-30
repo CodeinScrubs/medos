@@ -35,14 +35,14 @@ export function MoreScreen() {
     },
     {
       icon: 'file-tray-outline',
-      title: 'ثبت‌های نشده',
-      subtitle: 'هرچه سریع ثبت کرده‌اید و هنوز جایش مشخص نیست',
+      title: 'ورودی‌ها',
+      subtitle: 'ثبت‌های سریع برای دسته‌بندی',
       href: '/inbox',
     },
     {
       icon: 'call-outline',
-      title: 'ضبط تماس‌ها',
-      subtitle: 'ضبطِ اپ «تلفن»، با یک لمس در پرونده‌ی بیمار',
+      title: 'فایل‌های تماس',
+      subtitle: 'افزودن فایل صوتی به پروندهٔ بیمار',
       href: '/calls',
     },
   ];

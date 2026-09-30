@@ -4,7 +4,7 @@
 
 - Priority: P2 within the UX batch; effort M; change risk Medium; confidence High.
 - Depends on: none. Planned on 2026-09-30 at app commit `7c8a1bd`.
-- Status: TODO. This document does not implement the change.
+- Status: SOFTWARE VERIFIED (0.11.4); native acceptance pending.
 
 MedOS is one physician's offline Android workspace, with Persian RTL menus and
 Latin clinical fields. A tap on "admitted" or "starred" should produce that list;
@@ -88,7 +88,7 @@ Run from the repository root:
 npm run brief
 npm run check
 git diff --stat 7c8a1bd..HEAD -- apps/mobile/src/features/patients apps/mobile/src/features/today apps/mobile/src/features/consults/open-consults.tsx
-npm run test -- --runInBand src/features/patients/list-route.test.ts src/features/patients/patient-list-screen.test.tsx src/features/patients/queries.test.ts src/features/consults/open-consults.test.tsx src/features/today/today-screen.test.tsx
+npm run test --workspace=@medos/mobile -- --runInBand src/features/patients/list-route.test.ts src/features/patients/patient-list-screen.test.tsx src/features/patients/queries.test.ts src/features/consults/open-consults.test.tsx src/features/today/today-screen.test.tsx
 npm run check
 git diff --check
 ```

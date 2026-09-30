@@ -3,8 +3,8 @@
  *
  * The palette is built for two conditions that matter more here than aesthetics:
  * a bright hospital corridor, and a dark on-call room at 3am. Every semantic
- * colour is defined for both schemes and checked for contrast against its own
- * surface, so clinical flags stay legible either way.
+ * colour is defined for both schemes. Contrast tests pin secondary text to
+ * readable values on the four ordinary surfaces in each scheme.
  */
 
 /**
@@ -64,7 +64,7 @@ export const palette: Record<'light' | 'dark', Colors> = {
     // Text
     text: '#0F1A1F',
     textMuted: '#5A6B75',
-    textFaint: '#8A9AA4',
+    textFaint: '#5C6972',
     textInverse: '#FFFFFF',
 
     // Brand
@@ -102,7 +102,7 @@ export const palette: Record<'light' | 'dark', Colors> = {
 
     text: '#E9EFF2',
     textMuted: '#93A5B0',
-    textFaint: '#6B7E8A',
+    textFaint: '#879BA7',
     textInverse: '#0B1216',
 
     primary: '#3BA9B8',

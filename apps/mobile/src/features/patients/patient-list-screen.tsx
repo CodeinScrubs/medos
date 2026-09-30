@@ -1,24 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { Column, EmptyState, Fab, Row, Text } from '@/components/ui';
-import type { PatientStatus } from '@/db/schema';
+import { ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
-import { CURRENT_STATUSES } from '@/features/patients/logic';
 import { PatientCard } from '@/features/patients/patient-card';
 import { patientListQuery } from '@/features/patients/queries';
 import { toPersianDigits } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
 import { PATIENT_STATUS, PATIENT_STATUS_ORDER } from './labels';
-
-type Tab = 'all' | PatientStatus;
+import { parsePatientListRoute, patientListStatuses, type PatientListScope } from './list-route';
 
 /**
  * The patient list.
@@ -30,41 +27,53 @@ type Tab = 'all' | PatientStatus;
 export function PatientListScreen() {
   const { colors, spacing, radii, typography } = useTheme();
   const router = useRouter();
-
+  const params = useLocalSearchParams<{ status?: string; starred?: string; resetSearch?: string }>();
+  const route = parsePatientListRoute(params);
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<Tab>('all');
-
-  // Searching by name means "find this person", wherever they are now: on the
-  // default view a search also reaches discharged and archived patients, whose
-  // badge says so. A status chip still narrows it.
+  const resetRequested = params.resetSearch === '1';
+  const [resetting, setResetting] = useState(false);
+  if (resetting !== resetRequested) {
+    setResetting(resetRequested);
+    if (resetRequested) setSearch('');
+  }
   const searching = search.trim().length > 0;
-  const statuses = useMemo<PatientStatus[] | undefined>(() => {
-    if (tab !== 'all') return [tab];
-    return searching ? undefined : [...CURRENT_STATUSES];
-  }, [tab, searching]);
 
-  const { data: rows, error } = useLive(patientListQuery({ search, statuses }), [search, statuses]);
-  // One query for the whole list: which ward and bed each admitted patient is in.
-  const { data: locationRows } = useLive(activeLocationsQuery());
-  const locations = useMemo(() => new Map((locationRows ?? []).map((r) => [r.patientId, r])), [locationRows]);
-  const patients = rows ?? [];
+  // A Today tile asks for a fresh list. Returning from a record does not:
+  // retain the search and keyboard state, consuming this request only once.
+  useEffect(() => {
+    if (params.resetSearch !== '1') return;
+    router.setParams({ resetSearch: undefined });
+  }, [params.resetSearch, router]);
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'all', label: searching ? 'همه' : 'جاری' },
-    ...PATIENT_STATUS_ORDER.map((s) => ({ key: s as Tab, label: PATIENT_STATUS[s].label })),
+  const tabs: { value: PatientListScope; label: string }[] = [
+    { value: 'current', label: searching ? 'جستجو در همه' : 'جاری' },
+    { value: 'all', label: 'همه وضعیت‌ها' },
+    ...PATIENT_STATUS_ORDER.map((s) => ({ value: s, label: PATIENT_STATUS[s].label })),
   ];
+
+  function setFilters(scope: PatientListScope, starredOnly: boolean) {
+    router.setParams({ status: scope, starred: starredOnly ? '1' : '0' });
+  }
 
   return (
     <SafeAreaView edges={['top']} style={[styles.flex, { backgroundColor: colors.background }]}>
       <Column gap="sm" style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
         <Row justify="space-between">
           <Text variant="display">بیماران</Text>
-          <Text variant="caption" color="textFaint">
-            {toPersianDigits(patients.length)} نفر
-          </Text>
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel="فقط بیماران ستاره‌دار"
+            accessibilityState={{ checked: route.starredOnly }}
+            onPress={() => setFilters(route.scope, !route.starredOnly)}
+            style={styles.star}
+          >
+            <Ionicons
+              name={route.starredOnly ? 'star' : 'star-outline'}
+              size={24}
+              color={route.starredOnly ? colors.primary : colors.textMuted}
+            />
+          </Pressable>
         </Row>
-
-        <ErrorNotice error={error} what="لیست بیماران" />
 
         <Row
           gap="sm"
@@ -95,86 +104,107 @@ export function PatientListScreen() {
         </Row>
       </Column>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
-          gap: spacing.sm,
-        }}
-        style={styles.chipStrip}
-      >
-        {tabs.map((t) => {
-          const active = t.key === tab;
-          return (
-            <Pressable
-              key={t.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              onPress={() => setTab(t.key)}
-              style={[
-                styles.chip,
-                {
-                  borderRadius: radii.full,
-                  backgroundColor: active ? colors.primary : colors.surface,
-                  borderColor: active ? colors.primary : colors.border,
-                  paddingHorizontal: spacing.lg,
-                },
-              ]}
-            >
-              <Text variant="captionStrong" style={{ color: active ? colors.primaryText : colors.textMuted }}>
-                {t.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.flex}>
-        {rows === undefined ? null : patients.length === 0 ? (
-          <EmptyState
-            icon={search ? 'search-outline' : 'people-outline'}
-            // The default view hides discharged and archived patients, so an
-            // empty list here does not mean nobody has been recorded.
-            title={search ? 'بیماری پیدا نشد' : tab === 'all' ? 'بیمار جاری‌ای نیست' : 'در این دسته بیماری نیست'}
-            description={
-              search
-                ? tab === 'all'
-                  ? 'جستجو را کوتاه‌تر کنید؛ نام، کد ملی، شماره پرونده، تشخیص یا تخت.'
-                  : 'جستجو را کوتاه‌تر کنید یا فیلتر وضعیت را بردارید.'
-                : tab === 'all'
-                  ? 'بیمار تازه را با دکمه‌ی + اضافه کنید. ترخیص‌شده‌ها با جستجو یا چیپ‌های بالا پیدا می‌شوند.'
-                  : undefined
-            }
-          />
-        ) : (
-          <FlashList
-            data={patients}
-            keyExtractor={(p) => p.id}
-            renderItem={({ item }) => <PatientCard patient={item} location={locationLabel(locations.get(item.id))} />}
-            contentContainerStyle={{
-              paddingHorizontal: spacing.lg,
-              paddingBottom: spacing.huge * 2,
-            }}
-            keyboardDismissMode="on-drag"
-          />
-        )}
+      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+        <ChipSelect
+          options={tabs}
+          value={route.scope}
+          onChange={(scope) => {
+            if (scope) setFilters(scope, route.starredOnly);
+          }}
+        />
       </View>
+
+      {/* Only the read region resets when the scope changes. useLive intentionally
+          retains old rows on refresh; those must not masquerade as a new scope. */}
+      <PatientResults
+        key={`${route.scope}:${route.starredOnly}:${searching}`}
+        search={search}
+        scope={route.scope}
+        starredOnly={route.starredOnly}
+      />
 
       <Fab tabRoot label="افزودن بیمار" onPress={() => router.push('/patient/new')} />
     </SafeAreaView>
   );
 }
 
+function PatientResults({
+  search,
+  scope,
+  starredOnly,
+}: {
+  search: string;
+  scope: PatientListScope;
+  starredOnly: boolean;
+}) {
+  const { colors, spacing } = useTheme();
+  const searching = search.trim().length > 0;
+  const statuses = useMemo(() => patientListStatuses(scope, searching), [scope, searching]);
+  const {
+    data: rows,
+    error,
+    retry,
+    loading,
+  } = useLive(patientListQuery({ search, statuses, starredOnly }), [search, statuses, starredOnly]);
+  const { data: locationRows, error: locationError, retry: retryLocations } = useLive(activeLocationsQuery());
+  const locations = useMemo(() => new Map((locationRows ?? []).map((r) => [r.patientId, r])), [locationRows]);
+  const patients = rows ?? [];
+
+  return (
+    <View style={styles.flex}>
+      <Column gap="sm" style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
+        <Text variant="caption" color="textFaint">
+          {error || rows === undefined ? '—' : toPersianDigits(patients.length)} نفر
+          {starredOnly ? ' · ستاره‌دار' : ''}
+        </Text>
+        <ErrorNotice error={error} what="لیست بیماران" onRetry={retry} />
+        <ErrorNotice error={locationError} what="محل بستری" onRetry={retryLocations} />
+      </Column>
+      {loading ? <ActivityIndicator color={colors.primary} /> : null}
+      {rows === undefined || (error && patients.length === 0) ? null : patients.length === 0 ? (
+        <EmptyState
+          icon={search ? 'search-outline' : 'people-outline'}
+          // The default view hides discharged and archived patients, so an
+          // empty list here does not mean nobody has been recorded.
+          title={search ? 'بیماری پیدا نشد' : scope === 'current' ? 'بیمار جاری‌ای نیست' : 'در این دسته بیماری نیست'}
+          description={
+            search
+              ? scope === 'current' || scope === 'all'
+                ? 'جستجو را کوتاه‌تر کنید؛ نام، کد ملی، شماره پرونده، تشخیص یا تخت.'
+                : 'جستجو را کوتاه‌تر کنید یا فیلتر وضعیت را بردارید.'
+              : scope === 'current'
+                ? 'بیمار تازه را با دکمه‌ی + اضافه کنید. ترخیص‌شده‌ها با جستجو یا چیپ‌های بالا پیدا می‌شوند.'
+                : undefined
+          }
+        />
+      ) : (
+        <FlashList
+          data={patients}
+          keyExtractor={(p) => p.id}
+          renderItem={({ item }) => (
+            <PatientCard
+              patient={item}
+              location={
+                locationError && item.status === 'admitted'
+                  ? 'محل بستری خوانده نشد'
+                  : locationLabel(locations.get(item.id))
+              }
+            />
+          )}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.huge * 2,
+          }}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   searchInput: { flex: 1, paddingVertical: 10 },
-  chipStrip: { flexGrow: 0 },
-  chip: {
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  star: { minHeight: MIN_TOUCH, minWidth: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
 });

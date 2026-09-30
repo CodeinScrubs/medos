@@ -1,7 +1,8 @@
 # MedOS UX execution plans
 
 Prepared on 2026-09-30 against app commit `7c8a1bd7e3c40ee9711ea812d344dee9a93c2263`.
-These are proposed changes, not shipped improvements. The audit changed no app source.
+Implemented in 0.11.4 / code 20 after the owner authorized continuation. The original
+audit changed no app source; this execution added regression tests and software fixes.
 The owner requested faster, clearer ward work with fewer detours and less clutter.
 The default selection is the five bounded changes below, following the owner's
 request to continue the UX review. Execute directly without subagents.
@@ -18,16 +19,24 @@ usability, physical touch areas, typing, camera behavior or phone performance.
 
 | Plan | Verified problem / proposed result | Effort | Change risk | Confidence | Status |
 |---|---|---|---|---|---|
-| [001](001-direct-destinations.md) | Today's admitted/starred tiles open the default current-patient list; a consult row opens the patient root. Open the requested list or consult directly. | M | Medium: route/state transitions | High: source behavior | TODO |
-| [002](002-save-language.md) | Recovered persisted drafts are called unsaved; captured items are called unrecorded. Use consistent draft, chart-publication and inbox labels. | S | Low: wording only | High: source behavior | TODO |
-| [003](003-readable-touch-controls.md) | Shared chips/segments have 36/38dp height; small `textFaint` has inadequate contrast on several surfaces. Improve touch targets and legibility. | M | Medium: shared layout | High: sizes/color calculation; native bounds still unverified | TODO |
-| [004](004-today-work-and-overflow.md) | Shift entry follows up to eight inpatient cards; admitted/future follow-up previews lack a full-list destination. Put shift work earlier and make overflow reachable. | M | Medium: layout/counts/navigation | High: source behavior; expected usability benefit needs native acceptance | TODO |
-| [005](005-round-action-footer.md) | Round navigation follows the entire scrolling patient card. Keep the next action reachable while preserving autosave and identity. | M | Medium: keyboard/insets/save boundaries | High: source location; native layout still unverified | TODO |
+| [001](001-direct-destinations.md) | Exact admitted/starred lists and consult answer; synchronized URL filters with retained return search and explicit fresh-search reset. | M | Medium: route/state transitions | High: actual SQLite/useLive tests | SOFTWARE VERIFIED |
+| [002](002-save-language.md) | Distinct draft/chart-publication, recovered draft and inbox/audio-import labels. Save handlers unchanged. | S | Low: wording only | High: source and existing persistence tests | SOFTWARE VERIFIED |
+| [003](003-readable-touch-controls.md) | Minimum 48dp chips/segments/checkboxes; small text contrast tests; wrapping record destinations/buttons with font scaling. | M | Medium: shared layout | High: sizes/color calculation; native bounds still unverified | SOFTWARE VERIFIED |
+| [004](004-today-work-and-overflow.md) | Shift first, complete counts before previews, direct full patient/follow-up lists and protected outcome prompts. | M | Medium: layout/counts/navigation | High: real SQLite/useLive tests; native acceptance separate | SOFTWARE VERIFIED |
+| [005](005-round-action-footer.md) | Footer outside scroll; hides during keyboard editing, retains savers, blocks failed flush/write and duplicate actions. | M | Medium: keyboard/insets/save boundaries | High: real autosave/SQLite component tests; native separate | SOFTWARE VERIFIED |
 
 Priority within this UX batch: 001, 002, 003, 004, 005. These are P2 changes,
 not claims of a data-loss emergency. Plan 004 depends on 001's patient-list route
 contract; 005 follows 003's control sizing. Other plans can be reviewed independently.
 Do not have concurrent executors edit the same Today, patient-list or shift files.
+
+Execution notes: all 75 suites / 830 app tests + 3 workflow tests passed, including
+new route, real-useLive read/retry, 40-row counts and actual SaveGroup failure tests.
+Quick patient creation also fixes an omitted-status admission bug without changing
+the schema. Scope expanded narrowly to Button wrapping/accessibility hint and
+FollowUpCard touch sizing/prompt-lifetime reporting; completion/reminder semantics
+are unchanged. No dependency added. See the newest HANDOFF for native build evidence
+and open gates; do not replay these implemented plans blindly.
 
 Status values: TODO, IN PROGRESS, SOFTWARE VERIFIED, NATIVE VERIFIED, BLOCKED
 (reason), REJECTED (reason). Use SOFTWARE VERIFIED when automated checks pass but

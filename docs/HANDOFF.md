@@ -33,6 +33,66 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Direct ward workflows and safer, readable controls (0.11.4)
+
+**Agent:** GPT-6 via Codex
+**Commits:** this implementation commit (parent `3b02ad4`); 0.11.4 / code 20.
+
+**Changed**
+- Implemented UX plans 001-005: Today opens the exact admitted/all-starred list,
+  an unanswered consult opens its answer form, filters synchronize with the URL,
+  and only an explicit fresh-list link clears search. Read errors have retry and
+  unknown counts; a failed read never claims an empty list.
+- Shift entry precedes long Today previews. Full follow-up counts and `All` open
+  `/followups?mode=due|upcoming`, a virtualized list reusing existing queries/cards.
+  Mode/day changes wait for an active outcome prompt to close; the card is keyed
+  by follow-up id to avoid recycling another record's local prompt state.
+- Draft/chart publication and inbox/audio-import labels now describe the actual
+  operation. Chips/segments/task/review/follow-up controls have 48dp minimums;
+  textFaint passes contrast tests on all four ordinary surfaces in both themes.
+  All eight record destinations remain visible, with wrapping/two columns at
+  larger fonts. Buttons can grow/wrap; skip has a screen-reader hint.
+- Round next/seen actions are outside scrolling content and still use the real
+  SaveGroup. They hide during keyboard input, then return with the card intact;
+  false flush, failed reviewed write and repeated taps do not advance/discard.
+- Found/fixed a separate query bug: omitted patient status used the schema's
+  legacy admitted default, inventing an admission. Quick creation now explicitly
+  uses outpatient until an admission exists. No schema/migration/dependency change.
+
+**Verified**
+- Baseline and origin `3b02ad4` were clean; its hosted CI succeeded. Initial route/
+  consult regressions failed before their fixes. No subagents.
+- Fresh `npm run check`: 75 suites / 830 app tests + 3 workflow tests;
+  typecheck, ESLint and formatting passed. Queries run on migrated SQLite;
+  new list tests use actual useLive, round tests actual AutosaveScope/SaveGroup.
+  Covered full vs preview counts through 40 rows, initial/refresh failure/retry,
+  route return/reentry, prompt text at midnight, flush false and duplicate taps.
+
+**Not verified**
+- At this commit: no new APK/native UI acceptance or physical-phone run; software
+  tests do not prove touch bounds, keyboard/header behavior or speed. See the next
+  native evidence entry when available. No new clinical-content/restore acceptance.
+
+**Open threads** (what the next session should pick up)
+- Finish native acceptance for plans 001-005, recording exact build/ABI/scenarios;
+  target-phone usability, TalkBack, camera/audio/alarms and speed remain separate.
+- D08 active-shift identity transitions, other auxiliary reads and manual-form
+  drafts remain open; the round footer does not close this correctness thread.
+- C05 durable audio-import identity/journaling, orphan-copy recovery, filename
+  collisions and actual Cube-provider acceptance remain open.
+- D05/D10 native exits/process death/interrupted restore; W02/W05-W10, rich text
+  and C01-C04 retain their ledger scope and validation gates. See IMPLEMENTATION.
+
+**Gotchas**
+- Focused tests from root need `npm run test --workspace=@medos/mobile -- --runInBand ...`;
+  the root forwarding script otherwise drops flags. Plans' commands were corrected.
+- Only the read region is keyed by filters; search remains mounted. render-time
+  conditional state adjustment handles fresh-list/scope requests before paint;
+  the effect only consumes the URL flag. Do not copy form records in effects.
+- Footer has one bottom safe-area owner (Screen); hiding it never unregisters
+  the card's savers. Added keyboard-controller stand-ins to two existing suites
+  because Round now imports that installed native component directly.
+
 ## 2026-09-30 — Bounded UX plans for faster ward work (analysis only)
 
 **Agent:** GPT-6 via Codex

@@ -81,6 +81,7 @@ jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {}, radii:
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
 jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
 jest.mock('@/components/screen-options', () => ({ ScreenOptions: () => null }));
+jest.mock('react-native-keyboard-controller', () => ({ KeyboardAwareScrollView: 'KeyboardAwareScrollView' }));
 jest.mock('@/components/feedback', () => ({
   alertError: jest.fn(),
   notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,

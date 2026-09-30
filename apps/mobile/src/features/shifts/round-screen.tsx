@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, StyleSheet, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { AutosaveField } from '@/components/autosave-field';
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
@@ -49,7 +50,19 @@ export function RoundScreen() {
 function RoundScreenContent() {
   const scope = useAutosaveScope()!;
   const router = useRouter();
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
+  const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+  const [busy, setBusy] = useState(false);
+  const acting = useRef(false);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
 
   const { data: shifts, error, retry: retryShift } = useLive(activeShiftQuery());
   const shift = shifts?.[0] ?? null;
@@ -91,6 +104,18 @@ function RoundScreenContent() {
   /** Skipped: still owed a visit, so the round can come back to them. */
   function skip(at: number) {
     goTo(nextIndex(rows, at, { includeCurrent: true }));
+  }
+
+  async function advance(markSeen: boolean) {
+    if (acting.current || progress === null || !current || index == null) return;
+    acting.current = true;
+    setBusy(true);
+    try {
+      await scope.perform(() => (markSeen ? seen(current.member.id, index) : skip(index)));
+    } finally {
+      acting.current = false;
+      setBusy(false);
+    }
   }
 
   if (error && !shift) {
@@ -170,45 +195,75 @@ function RoundScreenContent() {
   }
 
   return (
-    <Screen scroll>
+    <Screen padded={false}>
       <ScreenOptions options={{ title: 'راند' }} />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error ?? membersError} what="راند" onRetry={retryReads} />
+      <KeyboardAwareScrollView
+        style={styles.grow}
+        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.huge }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        bottomOffset={spacing.xl}
+      >
+        <Column gap="md">
+          <ErrorNotice error={error ?? membersError} what="راند" onRetry={retryReads} />
 
-        <Row justify="space-between" align="center">
-          <Text variant="caption" color="textMuted">
-            بیمار {toPersianDigits(index + 1)} از {toPersianDigits(progress?.total ?? rows.length)}
-          </Text>
-          <Badge
-            label={progress ? `${toPersianDigits(progress.seen)} دیده‌شده` : 'وضعیت بیماران نامشخص'}
-            tone={progress && progress.seen > 0 ? 'success' : 'neutral'}
-          />
-        </Row>
-
-        <RoundCard key={current.member.id} row={current} />
-
-        <Row gap="sm">
-          <View style={styles.grow}>
-            <Button
-              label="دیدم و بعدی"
-              icon="checkmark-circle-outline"
-              onPress={() => void scope.perform(() => seen(current.member.id, index))}
-              full
+          <Row justify="space-between" align="center">
+            <Text variant="caption" color="textMuted">
+              بیمار {toPersianDigits(index + 1)} از {toPersianDigits(progress?.total ?? rows.length)}
+            </Text>
+            <Badge
+              label={progress ? `${toPersianDigits(progress.seen)} دیده‌شده` : 'وضعیت بیماران نامشخص'}
+              tone={progress && progress.seen > 0 ? 'success' : 'neutral'}
             />
-          </View>
-          <Button
-            label="بعدی"
-            icon="arrow-back"
-            variant="secondary"
-            haptic={false}
-            onPress={() => void scope.perform(() => skip(index))}
-          />
-        </Row>
+          </Row>
 
-        <Text variant="tiny" color="textFaint" style={{ marginBottom: spacing.xl }}>
-          «بعدی» کسی را دیده‌شده علامت نمی‌زند؛ همان‌جا در صف می‌ماند تا دوباره برسید به او.
-        </Text>
-      </Column>
+          <RoundCard key={current.member.id} row={current} />
+        </Column>
+      </KeyboardAwareScrollView>
+
+      {/* Screen owns the bottom safe edge. Hiding only the footer gives typing
+          its space without unmounting the card or its registered savers. */}
+      {!keyboardVisible ? (
+        <Column
+          gap="xs"
+          style={{
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: colors.border,
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Row gap="sm">
+            <View style={styles.grow}>
+              <Button
+                label="دیدم و بعدی"
+                icon="checkmark-circle-outline"
+                onPress={() => void advance(true)}
+                loading={busy}
+                disabled={progress === null}
+                full
+              />
+            </View>
+            <View style={styles.grow}>
+              <Button
+                label="بعدی"
+                icon="arrow-back"
+                variant="secondary"
+                haptic={false}
+                accessibilityHint="بدون ثبتِ دیده‌شدن"
+                disabled={busy || progress === null}
+                onPress={() => void advance(false)}
+                full
+              />
+            </View>
+          </Row>
+
+          <Text variant="tiny" color="textFaint">
+            بعدی: بدون ثبتِ دیده‌شدن
+          </Text>
+        </Column>
+      ) : null}
     </Screen>
   );
 }

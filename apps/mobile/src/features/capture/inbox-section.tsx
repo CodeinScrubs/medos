@@ -77,7 +77,7 @@ export function InboxSection() {
 
   return (
     <>
-      <SectionHeader title="ثبت‌های نشده" count={total} />
+      <SectionHeader title="ورودی‌ها" count={total} />
       <ErrorNotice
         error={failed[0]?.query.error}
         what={failed.map(({ label }) => label).join('، ')}

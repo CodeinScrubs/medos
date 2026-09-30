@@ -659,3 +659,30 @@ Tradeoff: this permits the owner's intended workflow, but adds source maintenanc
 per-tool validation work. Personal notes/templates remain distinct from validated tools.
 Seeded specialties and adult lab ranges remain editable defaults, not clinical authority;
 no inferred critical flags or adult-to-child extrapolation.
+
+---
+
+## Direct ward navigation and bounded previews (0.11.4)
+
+The patient-list URL is the filter contract: `status=current|all|<patient status>`
+and `starred=0|1`. Current remains the default; searching that default finds old
+records too. Today uses explicit admitted/all-starred routes and `resetSearch=1`
+for a fresh list; returning from a patient preserves the existing search. Only the
+read region resets on a scope change, because useLive intentionally retains rows
+on refresh. Counts are unknown on failed reads, with a retry rather than false zero.
+
+Today shows shift entry before previews. Due/upcoming follow-ups count the whole
+matching query before showing five rows; `/followups` is the full virtualized
+destination, not another top-level tab. The upcoming predicate is shared and uses
+the local end of day. An active outcome prompt delays a mode/day scope change;
+the old list keeps its accurate label and the original outcome until submit/cancel.
+FollowUpCard is keyed by id inside the recycler because its prompt has local state.
+This sacrifices some reuse to prevent another record inheriting the prompt.
+
+Round actions sit outside its one keyboard-aware scroller. Screen alone owns the
+bottom safe edge. The footer hides during keyboard input to leave room for editing,
+without unmounting the card or save scope. Both actions still await SaveGroup and
+require reliable membership reads; skip never marks reviewed. Larger touch targets
+and wrapping text cost vertical space, but do not hide any record destination or
+cap font scaling. No new dependency, schema, generic dashboard or navigation layer
+was required. Software and native acceptance are separate in HANDOFF and plans.

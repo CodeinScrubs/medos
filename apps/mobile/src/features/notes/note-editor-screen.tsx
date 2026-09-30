@@ -307,35 +307,31 @@ function NoteEditor({
       void discardAndLeave();
       return;
     }
-    Alert.alert(
-      isEdit ? 'این تغییرها هنوز ذخیره نشده' : 'این نوت هنوز در پرونده ثبت نشده',
-      'می‌خواهید متنش نگه داشته شود؟',
-      [
-        { text: 'ادامه‌ی نوشتن', style: 'cancel' },
-        {
-          text: 'نگه دار',
-          onPress: () => {
-            // Only leave if the text actually reached storage. `flush` resolves
-            // either way; treating that as success would close the screen on the
-            // one copy of the note that exists.
-            void saver.flush().then((stored) => {
-              if (stored) router.back();
-              else {
-                notify(
-                  'هنوز ذخیره نشد',
-                  'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
-                );
-              }
-            });
-          },
+    Alert.alert('این تغییرها هنوز در پرونده ثبت نشده', 'می‌خواهید متنش نگه داشته شود؟', [
+      { text: 'ادامه‌ی نوشتن', style: 'cancel' },
+      {
+        text: 'نگه دار',
+        onPress: () => {
+          // Only leave if the text actually reached storage. `flush` resolves
+          // either way; treating that as success would close the screen on the
+          // one copy of the note that exists.
+          void saver.flush().then((stored) => {
+            if (stored) router.back();
+            else {
+              notify(
+                'هنوز ذخیره نشد',
+                'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
+              );
+            }
+          });
         },
-        {
-          text: 'دور بریز',
-          style: 'destructive',
-          onPress: () => void discardAndLeave(),
-        },
-      ],
-    );
+      },
+      {
+        text: 'دور بریز',
+        style: 'destructive',
+        onPress: () => void discardAndLeave(),
+      },
+    ]);
   }
 
   const autosaveLine =
@@ -368,7 +364,7 @@ function NoteEditor({
                   }
                 />
               ) : null}
-              <Button label="ذخیره" variant="secondary" size="sm" loading={saving} onPress={() => void save()} />
+              <Button label="ثبت" variant="secondary" size="sm" loading={saving} onPress={() => void save()} />
             </Row>
           ),
         }}
@@ -377,7 +373,7 @@ function NoteEditor({
         <ErrorNotice error={readError} what="نوت و پیش‌نویس" onRetry={retryRead} />
         {recovered ? (
           <Text variant="caption" color="textMuted">
-            نوشته‌ی ذخیره‌نشده‌ی قبلی برگردانده شد.
+            پیش‌نویس قبلی بازیابی شد.
           </Text>
         ) : null}
 
@@ -505,7 +501,7 @@ function NoteEditor({
 
         <Row gap="sm" style={{ marginTop: spacing.sm }}>
           <View style={{ flex: 1 }}>
-            <Button label="ذخیره" icon="checkmark" onPress={() => void save()} loading={saving} full />
+            <Button label="ثبت در پرونده" icon="checkmark" onPress={() => void save()} loading={saving} full />
           </View>
           <Button label="انصراف" variant="ghost" onPress={leave} haptic={false} disabled={saving} />
         </Row>

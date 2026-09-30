@@ -243,6 +243,7 @@ export function Segmented<T extends string>({
                 styles.segment,
                 {
                   borderRadius: radii.sm,
+                  paddingVertical: spacing.xs,
                   backgroundColor: active ? colors.surface : 'transparent',
                 },
               ]}
@@ -310,5 +311,5 @@ export function Toggle({
 const styles = StyleSheet.create({
   input: { flex: 1, paddingVertical: 10 },
   grow: { flex: 1 },
-  segment: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 38 },
+  segment: { flex: 1, minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
 });

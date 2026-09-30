@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useRef } from 'react';
 import { I18nManager, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
-import { useTheme } from '@/theme';
+import { MIN_TOUCH, useTheme } from '@/theme';
 
 import { Field } from './field';
 import { Text } from './text';
@@ -100,6 +100,7 @@ export function ChipSelect<T extends string>({
           {
             borderRadius: radii.full,
             paddingHorizontal: spacing.md,
+            paddingVertical: spacing.xs,
             backgroundColor: active ? colors.primary : colors.surface,
             borderColor: active ? colors.primary : colors.border,
           },
@@ -142,7 +143,8 @@ export function ChipSelect<T extends string>({
 
 const styles = StyleSheet.create({
   chip: {
-    height: 36,
+    minHeight: MIN_TOUCH,
+    minWidth: MIN_TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { Card, Column, EmptyState, Fab, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { Button, Card, Column, EmptyState, Fab, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { BackupNudge } from '@/features/backup/backup-nudge';
@@ -15,6 +15,7 @@ import { OpenConsults } from '@/features/consults/open-consults';
 import { UpcomingOccasions } from '@/features/doctors/upcoming-occasions';
 import { activeLocationsQuery, locationLabel } from '@/features/encounters/status';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
+import { upcomingFollowUps } from '@/features/followups/list-logic';
 import { dueFollowUpsQuery, pendingFollowUpsQuery } from '@/features/followups/queries';
 import { UnfinishedNotes } from '@/features/notes/unfinished-notes';
 import { PatientCard } from '@/features/patients/patient-card';
@@ -62,7 +63,7 @@ export function TodayScreen() {
   const { jy } = toJalali(now);
   const dueRows = due ?? [];
   const overdue = dueRows.filter((r) => (daysBetween(r.followUp.dueAt, now) ?? 0) < 0).length;
-  const upcoming = (pending ?? []).filter((r) => (daysBetween(r.followUp.dueAt, now) ?? 0) > 0).slice(0, 5);
+  const upcoming = upcomingFollowUps(pending ?? [], now);
 
   const loaded = due !== undefined && admitted !== undefined && pending !== undefined;
   const reliable = loaded && !dueQuery.error && !admittedQuery.error && !pendingQuery.error;
@@ -87,7 +88,7 @@ export function TodayScreen() {
           />
           <RestoreTrouble />
           <BackupNudge now={now.getTime()} />
-          <RecentCallsCard now={now} />
+          <ShiftCard />
 
           <Row gap="sm" style={{ marginTop: spacing.lg }}>
             <StatTile
@@ -95,18 +96,23 @@ export function TodayScreen() {
               label="پیگیری امروز"
               value={due === undefined || dueQuery.error ? null : due.length}
               alert={!dueQuery.error && overdue > 0}
+              onPress={() => router.push({ pathname: '/followups', params: { mode: 'due' } })}
             />
             <StatTile
               icon="bed-outline"
               label="بستری"
               value={admittedQuery.error ? null : (admitted?.length ?? null)}
-              onPress={() => router.push('/patients')}
+              onPress={() =>
+                router.push({ pathname: '/patients', params: { status: 'admitted', starred: '0', resetSearch: '1' } })
+              }
             />
             <StatTile
               icon="star-outline"
               label="ستاره‌دار"
               value={starredQuery.error ? null : (starred?.length ?? null)}
-              onPress={() => router.push('/patients')}
+              onPress={() =>
+                router.push({ pathname: '/patients', params: { status: 'all', starred: '1', resetSearch: '1' } })
+              }
             />
           </Row>
 
@@ -119,9 +125,17 @@ export function TodayScreen() {
                     : 'پیگیری‌های امروز'
                 }
                 count={dueQuery.error ? undefined : dueRows.length}
+                action={
+                  <Button
+                    label="همه"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => router.push({ pathname: '/followups', params: { mode: 'due' } })}
+                  />
+                }
               />
               <Column gap="sm">
-                {dueRows.map(({ followUp, patient }) => (
+                {dueRows.slice(0, 5).map(({ followUp, patient }) => (
                   <FollowUpCard key={followUp.id} followUp={followUp} patient={patient} showPatient />
                 ))}
               </Column>
@@ -132,7 +146,23 @@ export function TodayScreen() {
 
           {(admitted?.length ?? 0) > 0 && (
             <>
-              <SectionHeader title="بیماران بستری" count={admittedQuery.error ? undefined : admitted!.length} />
+              <SectionHeader
+                title="بیماران بستری"
+                count={admittedQuery.error ? undefined : admitted!.length}
+                action={
+                  <Button
+                    label="همه"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/patients',
+                        params: { status: 'admitted', starred: '0', resetSearch: '1' },
+                      })
+                    }
+                  />
+                }
+              />
               {admitted!.slice(0, 8).map((p) => (
                 <PatientCard
                   key={p.id}
@@ -143,7 +173,7 @@ export function TodayScreen() {
             </>
           )}
 
-          <ShiftCard />
+          <RecentCallsCard now={now} />
 
           <InboxSection />
 
@@ -157,9 +187,20 @@ export function TodayScreen() {
 
           {upcoming.length > 0 && (
             <>
-              <SectionHeader title="پیگیری‌های پیش رو" count={pendingQuery.error ? undefined : upcoming.length} />
+              <SectionHeader
+                title="پیگیری‌های پیش رو"
+                count={pendingQuery.error ? undefined : upcoming.length}
+                action={
+                  <Button
+                    label="همه"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => router.push({ pathname: '/followups', params: { mode: 'upcoming' } })}
+                  />
+                }
+              />
               <Column gap="sm">
-                {upcoming.map(({ followUp, patient }) => (
+                {upcoming.slice(0, 5).map(({ followUp, patient }) => (
                   <FollowUpCard key={followUp.id} followUp={followUp} patient={patient} showPatient />
                 ))}
               </Column>
@@ -197,7 +238,13 @@ function StatTile({
 }) {
   const { colors, radii, spacing } = useTheme();
   return (
-    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.grow, pressed && styles.pressed]}>
+    <Pressable
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={label}
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [styles.grow, pressed && styles.pressed]}
+    >
       <View
         style={{
           backgroundColor: alert ? colors.dangerSoft : colors.surface,

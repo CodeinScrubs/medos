@@ -38,6 +38,14 @@ const listNames = async (search?: string) =>
 
 const tomorrow = () => new Date(Date.now() + 24 * 3_600_000);
 
+it('does not invent an admission when quick creation omits status', async () => {
+  const id = await createPatient({ firstName: 'Example', lastName: 'Patient' });
+  expect((await patientListQuery({ statuses: ['admitted'] })).map((p) => p.id)).not.toContain(id);
+  expect((await patientListQuery({ statuses: ['outpatient'] })).map((p) => p.id)).toContain(id);
+  await openEncounter({ patientId: id, kind: 'admission' });
+  expect((await patientListQuery({ statuses: ['admitted'] })).map((p) => p.id)).toContain(id);
+});
+
 describe('patient search', () => {
   beforeEach(async () => {
     await createPatient({

@@ -3,7 +3,7 @@
 ## Status and purpose
 
 - Priority P2; effort S; risk Low; confidence High; depends on none.
-- Planned on 2026-09-30 at app commit `7c8a1bd`; status TODO.
+- Planned on 2026-09-30 at app commit `7c8a1bd`; status SOFTWARE VERIFIED (0.11.4); native acceptance pending.
 
 MedOS is a Persian RTL offline Android app for one physician. Draft persistence
 and publication in the clinical record are different existing operations. Wording
@@ -62,7 +62,7 @@ drafts and clinical publication each describe different operations.
    npm run brief
    npm run check
    git diff --stat 7c8a1bd..HEAD -- apps/mobile/src/features/notes/note-editor-screen.tsx apps/mobile/src/features/capture/inbox-section.tsx apps/mobile/src/features/settings/more-screen.tsx
-   npm run test -- --runInBand src/features/notes/drafts.test.ts src/features/notes/commit-draft.test.ts src/features/editor-recovery.test.tsx src/features/capture/captures.test.ts
+   npm run test --workspace=@medos/mobile -- --runInBand src/features/notes/drafts.test.ts src/features/notes/commit-draft.test.ts src/features/editor-recovery.test.tsx src/features/capture/captures.test.ts
    npm run check
    git diff --check
    ```

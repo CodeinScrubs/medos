@@ -16,7 +16,7 @@ import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
-import { useTheme } from '@/theme';
+import { MIN_TOUCH, useTheme } from '@/theme';
 
 import {
   activeShiftQuery,
@@ -248,7 +248,12 @@ function ShiftScreenContent() {
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: seen }}
                     accessibilityLabel={seen ? 'برگرداندن به دیده‌نشده' : 'دیدم'}
-                    hitSlop={8}
+                    style={{
+                      minWidth: MIN_TOUCH,
+                      minHeight: MIN_TOUCH,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
                     onPress={() =>
                       void setShiftPatientReviewed(member.id, !seen).catch((e) => alertError('ثبت نشد', e))
                     }

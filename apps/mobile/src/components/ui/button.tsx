@@ -12,6 +12,7 @@ type Size = 'sm' | 'md' | 'lg';
 
 export type ButtonProps = {
   label: string;
+  accessibilityHint?: string;
   onPress?: () => void;
   variant?: Variant;
   size?: Size;
@@ -27,6 +28,7 @@ export type ButtonProps = {
 
 export function Button({
   label,
+  accessibilityHint,
   onPress,
   variant = 'primary',
   size = 'md',
@@ -57,6 +59,7 @@ export function Button({
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       disabled={inactive}
       hitSlop={HIT_SLOP}
       onPress={() => {
@@ -66,7 +69,8 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         {
-          height,
+          minHeight: height,
+          paddingVertical: spacing.xs,
           borderRadius: radii.md,
           paddingHorizontal: size === 'sm' ? spacing.md : spacing.lg,
           backgroundColor: tone.bg,
@@ -84,7 +88,10 @@ export function Button({
       ) : (
         <>
           {icon && <Ionicons name={icon} size={size === 'sm' ? 16 : 19} color={tone.fg} />}
-          <Text variant={textVariant} style={{ color: tone.fg, fontFamily: typography.bodyStrong.fontFamily }}>
+          <Text
+            variant={textVariant}
+            style={{ color: tone.fg, fontFamily: typography.bodyStrong.fontFamily, flexShrink: 1, textAlign: 'center' }}
+          >
             {label}
           </Text>
           {iconEnd && <Ionicons name={iconEnd} size={size === 'sm' ? 16 : 19} color={tone.fg} />}

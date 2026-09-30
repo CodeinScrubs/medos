@@ -8,7 +8,7 @@ import { useUndo } from '@/components/undo-toast';
 import type { Patient, Task } from '@/db/schema';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
-import { useTheme } from '@/theme';
+import { MIN_TOUCH, useTheme } from '@/theme';
 
 import { TASK_STATUS_LABEL } from './labels';
 import { setTaskStatus } from './queries';
@@ -50,7 +50,7 @@ export function TaskRow({
             accessibilityState={{ checked: task.status === 'done', disabled: busy }}
             accessibilityLabel={task.status === 'open' ? 'انجام شد' : 'بازگشایی کار'}
             disabled={busy}
-            hitSlop={8}
+            style={{ minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}
             onPress={() => void toggle()}
           >
             <Ionicons

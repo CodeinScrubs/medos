@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
@@ -53,6 +53,8 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
   const scope = useAutosaveScope()!;
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const wideTabs = (width - spacing.lg * 2) / fontScale < 320;
   const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : 'overview');
   useEffect(() => {
     if (!isTab(initialTab)) return;
@@ -174,7 +176,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
                       router.setParams({ tab: t.key });
                     })
                   }
-                  style={({ pressed }) => [styles.tabCell, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.tabCell, wideTabs && { width: '50%' }, pressed && styles.pressed]}
                 >
                   <View
                     style={[
@@ -183,7 +185,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
                     ]}
                   >
                     <Ionicons name={t.icon} size={18} color={active ? colors.primary : colors.textFaint} />
-                    <Text variant="tiny" color={active ? 'primary' : 'textMuted'} numberOfLines={1}>
+                    <Text variant="caption" color={active ? 'primary' : 'textMuted'} style={{ textAlign: 'center' }}>
                       {t.label}
                     </Text>
                   </View>
@@ -210,6 +212,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, borderWidth: StyleSheet.hairlineWidth },
   tabCell: { width: '25%', padding: 2 },
-  tab: { height: 52, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  tab: { minHeight: 52, alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 4 },
   pressed: { opacity: 0.6 },
 });

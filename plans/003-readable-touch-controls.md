@@ -4,7 +4,7 @@
 
 - Priority P2; effort M; risk Medium because primitives affect many forms.
 - Confidence High for source sizes/colors; native tap bounds unverified.
-- Depends on none; planned on 2026-09-30 at app commit `7c8a1bd`; status TODO.
+- Depends on none; planned on 2026-09-30 at app commit `7c8a1bd`; status SOFTWARE VERIFIED (0.11.4); native acceptance pending.
 
 MedOS is a Persian RTL clinical Android app used during busy ward work. Slightly
 taller controls consume space but reduce precise aiming; readable secondary text
@@ -72,7 +72,7 @@ From the repo root, before edits and after the relevant steps:
 npm run brief
 npm run check
 git diff --stat 7c8a1bd..HEAD -- apps/mobile/src/theme apps/mobile/src/components/ui apps/mobile/src/features/patients apps/mobile/src/features/tasks/task-row.tsx apps/mobile/src/features/shifts/shift-screen.tsx
-npm run test -- --runInBand src/theme/tokens.test.ts src/features/patients/patient-record-screen.test.tsx src/features/tasks/tasks.test.ts src/features/shifts/shifts.test.ts
+npm run test --workspace=@medos/mobile -- --runInBand src/theme/tokens.test.ts src/features/patients/patient-record-screen.test.tsx src/features/tasks/tasks.test.ts src/features/shifts/shifts.test.ts
 npm run check
 git diff --check
 ```
