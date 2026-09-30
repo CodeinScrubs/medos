@@ -33,6 +33,32 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-09-30 — Consistent date clock before 0.11.7 delivery
+
+**Agent:** GPT-6 via Codex
+**Commits:** this follow-up; draft implementation `adc54e3`.
+
+**Changed**
+- Shared date validation and patient preview/conversion/three-way patch now use
+  the caller's same explicit clock for two-digit year expansion. Existing
+  four-digit dates and separator grammar are unchanged. No schema/dependency.
+
+**Verified**
+- Two regressions first failed with a simulated Jalali 1416 clock: short year 16
+  incorrectly used this host's clock and became 1316. Both pass after the fix.
+- Full gate: 78 suites / 907 app tests + 3 workflows, typecheck/lint/format.
+
+**Not verified**
+- Final native artifacts pending. The preceding adc54e3 owner/emulator builds
+  are superseded; do not mistake their hashes for this source's evidence.
+- Initial emulator draft recovery/validation passed on adc54e3; final-source
+  native acceptance must be rerun. No physical phone or injected native faults.
+
+**Open threads** (what the next session should pick up)
+- Build and verify this final source, then record its artifact identities and
+  bounded native acceptance. D08 remaining forms, C05 import durability and
+  D05/D10 recovery retain their priorities in IMPLEMENTATION.
+
 ## 2026-09-30 — Recoverable patient forms and atomic publication (0.11.7)
 
 **Agent:** GPT-6 via Codex

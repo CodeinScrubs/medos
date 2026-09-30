@@ -60,7 +60,7 @@ export function JalaliDateField({
   const [seenValue, setSeenValue] = useState(value);
   if (value !== seenValue) {
     setSeenValue(value);
-    const parsed = parseJalaliInput(text);
+    const parsed = parseJalaliInput(text, new Date(now));
     if (rawText === undefined && (parsed ? toIsoDate(parsed) : null) !== value) setText(isoToJalaliText(value));
   }
 

@@ -10,7 +10,7 @@ export function validateDateInput(
   options: { required: boolean; allowFuture: boolean; now: Date },
 ): DateInputResult {
   if (!text.trim()) return options.required ? { valid: false, reason: 'required' } : { valid: true, iso: null };
-  const parsed = parseJalaliInput(text);
+  const parsed = parseJalaliInput(text, options.now);
   if (!parsed) return { valid: false, reason: 'invalid' };
   if (!options.allowFuture && parsed.getTime() > options.now.getTime()) return { valid: false, reason: 'future' };
   return { valid: true, iso: toIsoDate(parsed) };

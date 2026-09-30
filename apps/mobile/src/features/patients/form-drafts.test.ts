@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { auditLog, patientFormDrafts, patients } from '@/db/schema';
 import { newId, softDelete } from '@/lib/ids';
+import { fromJalali, toIsoDate } from '@/lib/jalali';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -54,6 +55,14 @@ async function edit() {
 }
 
 describe('durable raw patient forms', () => {
+  it('publishes the two-digit birth year using the same explicit clock as validation', async () => {
+    const document = fresh();
+    Object.assign(document.fields, { firstName: 'Clock', lastName: 'Test', birthDateText: '16/01/01' });
+    const id = newId();
+    await savePatientFormDraft(id, null, document, 0);
+    const patientId = await commitPatientFormDraft(id, null, 1, fromJalali(1416, 1, 2));
+    expect((await patientQuery(patientId))[0]?.birthDate).toBe(toIsoDate(fromJalali(1416, 1, 1)));
+  });
   it('does not create a draft or patient merely by opening a new form', async () => {
     expect(await savePatientFormDraft(newId(), null, fresh(), 0)).toBe(0);
     expect(await db.select().from(patientFormDrafts)).toEqual([]);

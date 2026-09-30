@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, Column, Input, Row, Screen, Segmented, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
+import { useNow } from '@/components/use-now';
 import type { Patient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { CHOOSABLE_STATUSES, isChoosableStatus } from '@/features/encounters/status';
@@ -69,7 +70,8 @@ function PatientFormEditor({
   const editing = usePatientFormDraft(seed, onReset);
   const { form, set, errors, busy: saving } = editing;
   const dateValidation = useDateValidation();
-  const parsedBirthDate = parseJalaliInput(form.birthDateText);
+  const now = useNow();
+  const parsedBirthDate = parseJalaliInput(form.birthDateText, new Date(now));
   const nationalIdDigits = toLatinDigits(form.nationalId).replace(/\D/g, '');
   const nationalIdWarning =
     nationalIdDigits.length === 10 && !isValidNationalId(nationalIdDigits)

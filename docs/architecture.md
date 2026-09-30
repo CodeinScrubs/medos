@@ -731,6 +731,11 @@ unknown/malformed documents with a generic error; it never falls back to a blank
 editor or logs the document. Raw Jalali text is input, not a stored clinical date.
 Published birth dates remain Gregorian ISO.
 
+The caller's explicit `now` is used for both two-digit year expansion and future
+validation, including the final conversion and three-way comparison. A simulated
+clock must not expand a short year against the real system clock. Four-digit
+dates and the existing separator grammar are unchanged.
+
 The gate reads the draft before mounting a keyed editor. Later read failures show
 retry inside that same editor. `usePatientFormDraft` uses the existing Autosave
 queue (800 ms quiet period, 3 s ceiling), background flush and always-on removal

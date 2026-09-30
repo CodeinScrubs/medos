@@ -106,8 +106,8 @@ export function patientFormErrors(fields: PatientFormFields, now: Date): Patient
 }
 
 /** Call only after validating current input. Base snapshots may include a historically future date. */
-export function patientFormValues(fields: PatientFormFields) {
-  const date = parseJalaliInput(fields.birthDateText);
+export function patientFormValues(fields: PatientFormFields, now: Date) {
+  const date = parseJalaliInput(fields.birthDateText, now);
   return {
     firstName: fields.firstName.trim(),
     lastName: fields.lastName.trim(),
@@ -132,11 +132,15 @@ export function patientFormValues(fields: PatientFormFields) {
 export type PatientFormValues = ReturnType<typeof patientFormValues>;
 
 /** Only local edits are published; unrelated background edits, flags and tags survive. */
-export function patientFormPatch(document: PatientFormDocument, current: Patient): Partial<PatientFormValues> {
+export function patientFormPatch(
+  document: PatientFormDocument,
+  current: Patient,
+  now: Date,
+): Partial<PatientFormValues> {
   if (!document.base) throw new Error('مبنای ویرایش پرونده پیدا نشد.');
-  const base = patientFormValues(document.base);
-  const desired = patientFormValues(document.fields);
-  const latest = patientFormValues(initialPatientFields(current));
+  const base = patientFormValues(document.base, now);
+  const desired = patientFormValues(document.fields, now);
+  const latest = patientFormValues(initialPatientFields(current), now);
   const patch: Partial<PatientFormValues> = {};
   for (const key of Object.keys(desired) as (keyof PatientFormValues)[]) {
     if (desired[key] === base[key]) continue;

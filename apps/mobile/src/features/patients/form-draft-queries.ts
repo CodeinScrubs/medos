@@ -111,11 +111,11 @@ export async function commitPatientFormDraft(
     if (Object.keys(errors).length) throw new Error('اطلاعات فرم کامل یا معتبر نیست؛ پیش‌نویس نگه داشته شد.');
     let result: string;
     if (patientId) {
-      const patch = patientFormPatch(document, currentPatient(tx, patientId));
+      const patch = patientFormPatch(document, currentPatient(tx, patientId), now);
       updatePatientInTransaction(tx, patientId, patch);
       result = patientId;
     } else {
-      const input = patientFormValues(document.fields);
+      const input = patientFormValues(document.fields, now);
       const duplicates = possibleDuplicatesQuery(input.firstName, input.lastName, input.nationalId, tx).all();
       if (duplicates.length && !allowDuplicate) throw new PatientDuplicateWarning(duplicates);
       result = createPatientInTransaction(tx, input);

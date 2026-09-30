@@ -1,10 +1,18 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { validDateAndClock, validateDateInput } from './date-input';
+import { fromJalali, toIsoDate } from './jalali';
 
 const options = { now: new Date('2026-09-23T12:00:00Z'), required: true, allowFuture: false };
 
 describe('visible date input validity', () => {
+  it('uses the supplied clock for two-digit year expansion as well as future validation', () => {
+    const now = fromJalali(1416, 1, 2);
+    expect(validateDateInput('16/01/01', { now, required: true, allowFuture: false })).toEqual({
+      valid: true,
+      iso: toIsoDate(fromJalali(1416, 1, 1)),
+    });
+  });
   it('rejects incomplete, impossible and future input, rather than reusing a previous date', () => {
     expect(validateDateInput('۱۴۰۵/۰۷/', options).valid).toBe(false);
     expect(validateDateInput('۱۴۰۵/۰۷/۳۱', options).valid).toBe(false);
