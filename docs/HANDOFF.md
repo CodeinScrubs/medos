@@ -33,6 +33,49 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Pin 0.11.13 native recovery and restore evidence
+
+**Agent:** GPT-6 via Codex
+**Commits:** evidence in this commit; application source `947d0b4`.
+
+**Changed**
+- `validation-0.11.13.md` pins both signed APKs, installed-hash equality,
+  exact-source CI and bounded native evidence. The execution ledger names the
+  next two reproduced media defects. No application/dependency/schema change.
+
+**Verified**
+- Source check: 90 suites / 1098 app tests + 3 workflows. Source CI
+  [36889531190](https://github.com/CodeinScrubs/medos/actions/runs/36889531190)
+  succeeds with head SHA `947d0b4`.
+- Signed arm64 owner and separate x86_64 packages, native-library/ABI/signature
+  checks; installed upgrade over 0.11.12 hashes exactly to the pinned emulator APK.
+- Offline isolated emulator: acknowledged raw new/edit/discharge fields survive
+  force-stop; invalid admission/discharge refused; valid publication/edit/close
+  updates one encounter. Font 1.3/dark/three-button discharge tap and visual check.
+- Actual SAF old/current restores, cold raw-draft reopening, independent crypto/
+  SQLite checks and a fresh backup: all 38 non-audit/backup/settings application
+  tables and original WAV match in one small synthetic dataset.
+
+**Not verified**
+- No physical-phone/IME/gesture/alarm/CDS, critical swap/power-loss/full-disk or
+  ordinary editor/media-versus-restore acceptance. The product is not complete.
+
+**Open threads**
+- Reproduced in a private real-SQLite/file-contract probe: voice insert failure
+  moves away the retry source; attachment publication accepts a deleted patient.
+  Add permanent regressions and fix both. Coordinate recorder acknowledgement
+  and pending media through the screen's existing save group, not a competing
+  navigation guard. Durable post-stop/copy recovery is a separate required gate.
+- Native picker crops before returning its asset; preserving that returned file
+  does not preserve the uncropped source. W08 needs source-before-edit handling.
+- Continue D05/D08 manual forms, D10/C05 ordinary-write restore exclusion, then
+  the everyday flow ledger and separately sourced/reviewed clinical tools/AI.
+
+**Gotchas**
+- Fresh cold XML may precede query completion. Swiping over a multiline input
+  scrolls that input: use observed form-scroll gutter bounds. Record automation
+  failures separately from app failures. Use this session's owned emulator only.
+
 ## 2026-10-01 — Recover unfinished admission, edit and discharge forms
 
 **Agent:** GPT-6 via Codex

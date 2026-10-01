@@ -37,7 +37,13 @@ order; do not treat a successful test suite as acceptance of the entire product.
 2026-10-01, 0.11.13: D05/D08 now include recoverable raw admission/edit/discharge
 forms with explicit atomic publication, stale clinical-context refusal, confirmed
 comparison/load/discard and visible auxiliary-read errors. This is a software
-slice with its own pending native gate, not completion of all manual forms.
+slice, not completion of all manual forms. Its exact-source CI, signed packages,
+acknowledged raw-form force-stop recovery, invalid/valid publication, older/current
+SAF restores and exact 38-table/original-WAV round trip on an isolated emulator
+are recorded in [validation-0.11.13.md](validation-0.11.13.md). Physical-phone and
+interruption gates remain open. That review reproduced two ordinary-media bugs:
+a moved voice source cannot retry a rejected SQL insert, and attachment writes
+accept a deleted patient. Fix these before further feature expansion.
 The preceding 0.11.12 source/artifacts/CI, actual SAF cancellation and full native
 restore round trip are recorded in [validation-0.11.12.md](validation-0.11.12.md).
 All 37 non-audit/backup/settings application tables and original WAV matched in
