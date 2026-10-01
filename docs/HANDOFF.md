@@ -33,6 +33,50 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Verify external emulator claims without speculative fixes
+
+**Agent:** GPT-6 via Codex
+**Commits:** this review record; audited checkout `bb0100a`, application `e82a622`.
+
+**Changed**
+- Recorded claim-by-claim dispositions and a narrow builder follow-up in
+  external-review-2026-10-01.md. Documentation only; no app/build/schema edits.
+- Rejected invented Argon2id/POD/SBAR/SLA descriptions and blanket padding,
+  speculative consult delay and an unused errors-route alias as fix requests.
+
+**Verified**
+- Fresh `npm run check`: 82 suites / 966 app tests + 3 workflows; type/lint/format
+  green. Remote main matched bb0100a and its hosted CI passed.
+- Pulled emulator-5556's installed APK; SHA-256 matches the final e82a622
+  x86_64 artifact in validation-0.11.8.md. Synthetic Android 16/API 36.1 checks:
+  patient/credential bottom actions stay above three-button navigation after
+  normal scrolling; backup setup lacks Next focus handoff; one Back with IME
+  visible opens PromptModal's dirty-text discard dialog. Continue retains text.
+
+**Not verified**
+- No phone, full encrypted archive/restore, complete media recovery, consult
+  transition race, all-module acceptance or clinical/performance validation.
+  Native proposed keyboard fixes were not implemented or tested.
+
+**Open threads** (what the next session should pick up)
+- W03: fix the confirmed shared PromptModal first-Back/IME behavior with native
+  acceptance; add the small first-to-second backup passphrase focus handoff.
+- Keep D05/D08 remaining manual forms/raw invalid dates and D10 native restore
+  open. Preserve C05 recorder/grant/interruption/restore gates and C01 visible
+  patient context before clinical/AI gates. Do not treat the external report
+  as acceptance for these threads or as authorization for extra features.
+
+**Gotchas**
+- UI Automator can report scroll children behind an IME or clipped/inverted
+  bounds; screenshots and IME state must agree before a touch. An initial
+  obscured scroll was excluded and its synthetic draft removed. The boot-time
+  System UI not-responding dialog is not a MedOS crash witness.
+- Reported 81/958 counts are historical; final source is 82/966. Same version
+  and versionCode do not identify an APK; use its hash. Passphrase verification
+  compares a phone key and does not test archive recovery.
+
+---
+
 ## 2026-10-01 — Accept the final 0.11.8 audio-import release on an isolated emulator
 
 **Agent:** GPT-6 via Codex
