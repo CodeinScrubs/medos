@@ -72,22 +72,30 @@ export function statusFor(
  * run repeatedly: it writes only when the stored status is actually wrong.
  */
 export async function reconcilePatientStatus(patientId: string): Promise<PatientStatus | null> {
-  const patient = (
-    await db
-      .select({ status: patients.status })
+  const now = new Date();
+  return db.transaction((tx) => {
+    const patient = tx
+      .select({ id: patients.id, status: patients.status })
       .from(patients)
       .where(and(isNull(patients.deletedAt), eq(patients.id, patientId)))
-      .limit(1)
-  )[0];
-  if (!patient) return null;
+      .get();
+    return patient ? reconcileStoredStatus(tx, patient, now) : null;
+  });
+}
 
-  const next = statusFor(await activeEncounter(patientId), patient.status);
-  if (next !== patient.status) {
-    await db
+/** Repair is an inference from current rows, never an awaited stale snapshot. */
+function reconcileStoredStatus(
+  handle: Pick<Database, 'select' | 'update'>,
+  patient: { id: string; status: PatientStatus },
+  now: Date,
+): PatientStatus {
+  const next = statusFor(activeEncounterQuery(patient.id, handle).get() ?? null, patient.status);
+  if (next !== patient.status)
+    handle
       .update(patients)
-      .set({ status: next, ...touch() })
-      .where(eq(patients.id, patientId));
-  }
+      .set({ status: next, ...touch(now) })
+      .where(eq(patients.id, patient.id))
+      .run();
   return next;
 }
 
@@ -96,30 +104,23 @@ export async function reconcilePatientStatus(patientId: string): Promise<Patient
  *
  * A disagreement between the two tables can only come from a build that let
  * them disagree, or from a restore of one. Rather than trusting that no such
- * row exists, the app checks — it is one query over a personal-sized table —
- * and reports how many it had to correct.
+ * row exists, the app checks in one startup transaction and reports how many
+ * it had to correct. Each patient's active episode uses the same ordered query
+ * as individual repair; imported duplicate episodes
+ * are retained, not silently closed or applied repeatedly in join order.
  */
 export async function reconcileAllPatientStatuses(): Promise<number> {
-  const rows = await db
-    .select({ id: patients.id, status: patients.status, kind: encounters.kind })
-    .from(patients)
-    .leftJoin(
-      encounters,
-      and(eq(encounters.patientId, patients.id), eq(encounters.isActive, true), isNull(encounters.deletedAt)),
-    )
-    .where(isNull(patients.deletedAt));
-
-  let fixed = 0;
-  for (const row of rows) {
-    const next = statusFor(row.kind ? { kind: row.kind } : null, row.status);
-    if (next === row.status) continue;
-    await db
-      .update(patients)
-      .set({ status: next, ...touch() })
-      .where(eq(patients.id, row.id));
-    fixed += 1;
-  }
-  return fixed;
+  const now = new Date();
+  return db.transaction((tx) => {
+    const rows = tx
+      .select({ id: patients.id, status: patients.status })
+      .from(patients)
+      .where(isNull(patients.deletedAt))
+      .all();
+    let fixed = 0;
+    for (const row of rows) if (reconcileStoredStatus(tx, row, now) !== row.status) fixed += 1;
+    return fixed;
+  });
 }
 
 /**

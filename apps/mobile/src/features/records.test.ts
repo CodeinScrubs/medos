@@ -14,12 +14,12 @@ import {
   openEncounter,
   updateEncounter,
 } from './encounters/queries';
-import { reconcileAllPatientStatuses } from './encounters/status';
+import { reconcileAllPatientStatuses, reconcilePatientStatus } from './encounters/status';
 import { createOrder, patientOrdersQuery, setOrderStatus, suggestOrderNames } from './kardex/queries';
 import { analyteSeriesQuery, createLabPanel, updateLabPanel } from './labs/queries';
 import { reflagLabValuesIfNeeded } from './labs/reflag';
 import { createNote, updateNote } from './notes/queries';
-import { createPatient, updatePatient } from './patients/queries';
+import { createPatient, deletePatient, updatePatient } from './patients/queries';
 import { createExtension, createPlace, extensionsQuery, updatePlace } from './places/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -80,6 +80,130 @@ describe('encounters', () => {
     expect(rows.find((n) => n.id === attached)?.encounterId).toBe(encounterId);
     expect(rows.find((n) => n.id === standalone)?.encounterId).toBeNull();
   });
+
+  it('refuses to open or mutate an episode for a deleted patient', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission', ward: 'Original' });
+    await deletePatient(patientId);
+    const before = t.db.select().from(encounters).all();
+    const patientBefore = t.db.select().from(patients).get();
+
+    await expect(openEncounter({ patientId, kind: 'outpatient' })).rejects.toThrow();
+    await expect(updateEncounter(id, { ward: 'Overwrite' })).rejects.toThrow();
+    await expect(
+      dischargeEncounter(id, { dischargedAt: new Date(), dischargeType: 'improved', nextStatus: 'followup' }),
+    ).rejects.toThrow();
+    await expect(deleteEncounter(id)).rejects.toThrow();
+
+    expect(t.db.select().from(encounters).all()).toEqual(before);
+    expect(t.db.select().from(patients).get()).toEqual(patientBefore);
+  });
+
+  it('does not let a stale discharge of a superseded episode change the current patient', async () => {
+    const old = await openEncounter({ patientId, kind: 'admission', ward: 'Previous' });
+    const current = await openEncounter({ patientId, kind: 'admission', ward: 'Current' });
+    const before = t.db.select().from(encounters).all();
+    const patientBefore = t.db.select().from(patients).get();
+    await expect(
+      dischargeEncounter(old, { dischargedAt: new Date(), dischargeType: 'death', nextStatus: 'followup' }),
+    ).rejects.toThrow();
+    expect(t.db.select().from(encounters).all()).toEqual(before);
+    expect(t.db.select().from(patients).get()).toEqual(patientBefore);
+    expect(t.db.select().from(encounters).where(eq(encounters.id, current)).get()?.isActive).toBe(true);
+    expect(t.db.select().from(auditLog).all()).toEqual([]);
+  });
+
+  it('keeps status in step with the newest episode when editing an imported duplicate', async () => {
+    const older = await openEncounter({ patientId, kind: 'admission', admittedAt: new Date(2025, 0, 1) });
+    const newest = await openEncounter({ patientId, kind: 'admission', admittedAt: new Date(2025, 0, 2) });
+    t.db.update(encounters).set({ isActive: true }).where(eq(encounters.id, older)).run();
+    await updateEncounter(older, { kind: 'outpatient' });
+    expect(await patientStatus()).toBe('admitted');
+    const before = t.db.select().from(encounters).all();
+    await expect(
+      dischargeEncounter(newest, { dischargedAt: new Date(), dischargeType: 'improved', nextStatus: 'discharged' }),
+    ).rejects.toThrow();
+    expect(t.db.select().from(encounters).all()).toEqual(before);
+    expect(await patientStatus()).toBe('admitted');
+  });
+
+  it('reads active state in the same transaction as a kind correction', async () => {
+    const old = await openEncounter({ patientId, kind: 'admission', ward: 'Previous' });
+    const editing = updateEncounter(old, { kind: 'outpatient' });
+    // Let the old implementation execute its awaited read, then open the new
+    // admission before its continuation writes the cached active state.
+    await Promise.resolve();
+    const current = await openEncounter({ patientId, kind: 'admission', ward: 'Current' });
+    await editing;
+    expect(await patientStatus()).toBe('admitted');
+    expect(t.db.select().from(encounters).where(eq(encounters.id, current)).get()?.isActive).toBe(true);
+    expect(t.db.select().from(encounters).where(eq(encounters.id, old)).get()?.isActive).toBe(false);
+    expect(t.db.select().from(patients).get()?.searchText).toContain('current');
+    expect(t.db.select().from(patients).get()?.searchText).not.toContain('previous');
+  });
+
+  it('rejects invalid dates without changing an episode, orders or patient status', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission' });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic medication' });
+    const before = {
+      patient: t.db.select().from(patients).get(),
+      encounters: t.db.select().from(encounters).all(),
+      orders: t.db.select().from(orders).all(),
+    };
+    await expect(openEncounter({ patientId, kind: 'outpatient', admittedAt: new Date(NaN) })).rejects.toThrow();
+    await expect(updateEncounter(id, { admittedAt: new Date(NaN) })).rejects.toThrow();
+    await expect(
+      dischargeEncounter(id, { dischargedAt: new Date(NaN), dischargeType: 'improved', nextStatus: 'discharged' }),
+    ).rejects.toThrow();
+    expect({
+      patient: t.db.select().from(patients).get(),
+      encounters: t.db.select().from(encounters).all(),
+      orders: t.db.select().from(orders).all(),
+    }).toEqual(before);
+  });
+
+  it.each(['open', 'edit', 'discharge', 'delete'] as const)(
+    'rolls back the whole %s operation when the patient write fails',
+    async (operation) => {
+      const id = await openEncounter({ patientId, kind: 'admission', ward: 'Original' });
+      // Delete is allowed only for an empty episode. The discharge case also
+      // checks rollback of orders that were ended before the failed status write.
+      if (operation === 'discharge') await createOrder({ patientId, kind: 'drug', name: 'Synthetic medication' });
+      const before = {
+        patient: t.db.select().from(patients).get(),
+        encounters: t.db.select().from(encounters).all(),
+        orders: t.db.select().from(orders).all(),
+      };
+      t.sqlite.exec(
+        "CREATE TRIGGER fail_patient BEFORE UPDATE ON patients BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+      );
+      const action = () => {
+        switch (operation) {
+          case 'open':
+            return openEncounter({ patientId, kind: 'outpatient' });
+          case 'edit':
+            return updateEncounter(id, { kind: 'outpatient' });
+          case 'discharge':
+            return dischargeEncounter(id, {
+              dischargedAt: new Date(),
+              dischargeType: 'improved',
+              nextStatus: 'followup',
+            });
+          case 'delete':
+            return deleteEncounter(id);
+        }
+      };
+      await expect(action()).rejects.toThrow('synthetic failure');
+      expect({
+        patient: t.db.select().from(patients).get(),
+        encounters: t.db.select().from(encounters).all(),
+        orders: t.db.select().from(orders).all(),
+      }).toEqual(before);
+      expect(t.db.select().from(auditLog).all()).toEqual([]);
+      t.sqlite.exec('DROP TRIGGER fail_patient');
+      await action();
+      expect(t.db.select().from(patients).get()?.status).toBe(operation === 'discharge' ? 'followup' : 'outpatient');
+    },
+  );
 });
 
 describe('notes', () => {
@@ -323,6 +447,62 @@ describe('deleting an episode', () => {
 });
 
 describe('who decides that a patient is on a ward', () => {
+  it('uses the newest live active episode once without deleting imported duplicates', async () => {
+    const older = await openEncounter({ patientId, kind: 'admission', admittedAt: new Date(2025, 0, 1) });
+    const newest = await openEncounter({ patientId, kind: 'outpatient', admittedAt: new Date(2025, 0, 2) });
+    // An older/imported dataset may contain more than one active episode.
+    t.db.update(encounters).set({ isActive: true }).where(eq(encounters.id, older)).run();
+    t.db.update(patients).set({ status: 'admitted' }).where(eq(patients.id, patientId)).run();
+    const before = t.db.select().from(encounters).all();
+    expect(await reconcileAllPatientStatuses()).toBe(1);
+    expect(await patientStatus()).toBe('outpatient');
+    expect(t.db.select().from(encounters).all()).toEqual(before);
+    expect(t.db.select().from(encounters).where(eq(encounters.id, newest)).get()?.isActive).toBe(true);
+    expect(await reconcileAllPatientStatuses()).toBe(0);
+  });
+
+  it('rolls back a failed startup repair and retries without partially corrected patients', async () => {
+    const other = await createPatient({ firstName: 'Second', lastName: 'Synthetic' });
+    await openEncounter({ patientId, kind: 'admission' });
+    await openEncounter({ patientId: other, kind: 'admission' });
+    t.db.update(patients).set({ status: 'outpatient' }).run();
+    const before = t.db.select().from(patients).all();
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_repair BEFORE UPDATE ON patients WHEN OLD.first_name = 'Second' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+    );
+    await expect(reconcileAllPatientStatuses()).rejects.toThrow('synthetic failure');
+    expect(t.db.select().from(patients).all()).toEqual(before);
+    t.sqlite.exec('DROP TRIGGER fail_repair');
+    expect(await reconcileAllPatientStatuses()).toBe(2);
+    expect(
+      t.db
+        .select()
+        .from(patients)
+        .all()
+        .map((p) => p.status),
+    ).toEqual(['admitted', 'admitted']);
+    await deletePatient(other);
+    const deleted = t.db.select().from(patients).where(eq(patients.id, other)).get();
+    expect(await reconcilePatientStatus(other)).toBeNull();
+    expect(t.db.select().from(patients).where(eq(patients.id, other)).get()).toEqual(deleted);
+  });
+
+  it.each(['patient', 'startup'] as const)('does not overwrite a discharge from a stale %s repair', async (scope) => {
+    const id = await openEncounter({ patientId, kind: 'admission' });
+    t.db.update(patients).set({ status: 'outpatient' }).where(eq(patients.id, patientId)).run();
+    const repairing = scope === 'patient' ? reconcilePatientStatus(patientId) : reconcileAllPatientStatuses();
+    // The old per-patient function awaited two reads; the startup pass awaited
+    // its list. Both could write an obsolete inference after a clinical change.
+    for (let step = 0; step < (scope === 'patient' ? 4 : 1); step++) await Promise.resolve();
+    await dischargeEncounter(id, {
+      dischargedAt: new Date(),
+      dischargeType: 'improved',
+      nextStatus: 'followup',
+    });
+    await repairing;
+    expect(await patientStatus()).toBe('followup');
+  });
+
   /*
    * The status used to be writable from the patient form, so a patient could
    * be "admitted" with no admission behind them — on the ward list with no

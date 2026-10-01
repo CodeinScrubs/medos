@@ -5,12 +5,16 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
-## Expo SDK 57 / React Native, not Flutter or a PWA
+## Keep the existing Expo SDK 57 / React Native application
 
-A PWA cannot reliably hold a multi-gigabyte local photo library, run background
-notification schedules, or survive being evicted by the OS — all of which this app needs.
-Flutter would work equally well technically; React Native wins because the same codebase
-and the same data layer extend to a desktop web dashboard later, which is on the roadmap.
+Android installation is the current locked target; web remains later work. No
+measured requirement currently justifies replacing the working implementation.
+A rewrite would have to reproduce migrations, forever-compatible backups, media
+recovery and native behavior. Flutter remains a candidate if a prototype demonstrates
+a concrete advantage and a migration plan preserves existing data and evidence.
+This is a cost/evidence decision, not proof of universal framework superiority.
+Future web clients still need their own platform, persistence and sync adapters;
+neither framework guarantees reuse of the Android data layer unchanged.
 
 Android-only was chosen by the owner, which removes the usual cross-platform tax: no
 Apple Developer account, no 7-day sideload expiry, and direct SMS access stays available
@@ -286,7 +290,8 @@ whenever a diagnosis or an episode is written, inside the same transaction where
 
 **Rejected: SQLite FTS5.** Better ranking, but it needs its own virtual table, triggers,
 and a second migration path, and it does not solve the normalisation problem on its own.
-For a personal dataset of hundreds to a few thousand rows, a scan is instant.
+The current scan approach still needs measured large-record acceptance; it is
+not a guarantee of instant search on a lifelong dataset.
 
 ---
 
@@ -324,6 +329,25 @@ except keys starting with `backup.` (folder grant, schedule, last success), whic
 the phone doing the backing up and survive a restore.
 
 Secrets are never settings: the backup key lives in the Android Keystore via SecureStore.
+
+---
+
+## Encounter mutations and status repair
+
+Episode creation/edit/discharge/deletion read their live patient and episode in
+the same synchronous transaction as the write, record-count guard and merged
+search update (0.11.12). An awaited pre-read allowed a new admission to arrive
+before a correction wrote the old active state. A closed/superseded episode
+cannot discharge the current patient; a deleted parent cannot accept changes.
+Clinical SQL failure rolls back episode, orders, patient status and search together.
+
+Status repair also reads and writes atomically. Startup repair uses the same
+ordered active-episode query as individual repair, rather than applying imported
+duplicates repeatedly in join order. It retains those episodes. Ambiguous multiple
+active episodes refuse discharge until corrected; no silent history merge occurs.
+Repair's per-patient ordered reads favor consistent behavior; long-term dataset
+startup cost still needs measurement. Manual encounter/discharge forms now guard
+repeated submits before React rerenders, but do not yet have raw-draft recovery.
 
 ---
 
@@ -368,8 +392,17 @@ JSON manifest, the database snapshot, and media files.
 
 Backup, restore and interrupted-restore recovery acquire the same in-process exclusion
 before their first await (0.11.10). A rejected attempt releases it even if a native
-source handle cannot close. This does not serialize ordinary clinical writes or an
-audio import's native copy; concurrent restore/import remains a separate gate.
+source handle cannot close. In 0.11.12, complete call-file import/retry/cancel jobs
+reserve a shared job lease before yielding; maintenance refuses while any job is
+active, and new jobs refuse maintenance. Independent imports remain concurrent.
+The lease covers reservation, native copy/hash, clinical commit and cancellation
+cleanup. Automatic backup skips busy acquisition without inventing a failed run.
+This is a small in-process boundary, not a general lock on ordinary clinical
+writes, other photo/voice workflows, old editors or another process.
+Each archive entry captures a validated exact byte length once. Streaming rejects
+growth/shrinkage, premature EOF and unknown size while allowing bounded short reads.
+These guards prevent an authenticated but internally misframed archive; they do
+not prove physical power-loss durability. No format or passphrase scheme changes.
 Manual backup now refuses unresolved media just as automatic backup does.
 
 Recovery markers are operational state, not preferences: malformed JSON or unsafe
@@ -391,8 +424,10 @@ incomplete text must never authorize saving that older value. Every consumer pas
 `useDateValidation().setValid` and checks `check()` before its explicit write. This uses
 a ref so a text event followed immediately by Save cannot observe stale React state.
 Day and clock validity stay independent; presets repair the day only, and an explicitly
-unknown admission hour removes only clock validation. The raw unfinished date text is
-still screen-local: this guard is not crash recovery for invalid date drafts.
+unknown admission hour removes only clock validation. Most manual forms still
+hold raw unfinished input locally. Patient, task and follow-up draft consumers
+opt into controlled raw recovery separately; validity alone is not crash recovery
+or an independent backup.
 
 Task previews stay short, with separate searchable/paged lists and a detail route shared
 by patient/global tasks and capture destinations. Counts use the same WHERE conditions as

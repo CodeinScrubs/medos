@@ -92,6 +92,9 @@ export class File {
 }
 
 export class Directory {
+  static async pickDirectoryAsync(): Promise<Directory> {
+    throw Object.assign(new Error('Synthetic picker cancellation'), { code: 'ERR_PICKER_CANCELLED' });
+  }
   uri: string;
   constructor(...parts: Path[]) {
     this.uri = uri(parts);

@@ -5,6 +5,7 @@ import { attachments, callImports, notes, noteVersions } from '@/db/schema';
 import { readSetting } from '@/db/settings';
 import { openEncounter } from '@/features/encounters/queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
+import { FileWorkBusyError, reserveFileMaintenance } from '@/lib/file-work';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -199,6 +200,78 @@ describe('durable import recovery and cancellation', () => {
   const reserve = () => beginCallImport(patientId, recording, now, id);
   const ready = () => markCallImportReady(reserve(), fingerprint, now);
 
+  it('refuses import, publication and cancellation during maintenance without changing the saved request', async () => {
+    const copying = reserve();
+    const row = markCallImportReady(copying, fingerprint, now);
+    const release = reserveFileMaintenance();
+    try {
+      await expect(fileCallRecording(patientId, recording, now, id)).rejects.toThrow(FileWorkBusyError);
+      await expect(resumeCallImport(id)).rejects.toThrow(FileWorkBusyError);
+      await expect(discardCallImport(id)).rejects.toThrow(FileWorkBusyError);
+      expect(() => beginCallImport(patientId, recording, now, '937a4e78-5d08-4b8d-80b3-03fd09121718')).toThrow(
+        FileWorkBusyError,
+      );
+      expect(() => markCallImportReady(copying, fingerprint, now)).toThrow(FileWorkBusyError);
+      expect(() => commitCallImport(row, fingerprint, now)).toThrow(FileWorkBusyError);
+      expect(callImportQuery(id).get()).toEqual(row);
+      expect(mockCopy).not.toHaveBeenCalled();
+      expect(mockFingerprint).not.toHaveBeenCalled();
+      expect(mockDelete).not.toHaveBeenCalled();
+    } finally {
+      release();
+    }
+    await resumeCallImport(id);
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+  });
+
+  it('keeps maintenance out through copy and releases it on copy failure for a later retry', async () => {
+    let fail!: (error: Error) => void;
+    mockCopy.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          fail = reject;
+        }),
+    );
+    const pending = fileCallRecording(patientId, recording, now, id);
+    const rejected = expect(pending).rejects.toThrow('synthetic provider failure');
+    try {
+      expect(() => reserveFileMaintenance()).toThrow(FileWorkBusyError);
+    } finally {
+      fail(new Error('synthetic provider failure'));
+    }
+    await rejected;
+    reserveFileMaintenance()();
+    await resumeCallImport(id);
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+  });
+
+  it('keeps maintenance out through ready-file verification and releases after a failed clinical commit', async () => {
+    ready();
+    let finish!: (value: typeof fingerprint) => void;
+    mockFingerprint.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_job_commit BEFORE INSERT ON notes BEGIN SELECT RAISE(ABORT, 'synthetic clinical failure'); END;",
+    );
+    const pending = resumeCallImport(id);
+    const rejected = expect(pending).rejects.toThrow('synthetic clinical failure');
+    try {
+      expect(() => reserveFileMaintenance()).toThrow(FileWorkBusyError);
+      expect(t.db.select().from(notes).all()).toEqual([]);
+    } finally {
+      finish(fingerprint);
+    }
+    await rejected;
+    reserveFileMaintenance()();
+    t.sqlite.exec('DROP TRIGGER fail_job_commit');
+    await resumeCallImport(id);
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+  });
+
   it('reserves the destination before a failed copy and retries the same path', async () => {
     mockCopy.mockImplementationOnce(async () => {
       expect(callImportQuery(id).get()).toMatchObject({ state: 'copying', relativePath: `media/imports/${id}.m4a` });
@@ -329,9 +402,11 @@ describe('durable import recovery and cancellation', () => {
     const cancelling = discardCallImport(id, now);
     expect(callImportQuery(id).get()).toMatchObject({ state: 'discarding', deletedAt: now });
     expect(mockDelete).not.toHaveBeenCalled();
+    expect(() => reserveFileMaintenance()).toThrow(FileWorkBusyError);
     finish(fingerprint);
     await rejected;
     await cancelling;
+    reserveFileMaintenance()();
     expect(callImportQuery(id).get()!.state).toBe('discarded');
     expect(mockDelete).toHaveBeenCalledTimes(1);
     expect(t.db.select().from(notes).all()).toEqual([]);

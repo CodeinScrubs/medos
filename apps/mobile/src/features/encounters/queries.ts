@@ -23,9 +23,30 @@ import { refreshPatientSearchText } from '@/features/patients/search-index';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { statusAfterDischarge, statusForEncounterKind } from './logic';
-import { statusFor } from './status';
+import { activeEncounterQuery, statusFor } from './status';
 
 const alive = isNull(encounters.deletedAt);
+
+/** Validation and writes share the same synchronous transaction snapshot. */
+function requirePatient(reader: Pick<Database, 'select'>, patientId: string): void {
+  const patient = reader
+    .select({ id: patients.id })
+    .from(patients)
+    .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+    .get();
+  if (!patient) throw new Error('پروندهٔ بیمار در دسترس نیست.');
+}
+
+function requireEncounter(reader: Pick<Database, 'select'>, id: string): Encounter {
+  const row = reader
+    .select()
+    .from(encounters)
+    .where(and(alive, eq(encounters.id, id)))
+    .get();
+  if (!row) throw new Error('این نوبت در دسترس نیست.');
+  requirePatient(reader, row.patientId);
+  return row;
+}
 
 /** Active encounter plus the hospital and attending, for the record header. */
 export function activeEncounterDetailQuery(patientId: string) {
@@ -106,13 +127,15 @@ export type EncounterInput = {
  * superseded rather than discharged.
  */
 export async function openEncounter(input: EncounterInput): Promise<string> {
+  if (input.admittedAt && !Number.isFinite(input.admittedAt.getTime())) throw new Error('تاریخ بستری معتبر نیست.');
   const id = newId();
   const now = new Date();
 
   db.transaction((tx) => {
+    requirePatient(tx, input.patientId);
     tx.update(encounters)
       .set({ isActive: false, ...touch(now) })
-      .where(and(eq(encounters.patientId, input.patientId), eq(encounters.isActive, true)))
+      .where(and(alive, eq(encounters.patientId, input.patientId), eq(encounters.isActive, true)))
       .run();
 
     tx.insert(encounters)
@@ -154,20 +177,22 @@ export async function openEncounter(input: EncounterInput): Promise<string> {
  * A closed episode is history and moves nothing.
  */
 export async function updateEncounter(id: string, patch: Partial<Omit<EncounterInput, 'patientId'>>): Promise<void> {
-  const current = (await encounterQuery(id))[0];
-  if (!current) throw new Error(`Encounter ${id} not found`);
+  if (patch.admittedAt && !Number.isFinite(patch.admittedAt.getTime())) throw new Error('تاریخ بستری معتبر نیست.');
   const now = new Date();
-  const kindChanged = patch.kind != null && patch.kind !== current.kind;
 
   db.transaction((tx) => {
+    const current = requireEncounter(tx, id);
     tx.update(encounters)
       .set({ ...patch, ...touch(now) })
-      .where(eq(encounters.id, id))
+      .where(and(alive, eq(encounters.id, id)))
       .run();
 
-    if (kindChanged && current.isActive) {
+    if (current.isActive) {
+      // Older/imported datasets can contain multiple active episodes. A
+      // correction to one must follow the same newest episode as the header.
+      const active = activeEncounterQuery(current.patientId, tx).get();
       tx.update(patients)
-        .set({ status: statusForEncounterKind(patch.kind!), ...touch(now) })
+        .set({ status: statusFor(active ?? null, 'outpatient'), ...touch(now) })
         .where(eq(patients.id, current.patientId))
         .run();
     }
@@ -185,11 +210,18 @@ export type DischargeInput = {
 };
 
 export async function dischargeEncounter(id: string, input: DischargeInput): Promise<void> {
-  const current = (await encounterQuery(id))[0];
-  if (!current) throw new Error(`Encounter ${id} not found`);
+  if (!Number.isFinite(input.dischargedAt.getTime())) throw new Error('تاریخ ترخیص معتبر نیست.');
   const now = new Date();
 
   db.transaction((tx) => {
+    const current = requireEncounter(tx, id);
+    if (!current.isActive) throw new Error('این نوبت دیگر فعال نیست؛ پروندهٔ فعلی را بررسی کنید.');
+    const activeCount = tx
+      .select({ n: count() })
+      .from(encounters)
+      .where(and(alive, eq(encounters.patientId, current.patientId), eq(encounters.isActive, true)))
+      .get()?.n;
+    if (activeCount !== 1) throw new Error('بیش از یک نوبت فعال وجود دارد؛ ابتدا نوبت‌های پرونده را بررسی کنید.');
     tx.update(encounters)
       .set({
         isActive: false,
@@ -198,7 +230,7 @@ export async function dischargeEncounter(id: string, input: DischargeInput): Pro
         outcomeNotes: input.outcomeNotes ?? null,
         ...touch(now),
       })
-      .where(eq(encounters.id, id))
+      .where(and(alive, eq(encounters.id, id)))
       .run();
 
     // Inpatient orders end with the admission. Without this they stay
@@ -236,12 +268,12 @@ export class EncounterNotEmptyError extends Error {
  * the kardex and the episode's lists — so it is closed with a discharge, or
  * corrected with an edit, instead.
  */
-export function encounterRecordCount(id: string): number {
+export function encounterRecordCount(id: string, reader: Pick<Database, 'select'> = db): number {
   const tables = [notes, orders, vitals, labPanels, imagingStudies, diagnoses, followUps, consultations, tasks];
   return tables.reduce(
     (sum, table) =>
       sum +
-      (db
+      (reader
         .select({ n: count() })
         .from(table)
         .where(and(eq(table.encounterId, id), isNull(table.deletedAt)))
@@ -260,36 +292,31 @@ export function encounterRecordCount(id: string): number {
  * of the app uses: no open episode means they are not on a ward.
  */
 export async function deleteEncounter(id: string): Promise<void> {
-  const current = (
-    await db
+  const now = new Date();
+
+  const changed = db.transaction((tx) => {
+    const current = tx
       .select()
       .from(encounters)
       .where(and(alive, eq(encounters.id, id)))
-      .limit(1)
-  )[0];
-  if (!current) return;
-  if (encounterRecordCount(id) > 0) throw new EncounterNotEmptyError();
-  const now = new Date();
-
-  db.transaction((tx) => {
+      .get();
+    if (!current) return false;
+    requirePatient(tx, current.patientId);
+    if (encounterRecordCount(id, tx) > 0) throw new EncounterNotEmptyError();
     tx.update(encounters)
       .set({ ...softDelete(now), isActive: false })
       .where(and(alive, eq(encounters.id, id)))
       .run();
 
-    if (!current.isActive) return;
+    if (!current.isActive) return true;
     // Any other open episode decides; otherwise the patient is not admitted.
-    const other = tx
-      .select()
-      .from(encounters)
-      .where(and(alive, eq(encounters.patientId, current.patientId), eq(encounters.isActive, true)))
-      .limit(1)
-      .all()[0];
+    const other = activeEncounterQuery(current.patientId, tx).get();
     tx.update(patients)
       .set({ status: statusFor(other ?? null, 'outpatient'), ...touch(now) })
       .where(eq(patients.id, current.patientId))
       .run();
     refreshPatientSearchText(current.patientId, tx);
+    return true;
   });
-  await audit('encounter.deleted', { entityType: 'encounter', entityId: id });
+  if (changed) await audit('encounter.deleted', { entityType: 'encounter', entityId: id });
 }

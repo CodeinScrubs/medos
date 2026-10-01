@@ -6,6 +6,7 @@ import { attachments, callImports, notes, patients, settings, type CallImport } 
 import { parseSetting } from '@/db/settings';
 import { addAttachmentInTransaction } from '@/features/attachments/queries';
 import { createNoteInTransaction } from '@/features/notes/queries';
+import { assertFileWorkAvailable, withFileJob } from '@/lib/file-work';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { copyImportFile, fingerprintImportFile, type FileFingerprint } from '@/platform/import-file';
 import { extensionOf, mediaFile } from '@/platform/media';
@@ -41,6 +42,7 @@ export function callImportQuery(id: string) {
 
 /** Persist the request AND its reserved path before any native operation. */
 export function beginCallImport(patientId: string, source: CallRecording, now: Date, id: string): CallImport {
+  assertFileWorkAvailable();
   const path = importMediaPath(id, extensionOf(source.name, 'm4a'));
   const body = encodeCallSource(source);
   return db.transaction((tx) => {
@@ -117,6 +119,7 @@ function assertCopyAllowed(expected: CallImport): void {
 }
 
 export function markCallImportReady(expected: CallImport, file: FileFingerprint, now: Date): CallImport {
+  assertFileWorkAvailable();
   if (!/^[0-9a-f]{64}$/.test(file.checksum) || !Number.isSafeInteger(file.sizeBytes) || file.sizeBytes <= 0)
     throw new Error('فایل کامل خوانده نشد.');
   return db.transaction((tx) => {
@@ -150,6 +153,7 @@ function filedNote(tx: DbTransaction, row: CallImport): string {
 
 /** All clinical metadata and the retry link commit together; never await here. */
 export function commitCallImport(expected: CallImport, file: FileFingerprint, now: Date): string {
+  assertFileWorkAvailable();
   return db.transaction((tx) => {
     const row = currentImport(tx, expected);
     requirePatient(tx, row.patientId);
@@ -212,6 +216,15 @@ export async function fileCallRecording(
   now: Date = new Date(),
   importId: string = recording.importId ?? newId(),
 ): Promise<string> {
+  return withFileJob(() => fileRecording(patientId, recording, now, importId));
+}
+
+async function fileRecording(
+  patientId: string,
+  recording: CallRecording,
+  now: Date,
+  importId: string,
+): Promise<string> {
   const row = beginCallImport(patientId, recording, now, importId);
   if (row.state === 'filed') return db.transaction((tx) => filedNote(tx, row));
   const previous = running.get(row.id);
@@ -244,6 +257,10 @@ export async function resumeCallImport(id: string, now: Date = new Date()): Prom
 
 /** Confirmed cancellation, then remove only its unreferenced unpublished copy. */
 export async function discardCallImport(id: string, now: Date = new Date()): Promise<void> {
+  return withFileJob(() => discardImport(id, now));
+}
+
+async function discardImport(id: string, now: Date): Promise<void> {
   const retired = db.transaction((tx) => {
     const row = tx.select().from(callImports).where(eq(callImports.id, id)).get();
     if (!row || row.state === 'filed' || row.noteId || row.attachmentId) conflict();

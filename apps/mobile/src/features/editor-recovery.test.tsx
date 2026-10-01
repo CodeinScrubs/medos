@@ -4,8 +4,10 @@ import { ActivityIndicator, Alert, TextInput } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Button, Input } from '@/components/ui';
 import { tablesOf } from '@/db/query-tables';
+import { encounters } from '@/db/schema';
 import * as notifications from '@/platform/notifications';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -16,6 +18,7 @@ import { DoctorFormScreen } from './doctors/doctor-form-screen';
 import { OccasionFormScreen } from './doctors/occasion-form-screen';
 import { createOccasion, occasionQuery } from './doctors/occasions-queries';
 import { createDoctor, doctorQuery } from './doctors/queries';
+import { DischargeScreen } from './encounters/discharge-screen';
 import { EncounterFormScreen } from './encounters/encounter-form-screen';
 import { encounterQuery, openEncounter } from './encounters/queries';
 import { ImagingFormScreen } from './imaging/imaging-form-screen';
@@ -175,6 +178,71 @@ afterEach(async () => {
 });
 
 describe('editors survive database read failures', () => {
+  it('publishes one encounter when the same save handler is pressed twice before rerender', async () => {
+    await render(<EncounterFormScreen />);
+    await type('بخش', 'Synthetic ward');
+    const press = tree.root.findAllByType(Button).find((node) => node.props.label === 'ثبت بستری')!.props.onPress;
+    await act(async () => {
+      press();
+      press();
+      await settle();
+    });
+    expect(t.db.select().from(encounters).all()).toHaveLength(1);
+    expect(t.db.select().from(encounters).get()?.ward).toBe('Synthetic ward');
+  });
+
+  it('retains encounter text after SQL failure and allows the same handler to retry', async () => {
+    await render(<EncounterFormScreen />);
+    await type('بخش', 'Retained ward');
+    const press = tree.root.findAllByType(Button).find((node) => node.props.label === 'ثبت بستری')!.props.onPress;
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_episode BEFORE INSERT ON encounters BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+    );
+    await act(async () => {
+      press();
+      await settle();
+    });
+    expect(t.db.select().from(encounters).all()).toEqual([]);
+    expect(input('بخش').props.value).toBe('Retained ward');
+    t.sqlite.exec('DROP TRIGGER fail_episode');
+    await act(async () => {
+      press();
+      await settle();
+    });
+    expect(t.db.select().from(encounters).all()).toHaveLength(1);
+    expect(t.db.select().from(encounters).get()?.ward).toBe('Retained ward');
+  });
+
+  it('reports a failed episode-record count without throwing or losing the loaded form', async () => {
+    mockParams.encounterId = await openEncounter({ patientId, kind: 'admission', ward: 'Original ward' });
+    await render(<EncounterFormScreen />);
+    await type('بخش', 'Unpublished correction');
+    jest.mocked(alertError).mockClear();
+    jest.spyOn(t.db, 'select').mockImplementationOnce(() => {
+      throw new Error('synthetic count failure');
+    });
+    const press = tree.root.findAllByType(Button).find((node) => node.props.label === 'حذف (ثبت اشتباه)')!.props
+      .onPress;
+    expect(press).not.toThrow();
+    expect(alertError).toHaveBeenCalledWith('بررسی نوبت انجام نشد', expect.any(Error));
+    expect(input('بخش').props.value).toBe('Unpublished correction');
+    expect(t.db.select().from(encounters).get()?.deletedAt).toBeNull();
+  });
+
+  it('ignores a repeated discharge press without a spurious failed-save alert', async () => {
+    mockParams.encounterId = await openEncounter({ patientId, kind: 'admission' });
+    await render(<DischargeScreen />);
+    jest.mocked(alertError).mockClear();
+    const press = tree.root.findAllByType(Button).find((node) => node.props.label === 'ثبت ترخیص')!.props.onPress;
+    await act(async () => {
+      press();
+      press();
+      await settle();
+    });
+    expect(t.db.select().from(encounters).get()?.isActive).toBe(false);
+    expect(alertError).not.toHaveBeenCalled();
+  });
+
   it('recovers an unpublished patient edit after reopening without changing the chart', async () => {
     await render(<EditPatientScreen />);
     await type('خلاصه‌ی یک‌خطی', 'Unpublished patient summary');

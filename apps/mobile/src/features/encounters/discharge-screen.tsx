@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { alertError } from '@/components/feedback';
@@ -53,10 +53,13 @@ export function DischargeScreen() {
   const [dischargedAt, setDischargedAt] = useState(() => new Date());
   const [outcomeNotes, setOutcomeNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const dateValidation = useDateValidation();
 
   async function save() {
+    if (savingRef.current) return;
     if (!dateValidation.check()) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       await dischargeEncounter(encounterId, {
@@ -69,6 +72,7 @@ export function DischargeScreen() {
     } catch (e) {
       alertError('ثبت نشد', e);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -140,7 +144,7 @@ export function DischargeScreen() {
           full
           style={{ marginTop: spacing.sm }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="انصراف" variant="ghost" onPress={() => router.back()} disabled={saving} full haptic={false} />
       </Column>
     </Screen>
   );

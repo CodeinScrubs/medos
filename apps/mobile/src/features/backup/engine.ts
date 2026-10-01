@@ -16,6 +16,7 @@ import { backfillNoteVersionsIfNeeded } from '@/features/notes/version-queries';
 import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
+import { FileWorkBusyError, fileJobsActive, reserveFileMaintenance } from '@/lib/file-work';
 import { newId, stamps, touch } from '@/lib/ids';
 import { redactErrorText } from '@/lib/redact';
 import { logError } from '@/platform/error-log';
@@ -103,13 +104,17 @@ export async function getBackupConfig(): Promise<BackupConfig> {
  * backup into an off-phone copy with no further work.
  */
 export async function chooseBackupFolder(): Promise<string | null> {
+  let dir: Directory;
   try {
-    const dir = await Directory.pickDirectoryAsync();
-    await writeSetting(backupFolderUri, dir.uri);
-    return dir.uri;
-  } catch {
-    return null;
+    dir = await Directory.pickDirectoryAsync();
+  } catch (error) {
+    // Expo SDK 57's Android PickerCancelledException has this stable code.
+    // Provider failures are errors; a failed SQL setting write is not Cancel.
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_PICKER_CANCELLED') return null;
+    throw error;
   }
+  await writeSetting(backupFolderUri, dir.uri);
+  return dir.uri;
 }
 
 /** The configured folder if it is still reachable; a restored phone has lost the old grant. */
@@ -147,28 +152,42 @@ function removeQuietly(entry: Directory | File | null): void {
   }
 }
 
-function listMediaFiles(): { file: File; path: string }[] {
+function backupFileSize(file: File): number {
+  const size = file.size;
+  if (size == null || !Number.isSafeInteger(size) || size < 0)
+    throw new Error('اندازهٔ فایل بکاپ خوانده نشد؛ دوباره تلاش کنید.');
+  return size;
+}
+
+function listMediaFiles(): { file: File; path: string; sizeBytes: number }[] {
   const root = new Directory(Paths.document, MEDIA_ROOT);
-  const out: { file: File; path: string }[] = [];
+  const out: { file: File; path: string; sizeBytes: number }[] = [];
   if (!root.exists) return out;
   const walk = (dir: Directory, prefix: string) => {
     for (const entry of dir.list()) {
       if (entry instanceof Directory) walk(entry, `${prefix}/${entry.name}`);
-      else out.push({ file: entry, path: `${prefix}/${entry.name}` });
+      else out.push({ file: entry, path: `${prefix}/${entry.name}`, sizeBytes: backupFileSize(entry) });
     }
   };
   walk(root, MEDIA_ROOT);
   return out;
 }
 
-async function streamFileInto(writer: EncryptingWriter, file: File): Promise<void> {
+async function streamFileInto(writer: EncryptingWriter, file: File, expectedSize: number): Promise<void> {
+  const changed = () => new Error('فایل هنگام ساخت بکاپ تغییر کرد؛ بکاپ کامل نشد. دوباره تلاش کنید.');
+  if (backupFileSize(file) !== expectedSize) throw changed();
   const handle = file.open(FileMode.ReadOnly);
   try {
-    for (;;) {
-      const bytes = handle.readBytes(CHUNK_BYTES);
-      if (bytes.length === 0) break;
+    let left = expectedSize;
+    while (left > 0) {
+      const bytes = handle.readBytes(Math.min(CHUNK_BYTES, left));
+      if (!bytes.length || bytes.length > left) throw changed();
       await writer.write(bytes);
+      left -= bytes.length;
     }
+    // The entry header promises one exact length. Authentication alone cannot
+    // detect a writer that encrypted more/fewer bytes than that promise.
+    if (handle.readBytes(1).length || backupFileSize(file) !== expectedSize) throw changed();
   } finally {
     handle.close();
   }
@@ -250,10 +269,10 @@ export async function createBackup({
   onProgress?: (p: BackupProgress) => void;
 }): Promise<BackupResult> {
   if (running) throw new Error('یک بکاپ دیگر در حال انجام است.');
-  running = true;
-
   const runId = newId();
   const startedAt = new Date();
+  const releaseFiles = reserveFileMaintenance();
+  running = true;
   let snapshot: File | null = null;
 
   try {
@@ -284,8 +303,9 @@ export async function createBackup({
     sqlite.execSync(`VACUUM INTO '${sqlPath(snapshot.uri)}'`);
 
     const media = includeMedia ? listMediaFiles() : [];
-    const mediaBytes = media.reduce((sum, m) => sum + (m.file.size ?? 0), 0);
-    const totalBytes = (snapshot.size ?? 0) + mediaBytes;
+    const snapshotBytes = backupFileSize(snapshot);
+    const mediaBytes = media.reduce((sum, m) => sum + m.sizeBytes, 0);
+    const totalBytes = snapshotBytes + mediaBytes;
 
     const manifest: BackupManifest = {
       app: 'MedOS',
@@ -314,13 +334,13 @@ export async function createBackup({
       await writer.write(entryHeader(ENTRY_MANIFEST, 'manifest.json', manifestBytes.length));
       await writer.write(manifestBytes);
 
-      await writer.write(entryHeader(ENTRY_FILE, 'db/medos.db', snapshot.size ?? 0));
-      await streamFileInto(writer, snapshot);
+      await writer.write(entryHeader(ENTRY_FILE, 'db/medos.db', snapshotBytes));
+      await streamFileInto(writer, snapshot, snapshotBytes);
       report();
 
       for (const m of media) {
-        await writer.write(entryHeader(ENTRY_FILE, m.path, m.file.size ?? 0));
-        await streamFileInto(writer, m.file);
+        await writer.write(entryHeader(ENTRY_FILE, m.path, m.sizeBytes));
+        await streamFileInto(writer, m.file, m.sizeBytes);
         report();
       }
 
@@ -416,6 +436,7 @@ export async function createBackup({
   } finally {
     removeQuietly(snapshot);
     running = false;
+    releaseFiles();
   }
 }
 
@@ -480,11 +501,13 @@ const livePaths: MediaPaths = {
  */
 export async function recoverInterruptedRestore(): Promise<{ putBack: number; failed: DisplacedMedia[] }> {
   if (running) throw new Error('یک بکاپ یا بازگردانی در حال انجام است؛ چند لحظه بعد دوباره امتحان کنید.');
+  const releaseFiles = reserveFileMaintenance();
   running = true;
   try {
     return await recoverRestoreMedia();
   } finally {
     running = false;
+    releaseFiles();
   }
 }
 
@@ -580,7 +603,7 @@ export async function markStaleRunsFailed(): Promise<void> {
  * the foreground; does nothing unless a passphrase and a folder are set up.
  */
 export async function runAutoBackupIfDue(): Promise<'skipped' | 'done' | 'failed'> {
-  if (running) return 'skipped';
+  if (running || fileJobsActive()) return 'skipped';
   // A dataset whose files were not put back is not a thing to copy anywhere
   // automatically; backing it up would spread the disagreement.
   if ((await readSetting(restoreMediaUnresolved)) > 0) return 'skipped';
@@ -590,7 +613,10 @@ export async function runAutoBackupIfDue(): Promise<'skipped' | 'done' | 'failed
   try {
     await createBackup({ includeMedia: cfg.autoIncludeMedia, trigger: 'auto' });
     return 'done';
-  } catch {
+  } catch (error) {
+    // Another job may start while configuration/key reads await. No backup
+    // run was inserted when acquisition refused; try on the next foreground.
+    if (error instanceof FileWorkBusyError) return 'skipped';
     // The failure is recorded in backup_runs and shown on the backup screen.
     return 'failed';
   }
@@ -669,6 +695,7 @@ export async function restoreBackup({
   onProgress?: (p: RestoreProgress) => void;
 }): Promise<RestoreResult> {
   if (running) throw new Error('یک بکاپ در حال انجام است؛ چند لحظه بعد دوباره امتحان کنید.');
+  const releaseFiles = reserveFileMaintenance();
   // Reserve before the first await: foreground automatic backup or another
   // restore must not enter while recovery still owns the displaced files.
   running = true;
@@ -859,6 +886,7 @@ export async function restoreBackup({
     } finally {
       removeQuietly(work);
       running = false;
+      releaseFiles();
     }
   }
 }

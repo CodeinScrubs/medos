@@ -1,17 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { File, FileMode } from 'expo-file-system';
+import { Directory, File, FileMode } from 'expo-file-system';
 
 import { patients, backupRuns, settings } from '@/db/schema';
 import { readSetting, writeSetting } from '@/db/settings';
 import { deriveKey, equalBytes } from '@/lib/crypto';
+import { FileWorkBusyError, withFileJob } from '@/lib/file-work';
 import { stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { closeFailures, memoryFiles, resetMemoryFiles } from '@/test/mocks/memory-files';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { createBackup, recoverInterruptedRestore, restoreBackup } from './engine';
-import { loadBackupKey } from './keys';
-import { restoreInFlight, restoreMediaUnresolved } from './settings';
+import {
+  chooseBackupFolder,
+  createBackup,
+  recoverInterruptedRestore,
+  restoreBackup,
+  runAutoBackupIfDue,
+} from './engine';
+import { hasBackupKey, loadBackupKey } from './keys';
+import { backupAutoEnabled, backupFolderUri, restoreInFlight, restoreMediaUnresolved } from './settings';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('expo-file-system', () => jest.requireActual('@/test/mocks/memory-files'));
@@ -34,7 +41,7 @@ jest.mock('@/lib/crypto', () => ({
   deriveKey: jest.fn(async () => new Uint8Array(32).fill(9)),
 }));
 jest.mock('./keys', () => ({
-  hasBackupKey: async () => true,
+  hasBackupKey: jest.fn(async () => true),
   loadBackupKey: jest.fn(async () => ({
     key: new Uint8Array(32).fill(9),
     salt: new Uint8Array(16).fill(7),
@@ -95,6 +102,165 @@ function restore(onProgress?: Parameters<typeof restoreBackup>[0]['onProgress'])
 const name = () => t.db.select({ name: patients.firstName }).from(patients).get()!.name;
 
 describe('backup orchestration (real archive/authentication and migrated SQLite; native files stood in)', () => {
+  it('treats Android picker cancellation as no change to the configured folder', async () => {
+    await writeSetting(backupFolderUri, 'file:///external/original');
+    await expect(chooseBackupFolder()).resolves.toBeNull();
+    expect(await readSetting(backupFolderUri)).toBe('file:///external/original');
+  });
+
+  it('reports provider errors instead of silently treating them as cancellation', async () => {
+    const failure = Object.assign(new Error('synthetic provider failure'), { code: 'ERR_UNAVAILABLE' });
+    jest.spyOn(Directory, 'pickDirectoryAsync').mockRejectedValueOnce(failure);
+    await expect(chooseBackupFolder()).rejects.toBe(failure);
+    expect(await readSetting(backupFolderUri)).toBeNull();
+  });
+
+  it('reports a failed folder-setting write, keeps the original folder and permits retry', async () => {
+    await writeSetting(backupFolderUri, 'file:///external/original');
+    jest.spyOn(Directory, 'pickDirectoryAsync').mockResolvedValue(new Directory('file:///external/selected'));
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_folder BEFORE UPDATE ON settings WHEN OLD.key = 'backup.folderUri' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+    );
+    await expect(chooseBackupFolder()).rejects.toThrow('synthetic failure');
+    expect(await readSetting(backupFolderUri)).toBe('file:///external/original');
+    t.sqlite.exec('DROP TRIGGER fail_folder');
+    await expect(chooseBackupFolder()).resolves.toBe('file:///external/selected');
+    expect(await readSetting(backupFolderUri)).toBe('file:///external/selected');
+  });
+
+  it('refuses backup, restore and recovery while a file job owns the dataset, then permits retry', async () => {
+    let finish!: () => void;
+    const active = withFileJob(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const before = t.db.select().from(backupRuns).all();
+    try {
+      await expect(createBackup({ includeMedia: true, trigger: 'manual', copyToFolder: false })).rejects.toThrow(
+        FileWorkBusyError,
+      );
+      await expect(restore()).rejects.toThrow(FileWorkBusyError);
+      await expect(recoverInterruptedRestore()).rejects.toThrow(FileWorkBusyError);
+      expect(t.db.select().from(backupRuns).all()).toEqual(before);
+      expect(name()).toBe('Current');
+      expect(equalBytes(memoryFiles.get(mediaUri)!, new Uint8Array([8, 7, 6]))).toBe(true);
+    } finally {
+      finish();
+      await active;
+    }
+    await expect(restore()).resolves.toBeTruthy();
+    expect(name()).toBe('Saved');
+  });
+
+  it('reserves maintenance before KDF work so a newly arriving file job never begins', async () => {
+    let entered = false;
+    jest.mocked(deriveKey).mockImplementationOnce(async () => {
+      await expect(
+        withFileJob(async () => {
+          entered = true;
+        }),
+      ).rejects.toThrow(FileWorkBusyError);
+      return new Uint8Array(32).fill(9);
+    });
+    await restore();
+    expect(entered).toBe(false);
+    await expect(withFileJob(async () => 'retry')).resolves.toBe('retry');
+  });
+
+  it('skips automatic backup if a file job starts during config reads without a false failed run', async () => {
+    await writeSetting(backupAutoEnabled, true);
+    await writeSetting(backupFolderUri, 'file:///external/backups');
+    new Directory('file:///external/backups').create();
+    const before = t.db.select().from(backupRuns).all();
+    let finish!: () => void;
+    let active: Promise<void> | undefined;
+    jest.mocked(hasBackupKey).mockImplementationOnce(async () => {
+      active = withFileJob(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      return true;
+    });
+    try {
+      await expect(runAutoBackupIfDue()).resolves.toBe('skipped');
+      expect(t.db.select().from(backupRuns).all()).toEqual(before);
+    } finally {
+      finish?.();
+      await active;
+    }
+    await expect(runAutoBackupIfDue()).resolves.toBe('done');
+  });
+
+  it.each([
+    ['growing', new Uint8Array([8, 7, 6, 5])],
+    ['shrinking', new Uint8Array([8, 7])],
+  ])('refuses %s media instead of publishing an unrestorable archive', async (_label, changed) => {
+    const open = File.prototype.open;
+    const fault = jest.spyOn(File.prototype, 'open').mockImplementation(function (this: File, mode?: FileMode) {
+      // The entry length was captured before open. This reproduces a native
+      // copy changing the file while backup encryption yields.
+      if (this.uri === mediaUri && mode === FileMode.ReadOnly) memoryFiles.set(mediaUri, changed);
+      return open.call(this, mode);
+    });
+    await expect(createBackup({ includeMedia: true, trigger: 'manual', copyToFolder: false })).rejects.toThrow();
+    expect(
+      t.db
+        .select()
+        .from(backupRuns)
+        .all()
+        .filter((run) => run.status === 'success'),
+    ).toHaveLength(1);
+    expect(new File(fixtureUri).exists).toBe(true);
+    fault.mockRestore();
+    await expect(restore()).resolves.toBeTruthy();
+    expect(name()).toBe('Saved');
+  });
+
+  it.each([null, -1, 1.5])(
+    'refuses unknown/invalid media length %s instead of guessing an empty entry',
+    async (size) => {
+      const getter = Object.getOwnPropertyDescriptor(File.prototype, 'size')!.get!;
+      const fault = jest.spyOn(File.prototype, 'size', 'get').mockImplementation(function (this: File) {
+        return this.uri === mediaUri ? size : getter.call(this);
+      });
+      await expect(createBackup({ includeMedia: true, trigger: 'manual', copyToFolder: false })).rejects.toThrow(
+        'اندازهٔ فایل',
+      );
+      expect(
+        t.db
+          .select()
+          .from(backupRuns)
+          .all()
+          .filter((run) => run.status === 'success'),
+      ).toHaveLength(1);
+      fault.mockRestore();
+      await expect(restore()).resolves.toBeTruthy();
+    },
+  );
+
+  it('accepts bounded short native reads when their exact total matches the entry, producing a restorable archive', async () => {
+    const open = File.prototype.open;
+    const fault = jest.spyOn(File.prototype, 'open').mockImplementation(function (this: File, mode?: FileMode) {
+      const handle = open.call(this, mode);
+      if (this.uri === mediaUri && mode === FileMode.ReadOnly) {
+        const read = handle.readBytes.bind(handle);
+        jest.spyOn(handle, 'readBytes').mockImplementation((length) => read(Math.min(length, 1)));
+      }
+      return handle;
+    });
+    const backup = await createBackup({ includeMedia: true, trigger: 'manual', copyToFolder: false });
+    const completeUri = 'file:///external/short-reads.medosbak';
+    await backup.file.copy(new File(completeUri));
+    fault.mockRestore();
+    await expect(restoreBackup({ fileUri: completeUri, passphrase: 'synthetic test input' })).resolves.toBeTruthy();
+    expect(name()).toBe('Current');
+    expect(equalBytes(memoryFiles.get(mediaUri)!, new Uint8Array([8, 7, 6]))).toBe(true);
+  });
+
   it.each(['throw', 'empty', 'zero'] as const)(
     'does not publish schema zero or report a newer backup when local migration metadata is unavailable: %s',
     async (failure) => {

@@ -171,7 +171,7 @@ export function BackupScreen() {
       } else if (!result.savedTo) {
         notify(
           'بکاپ ساخته شد ولی جایی ذخیره نشد',
-          'پوشه‌ی بکاپ انتخاب نشده است. یا یک پوشه انتخاب کنید، یا از «بکاپ و ارسال» استفاده کنید.',
+          'پوشه‌ی بکاپ انتخاب نشده است. یک پوشه انتخاب کنید یا «بکاپ و اشتراک‌گذاری» را بزنید.',
         );
       }
     } catch (e) {
@@ -300,14 +300,14 @@ export function BackupScreen() {
                   </Text>
                 ) : null}
                 <Text variant="tiny" color="textFaint">
-                  بهترین انتخاب پوشه‌ای است که یک برنامه‌ی همگام‌سازی (Google Drive، OneDrive، Syncthing) آن را با
-                  لپ‌تاپ یا فضای ابری همگام می‌کند؛ آن‌وقت هر بکاپ خودکار بیرون از گوشی هم یک نسخه دارد.
+                  برای خرابی گوشی، یک نسخه را بیرون از گوشی هم نگه دارید.
                 </Text>
                 <Button
                   label={config.folderUri ? 'تغییر پوشه' : 'انتخاب پوشه'}
                   icon="folder-open-outline"
                   variant="secondary"
-                  onPress={() => void chooseBackupFolder()}
+                  disabled={busy}
+                  onPress={() => void chooseBackupFolder().catch((e) => alertError('پوشه ثبت نشد', e))}
                 />
               </Column>
             </Card>
@@ -324,7 +324,6 @@ export function BackupScreen() {
                 <Divider />
                 <Toggle
                   label="همراه با عکس‌ها و صداها"
-                  description="وقتی تعداد عکس‌ها زیاد شد، خاموشش کنید و هفته‌ای یک بار بکاپ کامل دستی بگیرید"
                   value={config.autoIncludeMedia}
                   onChange={(v) =>
                     void writeSetting(backupAutoIncludeMedia, v).catch((e) => alertError('تنظیم ثبت نشد', e))
@@ -356,7 +355,7 @@ export function BackupScreen() {
                 onPress={() => void runBackup(true, false)}
               />
               <Button
-                label="بکاپ کامل و ارسال (تلگرام، درایو، ایمیل…)"
+                label="بکاپ و اشتراک‌گذاری"
                 icon="share-outline"
                 variant="secondary"
                 full
@@ -403,7 +402,7 @@ export function BackupScreen() {
               icon="download-outline"
               variant="ghost"
               disabled={busy}
-              onPress={() => void pickRestoreFile()}
+              onPress={() => void pickRestoreFile().catch((e) => alertError('فایل انتخاب نشد', e))}
             />
           </Column>
         </Card>

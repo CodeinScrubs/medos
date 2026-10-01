@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -68,6 +68,7 @@ function EncounterForm({
   // to assume 12:01 PM and say so rather than to pick a plausible-looking time.
   const [hourKnown, setHourKnown] = useState(encounter?.admittedAtHasTime ?? true);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const dateValidation = useDateValidation();
   const [picker, setPicker] = useState<'place' | 'attending' | null>(null);
 
@@ -95,8 +96,16 @@ function EncounterForm({
   // For an episode entered by mistake. A real one — with anything filed
   // under it — is ended with a discharge, not deleted.
   function confirmDelete(current: Encounter) {
+    if (savingRef.current) return;
     const label = ENCOUNTER_KIND_LABELS[current.kind];
-    if (encounterRecordCount(current.id) > 0) {
+    let records: number;
+    try {
+      records = encounterRecordCount(current.id);
+    } catch (error) {
+      alertError('بررسی نوبت انجام نشد', error);
+      return;
+    }
+    if (records > 0) {
       notify(
         `این ${label} حذف نمی‌شود`,
         'نوت، دستور، آزمایش یا کاری زیر آن ثبت شده است. اگر تمام شده «ترخیص» را بزنید؛ اگر جزئیاتش اشتباه است، همین‌جا ویرایشش کنید.',
@@ -117,7 +126,9 @@ function EncounterForm({
   }
 
   async function save() {
+    if (savingRef.current) return;
     if (!dateValidation.check()) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const payload = {
@@ -137,6 +148,7 @@ function EncounterForm({
     } catch (e) {
       alertError('ذخیره نشد', e);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -216,7 +228,7 @@ function EncounterForm({
           full
           style={{ marginTop: spacing.sm }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="انصراف" variant="ghost" onPress={() => router.back()} disabled={saving} full haptic={false} />
         {encounter ? (
           <Button
             label="حذف (ثبت اشتباه)"
@@ -224,6 +236,7 @@ function EncounterForm({
             variant="danger"
             size="sm"
             haptic={false}
+            disabled={saving}
             onPress={() => confirmDelete(encounter)}
             style={{ marginTop: spacing.lg }}
           />

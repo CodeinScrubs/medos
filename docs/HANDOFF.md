@@ -33,6 +33,63 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Refuse incomplete backup entries and stale encounter writes
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; baseline `a38eb74`.
+
+**Changed**
+- Version 0.11.12 / code 28. Whole call import/retry/cancel jobs and backup/
+  restore/recovery now exclude each other before yielding; independent imports
+  remain concurrent. Busy auto backup skips without a false failed run.
+- Backup streams the captured exact entry size and refuses growth/shrinkage,
+  premature EOF or unknown size. Short bounded reads remain valid.
+- Encounter writes validate live parents/current state and record counts inside
+  their transaction. Stale discharge refuses; status repair cannot overwrite a
+  later clinical change. Imported duplicates stay intact and use consistent order.
+- Encounter/discharge handlers guard repeated submits; failed count reads show
+  an error and retain input. Backup picker/setting failures now surface while
+  real Android cancellation stays quiet. Existing backup hints/buttons shortened;
+  README no longer requires the optional app lock. No added screen/menu.
+- Architecture removes unmeasured framework/search guarantees and records these
+  scoped contracts. No schema, dependency, permission or crypto-format change.
+
+**Verified**
+- Failing witnesses reproduced changed-file successful/unrestorable backups,
+  deleted-parent/stale-episode/status-repair races, duplicate admission submits,
+  count-read failure and swallowed folder errors; corrected tests pass.
+- `npm run check`: 88 suites / 1066 app tests + 3 workflows; typecheck,
+  lint and formatting pass without warnings.
+- Real migrated SQLite covers rollback/retry, duplicate imports, deleted parents,
+  status/search agreement and no false success. Native files/navigation are
+  stand-ins in these tests. Migration regeneration: 40 tables, no schema diff.
+- Previous signed 0.11.11 native evidence is separately in validation-0.11.11.md.
+
+**Not verified**
+- This source commit's signed APKs, native acceptance and exact-head CI remain
+  pending. Do not attribute these fixes to the 0.11.11 APK.
+- The file lease does not serialize ordinary writes, native photo/voice workflows,
+  old loaded editors, other processes or power loss. No physical-phone/alarm/CDS
+  acceptance and no claim that the full product is finished.
+
+**Open threads** (what the next session should pick up)
+- Build/pin this exact source for owner ARM and separate x86_64 QA, verify actual
+  libraries/signature and upgrade without clearing data; run SAF full backup and
+  restore, call-file retry and encounter/UI checks. Verify exact-head hosted CI.
+- Continue D05/D08 other manual forms (encounter/discharge raw drafts first), C05
+  ordinary writes/media/editors versus restore, W06-W09 and clinical/AI gates.
+
+**Gotchas**
+- Acquisition must happen before the first await and release in finally. Do not
+  nest exclusive maintenance for restore's internal recovery. Generic recording
+  is deliberately not leased until failed-save URI recovery is designed.
+- A size check alone does not check archive framing; stream exactly the promised
+  bytes, check EOF/size again and always close native handles.
+- C-drive space is limited; prior generated build/CMake outputs use local F-drive
+  junctions. Private signing material and AVD/user data must remain untouched.
+
+---
+
 ## 2026-10-01 — Accept bounded native follow-up recovery and backup compatibility
 
 **Agent:** GPT-6 via Codex
