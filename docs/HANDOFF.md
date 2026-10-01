@@ -33,6 +33,50 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Accept the bounded 0.11.9 keyboard fixes on an isolated emulator
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `ccb87e4`; evidence and test-locator refinement in this commit.
+
+**Changed**
+- Recorded source, signed APK hashes, native protocol, rejected observations and
+  limits in validation-0.11.9.md; updated the execution ledger.
+- Removed styling from the backdrop test locator so a visual redesign does not
+  invalidate its behavior check. No application edits after the release builds.
+
+**Verified**
+- Final `npm run check`: 83 suites / 973 app tests + 3 workflows; type/lint/format
+  green. Signed arm64 owner and separate x86_64 artifacts passed native-entry,
+  ABI/version and signature checks; the installed emulator APK hash matched.
+- Isolated offline API 36.1: first Back with IME shown retains ordinary/secret
+  text and hides the keyboard; second Back retains discard protection. Continue,
+  Discard, backdrop, explicit Cancel, empty/unchanged values and secret reopen
+  clearing passed. Saved synthetic patient/diagnosis survived the upgrade.
+- Backup first-field hardware Enter moves focus to confirmation with text retained;
+  confirmation Enter hides IME without setting a key. Large-text/dark prompt
+  first-Back/Cancel checked separately. See the report for the precise boundaries.
+
+**Not verified**
+- No physical phone or software-IME Next tap/continuous keyboard visibility.
+  Hardware Enter hid the IME after the focus handoff; do not call it a software
+  keyboard acceptance test. No gesture-back, full archive/restore, recorder/
+  grants/interruption, clinical or app-wide performance/accessibility acceptance.
+
+**Open threads** (what the next session should pick up)
+- D05/D08 other manual forms/raw invalid dates and D10 native restore remain first.
+- W03 phone/software-IME and other editor exit/alarm gates remain; these shared
+  prompt fixes do not close all keyboard work. Keep C05 recorder/recovery and
+  C01 visible clinical-context gates open before clinical/AI expansion.
+
+**Gotchas**
+- IME visibility, route and fresh bounds are preconditions, not assumptions.
+  A font/theme recreation dropped an immediate deep link; cold relaunch fixed
+  the test setup. Clipped/inverted bounds and hidden-IME observations were rejected.
+- The dedicated AVD is synthetic-only. Do not clear an existing phone key to
+  reach first-time setup; the arm64 owner APK and x86_64 test APK stay separate.
+
+---
+
 ## 2026-10-01 — Keep prompt text on first Back and connect backup passphrase fields
 
 **Agent:** GPT-6 via Codex

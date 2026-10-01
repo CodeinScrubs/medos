@@ -87,9 +87,8 @@ describe('prompt text survives Android Back', () => {
     render();
     act(() => input().props.onChangeText('Do not discard silently'));
     visible.mockReturnValue(true);
-    const backdrop = tree!.root.findAll(
-      (node) => typeof node.props.onPress === 'function' && node.props.style?.[0]?.justifyContent === 'center',
-    )[0]!;
+    // The dialog's outer press target is the backdrop; do not pin its styling.
+    const backdrop = tree!.root.findByType(Modal).findAll((node) => typeof node.props.onPress === 'function')[0]!;
     act(() => backdrop.props.onPress());
     expect(Alert.alert).toHaveBeenCalledTimes(1);
     expect(cancel).not.toHaveBeenCalled();
