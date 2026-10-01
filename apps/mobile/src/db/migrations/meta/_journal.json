@@ -134,6 +134,13 @@
       "when": 1790855415287,
       "tag": "0018_solid_rumiko_fujikawa",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1790868429267,
+      "tag": "0019_harsh_viper",
+      "breakpoints": true
     }
   ]
 }

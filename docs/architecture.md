@@ -346,8 +346,8 @@ ordered active-episode query as individual repair, rather than applying imported
 duplicates repeatedly in join order. It retains those episodes. Ambiguous multiple
 active episodes refuse discharge until corrected; no silent history merge occurs.
 Repair's per-patient ordered reads favor consistent behavior; long-term dataset
-startup cost still needs measurement. Manual encounter/discharge forms now guard
-repeated submits before React rerenders, but do not yet have raw-draft recovery.
+startup cost still needs measurement. Manual encounter/discharge forms guard
+repeated submits before React rerenders; 0.11.13 adds raw-draft recovery below.
 
 ---
 
@@ -884,6 +884,50 @@ dependency, general sync framework or clinical calculator was added. The stored
 revision does not give permanent history of every patient field. Uncommitted
 keystrokes, disk/power failure and native recovery remain bounded by the separate
 release evidence; other manual forms still need their own recovery work.
+
+---
+
+## Raw admission, edit and discharge drafts (0.11.13)
+
+Migration 0019 adds `encounter_form_drafts`, one open scope per patient for a
+new episode and per episode for edit/discharge. The strict version-1 document
+retains exact raw fields, including incomplete date/clock input, original form
+values and the relevant clinical snapshot. Opening an untouched form creates
+nothing. Confirmed dates remain Gregorian timestamps; an explicitly unknown
+admission hour still uses 12:01 noon with the existing visible uncertainty.
+
+The existing forms share a feature-local gate, Autosave hook and small status
+notice. Identity, target, active encounters and raw draft are read together.
+Later read failure retains the loaded editor; background/route removal flushes
+the same serialized writer. Rapid field changes merge from its latest value,
+not a stale render. No clinical record or discharge changes merely from typing.
+
+Explicit publication validates the persisted raw fields with the caller's `now`,
+checks patient/episode ownership and the displayed clinical basis, and applies
+the clinical effect plus token retirement in one synchronous transaction.
+Existing encounter transaction helpers are shared with the public mutations.
+Failure rolls back patient status, encounter, orders, search and draft retirement.
+Identical replay returns the same destination without another discharge audit;
+different input is refused. Deleted destinations cannot be recreated by replay.
+
+New admission checks its entire active context before superseding it. Edit and
+discharge check the target snapshot; discharge also requires the uniquely active
+target. A competing draft or intervening clinical change requires comparison.
+Keep mine checks the displayed draft revision and current clinical snapshot
+again. Loading stored input and discarding require confirmation. Discard is
+soft and audited by id. Loaded final raw text can survive a soft-deleted parent
+without authorizing publication or reviving any clinical state. Navigation
+failure after commit is reported separately from a failed clinical write.
+
+Tradeoff: a separate table/codec and explicit publication cost code and storage
+but preserve incomplete inputs without partially admitting or discharging a
+patient. Clinical snapshot conflicts are deliberately conservative; the user
+sees changed fields/context before accepting their full form. This is not
+permanent revision history of every clinical field. Table discovery includes
+the new drafts in backups; older table-absent archives clear drafts from the
+replaced dataset. No general form framework, route, dependency or permission.
+Native interruption, ordinary writes/old editors versus restore and the other
+manual forms remain separate acceptance gates.
 
 ---
 

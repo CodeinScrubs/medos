@@ -33,6 +33,61 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Recover unfinished admission, edit and discharge forms
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; baseline `c5627ce`.
+
+**Changed**
+- Version 0.11.13 / code 29. Additive migration 0019 adds raw encounter-form
+  drafts. Shared feature-local gate/writer keeps exact fields and partial dates
+  across new/edit/discharge, without clinical changes from autosave.
+- Explicit valid publication and draft retirement share one transaction using
+  existing clinical helpers. Scope/revision/clinical basis are checked; replay
+  requires identical input and cannot duplicate a discharge audit or destination.
+- Existing forms show save/read failures, retain input, guard leaving, and offer
+  confirmed comparison/load/soft discard. Normal use has one status line, no new
+  route/menu/dependency/permission. Navigation failure after discard is distinct
+  from SQL failure. Backup/passphrase formats and existing migrations unchanged.
+- `validation-0.11.12.md` records the preceding exact-source CI, signed packages
+  and native SAF restore/cold reopen/independent round trip.
+
+**Verified**
+- `npm run check`: 90 suites / 1098 app tests + 3 workflows; typecheck, lint and
+  formatting pass. Migration regeneration: 41 tables, no additional schema diff.
+- Migrated-SQLite/component handlers cover all three modes, raw invalid dates,
+  failed save/retry/exit, rapid input, stale targets/writers, confirmed load/discard,
+  deleted parents/destinations, rollback/idempotency and table-absent old backups.
+- New witnesses reproduced duplicate discharge audits, false replay success for
+  different input, mismatched draft scope and false discard-failure feedback;
+  corrections pass. The old primary-read witnesses still test retained input.
+- Preceding 0.11.12 installed APK hash/CI match `c5627ce`; full native restore
+  and fresh backup preserve all 37 non-audit/backup/settings application tables
+  and original WAV in one small synthetic dataset, including raw follow-ups.
+
+**Not verified**
+- This commit's signed owner/emulator APKs, native raw-form recovery and exact-head
+  CI are pending. The preceding APK cannot validate this new source.
+- No physical-phone/IME/gesture/alarm/CDS acceptance, critical swap/power loss,
+  full-disk/provider loss or ordinary editor/media-versus-restore acceptance.
+  Draft revision is not permanent clinical-field history; the product is not done.
+
+**Open threads** (what the next session should pick up)
+- Freeze/build this source, check signature/actual ABI/libs and installed APK hash,
+  then verify acknowledged raw new/edit/discharge recovery, invalid/valid explicit
+  publication, close/discard and new/old archive compatibility on the owned AVD.
+- Continue D05/D08 remaining manual forms, D10/C05 ordinary writes/old editors/
+  photo/voice versus restore and W06-W09. Clinical library/AI stay separately gated.
+
+**Gotchas**
+- Source must remain frozen during both native builds. Prebuild regenerated the
+  Android folder and removed app build/CMake junctions even without `--clean`.
+  Inspect host free space and generated-output junctions before compiling.
+- Folder picker Back first navigates upward; only leaving its root cancels.
+  KDF can prevent an idle UI dump; use settled outcome, not that transition.
+
+---
+
 ## 2026-10-01 — Refuse incomplete backup entries and stale encounter writes
 
 **Agent:** GPT-6 via Codex

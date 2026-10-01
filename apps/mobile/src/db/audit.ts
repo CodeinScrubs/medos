@@ -20,6 +20,7 @@ export type AuditAction =
   | 'diagnosis.deleted'
   | 'encounter.discharged'
   | 'encounter.deleted'
+  | 'encounter.draftDiscarded'
   | 'note.deleted'
   | 'note.restored'
   | 'task.deleted'

@@ -152,6 +152,33 @@ export const encounters = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Unpublished encounter forms                                                 */
+/* -------------------------------------------------------------------------- */
+
+/** Unpublished admission/edit/discharge input; autosave does not change clinical state. */
+export const encounterFormDrafts = sqliteTable(
+  'encounter_form_drafts',
+  {
+    ...baseColumns,
+    scopeKey: text('scope_key').notNull(),
+    mode: text('mode', { enum: ['new', 'edit', 'discharge'] }).notNull(),
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id),
+    encounterId: text('encounter_id').references(() => encounters.id),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedEncounterId: text('committed_encounter_id').references(() => encounters.id),
+  },
+  (t) => [
+    uniqueIndex('encounter_form_drafts_open_scope_idx')
+      .on(t.scopeKey)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type EncounterFormDraft = typeof encounterFormDrafts.$inferSelect;
+
+/* -------------------------------------------------------------------------- */
 /*  Diagnoses                                                                   */
 /* -------------------------------------------------------------------------- */
 

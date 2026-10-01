@@ -20,7 +20,8 @@ import { createOccasion, occasionQuery } from './doctors/occasions-queries';
 import { createDoctor, doctorQuery } from './doctors/queries';
 import { DischargeScreen } from './encounters/discharge-screen';
 import { EncounterFormScreen } from './encounters/encounter-form-screen';
-import { encounterQuery, openEncounter } from './encounters/queries';
+import { encounterFormQuery } from './encounters/form-draft-queries';
+import { openEncounter } from './encounters/queries';
 import { ImagingFormScreen } from './imaging/imaging-form-screen';
 import { imagingStudyQuery } from './imaging/queries';
 import { OrderFormScreen } from './kardex/order-form-screen';
@@ -360,7 +361,7 @@ describe('editors survive database read failures', () => {
 
   it.each<[string, string, (id: string) => unknown, () => ReactElement]>([
     ['doctor', 'doctorId', doctorQuery, () => <DoctorFormScreen />],
-    ['encounter', 'encounterId', encounterQuery, () => <EncounterFormScreen />],
+    ['encounter', 'encounterId', (id) => encounterFormQuery('edit', patientId, id), () => <EncounterFormScreen />],
     ['imaging', 'studyId', imagingStudyQuery, () => <ImagingFormScreen />],
     ['order', 'orderId', orderQuery, () => <OrderFormScreen />],
     ['idea', 'ideaId', ideaQuery, () => <IdeaFormScreen />],
@@ -431,7 +432,7 @@ describe('editors survive database read failures', () => {
     await act(async () => {
       field.props.onChangeText('Latest complaint');
     });
-    const key = tablesOf(encounterQuery(id))[0]!;
+    const key = tablesOf(encounterFormQuery('edit', patientId, id))[0]!;
     mockErrors.set(key, new Error('Synthetic read failure'));
     await refresh(<EncounterFormScreen />);
     expectReadError();

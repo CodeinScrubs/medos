@@ -34,6 +34,16 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-01, 0.11.13: D05/D08 now include recoverable raw admission/edit/discharge
+forms with explicit atomic publication, stale clinical-context refusal, confirmed
+comparison/load/discard and visible auxiliary-read errors. This is a software
+slice with its own pending native gate, not completion of all manual forms.
+The preceding 0.11.12 source/artifacts/CI, actual SAF cancellation and full native
+restore round trip are recorded in [validation-0.11.12.md](validation-0.11.12.md).
+All 37 non-audit/backup/settings application tables and original WAV matched in
+that small dataset. It does not close critical interruption or ordinary-write
+and media/editor-versus-restore gates in D10/C05.
+
 | ID | Required behavior | Status / acceptance evidence |
 |---|---|---|
 | D01 | Exact note history includes SOAP boundaries, doctor, metadata and text; no hash-based false equality; stable rapid-save ordering | Implemented; `notes/versions.test.ts`. Old snapshots remain readable. Missing historical versions cannot be reconstructed. |

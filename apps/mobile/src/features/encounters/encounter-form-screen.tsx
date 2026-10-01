@@ -1,23 +1,26 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { useMemo, useState, type ReactNode } from 'react';
+import { View } from 'react-native';
 
-import { EditGate } from '@/components/edit-gate';
-import { alertError, notify } from '@/components/feedback';
+import { ErrorNotice } from '@/components/error-notice';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
-import { Button, ChipSelect, Column, Input, Row, Screen, SelectField, Toggle } from '@/components/ui';
+import { Button, ChipSelect, Column, Input, Row, Screen, SelectField, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
+import { useNow } from '@/components/use-now';
 import type { Encounter } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
-import { isInpatient, withAssumedHour } from '@/features/encounters/logic';
+import { isInpatient } from '@/features/encounters/logic';
 import { createPlace, placesQuery } from '@/features/places/queries';
 import { useTheme } from '@/theme';
 
+import { encounterFormDisplayDate, type EncounterFormFields } from './form-draft';
+import { EncounterFormDraftGate } from './form-draft-gate';
+import { EncounterFormDraftNotice } from './form-draft-notice';
 import { ENCOUNTER_KIND_LABELS } from './labels';
-import { deleteEncounter, encounterQuery, encounterRecordCount, openEncounter, updateEncounter } from './queries';
+import { useEncounterFormDraft, type EncounterFormSeed } from './use-form-draft';
 
 const KIND_OPTIONS = (Object.keys(ENCOUNTER_KIND_LABELS) as Encounter['kind'][]).map((k) => ({
   value: k,
@@ -34,46 +37,44 @@ const COMMON_SERVICES = ['داخلی', 'جراحی', 'اطفال', 'زنان', '
  */
 export function EncounterFormScreen() {
   const { id: patientId, encounterId } = useLocalSearchParams<{ id: string; encounterId?: string }>();
-  const { data, error, retry } = useLive(encounterQuery(encounterId ?? ''), [encounterId]);
+  const mode = encounterId ? 'edit' : 'new';
   return (
-    <EditGate editing={Boolean(encounterId)} rows={data} error={error} onRetry={retry} what="بستری">
-      {(encounter, readNotice) => <EncounterForm readNotice={readNotice} patientId={patientId} encounter={encounter} />}
-    </EditGate>
+    <EncounterFormDraftGate
+      key={mode + ':' + (encounterId ?? patientId)}
+      mode={mode}
+      patientId={patientId}
+      encounterId={encounterId ?? null}
+    >
+      {(seed, notice, reset) => <EncounterForm seed={seed} readNotice={notice} onReset={reset} />}
+    </EncounterFormDraftGate>
   );
 }
 
 function EncounterForm({
-  patientId,
-  encounter,
+  seed,
   readNotice,
+  onReset,
 }: {
+  seed: EncounterFormSeed;
   readNotice: ReactNode;
-  patientId: string;
-  encounter: Encounter | null;
+  onReset: (seed: EncounterFormSeed) => void;
 }) {
-  const router = useRouter();
   const { spacing } = useTheme();
-  const isEdit = encounter != null;
-
-  const [kind, setKind] = useState<Encounter['kind']>(encounter?.kind ?? 'admission');
-  const [placeId, setPlaceId] = useState<string | null>(encounter?.placeId ?? null);
-  const [ward, setWard] = useState(encounter?.ward ?? '');
-  const [bed, setBed] = useState(encounter?.bed ?? '');
-  const [service, setService] = useState(encounter?.service ?? '');
-  const [attendingId, setAttendingId] = useState<string | null>(encounter?.attendingId ?? null);
-  const [chiefComplaint, setChiefComplaint] = useState(encounter?.chiefComplaint ?? '');
-  const [admittedAt, setAdmittedAt] = useState(() => encounter?.admittedAt ?? new Date());
-  // New admissions are usually entered as they happen, so the clock is real.
-  // Back-dating one is where the hour gets invented, and the owner's rule is
-  // to assume 12:01 PM and say so rather than to pick a plausible-looking time.
-  const [hourKnown, setHourKnown] = useState(encounter?.admittedAtHasTime ?? true);
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
+  const now = useNow();
+  const editing = useEncounterFormDraft(seed, onReset);
+  // The keyed gate validates the stored mode before this editor mounts.
+  const { kind, placeId, ward, bed, service, attendingId, chiefComplaint, hourKnown } =
+    editing.form as EncounterFormFields;
+  const change = editing.changeEncounter;
+  const encounter = seed.row.target;
+  const isEdit = seed.mode === 'edit';
+  const saving = editing.busy;
+  const locked = saving || !!editing.finishedMessage;
   const dateValidation = useDateValidation();
   const [picker, setPicker] = useState<'place' | 'attending' | null>(null);
 
-  const { data: placeRows } = useLive(placesQuery());
-  const { data: doctorRows } = useLive(doctorsQuery());
+  const { data: placeRows, error: placeError, retry: retryPlaces } = useLive(placesQuery());
+  const { data: doctorRows, error: doctorError, retry: retryDoctors } = useLive(doctorsQuery());
 
   const placeItems: PickerItem[] = useMemo(
     () => (placeRows ?? []).map((p) => ({ id: p.id, label: p.name, sublabel: p.city })),
@@ -93,111 +94,70 @@ function EncounterForm({
   const placeLabel = placeItems.find((p) => p.id === placeId)?.label ?? null;
   const attendingLabel = doctorItems.find((d) => d.id === attendingId)?.label ?? null;
 
-  // For an episode entered by mistake. A real one — with anything filed
-  // under it — is ended with a discharge, not deleted.
-  function confirmDelete(current: Encounter) {
-    if (savingRef.current) return;
-    const label = ENCOUNTER_KIND_LABELS[current.kind];
-    let records: number;
-    try {
-      records = encounterRecordCount(current.id);
-    } catch (error) {
-      alertError('بررسی نوبت انجام نشد', error);
-      return;
-    }
-    if (records > 0) {
-      notify(
-        `این ${label} حذف نمی‌شود`,
-        'نوت، دستور، آزمایش یا کاری زیر آن ثبت شده است. اگر تمام شده «ترخیص» را بزنید؛ اگر جزئیاتش اشتباه است، همین‌جا ویرایشش کنید.',
-      );
-      return;
-    }
-    Alert.alert(`حذف این ${label}؟`, 'فقط برای موردی است که اشتباهی ثبت شده. از پرونده برداشته می‌شود.', [
-      { text: 'انصراف', style: 'cancel' },
-      {
-        text: 'حذف',
-        style: 'destructive',
-        onPress: () =>
-          void deleteEncounter(current.id)
-            .then(() => router.back())
-            .catch((e) => alertError('حذف نشد', e)),
-      },
-    ]);
-  }
-
-  async function save() {
-    if (savingRef.current) return;
-    if (!dateValidation.check()) return;
-    savingRef.current = true;
-    setSaving(true);
-    try {
-      const payload = {
-        kind,
-        placeId,
-        ward: ward.trim() || null,
-        bed: bed.trim() || null,
-        service: service.trim() || null,
-        attendingId,
-        chiefComplaint: chiefComplaint.trim() || null,
-        admittedAt: hourKnown ? admittedAt : withAssumedHour(admittedAt),
-        admittedAtHasTime: hourKnown,
-      };
-      if (encounter) await updateEncounter(encounter.id, payload);
-      else await openEncounter({ patientId, ...payload });
-      router.back();
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-    }
-  }
-
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
-        <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
+        <Text variant="bodyStrong">
+          {seed.row.patient.firstName} {seed.row.patient.lastName}
+        </Text>
+        <EncounterFormDraftNotice
+          editing={editing}
+          seed={seed}
+          name={(kind, id) =>
+            (kind === 'place' ? placeItems : doctorItems).find((item) => item.id === id)?.label ?? 'در فهرست فعلی نیست'
+          }
+        />
+        <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && change({ kind: v })} />
 
+        <ErrorNotice error={placeError} what="فهرست مراکز" onRetry={retryPlaces} />
         <SelectField
           label="بیمارستان / مرکز"
           icon="business-outline"
           value={placeLabel}
           placeholder="انتخاب یا افزودن"
-          onPress={() => setPicker('place')}
-          onClear={() => setPlaceId(null)}
+          onPress={() => !locked && setPicker('place')}
+          onClear={() => change({ placeId: null })}
         />
 
         <Row gap="md">
           <View style={{ flex: 2 }}>
-            <Input label="بخش" value={ward} onChangeText={setWard} placeholder="مثلاً داخلی ۲" />
+            <Input
+              label="بخش"
+              value={ward}
+              onChangeText={(ward) => change({ ward })}
+              editable={!locked}
+              placeholder="مثلاً داخلی ۲"
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <Input label="تخت" value={bed} onChangeText={setBed} numericFold />
+            <Input label="تخت" value={bed} onChangeText={(bed) => change({ bed })} editable={!locked} numericFold />
           </View>
         </Row>
 
-        <Input label="سرویس" value={service} onChangeText={setService} />
+        <Input label="سرویس" value={service} onChangeText={(service) => change({ service })} editable={!locked} />
         <ChipSelect
           options={COMMON_SERVICES}
           value={COMMON_SERVICES.includes(service) ? service : null}
-          onChange={(v) => setService(v ?? '')}
+          onChange={(v) => change({ service: v ?? '' })}
           allowDeselect
         />
 
+        <ErrorNotice error={doctorError} what="فهرست پزشکان" onRetry={retryDoctors} />
         <SelectField
           label="اتند"
           icon="person-outline"
           value={attendingLabel}
           placeholder="انتخاب یا افزودن"
-          onPress={() => setPicker('attending')}
-          onClear={() => setAttendingId(null)}
+          onPress={() => !locked && setPicker('attending')}
+          onClear={() => change({ attendingId: null })}
         />
 
         <Input
           label="شکایت اصلی (CC)"
           value={chiefComplaint}
-          onChangeText={setChiefComplaint}
+          onChangeText={(chiefComplaint) => change({ chiefComplaint })}
+          editable={!locked}
           placeholder="مثلاً Abdominal pain since 3 days"
           multiline
         />
@@ -205,8 +165,10 @@ function EncounterForm({
         <QuickDateField
           onValidityChange={dateValidation.setValid}
           label={kind === 'outpatient' ? 'تاریخ ویزیت' : 'تاریخ بستری'}
-          value={admittedAt}
-          onChange={setAdmittedAt}
+          value={encounterFormDisplayDate(editing.document, new Date(now))}
+          rawInput={editing.document.fields.date}
+          onRawInputChange={editing.changeDate}
+          disabled={locked}
           direction="past"
           withTime={hourKnown}
         />
@@ -216,19 +178,25 @@ function EncounterForm({
             label="ساعت بستری را نمی‌دانم"
             description="ساعت ۱۲:۰۱ ظهر فرض می‌شود"
             value={!hourKnown}
-            onChange={(v) => setHourKnown(!v)}
+            onChange={(v) => change({ hourKnown: !v })}
           />
         ) : null}
 
         <Button
           label={isEdit ? 'ذخیره تغییرات' : kind === 'outpatient' ? 'ثبت ویزیت' : 'ثبت بستری'}
           icon="checkmark"
-          onPress={() => void save()}
+          onPress={() => {
+            if (dateValidation.check()) void editing.save();
+          }}
           loading={saving}
+          disabled={!!editing.finishedMessage}
           full
           style={{ marginTop: spacing.sm }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} disabled={saving} full haptic={false} />
+        <Button label="بستن" variant="ghost" onPress={editing.close} disabled={saving} full haptic={false} />
+        {editing.hasDraft && !editing.finishedMessage ? (
+          <Button label="حذف پیش‌نویس" variant="ghost" full disabled={saving} onPress={editing.discard} />
+        ) : null}
         {encounter ? (
           <Button
             label="حذف (ثبت اشتباه)"
@@ -236,8 +204,8 @@ function EncounterForm({
             variant="danger"
             size="sm"
             haptic={false}
-            disabled={saving}
-            onPress={() => confirmDelete(encounter)}
+            disabled={locked}
+            onPress={editing.deleteMistake}
             style={{ marginTop: spacing.lg }}
           />
         ) : null}
@@ -250,7 +218,7 @@ function EncounterForm({
         selectedId={placeId}
         onClose={() => setPicker(null)}
         onSelect={(item) => {
-          setPlaceId(item.id);
+          change({ placeId: item.id });
           setPicker(null);
         }}
         onCreate={async (name) => {
@@ -268,7 +236,7 @@ function EncounterForm({
         selectedId={attendingId}
         onClose={() => setPicker(null)}
         onSelect={(item) => {
-          setAttendingId(item.id);
+          change({ attendingId: item.id });
           setPicker(null);
         }}
         onCreate={quickCreateDoctor}
