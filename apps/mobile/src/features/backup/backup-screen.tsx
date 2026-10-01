@@ -1,8 +1,8 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, View, type TextInput } from 'react-native';
 
 import { alertError, notify } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
@@ -549,6 +549,7 @@ function PassphraseSetup({ onDone }: { onDone: () => void }) {
   const [first, setFirst] = useState('');
   const [second, setSecond] = useState('');
   const [working, setWorking] = useState(false);
+  const secondInput = useRef<TextInput>(null);
 
   const tooShort = first.length > 0 && first.length < 8;
   const mismatch = second.length > 0 && first !== second;
@@ -572,15 +573,20 @@ function PassphraseSetup({ onDone }: { onDone: () => void }) {
             onChangeText={setFirst}
             secureTextEntry
             autoCapitalize="none"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => secondInput.current?.focus()}
             error={tooShort ? 'حداقل ۸ کاراکتر؛ چند کلمه‌ی بی‌ربط کنار هم بهترین است' : undefined}
             ltr
           />
           <Input
+            ref={secondInput}
             label="تکرار رمز"
             value={second}
             onChangeText={setSecond}
             secureTextEntry
             autoCapitalize="none"
+            returnKeyType="done"
             error={mismatch ? 'با رمز اول یکی نیست' : undefined}
             ltr
           />

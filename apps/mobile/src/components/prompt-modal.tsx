@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Keyboard, KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardController } from 'react-native-keyboard-controller';
 
 import { Button, Column, Input, Row, Text } from '@/components/ui';
 import { useTheme } from '@/theme';
@@ -50,9 +51,8 @@ export function PromptModal({
     setText(visible ? initialValue : '');
   }
 
-  // Back and a tap outside the card are how a keyboard gets put away, too. With
-  // something typed, neither may throw the text away without asking; the
-  // «انصراف» button still cancels straight away.
+  // Back with the IME hidden and a backdrop tap retain the discard guard;
+  // the explicit «انصراف» button still cancels straight away.
   function dismiss() {
     if (!text.trim() || text === initialValue) {
       onCancel();
@@ -64,8 +64,18 @@ export function PromptModal({
     ]);
   }
 
+  function requestClose() {
+    // Android Modal intercepts Back in its own window. The existing controller
+    // tracks that window's IME; first Back should only hide it, retaining text.
+    if (KeyboardController.isVisible()) {
+      Keyboard.dismiss();
+      return;
+    }
+    dismiss();
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismiss} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={requestClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior="padding" style={styles.flex}>
         <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={dismiss}>
           <Pressable

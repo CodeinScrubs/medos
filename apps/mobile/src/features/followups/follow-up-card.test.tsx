@@ -18,6 +18,7 @@ jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicon');
+jest.mock('react-native-keyboard-controller', () => ({ KeyboardController: { isVisible: () => false } }));
 jest.mock('@/components/feedback', () => ({
   alertError: jest.fn(),
   notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,

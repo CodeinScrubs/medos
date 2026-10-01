@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Keep prompt text on first Back and connect backup passphrase fields
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; preceding review `784817a`.
+
+**Changed**
+- PromptModal consumes Back while its IME is visible, hides the keyboard and
+  keeps the dialog/text. With the IME hidden, the existing discard choice remains.
+  Backdrop discard protection and explicit Cancel keep their existing behavior.
+- Backup setup uses Next to focus the confirmation input and Done to end editing;
+  neither keyboard action sets/replaces a key. Version 0.11.9 / code 25.
+- Reused the installed keyboard controller's modal-window visibility tracking;
+  no dependency, permission, route, schema or cryptographic scheme changed.
+
+**Verified**
+- Four first-Back component witnesses failed before the fix. All seven prompt
+  tests now pass, including ordinary/secret text, untouched values, discard,
+  backdrop, explicit Cancel and reopen/submission behavior.
+- `npm run check`: 83 suites / 973 app tests + 3 workflows; type/lint/format green.
+  Existing follow-up save/retry tests remain green with native IME stood in.
+
+**Not verified**
+- Native acceptance/builds are pending in this implementation commit. Mocked
+  visibility does not prove Android event ordering or focus movement.
+- No physical phone, full archive/restore or app-wide acceptance.
+
+**Open threads** (what the next session should pick up)
+- W03: finish exact-artifact native first-Back and passphrase focus acceptance.
+- Preserve D05/D08 other form/date recovery, D10 native restore, C05 recorder/
+  grants/interruption/restore and C01 clinical-context gates.
+
+**Gotchas**
+- Use an isolated fresh AVD for first-time passphrase setup; do not clear an
+  existing environment's key/data just to reach this form. IME visibility and
+  screenshots must agree with fresh UI bounds before taps or scrolls.
+
+---
+
 ## 2026-10-01 — Verify external emulator claims without speculative fixes
 
 **Agent:** GPT-6 via Codex
