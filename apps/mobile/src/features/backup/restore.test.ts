@@ -412,6 +412,30 @@ describe('importTables', () => {
     expect(await live.db.select().from(imagingStudies)).toEqual([]);
   });
 
+  it('refuses a database without the original MedOS core before replacing any live table', async () => {
+    await addPatient(live, 'Current');
+    backup.conn.execSync('PRAGMA foreign_keys = OFF; DROP TABLE patients; DROP TABLE notes;');
+    attachAsBackup(live, backup);
+    expect(() => importTables(live.conn)).toThrow('دیتابیس');
+    expect(await names(live)).toEqual(['Current']);
+  });
+
+  it('refuses a counterfeit empty patients table instead of treating it as an empty valid record', async () => {
+    await addPatient(live, 'Current');
+    backup.conn.execSync('PRAGMA foreign_keys = OFF; DROP TABLE patients; CREATE TABLE patients (id TEXT);');
+    attachAsBackup(live, backup);
+    expect(() => importTables(live.conn)).toThrow('دیتابیس');
+    expect(await names(live)).toEqual(['Current']);
+  });
+
+  it('accepts a genuinely empty MedOS database, including old versions without newer tables', async () => {
+    await addPatient(live, 'Current');
+    backup.conn.execSync('DROP TABLE patient_form_drafts; DROP TABLE call_imports;');
+    attachAsBackup(live, backup);
+    importTables(live.conn);
+    expect(await names(live)).toEqual([]);
+  });
+
   it('restores exact raw patient form drafts without publishing their invalid fields', async () => {
     const patientId = await addPatient(backup, 'Draft target', { ageYears: 24, birthDate: '2001-08-03' });
     const patient = backup.db.select().from(patients).get()!;

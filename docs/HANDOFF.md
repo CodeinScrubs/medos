@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Preserve safety copies and serialize backup recovery before yielding
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; previous accepted source `ccb87e4`.
+
+**Changed**
+- Safety snapshots create and verify a nonempty UUID-named copy before retention;
+  disk/write failure keeps earlier copies, and cleanup failure keeps extra files.
+- Backup/restore/recovery reserve exclusion before the first await. Source-close
+  failures release it; post-commit close/progress failures are honest warnings.
+- Corrupt/unsafe recovery markers retain displaced files and refuse destructive
+  work. Both manual/automatic backup refuse unresolved media. Failed rollback
+  updates the existing recovery notice immediately. Backup errors redact SQL params.
+- SQL import requires schema-0000 core tables/columns before replacement, preserving
+  empty valid and older valid backups. Version 0.11.10 / code 26; no dependency,
+  permission, migration, archive or passphrase-scheme change.
+
+**Verified**
+- Regression witnesses failed on the preceding behavior. Final local check:
+  85 suites / 998 app tests + 3 workflows; type/lint/format green.
+- Engine tests combine real AES-GCM archive authentication and migrated SQLite
+  replacement/rollback with native file stand-ins. Race, failed recovery/copy,
+  corrupt marker, post-commit and retry cases pass; KDF is deterministic in these
+  orchestration tests and independently covered by existing crypto vectors.
+- Migration regeneration produced no changes. Public output uses synthetic data only.
+
+**Not verified**
+- Signed rebuilds, native SAF/full archive and interrupted restore acceptance are
+  pending at this implementation commit. No physical phone or power-loss evidence.
+- This exclusion does not serialize ordinary clinical writes/native audio copies.
+  Other manual forms, recorder/grants and clinical/AI acceptance remain open.
+
+**Open threads** (what the next session should pick up)
+- Finish exact-source signed artifacts/native D10 evidence, then D05/D08 raw/manual
+  form recovery. Preserve C05 concurrent restore/import and recorder/grant gates.
+- W03 phone/software-IME, other editors and alarms; C01 visible/structured clinical
+  context precedes per-tool clinical review and AI expansion. Do not call the app done.
+
+**Gotchas**
+- Settings fallback is suitable for preferences, not a destructive recovery marker.
+  Snapshot verification is nonempty-file evidence, not power-loss durability.
+- A fresh AVD initially lacked host space for a 6 GiB partition; it was changed to
+  2 GiB without deleting any other AVD/data. No native acceptance is claimed yet.
+
+---
+
 ## 2026-10-01 — Accept the bounded 0.11.9 keyboard fixes on an isolated emulator
 
 **Agent:** GPT-6 via Codex

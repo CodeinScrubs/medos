@@ -8,7 +8,7 @@ import { db, sqlite } from '@/db/client';
 import { sqlPath } from '@/db/files';
 import { backupRuns } from '@/db/schema';
 import { runSeeds } from '@/db/seed';
-import { readSetting, writeSetting } from '@/db/settings';
+import { readSetting, settingQuery, writeSetting } from '@/db/settings';
 import { snapshotDatabase } from '@/db/snapshots';
 import { reconcileAllPatientStatuses } from '@/features/encounters/status';
 import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
@@ -17,6 +17,7 @@ import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
 import { newId, stamps, touch } from '@/lib/ids';
+import { redactErrorText } from '@/lib/redact';
 import { logError } from '@/platform/error-log';
 import { MEDIA_ROOT } from '@/platform/media';
 
@@ -213,6 +214,20 @@ export type BackupResult = {
 /** One backup or restore at a time; both read and rewrite the same files. */
 let running = false;
 
+/** Recovery state is not a preference: malformed JSON cannot mean "nothing
+ * to recover", because that would delete the only displaced media copies.
+ * Missing/null is valid; an unreadable marker refuses destructive work.
+ */
+async function readRestoreMarker() {
+  const row = (await settingQuery(restoreInFlight))[0];
+  if (!row) return null;
+  try {
+    return restoreInFlight.schema.parse(JSON.parse(row.value ?? ''));
+  } catch {
+    throw new Error('اطلاعات بازگردانی ناتمام خوانا نیست. فایل‌های کنارگذاشته‌شده حفظ شدند؛ اطلاعات را پاک نکنید.');
+  }
+}
+
 /**
  * Build an encrypted backup in the app cache, then copy it to the configured
  * folder if there is one. The cache copy is returned so the caller can also
@@ -237,6 +252,11 @@ export async function createBackup({
   let snapshot: File | null = null;
 
   try {
+    // Manual copies must not spread the same unresolved dataset that automatic
+    // backup refuses. Recovery owns this marker until its media are put back.
+    if ((await readRestoreMarker()) != null || (await readSetting(restoreMediaUnresolved)) > 0) {
+      throw new Error('بازگردانی قبلی ناتمام است. ابتدا از پیام «بازگردانی ناتمام» فایل‌ها را برگردانید.');
+    }
     await db.insert(backupRuns).values({
       id: runId,
       ...stamps(startedAt),
@@ -382,7 +402,7 @@ export async function createBackup({
       .set({
         status: 'failed',
         finishedAt: new Date(),
-        errorText: e instanceof Error ? e.message : String(e),
+        errorText: redactErrorText(e instanceof Error ? e.message : String(e)),
         ...touch(),
       })
       .where(eq(backupRuns.id, runId))
@@ -454,7 +474,18 @@ const livePaths: MediaPaths = {
  * because they exist nowhere else.
  */
 export async function recoverInterruptedRestore(): Promise<{ putBack: number; failed: DisplacedMedia[] }> {
-  const marker = await readSetting(restoreInFlight);
+  if (running) throw new Error('یک بکاپ یا بازگردانی در حال انجام است؛ چند لحظه بعد دوباره امتحان کنید.');
+  running = true;
+  try {
+    return await recoverRestoreMedia();
+  } finally {
+    running = false;
+  }
+}
+
+/** Caller already holds the same exclusion as backup and restore. */
+async function recoverRestoreMedia(): Promise<{ putBack: number; failed: DisplacedMedia[] }> {
+  const marker = await readRestoreMarker();
   const root = new Directory(Paths.document, DISPLACED_ROOT);
 
   if (!marker) {
@@ -633,12 +664,8 @@ export async function restoreBackup({
   onProgress?: (p: RestoreProgress) => void;
 }): Promise<RestoreResult> {
   if (running) throw new Error('یک بکاپ در حال انجام است؛ چند لحظه بعد دوباره امتحان کنید.');
-  // A restore that was cut short has to be undone before another one starts,
-  // or its files would be put back on top of this one's.
-  const unfinished = await recoverInterruptedRestore();
-  if (unfinished.failed.length > 0) {
-    throw new Error('بازگردانی قبلی ناتمام مانده و چند فایل سر جایشان برنگشته‌اند. اول با یک بکاپ سالم شروع کنید.');
-  }
+  // Reserve before the first await: foreground automatic backup or another
+  // restore must not enter while recovery still owns the displaced files.
   running = true;
 
   let handle: FileHandle | null = null;
@@ -647,6 +674,10 @@ export async function restoreBackup({
   // copy of every file this restore replaced.
   let kept: Directory | null = null;
   try {
+    const unfinished = await recoverRestoreMedia();
+    if (unfinished.failed.length > 0) {
+      throw new Error('بازگردانی قبلی ناتمام است. ابتدا از پیام «بازگردانی ناتمام» فایل‌ها را برگردانید.');
+    }
     const source = new File(fileUri);
     handle = source.open(FileMode.ReadOnly);
     const header = parseHeader(handle.readBytes(HEADER_BYTES));
@@ -786,25 +817,43 @@ export async function restoreBackup({
       },
     });
 
-    onProgress?.({ phase: 'done', fraction: 1 });
+    // Native handle cleanup and final UI feedback happen after commit. They
+    // cannot truthfully turn a changed dataset into "restore did not happen".
+    await housekeeping('بستن فایل بکاپ', async () => {
+      const closing = handle;
+      handle = null;
+      closing?.close();
+    });
+    await housekeeping('نمایش پایان بازگردانی', async () => onProgress?.({ phase: 'done', fraction: 1 }));
     return { manifest, ...imported, files: media.length, reminders, warnings };
   } catch (e) {
     // A file that could not be put back exists nowhere else. The folder stays,
     // and the error the user reads says so.
     if (e instanceof MediaRestoreError && e.notPutBack.length > 0) {
       // The marker stays too: those files are still the live database's.
+      await writeSetting(restoreMediaUnresolved, e.notPutBack.length).catch((error) =>
+        logError(error, { source: 'handled', context: 'restore: recording unresolved media' }),
+      );
       logError(e, {
         source: 'handled',
         context: `restore: ${e.notPutBack.length} file(s) left in ${DISPLACED_ROOT}/${kept?.name ?? '?'}`,
       });
-    } else {
+    } else if (kept != null) {
+      // A failed recovery belongs to an earlier attempt. Do not clear its
+      // marker or only remaining copies when this attempt has not staged any.
       removeQuietly(kept);
       await writeSetting(restoreInFlight, null).catch(() => undefined);
     }
     throw e;
   } finally {
-    handle?.close();
-    removeQuietly(work);
-    running = false;
+    try {
+      handle?.close();
+    } catch (e) {
+      // Preserve the original pre-commit failure, and always release exclusion.
+      logError(e, { source: 'handled', context: 'restore: closing source after failure' });
+    } finally {
+      removeQuietly(work);
+      running = false;
+    }
   }
 }

@@ -57,6 +57,15 @@ export const MERGED_TABLES: ReadonlySet<string> = new Set(['audit_log']);
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
+// These tables/columns existed in 0000_init. Later optional tables may be
+// absent, but a different/invalid SQLite file must never mean "empty chart".
+const ORIGINAL_CORE: Readonly<Record<string, readonly string[]>> = {
+  patients: ['id', 'first_name', 'last_name', 'created_at', 'updated_at', 'deleted_at'],
+  notes: ['id', 'patient_id', 'note_date'],
+  attachments: ['id', 'relative_path'],
+  settings: ['key', 'value'],
+};
+
 /**
  * Replace every clinical table in `main` with the contents of the same table
  * in the attached `source` schema, in one transaction.
@@ -88,6 +97,17 @@ export function importTables(conn: SqlConnection, source = 'restore_src'): { tab
   const sourceTables = new Set(
     conn.getAllSync<{ name: string }>(`SELECT name FROM ${src}.sqlite_master WHERE type = 'table'`).map((r) => r.name),
   );
+
+  for (const [table, required] of Object.entries(ORIGINAL_CORE)) {
+    const columns = new Set(
+      sourceTables.has(table)
+        ? conn.getAllSync<{ name: string }>(`PRAGMA ${src}.table_info(${quoteIdent(table)})`).map((c) => c.name)
+        : [],
+    );
+    if (required.some((column) => !columns.has(column))) {
+      throw new Error('دیتابیس این بکاپ ساختار اولیهٔ MedOS را ندارد؛ اطلاعات فعلی جایگزین نشد.');
+    }
+  }
 
   let tables = 0;
   let rows = 0;

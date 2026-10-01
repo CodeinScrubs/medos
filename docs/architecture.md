@@ -232,6 +232,12 @@ one transaction, so a failing migration rolls back by itself; the snapshot cover
 case, a migration that succeeds but reshapes data wrongly. A backup made by a *newer* schema
 is refused rather than imported with its new columns silently dropped.
 
+Local safety-snapshot retention creates a UUID-named `VACUUM INTO` result and checks
+that its file exists and is nonempty before pruning earlier copies. A failed write
+keeps all earlier snapshots; cleanup failure keeps extra files. This needs temporary
+space for one extra snapshot. Same-millisecond calls cannot collide, and the current
+copy survives clock rollback. This check is not a power-loss or restore acceptance test.
+
 CI regenerates migrations and fails if that produces anything: a schema edit without its
 migration never reaches the phone.
 
@@ -359,6 +365,22 @@ JSON manifest, the database snapshot, and media files.
   after a clock rollback. Archive bytes, passphrase schemes and old-file restore support
   are unchanged. Provider/device behavior and actual restore remain separate acceptance
   checks; equality to the source does not validate every record inside an archive.
+
+Backup, restore and interrupted-restore recovery acquire the same in-process exclusion
+before their first await (0.11.10). A rejected attempt releases it even if a native
+source handle cannot close. This does not serialize ordinary clinical writes or an
+audio import's native copy; concurrent restore/import remains a separate gate.
+Manual backup now refuses unresolved media just as automatic backup does.
+
+Recovery markers are operational state, not preferences: malformed JSON or unsafe
+folder names refuse recovery/backup/restore and retain displaced copies. Falling back
+to `null` would incorrectly delete the only old media. Original schema-0000 core
+tables/columns are checked before SQL replacement; later optional tables may still
+be absent in older backups, and a genuinely empty valid MedOS database remains valid.
+Final progress/handle errors after a committed restore are warnings about changed
+data, never a false claim that replacement did not happen. File/SQLite race and failure
+tests cover this ordering; native process interruption and SAF behavior require their
+own evidence. No archive scheme, schema, permission or dependency changed.
 
 ---
 

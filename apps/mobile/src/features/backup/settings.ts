@@ -41,7 +41,7 @@ export const backupLastDelivery = defineSetting(
  */
 export const restoreInFlight = defineSetting(
   'restore.inFlight',
-  z.object({ dir: z.string().min(1), at: z.number() }).nullable(),
+  z.object({ dir: z.string().regex(/^[A-Za-z0-9_-]+$/), at: z.number() }).nullable(),
   null,
 );
 
