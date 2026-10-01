@@ -542,6 +542,33 @@ export const followUps = sqliteTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Unsubmitted follow-up input                                                */
+/* -------------------------------------------------------------------------- */
+
+/** One unsubmitted follow-up per patient; raw date/clock remain input until publication. */
+export const followUpFormDrafts = sqliteTable(
+  'follow_up_form_drafts',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id),
+    /** Captured when the editor opened, never rebound to a later admission. */
+    encounterId: text('encounter_id').references(() => encounters.id),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    /** Set atomically with soft retirement; the same publish token cannot duplicate work. */
+    committedFollowUpId: text('committed_follow_up_id').references(() => followUps.id),
+  },
+  (t) => [
+    uniqueIndex('follow_up_form_drafts_open_patient_idx')
+      .on(t.patientId)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type FollowUpFormDraft = typeof followUpFormDrafts.$inferSelect;
+
+/* -------------------------------------------------------------------------- */
 /*  Consultations                                                               */
 /* -------------------------------------------------------------------------- */
 

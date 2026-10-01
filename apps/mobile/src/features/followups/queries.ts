@@ -2,7 +2,7 @@ import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { followUps, patients, type FollowUp } from '@/db/schema';
+import { encounters, followUps, patients, type FollowUp } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { endOfDay } from '@/lib/time';
@@ -53,27 +53,48 @@ export type FollowUpInput = {
 };
 
 export async function createFollowUp(input: FollowUpInput): Promise<string> {
-  validate(input);
-  const id = newId();
-  db.transaction((tx) => {
-    requirePatient(tx, input.patientId);
-    tx.insert(followUps)
-      .values({
-        id,
-        ...stamps(),
-        patientId: input.patientId,
-        encounterId: resolveActiveEncounterId(input.patientId, tx),
-        dueAt: input.dueAt,
-        reason: input.reason.trim(),
-        channel: input.channel,
-        priority: input.priority,
-        status: 'pending',
-      })
-      .run();
-  });
+  const id = db.transaction((tx) => createFollowUpInTransaction(tx, input));
   // The record is durable before Android is touched. Native failures are retriable
   // side effects, not a reason to tell the user their clinical save failed.
   await reconcileFollowUpReminder(id, true);
+  return id;
+}
+
+/** Explicit captured context is used by draft publication; omitted context retains the existing API. */
+export function createFollowUpInTransaction(
+  tx: DbTransaction,
+  input: FollowUpInput,
+  now = new Date(),
+  context?: { encounterId: string | null },
+): string {
+  validate(input);
+  requirePatient(tx, input.patientId);
+  const encounterId = context ? context.encounterId : resolveActiveEncounterId(input.patientId, tx);
+  if (
+    encounterId &&
+    !tx
+      .select({ id: encounters.id })
+      .from(encounters)
+      .where(
+        and(eq(encounters.id, encounterId), eq(encounters.patientId, input.patientId), isNull(encounters.deletedAt)),
+      )
+      .get()
+  )
+    throw new Error('نوبت مربوط به پیش‌نویس پیدا نشد؛ پیگیری ثبت نشد.');
+  const id = newId();
+  tx.insert(followUps)
+    .values({
+      id,
+      ...stamps(now),
+      patientId: input.patientId,
+      encounterId,
+      dueAt: input.dueAt,
+      reason: input.reason.trim(),
+      channel: input.channel,
+      priority: input.priority,
+      status: 'pending',
+    })
+    .run();
   return id;
 }
 

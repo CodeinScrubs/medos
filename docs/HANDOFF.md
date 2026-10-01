@@ -33,6 +33,58 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Preserve raw follow-up forms until explicit atomic publication
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; baseline `8db45a6`.
+
+**Changed**
+- Migration 0018 adds one recoverable raw follow-up draft per patient, with a
+  versioned codec, CAS revision, captured encounter and idempotent publication link.
+- Existing follow-up form reads before editing, retains input on refresh/write
+  failure, flushes on background/exit and confirms discard or loading another draft.
+  Publication alone creates work; record + retirement commit together, then Android
+  reminder repair runs. Normal editing has one status line; no new route/menu.
+- QuickDateField optionally accepts controlled raw day/clock input, preserving
+  incomplete text and existing consumers. Presets do not repair a bad clock.
+- Local migration-count failures/missing/zero now refuse backup/restore instead
+  of silently declaring schema zero. Historic manifests and key schemes unchanged.
+- Version 0.11.11 / code 27; architecture and execution ledger document the contract.
+
+**Verified**
+- Old form reopening lost reason in a failing component witness; old migration
+  reads produced three falsely successful backups with schema zero. Both corrected.
+- `npm run check`: 87 suites / 1029 app tests + 3 workflows; type/lint/format green.
+- Real migrated SQLite covers invalid raw input, publication/retirement rollback,
+  repeated tokens, deleted/foreign parents, captured encounter, stale comparisons,
+  soft discard/audit and current/older table-absent backup compatibility.
+- Component handlers cover recovery, blocked exit/retry, background flush,
+  repeated submit, conflict comparison/recheck, confirmed load/discard, initial/
+  refresh read failure and changing patient scope. No UI snapshots.
+- Migration regeneration produced no diff: 40 tables / 19 migrations. No new
+  dependency, permission, clinical tool, archive format or passphrase scheme.
+
+**Not verified**
+- Signed artifacts, exact-head CI and native follow-up recovery/publication are
+  pending at this source commit. Previous 0.11.10 native evidence remains separate.
+- No physical phone/power loss, alarms/reboot/battery or all-form acceptance.
+  Revisions are concurrency tokens, not permanent field history.
+
+**Open threads** (what the next session should pick up)
+- Build/verify this exact source, upgrade the isolated AVD and test raw follow-up
+  recovery, publication/exit and older/current backup round trip. Keep originals.
+- Continue D05/D08 other manual forms; keep C05 restore versus ordinary writes/
+  native imports and W03/C01/clinical/AI gates open. The app is not complete.
+
+**Gotchas**
+- A draft's default due date and encounter belong to its original editor. Never
+  regenerate defaults or bind it to the current admission when recovering it.
+- Controlled QuickDateField's parsed Date is presentation only; SQL publication
+  validates the exact persisted raw text with explicit now.
+- The metadata fix is after `194f401`; do not attribute it to the 0.11.10 APK.
+
+---
+
 ## 2026-10-01 — Accept the bounded native 0.11.10 backup round trip
 
 **Agent:** GPT-6 via Codex

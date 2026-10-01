@@ -1,8 +1,17 @@
-import { parseJalaliInput, toIsoDate } from './jalali';
+import { parseJalaliInput, toIsoDate, toJalali } from './jalali';
+import { toPersianDigits } from './persian';
 import { parseClock } from './time';
 
 export type DateInputResult =
   { valid: true; iso: string | null } | { valid: false; reason: 'required' | 'invalid' | 'future' };
+
+/** Recoverable editor input, including incomplete text; never a clinical timestamp. */
+export type DateTimeInput = { dateText: string; clockText: string; customOpen: boolean };
+
+export function dateInputText(date: Date): string {
+  const { jy, jm, jd } = toJalali(date);
+  return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
+}
 
 /** Validation describes the visible text, never a previous successfully parsed value. */
 export function validateDateInput(

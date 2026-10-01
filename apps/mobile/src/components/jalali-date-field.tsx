@@ -7,6 +7,9 @@ import { toPersianDigits } from '@/lib/persian';
 
 import { useNow } from './use-now';
 
+export type RawDateTextProps =
+  { rawText?: never; onRawTextChange?: never } | { rawText: string; onRawTextChange: (text: string) => void };
+
 /**
  * A Jalali date typed as free text rather than picked from a calendar.
  *
@@ -37,7 +40,7 @@ export function JalaliDateField({
   /** Birth dates cannot be in the future; follow-up dates usually are. */
   allowFuture?: boolean;
   editable?: boolean;
-} & ({ rawText?: never; onRawTextChange?: never } | { rawText: string; onRawTextChange: (text: string) => void })) {
+} & RawDateTextProps) {
   const [localText, setText] = useState(() => isoToJalaliText(value));
   const text = rawText ?? localText;
   const [blurred, setBlurred] = useState(false);

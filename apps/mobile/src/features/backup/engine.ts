@@ -177,9 +177,14 @@ async function streamFileInto(writer: EncryptingWriter, file: File): Promise<voi
 /** How many migrations the live database has applied — its schema version. */
 function migrationCount(): number {
   try {
-    return sqlite.getFirstSync<{ n: number }>('SELECT count(*) AS n FROM __drizzle_migrations')?.n ?? 0;
+    const count = sqlite.getFirstSync<{ n: number }>('SELECT count(*) AS n FROM __drizzle_migrations')?.n;
+    if (count == null || !Number.isSafeInteger(count) || count < 1) throw new Error('Invalid local migration count');
+    return count;
   } catch {
-    return 0;
+    // Startup has already migrated the live database. Unknown cannot be schema
+    // zero: it would publish incorrect metadata or mislabel a valid old backup.
+    // Reading historic manifests (including zero) remains backward compatible.
+    throw new Error('نسخهٔ دیتابیس خوانده نشد؛ بکاپ یا بازگردانی را دوباره امتحان کنید.');
   }
 }
 

@@ -849,3 +849,52 @@ dependency, general sync framework or clinical calculator was added. The stored
 revision does not give permanent history of every patient field. Uncommitted
 keystrokes, disk/power failure and native recovery remain bounded by the separate
 release evidence; other manual forms still need their own recovery work.
+
+---
+
+## Raw follow-up drafts (0.11.11)
+
+Migration 0018 adds `follow_up_form_drafts`: one open draft per patient, a
+versioned raw document, revision, captured encounter and a published-follow-up
+link. The document includes reason, method, priority and exact date/clock input,
+including incomplete text. Opening an untouched form creates nothing. Confirmed
+follow-up dates remain Gregorian timestamps. The initial defaults are captured
+once and are not recomputed when reopening the draft.
+
+The existing follow-up screen reads identity, draft and initial encounter in one
+joined snapshot before mounting its editor. It uses the existing Autosave queue,
+background flush and always-on leave guard. A later read failure retains the
+editor with retry; a failed write retains input and blocks removal. The optional
+controlled raw-input contract on QuickDateField preserves its existing uncontrolled
+consumers. Preset selection changes the day without repairing an invalid clock.
+The Date supplied in controlled mode is for presentation; publication validates
+the persisted raw text with the caller's explicit `now`.
+
+Synchronous query transactions check draft revision and patient/context ownership.
+Explicit valid publication inserts a clinical follow-up and soft-retires its draft
+with a retry link in the same transaction. The same token cannot create duplicate
+work. Reminder reconciliation runs after commit and retains the existing repair
+intent; native failure does not undo the clinical record. A later admission never
+rebinds a recovered draft. Closed original encounters remain historical context;
+deleted/foreign encounters and deleted patients refuse publication. Final raw text
+can still be retained for a soft-deleted patient without reviving it.
+
+A competing draft requires explicit comparison. Keeping local input checks the
+displayed id/revision again and cannot change captured encounter or revive a closed
+token. Loading another draft and soft discard require confirmation. Audit records
+the discarded draft id, never its text. Comparison controls appear only on failure;
+normal use has one status line and the existing publication action. Close retains
+the draft, so its label is now Close rather than Cancel.
+
+Tradeoff: one additive table and feature-specific codec/queries cost more code
+than volatile component state. They keep incomplete inputs out of the clinical
+list and make validation, ownership and atomic publication obvious to a reviewer.
+There is no general form framework, new route, dependency or permission. These
+revision tokens are concurrency protection, not permanent history of every field.
+Other manual forms, restore versus ordinary writes/imports and native/power-loss
+acceptance remain separate gates.
+
+The live migration-count reader now refuses failed, missing or zero local metadata
+instead of publishing schema zero or claiming a valid backup is newer. Historic
+manifest parsing, including schema zero, and all archive/passphrase schemes remain
+unchanged. Failures occur before destination publication or clinical replacement.

@@ -29,6 +29,7 @@ export type AuditAction =
   | 'consult.deleted'
   | 'followup.statusChanged'
   | 'followup.deleted'
+  | 'followup.draftDiscarded'
   | 'occasion.deleted'
   | 'doctor.deleted'
   | 'backup.created'

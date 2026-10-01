@@ -127,6 +127,13 @@
       "when": 1790801981464,
       "tag": "0017_shallow_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1790855415287,
+      "tag": "0018_solid_rumiko_fujikawa",
+      "breakpoints": true
     }
   ]
 }

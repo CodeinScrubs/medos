@@ -95,6 +95,35 @@ function restore(onProgress?: Parameters<typeof restoreBackup>[0]['onProgress'])
 const name = () => t.db.select({ name: patients.firstName }).from(patients).get()!.name;
 
 describe('backup orchestration (real archive/authentication and migrated SQLite; native files stood in)', () => {
+  it.each(['throw', 'empty', 'zero'] as const)(
+    'does not publish schema zero or report a newer backup when local migration metadata is unavailable: %s',
+    async (failure) => {
+      const read = t.conn.getFirstSync.bind(t.conn);
+      const fault = jest.spyOn(t.conn, 'getFirstSync').mockImplementation(<T>(statement: string): T | null => {
+        if (statement === 'SELECT count(*) AS n FROM __drizzle_migrations') {
+          if (failure === 'throw') throw new Error('synthetic schema read failure');
+          return failure === 'empty' ? null : ({ n: 0 } as T);
+        }
+        return read<T>(statement);
+      });
+      await expect(createBackup({ includeMedia: true, trigger: 'manual', copyToFolder: false })).rejects.toThrow(
+        'نسخهٔ دیتابیس',
+      );
+      expect(
+        t.db
+          .select()
+          .from(backupRuns)
+          .all()
+          .filter((run) => run.status === 'success'),
+      ).toHaveLength(1);
+      await expect(restore()).rejects.toThrow('نسخهٔ دیتابیس');
+      expect(name()).toBe('Current');
+      expect(equalBytes(memoryFiles.get(mediaUri)!, new Uint8Array([8, 7, 6]))).toBe(true);
+      fault.mockRestore();
+      await expect(restore()).resolves.toBeTruthy();
+    },
+  );
+
   it('round-trips an encrypted database and original media, clearing the swap marker only after commit', async () => {
     const result = await restore();
     expect(name()).toBe('Saved');
