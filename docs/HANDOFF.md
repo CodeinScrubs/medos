@@ -33,6 +33,50 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Accept bounded native follow-up recovery and backup compatibility
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `a30ca5b`; evidence in this commit.
+
+**Changed**
+- `validation-0.11.11.md` binds signed owner/emulator artifacts and the installed
+  emulator APK to their hashes, with exact native steps and evidence limits.
+- No application edits are included in this evidence commit. Later source fixes
+  remain owned WIP in the working copy and are not in the 0.11.11 artifacts.
+
+**Verified**
+- Application source: 87 suites / 1029 tests + 3 workflows and exact-source CI.
+- Offline isolated AVD upgrade retained prior patient/drafts/original audio.
+  Acknowledged raw follow-up text/date/clock recovered after force-stop; invalid
+  publication refused. Valid publication made one record despite reminder denial.
+  Close/reopen and cancelled/confirmed soft discard passed.
+- Real SAF full backup, older table-absent restore, current restore and cold
+  reopen passed. Independent Node decryption and SQLite integrity/FK checks
+  verified exact original WAV, nine full clinical/draft tables and all follow-up
+  fields; no reminder bookkeeping differences. Future work used Upcoming mode.
+
+**Not verified**
+- No physical phone, swipe/software-IME, delivered alarms, critical swap/commit
+  or power-loss interruption, full disk/provider loss, ordinary concurrent
+  editors/media or complete-product/clinical acceptance.
+
+**Open threads** (what the next session should pick up)
+- Release the owned post-build WIP: exact backup entry lengths, call-file versus
+  maintenance exclusion, encounter/status transaction guards and picker errors.
+  Current WIP check passed 88 suites / 1062 tests + 3 workflows; still needs its
+  own version/commit/CI and signed artifacts. Do not discard it as foreign work.
+- Continue D05/D08 manual forms and C05 ordinary writes/media versus restore;
+  other delivery gates in IMPLEMENTATION.md remain open. The app is not complete.
+
+**Gotchas**
+- The host filled C during the first clean emulator build. Generated app build/
+  CMake outputs now use local F-drive junctions; no app/AVD data was deleted.
+  Prebuild clean may remove the junctions. Verify actual ABI/libs after a switch.
+- XML EditText can display a placeholder when empty. Confirm focus and settle
+  clearing before typing; exclude early unfocused inputs and transient dumps.
+
+---
+
 ## 2026-10-01 — Preserve raw follow-up forms until explicit atomic publication
 
 **Agent:** GPT-6 via Codex
