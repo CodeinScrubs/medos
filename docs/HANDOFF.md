@@ -33,6 +33,49 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-01 — Accept the bounded native 0.11.10 backup round trip
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `194f401`; evidence in this commit.
+
+**Changed**
+- Recorded exact signed artifacts, native protocol, independent archive/SQLite
+  comparison and limits in validation-0.11.10.md; updated D10 without closing it.
+- No application edits after the two builds; no dependency or schema change.
+
+**Verified**
+- Application check: 85 suites / 998 app tests + 3 workflows; exact-source CI green.
+- Signed arm64 owner and separate x86_64 packages passed native-entry/ABI/version/
+  signature checks. Installed emulator APK hash matched.
+- Isolated offline API 36.1: real SAF full backup, retained grant/key on upgrade/
+  restore, wrong-key and corrupt-file refusal, older full-backup restore, exact
+  eight-table/raw-draft/original-WAV round trip, cold reopen and early process-stop
+  followed by a successful current-backup restore. Independent Node AES-GCM/scrypt
+  decoding and SQLite integrity/FK checks passed.
+
+**Not verified**
+- No physical phone, critical-swap/commit or power-loss interruption, full disk,
+  revoked grants, second-device restore, actual recording/alarms or all-form UI.
+- Backup exclusion still does not serialize ordinary clinical writes/audio imports.
+  D05/D08 manual forms, C05 and broader clinical/AI acceptance remain open.
+
+**Open threads** (what the next session should pick up)
+- Continue manual raw-form recovery, including follow-up/admission forms; preserve
+  explicit publication, stale-edit checks and existing compact screens.
+- Verify a suspected silent migration-count read fallback before changing it.
+  See IMPLEMENTATION.md; do not call the whole app complete.
+
+**Gotchas**
+- The image forces a 6 GiB data partition despite a 2 GiB config. A new F-drive
+  isolated AVD solved host-space limits without deleting another AVD/data.
+- The process-stop screenshot did not expose the active restore phase. It proves
+  an early interruption only. A wrong `patients/<id>` deep link was excluded;
+  the actual route is `patient/<id>`.
+- One loaded pre-push test run timed out; unchanged source subsequently passed the
+  complete check. Do not raise timeouts or claim that the cause was proven.
+
+---
+
 ## 2026-10-01 — Preserve safety copies and serialize backup recovery before yielding
 
 **Agent:** GPT-6 via Codex
