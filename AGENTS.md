@@ -135,6 +135,10 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
   whole life. Do not make the guard conditional: switching it off as a save finishes
   changes the header in the same moment `router.back()` removes the screen (the same
   crash).
+- Voice callbacks return an awaited `Promise<void>` and reject failed metadata/draft
+  acknowledgement. Each recorder belongs to its screen's one `AutosaveScope`, alongside
+  text fields; never add a competing removal guard to that route or flush the whole group
+  from the recorder's own callback. In-process staging is not crash-recovery evidence.
 - Anything time-dependent takes `now` as a parameter; screens get it from `useNow()`.
 - Date fields report validity separately from their parsed value. Wire `onValidityChange`
   to `useDateValidation().setValid`, and call `check()` before saving; never save an old

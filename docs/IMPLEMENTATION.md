@@ -43,7 +43,11 @@ SAF restores and exact 38-table/original-WAV round trip on an isolated emulator
 are recorded in [validation-0.11.13.md](validation-0.11.13.md). Physical-phone and
 interruption gates remain open. That review reproduced two ordinary-media bugs:
 a moved voice source cannot retry a rejected SQL insert, and attachment writes
-accept a deleted patient. Fix these before further feature expansion.
+accept a deleted patient. The 0.11.14 software slice fixes both: copied source,
+same-file replay, synchronous target/owner checks, awaited recorder acknowledgement
+and one grouped screen exit. It also refuses successful no-op draft writes, commits
+capture voice/kind together and preserves recorded time. Validation and remaining
+native/durable-operation gates are in [validation-0.11.14.md](validation-0.11.14.md).
 The preceding 0.11.12 source/artifacts/CI, actual SAF cancellation and full native
 restore round trip are recorded in [validation-0.11.12.md](validation-0.11.12.md).
 All 37 non-audit/backup/settings application tables and original WAV matched in

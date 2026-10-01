@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, StyleSheet } from 'react-native';
 
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
@@ -16,10 +17,20 @@ import { deleteTopic, markTopicReviewed, setTopicNeedsReview, setTopicStarred, t
 /** Read one subject summary. Route param: `id`. */
 export function TopicScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  return (
+    <AutosaveScope key={id}>
+      <TopicView />
+    </AutosaveScope>
+  );
+}
+
+function TopicView() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { spacing } = useTheme();
 
-  const { data, error } = useLive(topicQuery(id ?? ''), [id]);
+  const scope = useAutosaveScope()!;
+  const { data, error, retry } = useLive(topicQuery(id ?? ''), [id]);
   const row = data?.[0];
   const topic = row?.topic;
 
@@ -27,7 +38,7 @@ export function TopicScreen() {
     return (
       <Screen>
         <ScreenOptions options={{ title: 'مبحث' }} />
-        <ErrorNotice error={error} what="مبحث" />
+        <ErrorNotice error={error} what="مبحث" onRetry={retry} />
         {data && !error ? (
           <EmptyState
             icon="alert-circle-outline"
@@ -57,7 +68,11 @@ export function TopicScreen() {
               <IconButton
                 icon="create-outline"
                 label="ویرایش"
-                onPress={() => router.push({ pathname: '/knowledge/topic/edit', params: { topicId: topic.id } })}
+                onPress={() =>
+                  void scope.perform(() =>
+                    router.push({ pathname: '/knowledge/topic/edit', params: { topicId: topic.id } }),
+                  )
+                }
               />
             </Row>
           ),
@@ -65,6 +80,7 @@ export function TopicScreen() {
       />
 
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <ErrorNotice error={error} what="مبحث" onRetry={retry} />
         <Row gap="xs" wrap>
           {row?.teacher ? <Badge label={doctorDisplayName(row.teacher)} icon="person-outline" /> : null}
           {row?.specialty ? <Badge label={row.specialty.nameFa} tone="info" /> : null}
@@ -124,7 +140,10 @@ export function TopicScreen() {
                 text: 'حذف',
                 style: 'destructive',
                 onPress: () => {
-                  void deleteTopic(topic.id).then(() => router.back());
+                  void scope.perform(async () => {
+                    await deleteTopic(topic.id);
+                    router.back();
+                  });
                 },
               },
             ])

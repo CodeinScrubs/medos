@@ -2,23 +2,23 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, Input, Row, Screen, SelectField, Text } from '@/components/ui';
-import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, attachPhotos } from '@/features/attachments/capture';
-import { addAttachment } from '@/features/attachments/queries';
+import { stageRecording } from '@/features/attachments/recordings';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withFileJob } from '@/lib/file-work';
 import { fullName } from '@/lib/persian';
-import { extensionOf, storeFile } from '@/platform/media';
 import { useTheme } from '@/theme';
 
-import { updateCapture } from './queries';
+import { addCaptureVoice, updateCapture } from './queries';
 import { CaptureWriter, type CaptureFields } from './writer';
 
 /**
@@ -35,6 +35,14 @@ import { CaptureWriter, type CaptureFields } from './writer';
  * is dropped again on the way out.
  */
 export function CaptureScreen() {
+  return (
+    <AutosaveScope>
+      <CaptureForm />
+    </AutosaveScope>
+  );
+}
+
+function CaptureForm() {
   const router = useRouter();
   const { spacing } = useTheme();
   const params = useLocalSearchParams<{ patientId?: string }>();
@@ -54,7 +62,8 @@ export function CaptureScreen() {
     [writer],
   );
 
-  useSaveBeforeLeave(() => saver.flush());
+  const scope = useAutosaveScope()!;
+  useEffect(() => scope.group.register(saver), [scope, saver]);
 
   function update(patch: Partial<CaptureFields>) {
     const next = { ...writer.current, ...patch };
@@ -94,26 +103,17 @@ export function CaptureScreen() {
   const patientLabel = patientItems.find((p) => p.id === patientId)?.label ?? null;
 
   async function onRecorded(recording: Recording) {
-    try {
-      // Stored before it is attached: a file still in the recorder's cache is
-      // not a recording, whatever the screen shows.
-      const stored = await storeFile(recording.uri, extensionOf(recording.uri, 'm4a'), { move: true });
-      const id = await writer.ensure({ kind: 'voice' });
-      await addAttachment({
-        entityType: 'capture',
-        entityId: id,
-        patientId: writer.current.patientId,
-        kind: 'voice',
+    await withFileJob(async () => {
+      const stored = await stageRecording(recording, new Date());
+      const id = await writer.ensure();
+      if (!(await saver.flush())) throw new Error('متن یا بیمار ثبت سریع هنوز ذخیره نشده است.');
+      await addCaptureVoice(id, {
         relativePath: stored.relativePath,
         sizeBytes: stored.sizeBytes,
-        mimeType: 'audio/mp4',
         durationMs: recording.durationMs,
+        capturedAt: stored.capturedAt,
       });
-      await updateCapture(id, { kind: 'voice' });
-      router.back();
-    } catch (e) {
-      alertError('وویس ذخیره نشد', e);
-    }
+    });
   }
 
   function addPhoto() {
@@ -145,7 +145,7 @@ export function CaptureScreen() {
   async function done() {
     setBusy(true);
     try {
-      const stored = await saver.flush();
+      const stored = await scope.group.flush();
       // Only leave if the words reached storage; a failed write keeps its
       // value and retries, and going back now would hide that.
       if (stored) router.back();
@@ -168,7 +168,7 @@ export function CaptureScreen() {
 
         <Row gap="sm">
           <View style={styles.grow}>
-            <VoiceRecorder label="ضبط وویس" onRecorded={(rec) => void onRecorded(rec)} />
+            <VoiceRecorder label="ضبط وویس" onRecorded={onRecorded} onSaved={() => router.back()} />
           </View>
           <Button label="عکس" icon="camera-outline" variant="secondary" onPress={addPhoto} loading={busy} />
         </Row>

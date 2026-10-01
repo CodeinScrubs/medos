@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { captureInbox, notes, noteVersions, tasks } from '@/db/schema';
+import { attachments, captureInbox, notes, noteVersions, tasks } from '@/db/schema';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import {
   captureCountQuery,
+  addCaptureVoice,
   captureQuery,
   createCapture,
   deletedCapturesQuery,
@@ -78,6 +79,60 @@ describe('a capture', () => {
     await inboxQuery();
     await updateCapture(id, { text: 'تماس با رادیولوژی بابت سی‌تی' });
     expect((await captureQuery(id))[0]?.filedAt).toBeNull();
+  });
+});
+
+describe('acknowledging a stopped voice capture', () => {
+  const voice = { relativePath: 'media/test/one.m4a', durationMs: 1000, sizeBytes: 3 };
+  it('commits the kind and canonical patient with one voice, including retries', async () => {
+    const id = await createCapture({ patientId });
+    const attachmentId = await addCaptureVoice(id, voice);
+    expect(await addCaptureVoice(id, voice)).toBe(attachmentId);
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
+    expect(t.db.select().from(attachments).get()?.patientId).toBe(patientId);
+    expect((await captureQuery(id))[0]?.kind).toBe('voice');
+  });
+
+  it('rolls back the voice if setting the capture kind fails', async () => {
+    const id = await createCapture();
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_voice_kind BEFORE UPDATE OF kind ON capture_inbox WHEN NEW.kind = 'voice' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+    );
+    await expect(addCaptureVoice(id, voice)).rejects.toThrow();
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+    expect((await captureQuery(id))[0]?.kind).toBe('text');
+    t.sqlite.exec('DROP TRIGGER fail_voice_kind');
+    await addCaptureVoice(id, voice);
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
+  });
+
+  it('refuses a voice after the capture was discarded or filed', async () => {
+    const deletedId = await createCapture();
+    await discardCapture(deletedId);
+    await expect(addCaptureVoice(deletedId, voice)).rejects.toThrow();
+    const filedId = await createCapture({ text: 'Synthetic task' });
+    await fileCaptureAsTask(filedId);
+    await expect(addCaptureVoice(filedId, voice)).rejects.toThrow();
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+  });
+
+  it('refuses a voice if the selected patient was deleted', async () => {
+    const id = await createCapture({ patientId });
+    await deletePatient(patientId);
+    await expect(addCaptureVoice(id, voice)).rejects.toThrow();
+    expect((await captureQuery(id))[0]?.kind).toBe('text');
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+  });
+
+  it('moves its media gallery owner atomically when an unfiled capture is assigned to another patient', async () => {
+    const id = await createCapture({ patientId });
+    await addCaptureVoice(id, voice);
+    const otherId = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
+    await updateCapture(id, { patientId: otherId });
+    expect((await captureQuery(id))[0]?.patientId).toBe(otherId);
+    expect(t.db.select().from(attachments).get()?.patientId).toBe(otherId);
+    await updateCapture(id, { patientId: null });
+    expect(t.db.select().from(attachments).get()?.patientId).toBeNull();
   });
 });
 

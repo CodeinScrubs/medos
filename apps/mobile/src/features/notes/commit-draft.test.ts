@@ -62,9 +62,9 @@ describe('publishing a note draft', () => {
     expect(t.db.select().from(attachments).all()).toHaveLength(1);
   });
 
-  it('ignores a delayed autosave after the draft has been published', async () => {
+  it('rejects a delayed autosave after publication instead of falsely acknowledging it', async () => {
     const id = await commitNoteDraft('draft');
-    await writeNoteDraft('draft', { patientId, noteId: null }, { ...fields, body: 'stale' });
+    await expect(writeNoteDraft('draft', { patientId, noteId: null }, { ...fields, body: 'stale' })).rejects.toThrow();
     const [draft] = t.db.select().from(noteDrafts).all();
     expect(draft?.noteId).toBe(id);
     expect(draft?.body).toBe(fields.body);
@@ -78,4 +78,30 @@ describe('publishing a note draft', () => {
     expect((await noteDraftQuery(patientId, id))[0]?.body).toBe('newer');
     expect(await noteDraftQuery(patientId, null)).toHaveLength(0);
   });
+
+  it('preserves the recorded time instead of moving audio to the later draft publication time', async () => {
+    const capturedAt = '2026-01-01T09:00:00Z';
+    await writeNoteDraft(
+      'draft',
+      { patientId, noteId: null },
+      { ...fields, voices: [{ ...fields.voices[0]!, capturedAt }] },
+    );
+    await commitNoteDraft('draft');
+    expect(t.db.select().from(attachments).get()?.capturedAt).toEqual(new Date(capturedAt));
+  });
+
+  it.each(['invalid', null, true, 123])(
+    'refuses malformed recorded time (%s) without publishing or guessing a date',
+    async (capturedAt) => {
+      await writeNoteDraft(
+        'draft',
+        { patientId, noteId: null },
+        { ...fields, voices: [{ ...fields.voices[0]!, capturedAt: capturedAt as string }] },
+      );
+      await expect(commitNoteDraft('draft')).rejects.toThrow();
+      expect(t.db.select().from(notes).all()).toEqual([]);
+      expect(t.db.select().from(attachments).all()).toEqual([]);
+      expect(await noteDraftQuery(patientId, null)).toHaveLength(1);
+    },
+  );
 });

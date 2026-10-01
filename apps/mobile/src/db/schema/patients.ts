@@ -322,8 +322,13 @@ export const noteVersions = sqliteTable(
   (t) => [index('note_versions_note_idx').on(t.noteId, t.createdAt)],
 );
 
-/** A recording already moved into storage, waiting for its note to exist. */
-export type DraftVoice = { relativePath: string; durationMs: number | null; sizeBytes: number | null };
+/** A copied recording awaiting note publication; old drafts omit capturedAt. */
+export type DraftVoice = {
+  relativePath: string;
+  durationMs: number | null;
+  sizeBytes: number | null;
+  capturedAt?: string;
+};
 
 /**
  * What is being typed, before it is part of the record.

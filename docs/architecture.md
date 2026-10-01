@@ -398,7 +398,9 @@ active, and new jobs refuse maintenance. Independent imports remain concurrent.
 The lease covers reservation, native copy/hash, clinical commit and cancellation
 cleanup. Automatic backup skips busy acquisition without inventing a failed run.
 This is a small in-process boundary, not a general lock on ordinary clinical
-writes, other photo/voice workflows, old editors or another process.
+writes, photo workflows, old editors or another process. In 0.11.14 the lease
+also covers each stopped-voice copy and metadata/draft acknowledgement. It does
+not cover active recording, all editor writes or a retry after dataset replacement.
 Each archive entry captures a validated exact byte length once. Streaming rejects
 growth/shrinkage, premature EOF and unknown size while allowing bounded short reads.
 These guards prevent an authenticated but internally misframed archive; they do
@@ -464,18 +466,52 @@ save the empty form as a new record.
 
 The note editor writes what is being typed to `note_drafts` continuously (`lib/autosave.ts`
 schedules it: a short debounce, plus a hard ceiling so continuous typing cannot postpone the
-write for ever), and a voice recording is moved into media storage the moment it stops. The
+write for ever), and a stopped recording is copied into media storage before its
+draft metadata is acknowledged. The
 note itself is still written once, when the user saves — a chart entry is a decision, not a
 side effect of typing — and the draft is dropped at that point.
 
 The save path now flushes the draft and publishes it in one synchronous transaction:
 note, exact-content version, voice attachment metadata and retiring the draft. Any failure
 rolls them all back, keeping the draft retryable. Media bytes must already be stored before
-this transaction. A late autosave cannot detach a linked draft or overwrite a retired one.
+this transaction. A late autosave cannot detach a linked draft or overwrite a retired one;
+retired/mismatched/deleted targets now reject rather than report a successful no-op.
 
 This is why the editor's own live query is read only at mount: it is watching a row the same
 screen is writing, and feeding those writes back into the fields would fight the keyboard.
 Drafts nobody finished are surfaced on Today rather than left to be found by accident.
+
+### Stopped voice acknowledgement (0.11.14)
+
+`VoiceRecorder` awaits its caller's promise and retains the same stopped recording
+object on failure. A compact retry replaces the record button; a second recording
+cannot overwrite pending work. Permission/start/stop are serialized before React's
+disabled state updates. Playback-mode and haptic housekeeping do not decide whether
+audio metadata was saved. Post-save navigation runs only after acknowledgement;
+when the screen's exit flush owns navigation, it cannot cause a second automatic Back.
+
+Every recorder consumer sits in its screen's one `AutosaveScope`. Registering the
+recorder beside text fields makes patient-tab changes, publication and Back await
+both. Do not add a second `usePreventRemove` hook to the same route: navigation's
+visited-route replay can let one handler bypass the other. The recorder's callback
+flushes only its own draft writer, avoiding a recursive wait on its own pending job.
+
+`stageRecording` copies without consuming the source, compares a known positive
+source/destination byte length, and shares one in-process staging promise for retries.
+Attachment publication rechecks the live polymorphic target and canonical patient in
+its synchronous transaction. Same-file voice replay requires the same live binding,
+duration, length, MIME type and supplied timestamp. Deleted attachments are not revived.
+Capture kind and voice metadata commit together; changing an unfiled capture's patient
+also updates its media owner atomically. Note-draft voice JSON now optionally retains
+the ISO recording time; old drafts keep their former timestamp fallback. There is no
+SQL schema/migration or backup-format change.
+
+Tradeoffs: keeping the cache source temporarily uses extra bytes. Byte-length equality
+is not a hash comparison or a durability guarantee. The staging map and pending recorder
+are process-local, not a journal: process death before acknowledgement, missing cached
+copies, restore-generation conflicts, full-disk recovery and native interruption still
+need a persistent operation protocol and acceptance evidence. This bounded fix must
+not be advertised as complete voice/crash/restore recovery.
 
 Consult answers have a narrower lifecycle: one recoverable response/instruction draft
 on their existing consultation row, separate from the published response and status.

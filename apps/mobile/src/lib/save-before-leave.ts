@@ -20,12 +20,13 @@ export class SaveGroup {
     };
   }
 
+  get unsaved(): boolean {
+    return [...this.fields].some((field) => field.unsaved);
+  }
+
   async flush(): Promise<boolean> {
     const results = await Promise.allSettled([...this.fields].map((field) => field.flush()));
-    return (
-      results.every((result) => result.status === 'fulfilled' && result.value) &&
-      [...this.fields].every((field) => !field.unsaved)
-    );
+    return results.every((result) => result.status === 'fulfilled' && result.value) && !this.unsaved;
   }
 
   async perform(action: () => void | Promise<void>): Promise<'done' | 'unsaved' | 'busy'> {

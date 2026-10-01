@@ -1,7 +1,7 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { noteDrafts, patients, type DraftVoice, type NoteDraft, type NoteType } from '@/db/schema';
+import { noteDrafts, notes, patients, type DraftVoice, type NoteDraft, type NoteType } from '@/db/schema';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
 /*
@@ -85,7 +85,7 @@ export async function retargetNoteDraft(id: string, noteId: string): Promise<voi
 }
 
 /**
- * Write the draft. One statement, so an interrupted app finds either the
+ * Write the draft in one transaction, so an interrupted app finds either the
  * previous version of the row or this one, never half of it.
  */
 export async function writeNoteDraft(
@@ -94,17 +94,39 @@ export async function writeNoteDraft(
   fields: NoteDraftFields,
 ): Promise<void> {
   const now = new Date();
-  const values = { ...fields, ...target };
-  await db
-    .insert(noteDrafts)
-    .values({ id, ...stamps(now), ...values })
-    .onConflictDoUpdate({
-      target: noteDrafts.id,
-      // A stale autosave must not detach a linked draft or rewrite one that
-      // has already been committed/discarded.
-      set: { ...values, noteId: sql`coalesce(${noteDrafts.noteId}, ${target.noteId})`, ...touch(now) },
-      setWhere: and(alive, eq(noteDrafts.patientId, target.patientId)),
-    });
+  db.transaction((tx) => {
+    const current = tx.select().from(noteDrafts).where(eq(noteDrafts.id, id)).get();
+    if (
+      current &&
+      (current.deletedAt ||
+        current.patientId !== target.patientId ||
+        (current.noteId && target.noteId && current.noteId !== target.noteId))
+    )
+      throw new Error('این پیش‌نویس تغییر کرده یا بسته شده است؛ نوشته روی صفحه باقی مانده است.');
+    if (
+      !tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, target.patientId), isNull(patients.deletedAt)))
+        .get()
+    )
+      throw new Error('پروندهٔ بیمار در دسترس نیست؛ پیش‌نویس ذخیره نشد.');
+    const noteId = current?.noteId ?? target.noteId;
+    if (
+      noteId &&
+      !tx
+        .select({ id: notes.id })
+        .from(notes)
+        .where(and(eq(notes.id, noteId), eq(notes.patientId, target.patientId), isNull(notes.deletedAt)))
+        .get()
+    )
+      throw new Error('نوت مقصد در دسترس نیست؛ پیش‌نویس ذخیره نشد.');
+    const values = { ...fields, patientId: target.patientId, noteId };
+    tx.insert(noteDrafts)
+      .values({ id, ...stamps(now), ...values })
+      .onConflictDoUpdate({ target: noteDrafts.id, set: { ...values, ...touch(now) } })
+      .run();
+  });
 }
 
 /** The draft is no longer wanted: saved into a note, or thrown away. */

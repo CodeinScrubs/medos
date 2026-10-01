@@ -88,6 +88,43 @@ describe('note drafts', () => {
     expect(row?.voices).toEqual([{ relativePath: 'media/2026/01/a.m4a', durationMs: 4200, sizeBytes: 900 }]);
   });
 
+  it('refuses a write after discard instead of acknowledging discarded media as saved', async () => {
+    await writeNoteDraft('d-1', { patientId, noteId: null }, { ...blank, body: 'Original' });
+    await discardNoteDraft('d-1');
+    await expect(
+      writeNoteDraft(
+        'd-1',
+        { patientId, noteId: null },
+        { ...blank, voices: [{ relativePath: 'media/new.m4a', durationMs: 1000, sizeBytes: 3 }] },
+      ),
+    ).rejects.toThrow();
+    expect(t.db.select().from(noteDrafts).get()?.voices).toEqual([]);
+  });
+
+  it('refuses a stale write bound to a different patient', async () => {
+    await writeNoteDraft('d-1', { patientId, noteId: null }, { ...blank, body: 'Original' });
+    const otherId = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
+    await expect(
+      writeNoteDraft('d-1', { patientId: otherId, noteId: null }, { ...blank, body: 'Wrong target' }),
+    ).rejects.toThrow();
+    expect(t.db.select().from(noteDrafts).get()?.body).toBe('Original');
+  });
+
+  it('refuses writing under a deleted patient without creating a hidden draft', async () => {
+    await deletePatient(patientId);
+    await expect(
+      writeNoteDraft('d-1', { patientId, noteId: null }, { ...blank, body: 'Keep in editor' }),
+    ).rejects.toThrow();
+    expect(t.db.select().from(noteDrafts).all()).toEqual([]);
+  });
+
+  it('refuses an edit draft whose note belongs to a different patient', async () => {
+    const otherId = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
+    const noteId = await createNote({ patientId: otherId, type: 'general', body: 'Original' });
+    await expect(writeNoteDraft('d-1', { patientId, noteId }, { ...blank, body: 'Wrong target' })).rejects.toThrow();
+    expect(t.db.select().from(noteDrafts).all()).toEqual([]);
+  });
+
   it('knows an empty draft from one worth keeping', () => {
     expect(draftHasContent({ ...blank })).toBe(false);
     expect(draftHasContent({ ...blank, body: '   ' })).toBe(false);

@@ -44,7 +44,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
   const [filter, setFilter] = useState<PhotoFilter>('all');
   const [adding, setAdding] = useState(false);
 
-  const { data, error } = useLive(patientMediaQuery(patientId), [patientId]);
+  const { data, error, retry } = useLive(patientMediaQuery(patientId), [patientId]);
   const all = data ?? [];
   const photos = all.filter(
     (a) =>
@@ -82,7 +82,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
-      <ErrorNotice error={error} what="عکس‌ها و صداها" />
+      <ErrorNotice error={error} what="عکس‌ها و صداها" onRetry={retry} />
       <ChipSelect options={FILTERS} value={filter} onChange={(v) => setFilter(v ?? 'all')} />
 
       <Button
@@ -94,7 +94,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
         onPress={addPhotos}
       />
 
-      {photos.length === 0 ? (
+      {photos.length === 0 && data !== undefined && !error ? (
         <EmptyState
           icon="images-outline"
           title="عکسی نیست"
@@ -109,7 +109,11 @@ export function MediaTab({ patientId }: { patientId: string }) {
               onLongPress={() =>
                 Alert.alert('حذف عکس؟', a.caption ?? formatJalaliDateTime(a.capturedAt), [
                   { text: 'انصراف', style: 'cancel' },
-                  { text: 'حذف', style: 'destructive', onPress: () => void deleteAttachment(a.id) },
+                  {
+                    text: 'حذف',
+                    style: 'destructive',
+                    onPress: () => void deleteAttachment(a.id).catch((e) => alertError('عکس حذف نشد', e)),
+                  },
                 ])
               }
             >
@@ -124,7 +128,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
         </View>
       )}
 
-      <SectionHeader title="وویس‌ها" count={voices.length} />
+      <SectionHeader title="وویس‌ها" count={data !== undefined && !error ? voices.length : undefined} />
       {voices.map((v) => {
         return (
           <VoiceNotePlayer
@@ -136,7 +140,11 @@ export function MediaTab({ patientId }: { patientId: string }) {
             onLongPress={() =>
               Alert.alert('حذف وویس؟', undefined, [
                 { text: 'انصراف', style: 'cancel' },
-                { text: 'حذف', style: 'destructive', onPress: () => void deleteAttachment(v.id) },
+                {
+                  text: 'حذف',
+                  style: 'destructive',
+                  onPress: () => void deleteAttachment(v.id).catch((e) => alertError('وویس حذف نشد', e)),
+                },
               ])
             }
           />
@@ -144,10 +152,8 @@ export function MediaTab({ patientId }: { patientId: string }) {
       })}
       <VoiceRecorder
         label="ضبط وویس برای این بیمار"
-        onRecorded={(rec) => {
-          saveRecording(rec, { entityType: 'patient', entityId: patientId, patientId }).catch((e: unknown) =>
-            alertError('وویس ذخیره نشد', e),
-          );
+        onRecorded={async (rec) => {
+          await saveRecording(rec, { entityType: 'patient', entityId: patientId, patientId });
         }}
       />
     </Column>

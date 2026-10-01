@@ -75,7 +75,7 @@ export type StoredFile = {
 export async function storeFile(
   sourceUri: string,
   extension: string,
-  { move = false }: { move?: boolean } = {},
+  { move = false, verifySize = false }: { move?: boolean; verifySize?: boolean } = {},
 ): Promise<StoredFile> {
   const folder = datedFolder();
   ensureFolder(folder);
@@ -83,12 +83,17 @@ export async function storeFile(
   const relativePath = `${folder}/${newId()}.${extension}`;
   const source = new File(sourceUri);
   const dest = mediaFile(relativePath);
+  const sourceSize = verifySize && source.exists ? source.size : null;
+  if (verifySize && (sourceSize == null || !Number.isSafeInteger(sourceSize) || sourceSize <= 0))
+    throw new Error('فایل اولیه کامل خوانده نشد؛ کپی ثبت نشد.');
 
   if (move) await source.move(dest);
   else await copyInto(source, sourceUri, dest);
 
   const stored = mediaFile(relativePath);
-  return { relativePath, sizeBytes: stored.exists ? stored.size : null };
+  const sizeBytes = stored.exists ? stored.size : null;
+  if (verifySize && sizeBytes !== sourceSize) throw new Error('اندازهٔ کپی با فایل اولیه یکسان نیست؛ فایل ثبت نشد.');
+  return { relativePath, sizeBytes };
 }
 
 /**

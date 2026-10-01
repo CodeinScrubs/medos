@@ -13,6 +13,7 @@ import {
   type NoteType,
 } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
+import { addAttachmentInTransaction, type AttachmentInput } from '@/features/attachments/queries';
 import { createNoteInTransaction } from '@/features/notes/queries';
 import { createTaskInTransaction } from '@/features/tasks/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -134,13 +135,68 @@ export async function updateCapture(
   id: string,
   patch: { text?: string | null; patientId?: string | null; kind?: CaptureKind },
 ): Promise<void> {
-  const current = (await captureQuery(id))[0];
-  if (!current) throw new Error(`Capture ${id} not found`);
-  const text = patch.text === undefined ? current.text : patch.text?.trim() || null;
-  await db
-    .update(captureInbox)
-    .set({ ...patch, text, searchText: captureSearchText({ text }), ...touch() })
-    .where(and(alive, eq(captureInbox.id, id)));
+  db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(captureInbox)
+      .where(and(alive, eq(captureInbox.id, id)))
+      .get();
+    if (!current) throw new Error('ثبت سریع در دسترس نیست؛ تغییر ذخیره نشد.');
+    const patientId = patch.patientId === undefined ? current.patientId : patch.patientId;
+    if (current.filedAt && (patientId !== current.patientId || patch.kind !== undefined))
+      throw new Error('این ثبت سریع قبلاً مرتب شده است؛ مقصد آن تغییر نکرد.');
+    if (
+      patch.patientId &&
+      !tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, patch.patientId), isNull(patients.deletedAt)))
+        .get()
+    )
+      throw new Error('پروندهٔ بیمار در دسترس نیست؛ تغییر ذخیره نشد.');
+    const text = patch.text === undefined ? current.text : patch.text?.trim() || null;
+    tx.update(captureInbox)
+      .set({ ...patch, text, searchText: captureSearchText({ text }), ...touch() })
+      .where(eq(captureInbox.id, id))
+      .run();
+    if (patientId !== current.patientId) {
+      tx.update(attachments)
+        .set({ patientId, ...touch() })
+        .where(and(eq(attachments.entityType, 'capture'), eq(attachments.entityId, id)))
+        .run();
+    }
+  });
+}
+
+/** Voice metadata and its capture kind acknowledge together; retries reuse one file. */
+export async function addCaptureVoice(
+  id: string,
+  voice: Pick<AttachmentInput, 'relativePath' | 'sizeBytes' | 'durationMs' | 'capturedAt'>,
+): Promise<string> {
+  return db.transaction((tx) => {
+    const capture = tx
+      .select()
+      .from(captureInbox)
+      .where(and(alive, eq(captureInbox.id, id)))
+      .get();
+    if (!capture || capture.filedAt) throw new Error('ثبت سریع در دسترس نیست؛ وویس ثبت نشد.');
+    const attachmentId = addAttachmentInTransaction(
+      tx,
+      {
+        ...voice,
+        entityType: 'capture',
+        entityId: id,
+        kind: 'voice',
+        mimeType: 'audio/mp4',
+      },
+      { reuseVoice: true },
+    );
+    tx.update(captureInbox)
+      .set({ kind: 'voice', ...touch() })
+      .where(eq(captureInbox.id, id))
+      .run();
+    return attachmentId;
+  });
 }
 
 /**

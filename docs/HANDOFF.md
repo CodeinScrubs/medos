@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-02 — Acknowledge stopped voice only after retryable persistence
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; baseline `a1f1dde`.
+
+**Changed**
+- Version 0.11.14 / code 30. Recorder awaits metadata/draft persistence, retains
+  failed work, serializes recording actions and joins the screen's single save
+  group. Text, Back/tab changes and explicit publication flush together.
+- Staging copies rather than consumes the source, checks positive byte lengths
+  and shares one file on SQL retry. Attachment transactions validate live targets
+  and canonical patient ownership; matching live voice replay is idempotent.
+- Note drafts reject retired/mismatched/deleted targets instead of acknowledging
+  no-op writes. Optional JSON time preserves actual recording time. Capture voice
+  and kind commit together; patient reassignment also updates its media owner.
+- One existing encounter component test pins system time to its mocked screen
+  time: the previous moving default eventually made admission appear in the future.
+  No SQL migration, dependency, permission, route, menu or crypto-format change.
+
+**Verified**
+- `npm run check`: 95 suites / 1178 app tests + 3 workflows; typecheck, lint and
+  formatting pass. Migration regeneration: 41 tables, no schema change.
+- Migrated SQLite, actual editor/recorder handlers and native-contract stand-ins
+  cover SQL/copy/target failures, same-file retry, delayed acknowledgement, grouped
+  exit, malformed recording time, retired drafts, ownership, rollback and replay.
+
+**Not verified**
+- This source's hosted CI, signed APKs and native recording/recovery are pending.
+  No physical-phone test. Byte length is not a content hash or power-loss proof.
+- Pending recorder/staging state is process-local, not a durable media journal.
+  Pre-ack process death, full disk, interruptions and restore races remain open.
+
+**Open threads**
+- Freeze/build this source, inspect signature/ABI/native libraries and installed
+  APK hash. On the owned emulator exercise actual recording, Back/tab flush,
+  new/existing note and quick capture, playback, cold recovery and fresh backup.
+- Continue persistent stopped-voice recovery, source-before-crop photos and
+  D10/C05 ordinary writes/old editors versus dataset restore. Continue remaining
+  raw manual forms and the workflow ledger. Product and clinical tools are not done.
+
+**Gotchas**
+- Recorder callbacks must not flush their own whole group: that waits on themselves.
+  Do not add competing removal guards. Post-ack navigation is separate from saving.
+- Use the isolated AVD/serial; preserve app data and generated-output junctions.
+  Freeze source during native builds and record the actual artifact's source SHA.
+
 ## 2026-10-01 — Pin 0.11.13 native recovery and restore evidence
 
 **Agent:** GPT-6 via Codex

@@ -2,7 +2,25 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { attachments, type Attachment, type AttachmentEntity, type AttachmentKind } from '@/db/schema';
+import {
+  attachments,
+  captureInbox,
+  credentials,
+  doctors,
+  encounters,
+  followUps,
+  ideas,
+  imagingStudies,
+  labPanels,
+  notes,
+  patients,
+  places,
+  prescriptionTemplates,
+  topics,
+  type Attachment,
+  type AttachmentEntity,
+  type AttachmentKind,
+} from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 const alive = isNull(attachments.deletedAt);
@@ -53,12 +71,102 @@ export type AttachmentInput = {
   capturedAt?: Date;
 };
 
-export async function addAttachment(input: AttachmentInput): Promise<string> {
-  return db.transaction((tx) => addAttachmentInTransaction(tx, input));
+export type AttachmentTarget = Pick<AttachmentInput, 'entityType' | 'entityId' | 'patientId'>;
+
+/** The polymorphic target and gallery owner are checked in the same write snapshot. */
+export function attachmentPatientInTransaction(tx: DbTransaction, target: AttachmentTarget): string | null {
+  const clinical = {
+    encounter: encounters,
+    note: notes,
+    lab_panel: labPanels,
+    imaging_study: imagingStudies,
+    follow_up: followUps,
+    capture: captureInbox,
+  };
+  const general = {
+    doctor: doctors,
+    topic: topics,
+    idea: ideas,
+    prescription_template: prescriptionTemplates,
+    place: places,
+    credential: credentials,
+  };
+  let patientId: string | null;
+  if (target.entityType === 'patient') {
+    patientId = target.entityId;
+  } else if (target.entityType in clinical) {
+    const table = clinical[target.entityType as keyof typeof clinical];
+    const row = tx
+      .select({ patientId: table.patientId })
+      .from(table)
+      .where(and(eq(table.id, target.entityId), isNull(table.deletedAt)))
+      .get();
+    if (!row) throw new Error('رکورد مقصد در دسترس نیست؛ فایل ثبت نشد.');
+    patientId = row.patientId;
+  } else {
+    const table = general[target.entityType as keyof typeof general];
+    if (
+      !table ||
+      !tx
+        .select({ id: table.id })
+        .from(table)
+        .where(and(eq(table.id, target.entityId), isNull(table.deletedAt)))
+        .get()
+    )
+      throw new Error('رکورد مقصد در دسترس نیست؛ فایل ثبت نشد.');
+    patientId = null;
+  }
+  if (
+    patientId !== null &&
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new Error('پروندهٔ بیمار در دسترس نیست؛ فایل ثبت نشد.');
+  if (target.patientId != null && target.patientId !== patientId)
+    throw new Error('بیمار فایل با رکورد مقصد یکسان نیست؛ فایل ثبت نشد.');
+  return patientId;
+}
+
+/** Preflight before expensive native work; publication checks again inside its transaction. */
+export function checkAttachmentTarget(target: AttachmentTarget): void {
+  db.transaction((tx) => attachmentPatientInTransaction(tx, target));
+}
+
+export async function addAttachment(input: AttachmentInput, options: { reuseVoice?: boolean } = {}): Promise<string> {
+  return db.transaction((tx) => addAttachmentInTransaction(tx, input, options));
 }
 
 /** Metadata only; file copying must finish before entering a transaction. */
-export function addAttachmentInTransaction(tx: DbTransaction, input: AttachmentInput): string {
+export function addAttachmentInTransaction(
+  tx: DbTransaction,
+  input: AttachmentInput,
+  { reuseVoice = false }: { reuseVoice?: boolean } = {},
+): string {
+  const patientId = attachmentPatientInTransaction(tx, input);
+  // One staged recording can be retried after an acknowledged commit/navigation
+  // failure. A retired or differently bound file is never silently revived/moved.
+  if (reuseVoice) {
+    if (input.kind !== 'voice') throw new Error('نوع فایل برای تلاش دوباره معتبر نیست.');
+    const previous = tx.select().from(attachments).where(eq(attachments.relativePath, input.relativePath)).get();
+    if (previous) {
+      if (
+        previous.deletedAt ||
+        previous.entityType !== input.entityType ||
+        previous.entityId !== input.entityId ||
+        previous.patientId !== patientId ||
+        previous.kind !== 'voice' ||
+        previous.durationMs !== (input.durationMs ?? null) ||
+        previous.sizeBytes !== (input.sizeBytes ?? null) ||
+        previous.mimeType !== (input.mimeType ?? null) ||
+        (input.capturedAt !== undefined && previous.capturedAt?.getTime() !== input.capturedAt.getTime())
+      )
+        throw new Error('وضعیت این وویس تغییر کرده است؛ دوباره ثبت نشد.');
+      return previous.id;
+    }
+  }
   const id = newId();
   tx.insert(attachments)
     .values({
@@ -66,7 +174,7 @@ export function addAttachmentInTransaction(tx: DbTransaction, input: AttachmentI
       ...stamps(),
       entityType: input.entityType,
       entityId: input.entityId,
-      patientId: input.patientId ?? null,
+      patientId,
       kind: input.kind,
       relativePath: input.relativePath,
       thumbnailPath: input.thumbnailPath ?? null,
@@ -88,10 +196,19 @@ export async function updateAttachment(
   id: string,
   patch: Partial<Pick<Attachment, 'caption' | 'bodySite' | 'kind' | 'transcript'>>,
 ): Promise<void> {
-  await db
-    .update(attachments)
-    .set({ ...patch, ...touch() })
-    .where(and(alive, eq(attachments.id, id)));
+  db.transaction((tx) => {
+    const row = tx
+      .select()
+      .from(attachments)
+      .where(and(alive, eq(attachments.id, id)))
+      .get();
+    if (!row) throw new Error('این فایل در دسترس نیست؛ تغییر ذخیره نشد.');
+    attachmentPatientInTransaction(tx, row);
+    tx.update(attachments)
+      .set({ ...patch, ...touch() })
+      .where(eq(attachments.id, id))
+      .run();
+  });
 }
 
 /**

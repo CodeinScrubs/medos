@@ -53,6 +53,10 @@ export async function commitNoteDraft(draftId: string): Promise<string> {
       noteId = createNoteInTransaction(tx, { patientId: draft.patientId, ...fields });
     }
     for (const voice of draft.voices ?? []) {
+      if (voice.capturedAt !== undefined && typeof voice.capturedAt !== 'string')
+        throw new Error('زمان ضبط وویس معتبر نیست؛ نوت ثبت نشد.');
+      const capturedAt = voice.capturedAt === undefined ? draft.updatedAt : new Date(voice.capturedAt);
+      if (!Number.isFinite(capturedAt.getTime())) throw new Error('زمان ضبط وویس معتبر نیست؛ نوت ثبت نشد.');
       addAttachmentInTransaction(tx, {
         entityType: 'note',
         entityId: noteId,
@@ -62,7 +66,7 @@ export async function commitNoteDraft(draftId: string): Promise<string> {
         sizeBytes: voice.sizeBytes,
         mimeType: 'audio/mp4',
         durationMs: voice.durationMs,
-        capturedAt: draft.updatedAt,
+        capturedAt,
       });
     }
     tx.update(noteDrafts)

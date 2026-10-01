@@ -114,7 +114,9 @@ beforeEach(async () => {
   mockListeners.clear();
   jest.mocked(alertError).mockClear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  jest.useFakeTimers();
+  // The mocked screen clock and default admission timestamps must agree.
+  // A real wall clock after 12:00 made date validation mask the conflict test.
+  jest.useFakeTimers({ now: new Date('2026-10-01T12:00:00Z') });
 });
 afterEach(async () => {
   await unmount();

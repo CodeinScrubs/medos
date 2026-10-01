@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
@@ -22,17 +23,18 @@ import {
   Toggle,
 } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
-import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { NOTE_TYPES, type Note, type NoteDraft, type NoteType } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { stageRecording } from '@/features/attachments/recordings';
 import { VoiceNotesSection } from '@/features/attachments/voice-notes';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withFileJob } from '@/lib/file-work';
 import { newId } from '@/lib/ids';
-import { extensionOf, mediaUri, storeFile } from '@/platform/media';
+import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
 import { commitNoteDraft } from './commit-queries';
@@ -53,7 +55,7 @@ import { latestPatientNoteQuery, noteQuery } from './queries';
  *
  * Nothing typed here waits for the save button. Every change goes to a draft
  * row a few seconds behind the keyboard (`lib/autosave.ts`), and a recording
- * is moved into storage the moment it stops. The note itself is still written
+ * is copied into storage and acknowledged in that draft when it stops. The note itself is still written
  * once, when the user says so: a chart entry is a decision, not a side effect
  * of typing. What the save button controls is what enters the record — not
  * whether the words survive.
@@ -64,7 +66,11 @@ const TYPE_OPTIONS = NOTE_TYPES.map((t) => ({ value: t, label: NOTE_TYPE_LABELS[
 /** Create or edit a note. Params: `id` (patient), optional `noteId`, optional `type`. */
 export function NoteEditorScreen() {
   const { id: patientId, noteId, type } = useLocalSearchParams<{ id: string; noteId?: string; type?: string }>();
-  return <NoteGate key={`${patientId}:${noteId ?? 'new'}`} patientId={patientId} noteId={noteId} type={type} />;
+  return (
+    <AutosaveScope key={`${patientId}:${noteId ?? 'new'}`}>
+      <NoteGate patientId={patientId} noteId={noteId} type={type} />
+    </AutosaveScope>
+  );
 }
 
 function NoteGate({ patientId, noteId, type }: { patientId: string; noteId?: string; type?: string }) {
@@ -197,7 +203,8 @@ function NoteEditor({
     [draftId, patientId, note?.id],
   );
 
-  useSaveBeforeLeave(() => saver.flush());
+  const scope = useAutosaveScope()!;
+  useEffect(() => scope.group.register(saver), [scope, saver]);
 
   function update(patch: Partial<NoteDraftFields>) {
     const next = { ...latest.current, ...patch };
@@ -240,32 +247,40 @@ function NoteEditor({
   const committing = useRef(false);
 
   async function onRecorded(recording: Recording) {
-    try {
-      // Stored before it is listed: a file still in the recorder's cache is
-      // not a voice note, whatever the screen shows.
-      const stored = await storeFile(recording.uri, extensionOf(recording.uri, 'm4a'), { move: true });
-      update({
-        voices: [
-          ...latest.current.voices,
-          { relativePath: stored.relativePath, durationMs: recording.durationMs, sizeBytes: stored.sizeBytes },
-        ],
-      });
-      if (!(await saver.flush())) notify('وویس هنوز ثبت نشد', 'وویس روی صفحه باقی مانده؛ دوباره ذخیره کنید.');
-    } catch (e) {
-      alertError('وویس ذخیره نشد', e);
-    }
+    await withFileJob(async () => {
+      const stored = await stageRecording(recording, new Date());
+      if (!latest.current.voices.some((voice) => voice.relativePath === stored.relativePath)) {
+        update({
+          voices: [
+            ...latest.current.voices,
+            {
+              relativePath: stored.relativePath,
+              durationMs: recording.durationMs,
+              sizeBytes: stored.sizeBytes,
+              capturedAt: stored.capturedAt.toISOString(),
+            },
+          ],
+        });
+      } else saver.change(latest.current);
+      // Do not flush the whole group here: it contains this recorder's handoff.
+      if (!(await saver.flush())) throw new Error('وویس هنوز در پیش‌نویس ذخیره نشده است.');
+    });
   }
 
   async function save() {
-    if (!dateValidation.check()) return;
     if (committing.current) return;
-    if (!draftHasContent(latest.current)) {
-      notify('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
-      return;
-    }
     committing.current = true;
     setSaving(true);
     try {
+      if (!(await scope.group.flush())) {
+        notify('ذخیره نشد', 'متن یا وویس روی صفحه باقی مانده؛ دوباره تلاش کنید.');
+        return;
+      }
+      if (!dateValidation.check()) return;
+      if (!draftHasContent(latest.current)) {
+        notify('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
+        return;
+      }
       // Even an unchanged existing note may not have a draft yet.
       saver.change(latest.current);
       if (!(await saver.flush())) {
@@ -289,7 +304,10 @@ function NoteEditor({
     setSaving(true);
     try {
       // Wait for in-flight writes before retiring the draft; failed deletion stays visible.
-      await saver.flush();
+      if (!(await scope.group.flush())) {
+        notify('پیش‌نویس حذف نشد', 'متن یا وویس هنوز ذخیره نشده است؛ دوباره تلاش کنید.');
+        return;
+      }
       await discardNoteDraft(draftId);
       saver.cancel();
       router.back();
@@ -303,7 +321,7 @@ function NoteEditor({
 
   function leave() {
     if (committing.current) return;
-    if (!draftHasContent(latest.current)) {
+    if (!draftHasContent(latest.current) && !scope.group.unsaved) {
       void discardAndLeave();
       return;
     }
@@ -315,15 +333,18 @@ function NoteEditor({
           // Only leave if the text actually reached storage. `flush` resolves
           // either way; treating that as success would close the screen on the
           // one copy of the note that exists.
-          void saver.flush().then((stored) => {
-            if (stored) router.back();
-            else {
-              notify(
-                'هنوز ذخیره نشد',
-                'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
-              );
-            }
-          });
+          void scope.group
+            .flush()
+            .then((stored) => {
+              if (stored) router.back();
+              else {
+                notify(
+                  'هنوز ذخیره نشد',
+                  'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
+                );
+              }
+            })
+            .catch((e) => alertError('ذخیره نشد', e));
         },
       },
       {
@@ -357,10 +378,12 @@ function NoteEditor({
                   icon="time-outline"
                   label="تاریخچه"
                   onPress={() =>
-                    router.push({
-                      pathname: '/patient/[id]/note-history',
-                      params: { id: patientId, noteId: note!.id },
-                    })
+                    void scope.perform(() =>
+                      router.push({
+                        pathname: '/patient/[id]/note-history',
+                        params: { id: patientId, noteId: note!.id },
+                      }),
+                    )
                   }
                 />
               ) : null}
@@ -479,10 +502,7 @@ function NoteEditor({
                 onLongPress={() => update({ voices: fields.voices.filter((_, j) => j !== i) })}
               />
             ))}
-            <VoiceRecorder
-              label={fields.voices.length ? 'وویس دیگر' : 'ضبط وویس'}
-              onRecorded={(rec) => void onRecorded(rec)}
-            />
+            <VoiceRecorder label={fields.voices.length ? 'وویس دیگر' : 'ضبط وویس'} onRecorded={onRecorded} />
           </Column>
         )}
 
