@@ -179,7 +179,7 @@ describe('ConsultShareModal', () => {
 
     expect(doctorActions.copyText).toHaveBeenCalledWith(expect.stringContaining('سارا محمودی'));
     expect(queries.markConsultRequested).toHaveBeenCalledWith('c1');
-    expect(notify).toHaveBeenCalledWith('کپی شد', expect.any(String));
+    expect(notify).toHaveBeenCalledWith('کپی شد و ارسال ثبت شد', expect.any(String));
     expect(onClose).toHaveBeenCalled();
   });
 });

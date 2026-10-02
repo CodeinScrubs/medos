@@ -82,8 +82,17 @@ export function ConsultShareModal({
 
   async function handleCopy() {
     await copyText(message);
-    notify('کپی شد', 'متن درخواست مشاوره در کلیپ‌بورد کپی شد.');
-    await handleAdvanceOnContact();
+    if (consult.status === 'pending') {
+      try {
+        await markConsultRequested(consult.id);
+        notify('کپی شد و ارسال ثبت شد', 'متن در کلیپ‌بورد کپی شد و وضعیت مشاوره به «منتظر پاسخ» به‌روزرسانی شد.');
+      } catch (e) {
+        alertError('تغییر وضعیت ثبت نشد', e);
+      }
+    } else {
+      notify('کپی شد', 'متن درخواست مشاوره در کلیپ‌بورد کپی شد.');
+    }
+    onClose();
   }
 
   return (
