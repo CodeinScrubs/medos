@@ -5,7 +5,7 @@ import { Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-n
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
-import { Button, ChipSelect, Column, EmptyState, SectionHeader } from '@/components/ui';
+import { Button, ChipSelect, Column, SectionHeader, Text } from '@/components/ui';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder } from '@/components/voice-recorder';
 import type { AttachmentKind } from '@/db/schema';
@@ -95,11 +95,9 @@ export function MediaTab({ patientId }: { patientId: string }) {
       />
 
       {photos.length === 0 && data !== undefined && !error ? (
-        <EmptyState
-          icon="images-outline"
-          title="عکسی نیست"
-          description="عکس ضایعه، ظاهر بیمار، فیلم رادیولوژی یا مدارک — با دوربین یا از گالری."
-        />
+        <Text variant="caption" color="textMuted" align="center">
+          {filter === 'all' ? 'هنوز عکسی ثبت نشده' : 'در این دسته عکسی نیست'}
+        </Text>
       ) : (
         <View style={[styles.grid, { gap }]}>
           {photos.map((a) => (
@@ -129,6 +127,12 @@ export function MediaTab({ patientId }: { patientId: string }) {
       )}
 
       <SectionHeader title="وویس‌ها" count={data !== undefined && !error ? voices.length : undefined} />
+      <VoiceRecorder
+        label="ضبط وویس برای این بیمار"
+        onRecorded={async (rec) => {
+          await saveRecording(rec, { entityType: 'patient', entityId: patientId, patientId });
+        }}
+      />
       {voices.map((v) => {
         return (
           <VoiceNotePlayer
@@ -150,12 +154,6 @@ export function MediaTab({ patientId }: { patientId: string }) {
           />
         );
       })}
-      <VoiceRecorder
-        label="ضبط وویس برای این بیمار"
-        onRecorded={async (rec) => {
-          await saveRecording(rec, { entityType: 'patient', entityId: patientId, patientId });
-        }}
-      />
     </Column>
   );
 }

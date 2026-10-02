@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 
-import { auditLog } from '@/db/schema';
+import { auditLog, encounters, vitals } from '@/db/schema';
+import { softDelete } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -14,7 +16,7 @@ import {
 } from './logic';
 import { deleteVital, patientVitalsQuery, recordVital, updateVital, vitalQuery, vitalSeries } from './queries';
 import { openEncounter } from '../encounters/queries';
-import { createPatient } from '../patients/queries';
+import { createPatient, deletePatient } from '../patients/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -214,6 +216,142 @@ describe('recording observations', () => {
     const newer = await recordVital({ patientId, heartRate: 92, measuredAt: new Date('2026-09-21T06:00:00Z') });
     expect((await patientVitalsQuery(patientId)).map((r) => r.id)).toEqual([newer, older]);
   });
+});
+
+describe('observation ownership and transaction boundaries', () => {
+  it('refuses new readings for a soft-deleted patient', async () => {
+    await deletePatient(patientId);
+    await expect(recordVital({ patientId, heartRate: 80 })).rejects.toThrow();
+    expect(t.db.select().from(vitals).all()).toEqual([]);
+  });
+
+  it('refuses a correction after the patient was deleted, preserving the reading', async () => {
+    const id = await recordVital({ patientId, heartRate: 80, temperature: 37 });
+    const before = t.db.select().from(vitals).where(eq(vitals.id, id)).get();
+    await deletePatient(patientId);
+    await expect(updateVital(id, { heartRate: 90 })).rejects.toThrow();
+    expect(t.db.select().from(vitals).where(eq(vitals.id, id)).get()).toEqual(before);
+    expect(
+      t.db
+        .select()
+        .from(auditLog)
+        .all()
+        .some((entry) => entry.action === 'vital.updated'),
+    ).toBe(false);
+  });
+
+  async function invalidEncounter(kind: 'foreign' | 'deleted' | 'missing') {
+    const owner = kind === 'foreign' ? await createPatient({ firstName: 'Synthetic', lastName: 'Other' }) : patientId;
+    const id = await openEncounter({ patientId: owner, kind: 'admission' });
+    if (kind === 'deleted') t.db.update(encounters).set(softDelete()).where(eq(encounters.id, id)).run();
+    return kind === 'missing' ? 'missing-synthetic-encounter' : id;
+  }
+
+  it.each(['foreign', 'deleted', 'missing'] as const)('refuses a %s encounter on creation', async (kind) => {
+    const encounterId = await invalidEncounter(kind);
+    await expect(recordVital({ patientId, encounterId, heartRate: 80 })).rejects.toThrow();
+    expect(t.db.select().from(vitals).all()).toEqual([]);
+  });
+
+  it.each(['foreign', 'deleted', 'missing'] as const)(
+    'refuses a %s encounter in a correction atomically',
+    async (kind) => {
+      const id = await recordVital({ patientId, encounterId: null, heartRate: 80, temperature: 37 });
+      const before = t.db.select().from(vitals).where(eq(vitals.id, id)).get();
+      const encounterId = await invalidEncounter(kind);
+      await expect(updateVital(id, { encounterId, heartRate: 90 })).rejects.toThrow();
+      expect(t.db.select().from(vitals).where(eq(vitals.id, id)).get()).toEqual(before);
+    },
+  );
+
+  it('validates simultaneous clears against the latest row so they cannot leave an empty reading', async () => {
+    const id = await recordVital({ patientId, encounterId: null, heartRate: 80, temperature: 37 });
+    const results = await Promise.allSettled([
+      updateVital(id, { heartRate: null }),
+      updateVital(id, { temperature: null }),
+    ]);
+    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected']);
+    const row = (await vitalQuery(id))[0]!;
+    expect(row.heartRate).toBeNull();
+    expect(row.temperature).toBe(37);
+    expect(hasAnyVital(row)).toBe(true);
+  });
+
+  it('allows an explicit owned historical encounter and preserves an explicit no-encounter choice', async () => {
+    const encounterId = await openEncounter({ patientId, kind: 'admission' });
+    t.db.update(encounters).set({ isActive: false }).where(eq(encounters.id, encounterId)).run();
+    const historical = await recordVital({ patientId, encounterId, heartRate: 80 });
+    await openEncounter({ patientId, kind: 'admission' });
+    const unattached = await recordVital({ patientId, encounterId: null, heartRate: 81 });
+    expect((await vitalQuery(historical))[0]?.encounterId).toBe(encounterId);
+    expect((await vitalQuery(unattached))[0]?.encounterId).toBeNull();
+  });
+
+  it('rejects a stale changed field without overwriting a newer correction', async () => {
+    const id = await recordVital({ patientId, heartRate: 80, temperature: 37 });
+    const basis = (await vitalQuery(id))[0]!;
+    await updateVital(id, { heartRate: 82 });
+    const current = (await vitalQuery(id))[0]!;
+    await expect(updateVital(id, { heartRate: 90 }, new Date(), basis)).rejects.toThrow();
+    expect((await vitalQuery(id))[0]).toEqual(current);
+  });
+
+  it('merges a changed field while preserving a newer unrelated correction', async () => {
+    const id = await recordVital({ patientId, heartRate: 80, temperature: 37 });
+    const basis = (await vitalQuery(id))[0]!;
+    await updateVital(id, { temperature: 38 });
+    await updateVital(id, { heartRate: 90 }, new Date(), basis);
+    expect((await vitalQuery(id))[0]).toMatchObject({ heartRate: 90, temperature: 38 });
+  });
+
+  it('refuses a foreign edit basis instead of using it to approve a correction', async () => {
+    const first = await recordVital({ patientId, heartRate: 80 });
+    const second = await recordVital({ patientId, heartRate: 80 });
+    const basis = (await vitalQuery(first))[0]!;
+    await expect(updateVital(second, { heartRate: 90 }, new Date(), basis)).rejects.toThrow();
+    expect((await vitalQuery(second))[0]?.heartRate).toBe(80);
+  });
+
+  it('refuses an unexpected patient identity field from an untyped caller', async () => {
+    const id = await recordVital({ patientId, heartRate: 80 });
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
+    const before = (await vitalQuery(id))[0]!;
+    const patch = { patientId: other, heartRate: 90 } as unknown as Parameters<typeof updateVital>[1];
+    await expect(updateVital(id, patch)).rejects.toThrow();
+    expect((await vitalQuery(id))[0]).toEqual(before);
+  });
+
+  it('does not audit an unchanged correction or a repeated deletion as a new action', async () => {
+    const id = await recordVital({ patientId, heartRate: 80 });
+    const before = (await vitalQuery(id))[0]!;
+    await updateVital(id, { heartRate: undefined });
+    expect((await vitalQuery(id))[0]).toEqual(before);
+    await deleteVital(id);
+    await deleteVital(id);
+    expect(
+      t.db
+        .select()
+        .from(auditLog)
+        .all()
+        .map((row) => row.action),
+    ).toEqual(['vital.deleted']);
+  });
+
+  it.each(['measuredAt', 'encounterId'] as const)(
+    'refuses a correction after the original %s context changed',
+    async (key) => {
+      const id = await recordVital({ patientId, encounterId: null, heartRate: 80 });
+      const basis = (await vitalQuery(id))[0]!;
+      const change =
+        key === 'measuredAt'
+          ? { measuredAt: new Date('2026-10-01T08:00:00Z') }
+          : { encounterId: await openEncounter({ patientId, kind: 'admission' }) };
+      await updateVital(id, change);
+      const current = (await vitalQuery(id))[0]!;
+      await expect(updateVital(id, { heartRate: 90 }, new Date(), basis)).rejects.toThrow();
+      expect((await vitalQuery(id))[0]).toEqual(current);
+    },
+  );
 });
 
 describe('a series over time', () => {

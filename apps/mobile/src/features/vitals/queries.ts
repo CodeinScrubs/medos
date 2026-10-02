@@ -1,12 +1,12 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
-import { vitals, type Vital } from '@/db/schema';
+import { db, type DbTransaction } from '@/db/client';
+import { encounters, patients, vitals, type Vital } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
-import { hasAnyVital, validateVitalNumbers } from './logic';
+import { hasAnyVital, validateVitalNumbers, VITAL_NUMBER_KEYS } from './logic';
 
 /*
  * Observations, as they were taken.
@@ -54,31 +54,62 @@ export type VitalInput = {
   notes?: string | null;
 };
 
-export async function recordVital(input: VitalInput): Promise<string> {
+/** Liveness and ownership are checked inside the transaction that writes the reading. */
+function requireContext(tx: DbTransaction, patientId: string, encounterId: string | null): void {
+  if (
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new Error('بیمار در دسترس نیست؛ اندازه‌گیری تغییر نکرد.');
+  if (
+    encounterId !== null &&
+    !tx
+      .select({ id: encounters.id })
+      .from(encounters)
+      .where(and(eq(encounters.id, encounterId), eq(encounters.patientId, patientId), isNull(encounters.deletedAt)))
+      .get()
+  )
+    throw new Error('نوبت این اندازه‌گیری در دسترس نیست؛ پرونده را بررسی کنید.');
+}
+
+export async function recordVital(input: VitalInput, now = new Date()): Promise<string> {
+  return db.transaction((tx) => recordVitalInTransaction(tx, input, now));
+}
+
+/** Synchronous clinical write; another write may be composed within this transaction. */
+export function recordVitalInTransaction(tx: DbTransaction, input: VitalInput, now: Date): string {
   validateVitalNumbers(input);
   if (!hasAnyVital(input)) throw new Error('At least one observation is required');
   if (input.measuredAt && !Number.isFinite(input.measuredAt.getTime())) throw new Error('Invalid observation time');
+  // Undefined selects the active encounter in this same snapshot; null stays unattached.
+  const encounterId =
+    input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx);
+  requireContext(tx, input.patientId, encounterId);
   const id = newId();
-  await db.insert(vitals).values({
-    id,
-    ...stamps(),
-    patientId: input.patientId,
-    // Undefined means "whatever admission is active"; null means explicitly none.
-    encounterId: input.encounterId !== undefined ? input.encounterId : await resolveActiveEncounterId(input.patientId),
-    measuredAt: input.measuredAt ?? new Date(),
-    systolic: input.systolic ?? null,
-    diastolic: input.diastolic ?? null,
-    heartRate: input.heartRate ?? null,
-    respRate: input.respRate ?? null,
-    temperature: input.temperature ?? null,
-    spo2: input.spo2 ?? null,
-    bloodSugar: input.bloodSugar ?? null,
-    weightKg: input.weightKg ?? null,
-    heightCm: input.heightCm ?? null,
-    painScore: input.painScore ?? null,
-    urineOutput: input.urineOutput?.trim() || null,
-    notes: input.notes?.trim() || null,
-  });
+  tx.insert(vitals)
+    .values({
+      id,
+      ...stamps(now),
+      patientId: input.patientId,
+      encounterId,
+      measuredAt: input.measuredAt ?? now,
+      systolic: input.systolic ?? null,
+      diastolic: input.diastolic ?? null,
+      heartRate: input.heartRate ?? null,
+      respRate: input.respRate ?? null,
+      temperature: input.temperature ?? null,
+      spo2: input.spo2 ?? null,
+      bloodSugar: input.bloodSugar ?? null,
+      weightKg: input.weightKg ?? null,
+      heightCm: input.heightCm ?? null,
+      painScore: input.painScore ?? null,
+      urineOutput: input.urineOutput?.trim() || null,
+      notes: input.notes?.trim() || null,
+    })
+    .run();
   return id;
 }
 
@@ -89,31 +120,90 @@ export async function recordVital(input: VitalInput): Promise<string> {
  * blood pressure on a set does not silently drop the temperature that was
  * taken with it.
  */
-export async function updateVital(id: string, patch: Omit<Partial<VitalInput>, 'patientId'>): Promise<void> {
-  const current = (await vitalQuery(id))[0];
-  if (!current) throw new Error(`Vital ${id} not found`);
+export async function updateVital(
+  id: string,
+  patch: Omit<Partial<VitalInput>, 'patientId'>,
+  now = new Date(),
+  expected?: Vital,
+): Promise<void> {
+  const changed = db.transaction((tx) => updateVitalInTransaction(tx, id, patch, now, expected));
+  if (changed) await audit('vital.updated', { entityType: 'vital', entityId: id });
+}
+
+const PATCH_KEYS = [
+  'encounterId',
+  'measuredAt',
+  'systolic',
+  'diastolic',
+  ...VITAL_NUMBER_KEYS,
+  'urineOutput',
+  'notes',
+] as const;
+function sameField(a: unknown, b: unknown): boolean {
+  return a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : a === b;
+}
+
+export function updateVitalInTransaction(
+  tx: DbTransaction,
+  id: string,
+  patch: Omit<Partial<VitalInput>, 'patientId'>,
+  now: Date,
+  expected?: Vital,
+): boolean {
+  const current = tx
+    .select()
+    .from(vitals)
+    .where(and(alive, eq(vitals.id, id)))
+    .get();
+  if (!current) throw new Error('این اندازه‌گیری در دسترس نیست؛ تغییر ثبت نشد.');
+  if (Object.keys(patch).some((key) => !PATCH_KEYS.some((allowed) => allowed === key)))
+    throw new Error('اطلاعات اصلاح اندازه‌گیری معتبر نیست.');
   validateVitalNumbers(patch);
   const definedPatch = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
   if (!hasAnyVital({ ...current, ...definedPatch })) throw new Error('At least one observation is required');
   if (patch.measuredAt && !Number.isFinite(patch.measuredAt.getTime())) throw new Error('Invalid observation time');
-  await db
-    .update(vitals)
+  requireContext(tx, current.patientId, patch.encounterId === undefined ? current.encounterId : patch.encounterId);
+  if (
+    expected &&
+    (expected.id !== id ||
+      expected.patientId !== current.patientId ||
+      expected.deletedAt !== null ||
+      expected.encounterId !== current.encounterId ||
+      !sameField(expected.measuredAt, current.measuredAt) ||
+      ((patch.systolic !== undefined || patch.diastolic !== undefined) &&
+        (current.systolic !== expected.systolic || current.diastolic !== expected.diastolic)) ||
+      PATCH_KEYS.some((key) => patch[key] !== undefined && !sameField(current[key], expected[key])))
+  )
+    throw new Error('این اندازه‌گیری تغییر کرده است؛ نسخهٔ جدید را بررسی کنید. نوشتهٔ شما روی صفحه باقی مانده است.');
+  if (Object.keys(definedPatch).length === 0) return false;
+  tx.update(vitals)
     .set({
       ...patch,
       urineOutput: patch.urineOutput === undefined ? undefined : patch.urineOutput?.trim() || null,
       notes: patch.notes === undefined ? undefined : patch.notes?.trim() || null,
-      ...touch(),
+      ...touch(now),
     })
-    .where(and(alive, eq(vitals.id, id)));
-  await audit('vital.updated', { entityType: 'vital', entityId: id });
+    .where(and(alive, eq(vitals.id, id)))
+    .run();
+  return true;
 }
 
-export async function deleteVital(id: string): Promise<void> {
-  await db
-    .update(vitals)
-    .set(softDelete())
-    .where(and(alive, eq(vitals.id, id)));
-  await audit('vital.deleted', { entityType: 'vital', entityId: id });
+export async function deleteVital(id: string, now = new Date()): Promise<void> {
+  const deleted = db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(vitals)
+      .where(and(alive, eq(vitals.id, id)))
+      .get();
+    if (!current) return false;
+    requireContext(tx, current.patientId, current.encounterId);
+    tx.update(vitals)
+      .set(softDelete(now))
+      .where(and(alive, eq(vitals.id, id)))
+      .run();
+    return true;
+  });
+  if (deleted) await audit('vital.deleted', { entityType: 'vital', entityId: id });
 }
 
 /** A measurement that can be plotted over time. */

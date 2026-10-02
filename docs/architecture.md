@@ -61,6 +61,32 @@ font and configured Persian fonts remain untouched. ESLint blocks barrel imports
 
 ---
 
+## Vitals correction boundaries (0.11.15)
+
+Observation mutations read liveness, encounter ownership and the current reading
+inside the same synchronous SQLite transaction as the write. An explicit live
+historical encounter or null remains valid; implicit encounter selection happens
+in that transaction. Soft-deleted patients/encounters cannot accept late readings.
+Merge validation uses the current row so overlapping clears cannot leave an empty
+measurement. Repeated deletion and empty patches do not create false audit entries.
+
+The inline editor sends only locally changed fields and carries its original
+reading as the comparison basis. Unrelated corrections can coexist. A changed
+patched field, either side of a patched blood-pressure pair, measured time or
+encounter rejects publication and keeps local input on screen. Blood-pressure
+halves are compared together to avoid constructing a reading from two revisions.
+Exact untouched note text is preserved. Latest-input refs and a synchronous submit
+guard cover input/Save in one event turn and repeated Save before React renders.
+
+**Rejected: rewriting every field or using only updatedAt as a conflict token.**
+The former overwrites independent corrections; the latter unnecessarily rejects
+edits to unrelated fields and does not express which observation context changed.
+These guards do not implement persistent raw drafts, permanent observation version
+history, a dataset epoch or ordinary-write-versus-restore exclusion. Native behavior
+and physical-device durability remain separate acceptance gates.
+
+---
+
 ## SQLite + Drizzle, local-first
 
 `expo-sqlite` with `enableChangeListener`, wrapped by Drizzle ORM. Screens read through

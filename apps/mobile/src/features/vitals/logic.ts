@@ -65,6 +65,38 @@ export const VITAL_NUMBER_KEYS = [
 ] as const;
 type VitalNumberKey = (typeof VITAL_NUMBER_KEYS)[number];
 export type VitalForm = Record<VitalNumberKey | 'bp' | 'urineOutput' | 'notes', string>;
+export type VitalEditValues = VitalFields & { measuredAt: Date; urineOutput: string | null; notes: string | null };
+
+/** Preserve the exact initial text when deciding which fields the user changed. */
+export function vitalFormOf(row: VitalEditValues): VitalForm {
+  return {
+    bp: formatBloodPressureInput(row.systolic, row.diastolic),
+    ...Object.fromEntries(VITAL_NUMBER_KEYS.map((key) => [key, row[key]?.toString() ?? ''])),
+    urineOutput: row.urineOutput ?? '',
+    notes: row.notes ?? '',
+  } as VitalForm;
+}
+
+/** Unchanged inputs must not overwrite another editor or normalize an untouched note. */
+export function vitalEditPatch(
+  original: VitalEditValues,
+  form: VitalForm,
+  values: VitalEditValues,
+): Partial<VitalEditValues> {
+  const initial = vitalFormOf(original);
+  const patch: Partial<VitalEditValues> = {};
+  if (form.bp !== initial.bp) {
+    if (values.systolic !== original.systolic) patch.systolic = values.systolic;
+    if (values.diastolic !== original.diastolic) patch.diastolic = values.diastolic;
+  }
+  for (const key of VITAL_NUMBER_KEYS) {
+    if (form[key] !== initial[key] && values[key] !== original[key]) patch[key] = values[key];
+  }
+  if (form.urineOutput !== initial.urineOutput) patch.urineOutput = values.urineOutput;
+  if (form.notes !== initial.notes) patch.notes = values.notes;
+  if (values.measuredAt.getTime() !== original.measuredAt.getTime()) patch.measuredAt = values.measuredAt;
+  return patch;
+}
 
 /** Reject nonempty invalid input as a whole; it must never become a blank measurement. */
 export function parseVitalForm(

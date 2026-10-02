@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
@@ -7,12 +7,13 @@ import { QuickDateField } from '@/components/quick-date-field';
 import { TrendChart } from '@/components/trend-chart';
 import { Button, Card, ChipSelect, Column, EmptyState, Input, Row, SectionHeader, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
+import { useNow } from '@/components/use-now';
+import type { Vital } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { formatJalali, formatJalaliDateTime } from '@/lib/jalali';
-import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
-import { formatBloodPressureInput, hasAnyVital, parseVitalForm, vitalChips, type VitalForm } from './logic';
+import { hasAnyVital, parseVitalForm, vitalChips, vitalEditPatch, vitalFormOf, type VitalForm } from './logic';
 import { deleteVital, patientVitalsQuery, recordVital, updateVital, vitalSeries, type VitalSeriesKey } from './queries';
 
 const SERIES: { value: VitalSeriesKey; label: string }[] = [
@@ -53,72 +54,81 @@ const EMPTY: VitalForm = {
  */
 export function VitalsTab({ patientId }: { patientId: string }) {
   const { colors, spacing } = useTheme();
-  const { data, error } = useLive(patientVitalsQuery(patientId), [patientId]);
+  const now = useNow();
+  const { data, error, retry } = useLive(patientVitalsQuery(patientId), [patientId]);
   const rows = data ?? [];
 
   const [form, setForm] = useState<VitalForm>(EMPTY);
-  const [editing, setEditing] = useState<string | null>(null);
+  const latestForm = useRef(form);
+  const [editing, setEditing] = useState<Vital | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const dateValidation = useDateValidation();
   const [errors, setErrors] = useState<Partial<Record<keyof VitalForm, string>>>({});
-  const [measuredAt, setMeasuredAt] = useState(() => new Date());
+  const [measuredAt, setMeasuredAt] = useState(() => new Date(now));
+  const latestDate = useRef(measuredAt);
   const [series, setSeries] = useState<VitalSeriesKey>('systolic');
 
-  const set = (key: keyof VitalForm, value: string) => setForm((f) => ({ ...f, [key]: value }));
+  function replaceForm(value: VitalForm) {
+    latestForm.current = value;
+    setForm(value);
+  }
+  function set(key: keyof VitalForm, value: string) {
+    if (!submitting.current) replaceForm({ ...latestForm.current, [key]: value });
+  }
+  function setDate(value: Date) {
+    if (submitting.current) return;
+    latestDate.current = value;
+    setMeasuredAt(value);
+  }
 
   function startNew() {
-    setForm(EMPTY);
+    if (submitting.current) return;
+    replaceForm(EMPTY);
     setErrors({});
-    setMeasuredAt(new Date());
+    setDate(new Date(now));
     setEditing(null);
     setOpen(true);
   }
 
   function startEdit(id: string) {
+    if (submitting.current) return;
     const row = rows.find((r) => r.id === id);
     if (!row) return;
     setErrors({});
-    setMeasuredAt(row.measuredAt);
-    setForm({
-      bp: formatBloodPressureInput(row.systolic, row.diastolic),
-      heartRate: row.heartRate?.toString() ?? '',
-      respRate: row.respRate?.toString() ?? '',
-      temperature: row.temperature?.toString() ?? '',
-      spo2: row.spo2?.toString() ?? '',
-      bloodSugar: row.bloodSugar?.toString() ?? '',
-      weightKg: row.weightKg?.toString() ?? '',
-      heightCm: row.heightCm?.toString() ?? '',
-      painScore: row.painScore?.toString() ?? '',
-      urineOutput: row.urineOutput ?? '',
-      notes: row.notes ?? '',
-    });
-    setEditing(id);
+    setDate(row.measuredAt);
+    replaceForm(vitalFormOf(row));
+    setEditing(row);
     setOpen(true);
   }
 
   async function save() {
+    if (submitting.current) return;
     if (!dateValidation.check()) return;
-    const parsed = parseVitalForm(form);
+    const raw = latestForm.current;
+    const parsed = parseVitalForm(raw);
     setErrors(parsed.ok ? {} : parsed.errors);
     if (!parsed.ok) return;
-    const values = { ...parsed.values, measuredAt };
+    const values = { ...parsed.values, measuredAt: latestDate.current };
 
     if (!hasAnyVital(values)) {
       notify('چیزی ثبت نشده', 'حداقل یک اندازه‌گیری بنویسید.');
       return;
     }
 
+    submitting.current = true;
     setBusy(true);
     try {
-      if (editing) await updateVital(editing, values);
-      else await recordVital({ patientId, ...values });
-      setForm(EMPTY);
+      if (editing) await updateVital(editing.id, vitalEditPatch(editing, raw, values), new Date(now), editing);
+      else await recordVital({ patientId, ...values }, new Date(now));
+      replaceForm(EMPTY);
       setEditing(null);
       setOpen(false);
     } catch (e) {
       alertError('ثبت نشد', e);
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -129,7 +139,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="md" style={{ paddingTop: spacing.md }}>
-      <ErrorNotice error={error} what="علائم حیاتی" />
+      <ErrorNotice error={error} what="علائم حیاتی" onRetry={retry} />
 
       {open ? (
         <Card tone="alt">
@@ -138,7 +148,8 @@ export function VitalsTab({ patientId }: { patientId: string }) {
               onValidityChange={dateValidation.setValid}
               label="زمان اندازه‌گیری"
               value={measuredAt}
-              onChange={setMeasuredAt}
+              onChange={setDate}
+              disabled={busy}
               direction="past"
               withTime
             />
@@ -150,6 +161,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="فشار (mmHg)"
                   error={errors.bp}
                   value={form.bp}
+                  editable={!busy}
                   onChangeText={(v) => set('bp', v)}
                   placeholder="120/80"
                   ltr
@@ -160,6 +172,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="نبض"
                   error={errors.heartRate}
                   value={form.heartRate}
+                  editable={!busy}
                   onChangeText={(v) => set('heartRate', v)}
                   keyboardType="numeric"
                   numericFold
@@ -174,6 +187,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="دما (°C)"
                   error={errors.temperature}
                   value={form.temperature}
+                  editable={!busy}
                   onChangeText={(v) => set('temperature', v)}
                   keyboardType="numeric"
                   numericFold
@@ -185,6 +199,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="اشباع اکسیژن"
                   error={errors.spo2}
                   value={form.spo2}
+                  editable={!busy}
                   onChangeText={(v) => set('spo2', v)}
                   keyboardType="numeric"
                   numericFold
@@ -196,6 +211,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="تنفس"
                   error={errors.respRate}
                   value={form.respRate}
+                  editable={!busy}
                   onChangeText={(v) => set('respRate', v)}
                   keyboardType="numeric"
                   numericFold
@@ -210,6 +226,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="قند"
                   error={errors.bloodSugar}
                   value={form.bloodSugar}
+                  editable={!busy}
                   onChangeText={(v) => set('bloodSugar', v)}
                   keyboardType="numeric"
                   numericFold
@@ -221,6 +238,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="وزن (kg)"
                   error={errors.weightKg}
                   value={form.weightKg}
+                  editable={!busy}
                   onChangeText={(v) => set('weightKg', v)}
                   keyboardType="numeric"
                   numericFold
@@ -232,6 +250,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="قد (cm)"
                   error={errors.heightCm}
                   value={form.heightCm}
+                  editable={!busy}
                   onChangeText={(v) => set('heightCm', v)}
                   keyboardType="numeric"
                   numericFold
@@ -246,6 +265,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                   label="درد (0 تا 10)"
                   error={errors.painScore}
                   value={form.painScore}
+                  editable={!busy}
                   onChangeText={(v) => set('painScore', v)}
                   keyboardType="numeric"
                   numericFold
@@ -256,6 +276,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                 <Input
                   label="ادرار"
                   value={form.urineOutput}
+                  editable={!busy}
                   onChangeText={(v) => set('urineOutput', v)}
                   placeholder="مثلاً 1200 mL/24h"
                   ltr
@@ -263,7 +284,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
               </View>
             </Row>
 
-            <Input label="توضیح" value={form.notes} onChangeText={(v) => set('notes', v)} multiline />
+            <Input label="توضیح" value={form.notes} editable={!busy} onChangeText={(v) => set('notes', v)} multiline />
 
             <Row gap="sm">
               <Button label="ثبت" icon="checkmark" onPress={() => void save()} loading={busy} />
@@ -273,6 +294,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                 variant="ghost"
                 haptic={false}
                 onPress={() => {
+                  if (submitting.current) return;
                   setOpen(false);
                   setEditing(null);
                 }}
@@ -284,7 +306,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
         <Button label="اندازه‌گیری تازه" icon="add" variant="secondary" onPress={startNew} full />
       )}
 
-      {rows.length === 0 && data !== undefined ? (
+      {rows.length === 0 && data !== undefined && !error ? (
         <EmptyState
           icon="pulse-outline"
           title="هنوز اندازه‌گیری‌ای ثبت نشده"
@@ -304,13 +326,14 @@ export function VitalsTab({ patientId }: { patientId: string }) {
 
       {rows.length > 0 ? (
         <>
-          <SectionHeader title="اندازه‌گیری‌ها" count={rows.length} />
+          <SectionHeader title="اندازه‌گیری‌ها" count={data !== undefined && !error ? rows.length : undefined} />
           <Column gap="sm">
             {rows.map((row) => {
               const chips = vitalChips(row);
               return (
                 <Pressable
                   key={row.id}
+                  disabled={busy}
                   onPress={() => startEdit(row.id)}
                   onLongPress={() =>
                     Alert.alert('حذف این اندازه‌گیری؟', formatJalaliDateTime(row.measuredAt), [
@@ -318,7 +341,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                       {
                         text: 'حذف',
                         style: 'destructive',
-                        onPress: () => void deleteVital(row.id).catch((e) => alertError('حذف نشد', e)),
+                        onPress: () => void deleteVital(row.id, new Date(now)).catch((e) => alertError('حذف نشد', e)),
                       },
                     ])
                   }
@@ -354,7 +377,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
             })}
           </Column>
           <Text variant="tiny" color="textFaint" style={{ color: colors.textFaint }}>
-            برای اصلاح یک اندازه‌گیری رویش بزنید؛ برای حذف، نگه دارید. {toPersianDigits(rows.length)} مورد ثبت شده.
+            ویرایش: لمس · حذف: نگه‌داشتن
           </Text>
         </>
       ) : null}

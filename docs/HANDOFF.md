@@ -33,6 +33,40 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-02 — Correct vitals atomically and shorten media capture layout
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; native/artifact gates pending.
+
+**Changed**
+- 0.11.15 / code 31: vitals check live patient/encounter ownership and merged
+  validity in synchronous transactions. Editor sends local-field patches,
+  refuses changed field/BP-pair/time/encounter context, reads latest input and
+  prevents duplicate submission. Read retry retains loaded text.
+- Empty photo area is one caption; existing voice recorder precedes voice rows.
+  No schema/dependency/permission/route/clinical rule or backup-format change.
+
+**Verified**
+- Reproduced defects before fixing; permanent real-SQLite/query and actual
+  form-handler tests cover the boundaries. Full `npm run check`: 96 suites /
+  1204 app tests + 3 workflows. Migration generation: 41 tables, no change.
+
+**Not verified**
+- This source's APK/CI/native gates are pending; the installed emulator is 0.11.14.
+  Raw vitals drafts still do not recover after process death or leaving the tab.
+  No phone, power/low-space, clinical or complete workflow acceptance.
+
+**Open threads**
+- Freeze app source, build/inspect both ABIs and upgrade the owned emulator;
+  verify native vitals, smaller media layout and archived observation metadata.
+- Then persistent stopped-voice operations, restore exclusion/dataset identity,
+  raw manual forms and original-before-crop. Ledger gates remain authoritative.
+
+**Gotchas**
+- Form tests use a native Pressable proxy to expose callbacks, not a native tap.
+  Early fixture failures were corrected before collecting product witnesses.
+  Do not call a query/conflict test native evidence or autosave completion.
+
 ## 2026-10-02 — Pin native voice recovery, restore and publication evidence
 
 **Agent:** GPT-6 via Codex
