@@ -33,6 +33,46 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-02 — Pin native voice recovery, restore and publication evidence
+
+**Agent:** GPT-6 via Codex
+**Commits:** evidence in this commit; application source `1a7d6d9`.
+
+**Changed**
+- `validation-0.11.14.md` pins exact-source CI, both signed artifacts, installed
+  hash equality and bounded native/independent archive evidence. Ledger updated.
+  No application, dependency, schema, permission or format change.
+
+**Verified**
+- Full `npm run check`: 95 suites / 1178 app tests + 3 workflows, all gates green.
+  Source CI [36935106084](https://github.com/CodeinScrubs/medos/actions/runs/36935106084)
+  succeeds with exact head `1a7d6d9`. Signed arm64/x86_64 native/ABI/signature gates.
+- Isolated offline emulator: permission denial/retry; recording Back/manual stop/
+  tab exit; playing state; acknowledged cold new/existing note and capture recovery.
+- Actual old/current SAF restores, cold draft recovery and fresh backup: all 38
+  application tables and seven media entries match the current archive. Independent
+  crypto/SQLite/FFmpeg checks pass. Restored publication creates one note/version/
+  voice, retires/links its draft and preserves the original recorded time.
+
+**Not verified**
+- No physical-phone, speech quality, critical-swap/commit interruption, power-loss,
+  full-disk or complete old-editor/ordinary-write-versus-restore acceptance.
+- In-process staging is not a persistent stopped-voice journal. The emulator's
+  disappearance had unknown timing; its final older dataset was checked separately.
+
+**Open threads**
+- Reproduce/harden remaining clinical child mutations, starting with vitals:
+  live parent/encounter ownership and merged validation must share the write transaction.
+- Continue durable voice recovery, original-before-crop photos, restore generation/
+  ordinary writes and other raw manual forms. Compact the verified media empty
+  illustration above existing voices. Product and clinical tools are not complete.
+
+**Gotchas**
+- Active timers/progress can defeat idle UI dumps. The private native helper still
+  requires freshly written nonempty XML; runner exit text alone is insufficient.
+- Old restores intentionally retain unreferenced newer media. Do not silently
+  delete originals to force equal archive size. Private QA reports stay ignored.
+
 ## 2026-10-02 — Acknowledge stopped voice only after retryable persistence
 
 **Agent:** GPT-6 via Codex
