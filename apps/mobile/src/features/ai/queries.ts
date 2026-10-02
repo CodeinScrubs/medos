@@ -420,7 +420,7 @@ export async function commitAiPlan(input: CommitAiPlanInput): Promise<CommitAiPl
   });
 
   // Audit asynchronously outside the transaction
-  void audit('note.versionsBackfilled', {
+  void audit('ai.planCommitted', {
     entityType: 'patient',
     entityId: input.patientId,
     summary: `ورود برنامه درمانی هوش مصنوعی: ${result.orderIds.length} سفارش، ${result.consultIds.length} مشاوره، ${result.taskIds.length} تسک`,

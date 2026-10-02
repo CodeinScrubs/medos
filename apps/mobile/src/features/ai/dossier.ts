@@ -209,11 +209,12 @@ export function buildPatientDossier(data: DossierData, options: DossierOptions =
   if (activeEncounter) {
     lines.push(`- **Encounter Kind:** ${activeEncounter.kind}`);
     if (activeEncounter.hospitalName || activeEncounter.ward) {
-      lines.push(
-        `- **Ward / Location:** ${activeEncounter.hospitalName || 'Hospital'}${activeEncounter.ward ? ` - Ward: ${activeEncounter.ward}` : ''}${activeEncounter.bed ? `, Bed: ${activeEncounter.bed}` : ''}`,
-      );
+      const hospitalPart = deidentify ? 'Hospital' : activeEncounter.hospitalName || 'Hospital';
+      const wardPart = activeEncounter.ward ? ` - Ward: ${activeEncounter.ward}` : '';
+      const bedPart = activeEncounter.bed && !deidentify ? `, Bed: ${activeEncounter.bed}` : '';
+      lines.push(`- **Ward / Location:** ${hospitalPart}${wardPart}${bedPart}`);
     }
-    if (activeEncounter.attendingName) {
+    if (activeEncounter.attendingName && !deidentify) {
       lines.push(`- **Attending Physician:** ${activeEncounter.attendingName}`);
     }
     if (activeEncounter.admittedAt) {

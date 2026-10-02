@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 
 import { alertError, notify } from '@/components/feedback';
@@ -24,6 +24,7 @@ export function PlanStagingModal({
 }) {
   const { colors, radii, spacing, shadows } = useTheme();
 
+  const committingRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [saveNote, setSaveNote] = useState(true);
   const [assessment, setAssessment] = useState(plan?.assessment ?? '');
@@ -56,11 +57,13 @@ export function PlanStagingModal({
     tasks.filter((t) => t.selected).length;
 
   const handleCommit = async () => {
+    if (committingRef.current) return;
     if (totalSelected === 0) {
       notify('هیچ موردی انتخاب نشده است', 'حداقل یک دارو، آزمایش، تسک یا نوت را برای ثبت انتخاب کنید.');
       return;
     }
 
+    committingRef.current = true;
     setSaving(true);
     try {
       await commitAiPlan({
@@ -78,9 +81,9 @@ export function PlanStagingModal({
       onCommitted();
       onClose();
     } catch (e) {
-      alertError('ثبت برنامه انجام نشد', e);
-    } finally {
+      committingRef.current = false;
       setSaving(false);
+      alertError('ثبت برنامه انجام نشد', e);
     }
   };
 

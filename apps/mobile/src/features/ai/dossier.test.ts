@@ -134,6 +134,8 @@ describe('buildPatientDossier', () => {
     expect(text).not.toContain('1234567890');
     expect(text).not.toContain('09171234567');
     expect(text).not.toContain('Zand Street');
+    expect(text).not.toContain('Dr. Rasaei');
+    expect(text).not.toContain('Namazi Hospital');
 
     // Should include clinical pseudonym
     expect(text).toContain('Patient #F-');
@@ -147,13 +149,14 @@ describe('buildPatientDossier', () => {
     expect(text).toContain('1234567890');
     expect(text).toContain('09171234567');
     expect(text).toContain('Zand Street');
+    expect(text).toContain('Dr. Rasaei');
+    expect(text).toContain('Namazi Hospital');
   });
 
   it('includes clinical trajectory, vitals, kardex, and abnormal labs', () => {
     const text = buildPatientDossier(sampleData, { now: fixedNow });
 
     // Trajectory
-    expect(text).toContain('Namazi Hospital');
     expect(text).toContain('Ward: Surgery');
     expect(text).toContain('HD #3');
 
