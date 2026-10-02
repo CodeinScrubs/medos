@@ -33,6 +33,50 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-02 — Verify vitals on Android and pin remaining chart/voice gaps
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `07348b5`; evidence in this commit.
+
+**Changed**
+- Pin 0.11.15 source/CI, owner and emulator APKs, actual upgrade/hash equality,
+  native cases and independently decoded archive in `validation-0.11.15.md`.
+  No application change in this evidence commit.
+
+**Verified**
+- Full local/pre-push gate: 96 suites / 1204 app tests + 3 workflows; exact-source
+  CI [36984708901](https://github.com/CodeinScrubs/medos/actions/runs/36984708901)
+  succeeded. In-band open-handle diagnostic passed without a report; it did not
+  explain the pre-push worker teardown warning.
+- Signed arm64/x86_64 artifacts and isolated offline upgrade without data reset.
+  Native partial BP/create/cold reopen/edit, invalid BP/time refusal, chart series,
+  confirmed soft delete; smaller media caption/recorder placement and playback;
+  acknowledged recording Back/cold recovery; bounded large-font/dark controls.
+- SAF full backup authenticates; SQLite integrity/FKs and observation metadata
+  pass. Thirty-six unchanged tables, seven old attachment rows/media files exact;
+  eight referenced audio files fully decode.
+
+**Not verified**
+- Raw vitals draft recovery, native conflict/failure injection, physical phone,
+  power/low-space, full restore concurrency or complete clinical workflows.
+- Chart endpoint date is clipped. An early pre-ack force-stop left a new empty
+  unreferenced audio file and no added attachment; interruption stage unknown.
+  Archive authenticity is not evidence of recovering that recording.
+
+**Open threads**
+- Cover active recording/start/stop/pending acknowledgement versus backup/restore;
+  current file-job lease only begins in the stopped-recording callback.
+- Correct chart endpoint anchors and dense final date-label spacing. Then durable
+  stopped-voice operations, dataset/ordinary-write/editor restore exclusion, raw
+  manual forms and original-before-crop; keep the ledger gates open.
+
+**Gotchas**
+- Baseline published 0.11.14 has seven voices, not the six from before publication.
+  Wait for observed acknowledgement before a post-ack force-stop test. Native
+  labels/inputs flatten: use fresh XML bounds and a unique lower overlapping field,
+  not assumed parent wrappers or screenshot coordinates. An incomplete fixture
+  assertion is not a product failure.
+
 ## 2026-10-02 — Correct vitals atomically and shorten media capture layout
 
 **Agent:** GPT-6 via Codex
