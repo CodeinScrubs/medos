@@ -25,7 +25,7 @@ import { CallRow } from './patient-header';
 import { PatientSnapshot } from './patient-snapshot';
 import { deletePatientContact, patientContactsQuery } from './queries';
 
-export function OverviewTab({ patient }: { patient: Patient }) {
+export function OverviewTab({ patient, onOpenAiConsult }: { patient: Patient; onOpenAiConsult?: () => void }) {
   const router = useRouter();
   const { colors } = useTheme();
   const patientId = patient.id;
@@ -47,6 +47,23 @@ export function OverviewTab({ patient }: { patient: Patient }) {
   return (
     <Column gap="none">
       <AdmissionCard patientId={patientId} />
+
+      {onOpenAiConsult ? (
+        <Card tone="alt" style={{ marginBottom: 12 }}>
+          <Row justify="space-between" align="center">
+            <Row gap="sm" align="center" style={{ flex: 1 }}>
+              <Ionicons name="sparkles" size={20} color={colors.primary} />
+              <Column gap="none" style={{ flex: 1 }}>
+                <Text variant="captionStrong">مشاوره بالینی با هوش مصنوعی</Text>
+                <Text variant="tiny" color="textMuted">
+                  صدور پرونده SBAR، تحلیل تشخیصی/درمانی و ثبت مستقیم برنامه
+                </Text>
+              </Column>
+            </Row>
+            <Button label="مشاوره" icon="sparkles-outline" size="sm" onPress={onOpenAiConsult} />
+          </Row>
+        </Card>
+      ) : null}
 
       <PatientSnapshot patientId={patientId} />
 

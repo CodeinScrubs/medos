@@ -9,6 +9,7 @@ import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, EmptyState, IconButton, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
+import { AiConsultModal } from '@/features/ai/ai-consult-modal';
 import { MediaTab } from '@/features/attachments/media-tab';
 import { ImagingTab } from '@/features/imaging/imaging-tab';
 import { KardexTab } from '@/features/kardex/kardex-tab';
@@ -56,6 +57,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
   const { width, fontScale } = useWindowDimensions();
   const wideTabs = (width - spacing.lg * 2) / fontScale < 320;
   const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : 'overview');
+  const [aiModalVisible, setAiModalVisible] = useState(false);
   useEffect(() => {
     if (!isTab(initialTab)) return;
     let current = true;
@@ -136,6 +138,11 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
           headerRight: () => (
             <Row gap="xs">
               <IconButton
+                icon="sparkles-outline"
+                label="مشاوره با هوش مصنوعی"
+                onPress={() => setAiModalVisible(true)}
+              />
+              <IconButton
                 icon="create-outline"
                 label="ویرایش"
                 onPress={() =>
@@ -194,7 +201,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
             })}
           </View>
 
-          {tab === 'overview' && <OverviewTab patient={patient} />}
+          {tab === 'overview' && <OverviewTab patient={patient} onOpenAiConsult={() => setAiModalVisible(true)} />}
           {tab === 'timeline' && <TimelineTab patientId={id} />}
           {tab === 'notes' && <NotesTab patientId={id} />}
           {tab === 'kardex' && <KardexTab patientId={id} />}
@@ -204,6 +211,8 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
           {tab === 'media' && <MediaTab patientId={id} />}
         </Column>
       </Screen>
+
+      <AiConsultModal visible={aiModalVisible} patientId={id} onClose={() => setAiModalVisible(false)} />
     </>
   );
 }
