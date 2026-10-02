@@ -4,9 +4,12 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
-import { Button, EmptyState, Input } from '@/components/ui';
+import { Button, EmptyState, Input, Text } from '@/components/ui';
 import { shiftPatients } from '@/db/schema';
+import { createOrder } from '@/features/kardex/queries';
+import { createLabPanel } from '@/features/labs/queries';
 import { createPatient } from '@/features/patients/queries';
+import { recordVital } from '@/features/vitals/queries';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -23,7 +26,8 @@ jest.mock('expo-sqlite', () => ({
 }));
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), replace: jest.fn() }) }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, replace: jest.fn() }) }));
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicon');
 jest.mock('react-native-keyboard-controller', () => ({ KeyboardAwareScrollView: 'KeyboardAwareScrollView' }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
@@ -49,6 +53,7 @@ jest.mock('@/features/tasks/tasks-section', () => ({ TasksSection: 'TasksSection
 
 let tree: ReactTestRenderer | undefined;
 let db: TestDatabase;
+let firstPatientId: string;
 let firstMember: string;
 let secondMember: string;
 const keyboard = new Map<string, () => void>();
@@ -102,6 +107,7 @@ beforeEach(async () => {
   const shiftId = await queries.startShift();
   const first = await createPatient({ firstName: 'Example', lastName: 'One' });
   const second = await createPatient({ firstName: 'Example', lastName: 'Two' });
+  firstPatientId = first;
   firstMember = await queries.addPatientToShift(shiftId, first, { shiftSummary: 'First context' });
   secondMember = await queries.addPatientToShift(shiftId, second, { shiftSummary: 'Second context' });
 });
@@ -340,5 +346,70 @@ describe('round footer with real autosave scope, useLive and SQLite', () => {
     });
     await press('بعدی');
     expect(member(firstMember).handoffNote).toBe('Before read failure');
+  });
+});
+
+describe('bedside round cockpit', () => {
+  it('renders vitals chips, running kardex orders, and flagged labs with quick navigation buttons', async () => {
+    await recordVital({
+      patientId: firstPatientId,
+      systolic: 120,
+      diastolic: 80,
+      heartRate: 72,
+      spo2: 98,
+      measuredAt: new Date(),
+    });
+    await createOrder({
+      patientId: firstPatientId,
+      kind: 'drug',
+      name: 'Cefazolin',
+      dose: '1g',
+      route: 'IV',
+      frequency: 'Q8H',
+      startAt: new Date(),
+    });
+    await createLabPanel({
+      patientId: firstPatientId,
+      collectedAt: new Date(),
+      source: 'manual',
+      values: [{ analyte: 'Cr', value: '3.4', refLow: 0.6, refHigh: 1.2 }],
+    });
+
+    await render(RoundScreen);
+
+    // Bedside shortcut buttons exist
+    const vitalsBtn = button('علائم');
+    const kardexBtn = button('کاردکس');
+    expect(vitalsBtn).toBeDefined();
+    expect(kardexBtn).toBeDefined();
+
+    // Clicking them routes directly to patient vitals/kardex tab
+    await act(async () => {
+      vitalsBtn.props.onPress();
+      await settle();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/patient/[id]',
+      params: { id: firstPatientId, tab: 'vitals' },
+    });
+
+    await act(async () => {
+      kardexBtn.props.onPress();
+      await settle();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/patient/[id]',
+      params: { id: firstPatientId, tab: 'kardex' },
+    });
+
+    // Check rendered text content
+    const textNodes = tree!.root.findAllByType(Text);
+    const renderedTexts = textNodes.map((n) =>
+      Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children ?? ''),
+    );
+    expect(renderedTexts.some((t) => t.includes('علائم حیاتی'))).toBe(true);
+    expect(renderedTexts.some((t) => t.includes('Cefazolin'))).toBe(true);
+    expect(renderedTexts.some((t) => t.includes('آزمایش‌های هشدار'))).toBe(true);
+    expect(renderedTexts.some((t) => t.includes('Cr'))).toBe(true);
   });
 });
