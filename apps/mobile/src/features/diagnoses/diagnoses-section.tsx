@@ -11,6 +11,7 @@ import { useTheme } from '@/theme';
 
 import { DIAGNOSIS_KIND_LABELS, DIAGNOSIS_STATUS_LABELS } from './labels';
 import { addDiagnosis, deleteDiagnosis, patientDiagnosesQuery, setDiagnosisStatus, updateDiagnosis } from './queries';
+import { matchImpressions } from './suggestions';
 
 const KINDS: { value: Diagnosis['kind']; label: string }[] = (
   ['primary', 'secondary', 'rule_out', 'complication', 'past'] as const
@@ -42,6 +43,8 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
   const [chosenKind, setChosenKind] = useState<Diagnosis['kind'] | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Diagnosis | null>(null);
+
+  const suggestions = title.trim() ? matchImpressions(title, 4) : [];
 
   const active = rows.filter((d) => d.status === 'active');
   const closed = rows.filter((d) => d.status !== 'active');
@@ -106,6 +109,33 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
           </View>
           <Button label="افزودن" icon="add" variant="secondary" onPress={() => void add()} loading={busy} />
         </Row>
+        {suggestions.length > 0 ? (
+          <Row gap="xs" wrap style={{ marginTop: -spacing.xs, marginBottom: spacing.xxs }}>
+            {suggestions.map((s) => (
+              <Pressable
+                key={s.abbr}
+                onPress={() => setTitle(`${s.full} (${s.abbr})`)}
+                style={({ pressed }) => [
+                  styles.suggestionChip,
+                  {
+                    backgroundColor: colors.surfaceAlt,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <Row gap="xxs" align="center">
+                  <Text variant="captionStrong" color="primary">
+                    {s.abbr}
+                  </Text>
+                  <Text variant="tiny" color="textMuted">
+                    • {s.full}
+                  </Text>
+                </Row>
+              </Pressable>
+            ))}
+          </Row>
+        ) : null}
         {/* Always visible, so the kind can be picked before typing: shown only while
             typing, the chip needed a tap with the keyboard up, and a tap that only
             closed the keyboard saved the default kind instead. */}
@@ -189,4 +219,10 @@ const styles = StyleSheet.create({
   faded: { opacity: 0.6 },
   grow: { flex: 1 },
   ltr: { writingDirection: 'ltr' },
+  suggestionChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
 });
