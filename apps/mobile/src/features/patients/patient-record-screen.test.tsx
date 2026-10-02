@@ -66,6 +66,7 @@ jest.mock('@/features/vitals/vitals-tab', () => ({ VitalsTab: 'VitalsTab' }));
 jest.mock('@/features/labs/labs-tab', () => ({ LabsTab: 'LabsTab' }));
 jest.mock('@/features/imaging/imaging-tab', () => ({ ImagingTab: 'ImagingTab' }));
 jest.mock('@/features/attachments/media-tab', () => ({ MediaTab: 'MediaTab' }));
+jest.mock('@/features/ai/ai-consult-modal', () => ({ AiConsultModal: 'AiConsultModal' }));
 
 let tree: ReactTestRenderer;
 async function settle() {
