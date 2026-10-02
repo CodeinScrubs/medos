@@ -70,6 +70,8 @@ export function AnswerEditor({
   });
   const latest = useRef(fields);
   const acting = useRef(false);
+  const committed = useRef(false);
+  const [isCommitted, setIsCommitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [operationFailed, setOperationFailed] = useState(false);
   const [comparison, setComparison] = useState<Consultation | null>(null);
@@ -104,7 +106,7 @@ export function AnswerEditor({
   }, [saver]);
 
   function update(patch: Partial<AnswerDraft>) {
-    if (acting.current || !editable) return;
+    if (acting.current || committed.current || !editable) return;
     const next = { ...latest.current, ...patch };
     latest.current = next;
     setFields(next);
@@ -112,7 +114,7 @@ export function AnswerEditor({
   }
 
   async function act(action: () => Promise<void>) {
-    if (acting.current) return;
+    if (acting.current || committed.current) return;
     acting.current = true;
     setBusy(true);
     try {
@@ -128,17 +130,27 @@ export function AnswerEditor({
   }
 
   async function publish() {
+    if (committed.current) return;
     if (!latest.current.response.trim()) {
       notify('پاسخ کانسالت را بنویسید.');
       return;
     }
     if (!(await saver.flush()) || saver.unsaved) return;
-    await commitConsultAnswerDraft(initial.id, persistence.getRevision());
-    saver.cancel();
-    router.back();
+    committed.current = true;
+    setIsCommitted(true);
+    try {
+      await commitConsultAnswerDraft(initial.id, persistence.getRevision());
+      saver.cancel();
+      router.back();
+    } catch (error) {
+      committed.current = false;
+      setIsCommitted(false);
+      throw error;
+    }
   }
 
   async function compare() {
+    if (committed.current) return;
     // Drain an in-flight write before taking the comparison snapshot, even if it fails.
     await saver.flush();
     const row = (await consultQuery(initial.id, true))[0];
@@ -200,7 +212,13 @@ export function AnswerEditor({
                 />
               </>
             ) : null}
-            <Button label="ثبت پاسخ" icon="checkmark" loading={busy} onPress={() => void act(publish)} />
+            <Button
+              label="ثبت پاسخ"
+              icon="checkmark"
+              loading={busy}
+              disabled={isCommitted}
+              onPress={() => void act(publish)}
+            />
           </>
         ) : (
           <>
