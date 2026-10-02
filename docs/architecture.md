@@ -1039,3 +1039,45 @@ The live migration-count reader now refuses failed, missing or zero local metada
 instead of publishing schema zero or claiming a valid backup is newer. Historic
 manifest parsing, including schema zero, and all archive/passphrase schemes remain
 unchanged. Failures occur before destination publication or clinical replacement.
+
+---
+
+## Recording lifecycle versus file maintenance (0.11.16)
+
+`reserveFileJob` extends the existing in-process file-work exclusion to lifecycles
+that do not fit one callback. Its release is idempotent; `withFileJob` uses the
+same acquisition rather than a second counter. Independent jobs remain allowed.
+VoiceRecorder reserves before permission, keeps ownership through native start,
+active recording, stop, staging and awaited metadata acknowledgement. Failed stop,
+missing URI or failed acknowledgement retains ownership while the editor can retry.
+Denied permission, failed preparation, intentional discard, a sub-500 ms stop or
+successful acknowledgement releases it. Backup/restore/recovery refuse that
+reservation before yielding; automatic backup skips it without a false failed run.
+
+Unmount checks prevent a delayed permission/preparation result from starting a
+recorder after its native object was released. Cleanup waits for an outstanding
+operation before releasing ownership, and does not navigate a removed screen.
+Normal screen/tab exit still uses the route's one AutosaveScope, not another guard.
+This relies on expo-audio's installed native-object lifecycle contract; stand-in
+tests do not prove every native cancellation path.
+
+Tradeoff: a long recording or unresolved handoff postpones maintenance, even a
+metadata-only backup. Starting ownership only inside `onRecorded` was rejected:
+restore could replace the dataset during preparation/recording/stop. No journal,
+schema, dependency, permission or general write lock was added. Process-death
+recovery, ordinary clinical writes/old editors versus restore and original photo
+capture remain separate gates; this reservation does not complete those contracts.
+
+## Chart dates fit the plot (0.11.16)
+
+Date labels use inward anchors at the first/last points and a conservative glyph
+width budget for their actual format. A small pure sampler selects at most five
+rounded point indices and reduces that count until adjacent labels have room.
+Narrow plots retain only the latest date; single-point labels remain centred.
+Every clinical point and the existing index-based spacing, units, bounds, numeric
+axis and reference band remain unchanged. The old stride plus unconditional final
+label could create six dates or a closely spaced final pair and clip the endpoint.
+
+Tradeoff: fewer date captions on a narrow phone instead of collisions. All readings
+and exact timestamps remain in the list. Width is a conservative estimate, not
+native font measurement; real SVG rendering still needs screenshot acceptance.

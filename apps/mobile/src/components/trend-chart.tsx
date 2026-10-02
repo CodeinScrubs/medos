@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
+import { chartDateIndices } from '@/lib/chart-dates';
 import { useTheme } from '@/theme';
 
 export type TrendPoint = {
@@ -10,7 +11,7 @@ export type TrendPoint = {
   flag?: 'high' | 'low' | 'normal' | 'critical_high' | 'critical_low' | null;
   /**
    * The result was reported as a bound, not a number: `>100` is drawn at 100
-   * with an arrow, because the true value is somewhere above it. Plotting it
+   * with a triangle, because the true value is somewhere above it. Plotting it
    * as the plain number puts a ">1000 mg/L" next to a 90 and makes it look
    * like the same measurement.
    */
@@ -86,8 +87,11 @@ export function TrendChart({
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const ticks = niceTicks(yMin, yMax);
 
-  // Label at most ~5 dates so they never collide on a narrow phone.
-  const labelEvery = Math.max(1, Math.ceil(points.length / 5));
+  // Budget for the actual date format: vitals include the year; labs use
+  // shorter month/day labels. Native glyph layout still needs visual review.
+  const dateLabels = points.map((p) => formatDate(p.at));
+  const labelWidth = Math.max(...dateLabels.map((label) => Array.from(label).length), 1) * 6.5;
+  const dateIndices = width >= labelWidth + PAD.right ? chartDateIndices(points.length, plotW, labelWidth) : [];
 
   const pointColor = (flag: TrendPoint['flag']) =>
     flag === 'high' || flag === 'critical_high'
@@ -157,21 +161,21 @@ export function TrendChart({
             return <Circle key={`p${i}`} cx={cx} cy={cy} r={4.5} fill={fill} stroke={stroke} strokeWidth={2} />;
           })}
 
-          {points.map((p, i) =>
-            i % labelEvery === 0 || i === points.length - 1 ? (
-              <SvgText
-                key={`d${i}`}
-                x={x(i)}
-                y={height - 8}
-                fontSize={10}
-                fontFamily={typography.tiny.fontFamily}
-                fill={colors.textFaint}
-                textAnchor="middle"
-              >
-                {formatDate(p.at)}
-              </SvgText>
-            ) : null,
-          )}
+          {dateIndices.map((i) => (
+            <SvgText
+              key={`d${i}`}
+              x={x(i)}
+              y={height - 8}
+              fontSize={10}
+              fontFamily={typography.tiny.fontFamily}
+              fill={colors.textFaint}
+              textAnchor={
+                points.length === 1 ? 'middle' : i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'
+              }
+            >
+              {dateLabels[i]}
+            </SvgText>
+          ))}
         </Svg>
       )}
     </View>

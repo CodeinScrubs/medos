@@ -33,6 +33,39 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Cover recording lifecycle and fit chart dates
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; artifact/native gates pending.
+
+**Changed**
+- Reuse the file-job exclusion from before microphone permission through recording,
+  stop and acknowledged persistence. Keep it on failure; release after settlement,
+  including delayed unmount. Do not start a removed recorder or navigate it.
+- Inward chart date anchors and bounded sampling keep dense trailing labels apart,
+  preserving all clinical points. Version 0.11.16 / code 32; no schema/dependency.
+
+**Verified**
+- Baseline full gate: 96 suites / 1204 app tests + 3 workflows. Corrected recorder
+  witnesses 10 failed / 11 passed; chart witnesses 7 failed on the old code.
+- Full current-source `npm run check`: 98 suites / 1229 app tests + 3 workflows.
+  Recorder handlers include stale/unmounted start/retry and failed in-flight
+  acknowledgement cleanup. See validation-0.11.16.md for exact scope.
+
+**Not verified**
+- Current native artifacts, exact-source CI, native concurrent maintenance,
+  phone audio/permission lifecycle, pre-ack process-death or power/low-space.
+
+**Open threads**
+- Finish signed artifacts, exact-source CI and isolated native date/voice/backup checks.
+- Then persistent stopped-voice UUID operations, dataset/ordinary-write/old-editor
+  restore exclusion, raw manual forms and original-before-crop; wider gates stay open.
+
+**Gotchas**
+- A failing reservation assertion must release a successfully acquired lock; pending
+  test promises must settle during cleanup. Otherwise a witness poisons later tests.
+- Use main-branch/head-specific hosted CI; other branches also have successful runs.
+
 ## 2026-10-02 — Verify vitals on Android and pin remaining chart/voice gaps
 
 **Agent:** GPT-6 via Codex

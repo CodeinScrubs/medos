@@ -1,5 +1,5 @@
 /**
- * In-process exclusion for complete call-file jobs and backup/restore/recovery.
+ * In-process exclusion for imports/recordings and backup/restore/recovery.
  * Independent imports may run together. Maintenance reserves before yielding,
  * and refuses an active job rather than snapshotting its partial bytes or
  * replacing its dataset. This is not a lock on ordinary clinical writes.
@@ -9,7 +9,7 @@ let maintenance = false;
 
 export class FileWorkBusyError extends Error {
   constructor() {
-    super('ورود فایل یا بکاپ و بازگردانی در حال انجام است؛ بعد از پایان دوباره تلاش کنید.');
+    super('ضبط یا ورود فایل، بکاپ یا بازگردانی در حال انجام است؛ بعد از پایان دوباره تلاش کنید.');
     this.name = 'FileWorkBusyError';
   }
 }
@@ -23,14 +23,25 @@ export function fileJobsActive(): boolean {
   return jobs > 0;
 }
 
-/** Callers release in finally, covering journal, copy, verification and commit. */
-export async function withFileJob<T>(work: () => Promise<T>): Promise<T> {
+/** Reserve before the first await; the owner releases after its entire operation. */
+export function reserveFileJob(): () => void {
   assertFileWorkAvailable();
   jobs += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    jobs -= 1;
+  };
+}
+
+/** Callers release in finally, covering journal, copy, verification and commit. */
+export async function withFileJob<T>(work: () => Promise<T>): Promise<T> {
+  const release = reserveFileJob();
   try {
     return await work();
   } finally {
-    jobs -= 1;
+    release();
   }
 }
 

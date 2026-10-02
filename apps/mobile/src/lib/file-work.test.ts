@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { fileJobsActive, FileWorkBusyError, reserveFileMaintenance, withFileJob } from './file-work';
+import { fileJobsActive, FileWorkBusyError, reserveFileJob, reserveFileMaintenance, withFileJob } from './file-work';
 
 function deferred() {
   let finish!: () => void;
@@ -11,6 +11,36 @@ function deferred() {
 }
 
 describe('file-job and maintenance exclusion', () => {
+  it('reserves a multi-step lifecycle synchronously and an old release cannot cancel a new owner', () => {
+    const first = reserveFileJob();
+    const second = reserveFileJob();
+    try {
+      expect(() => reserveFileMaintenance()()).toThrow(FileWorkBusyError);
+      first();
+      expect(fileJobsActive()).toBe(true);
+      first();
+      expect(() => reserveFileMaintenance()()).toThrow(FileWorkBusyError);
+    } finally {
+      first();
+      second();
+    }
+    expect(fileJobsActive()).toBe(false);
+    const maintenance = reserveFileMaintenance();
+    try {
+      expect(() => reserveFileJob()).toThrow(FileWorkBusyError);
+    } finally {
+      maintenance();
+    }
+    const next = reserveFileJob();
+    try {
+      second();
+      expect(() => reserveFileMaintenance()()).toThrow(FileWorkBusyError);
+    } finally {
+      next();
+    }
+    reserveFileMaintenance()();
+  });
+
   it('reserves maintenance synchronously and refuses a new job without entering its callback', async () => {
     const release = reserveFileMaintenance();
     let entered = false;

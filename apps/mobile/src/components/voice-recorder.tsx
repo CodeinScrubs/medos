@@ -12,6 +12,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { alertError, notify } from '@/components/feedback';
 import { Row, Text } from '@/components/ui';
+import { reserveFileJob } from '@/lib/file-work';
 import { toPersianDigits } from '@/lib/persian';
 import { prepareAudioForPlayback } from '@/platform/audio';
 import { MIN_TOUCH, useTheme } from '@/theme';
@@ -57,38 +58,54 @@ export function VoiceRecorder({
   const stopped = useRef<{ durationMs: number; capturedAt?: Date } | null>(null);
   const work = useRef<Promise<boolean> | null>(null);
   const flushing = useRef(0);
+  const mounted = useRef(false);
+  const releaseFiles = useRef<(() => void) | null>(null);
   const scope = useAutosaveScope();
 
-  // Leaving the screen while recording (the back gesture, a notification tap)
-  // unmounts this. expo-audio releases the recorder itself, but the audio mode
-  // stays switched to recording until something switches it back — harmless to
-  // repeat when nothing was being recorded.
-  useEffect(
-    () => () => {
+  function releaseFileOwnership() {
+    releaseFiles.current?.();
+    releaseFiles.current = null;
+  }
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // expo-audio's earlier lifecycle hook releases the native object. A
+      // permission/preparation or metadata promise may still be running: do
+      // not permit maintenance until it settles, or start after unmount.
+      const releaseWhenGone = () => {
+        if (!mounted.current) releaseFileOwnership();
+      };
+      if (work.current) void work.current.then(releaseWhenGone, releaseWhenGone);
+      else releaseWhenGone();
       void prepareAudioForPlayback().catch(() => undefined);
-    },
-    [],
-  );
+    };
+  }, []);
 
   async function start() {
-    if (work.current || stopped.current || pending.current || active.current) return;
+    if (!mounted.current || work.current || stopped.current || pending.current || active.current) return;
     setBusy(true);
     const operation = (async () => {
       try {
+        releaseFiles.current = reserveFileJob();
         const permission = await requestRecordingPermissionsAsync();
+        if (!mounted.current) return true;
         if (!permission.granted) {
           notify('دسترسی میکروفون لازم است', 'از تنظیمات گوشی، دسترسی میکروفون را برای MedOS فعال کنید.');
           return true;
         }
         await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+        if (!mounted.current) return true;
         await recorder.prepareToRecordAsync();
+        if (!mounted.current) return true;
         recorder.record();
         active.current = true;
         startedAt.current = new Date();
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
         return true;
       } catch (e) {
-        alertError('ضبط شروع نشد', e);
+        if (mounted.current) alertError('ضبط شروع نشد', e);
         void prepareAudioForPlayback().catch(() => undefined);
         return false;
       }
@@ -98,12 +115,14 @@ export function VoiceRecorder({
       await operation;
     } finally {
       if (work.current === operation) work.current = null;
-      setBusy(false);
+      if (!active.current || !mounted.current) releaseFileOwnership();
+      if (mounted.current) setBusy(false);
     }
   }
 
   async function finish(keep: boolean, manual = false): Promise<boolean> {
     if (work.current) return work.current;
+    if (!mounted.current) return false;
     if (!active.current && !stopped.current && !pending.current) return true;
     setBusy(true);
     let acknowledged = false;
@@ -131,11 +150,13 @@ export function VoiceRecorder({
           acknowledged = true;
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         }
-        setNeedsRetry(false);
+        if (mounted.current) setNeedsRetry(false);
         return true;
       } catch (e) {
-        setNeedsRetry(true);
-        alertError(pending.current ? 'وویس ذخیره نشد؛ دوباره تلاش کنید' : 'ضبط تمام نشد', e);
+        if (mounted.current) {
+          setNeedsRetry(true);
+          alertError(pending.current ? 'وویس ذخیره نشد؛ دوباره تلاش کنید' : 'ضبط تمام نشد', e);
+        }
         return false;
       }
     })();
@@ -145,9 +166,10 @@ export function VoiceRecorder({
       saved = await operation;
     } finally {
       if (work.current === operation) work.current = null;
-      setBusy(false);
+      if ((!active.current && !stopped.current && !pending.current) || !mounted.current) releaseFileOwnership();
+      if (mounted.current) setBusy(false);
     }
-    if (saved && acknowledged && manual && flushing.current === 0) {
+    if (saved && acknowledged && manual && flushing.current === 0 && mounted.current) {
       try {
         onSaved?.();
       } catch (e) {
