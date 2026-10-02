@@ -12,6 +12,7 @@ import { doctorDisplayName } from '@/features/doctors/logic';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
+import { ConsultShareModal, type ConsultShareTarget } from './consult-share-modal';
 import { cancelConsult, markConsultRequested, patientConsultsQuery } from './queries';
 import { ConsultRequestEditor } from './request-editor';
 
@@ -36,13 +37,22 @@ const URGENCY: Record<Consultation['urgency'], { label: string; tone: 'danger' |
  * answer are three separate events, and only the person who did them knows
  * which have happened.
  */
-export function ConsultsSection({ patientId }: { patientId: string }) {
+export function ConsultsSection({
+  patientId,
+  patientName,
+  location,
+}: {
+  patientId: string;
+  patientName?: string;
+  location?: string;
+}) {
   const router = useRouter();
   const scope = useAutosaveScope()!;
   const { spacing } = useTheme();
   const { data, error } = useLive(patientConsultsQuery(patientId), [patientId]);
   const rows = data ?? [];
   const [composing, setComposing] = useState(false);
+  const [shareTarget, setShareTarget] = useState<ConsultShareTarget | null>(null);
 
   // One tap from "ثبت پاسخ", and there is no way back from it: ask first.
   function confirmCancel(consultId: string) {
@@ -129,6 +139,15 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
               ) : null}
 
               <Row gap="sm" wrap>
+                {consult.status === 'pending' || consult.status === 'requested' ? (
+                  <Button
+                    label="ارسال / تماس"
+                    icon="paper-plane-outline"
+                    variant={consult.status === 'pending' ? 'primary' : 'secondary'}
+                    size="sm"
+                    onPress={() => setShareTarget({ consult, doctor, patientName, location })}
+                  />
+                ) : null}
                 {consult.status === 'pending' ? (
                   <Button
                     label="درخواست شد"
@@ -164,6 +183,7 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
           </Card>
         ))}
       </Column>
+      <ConsultShareModal visible={shareTarget !== null} target={shareTarget} onClose={() => setShareTarget(null)} />
     </>
   );
 }
