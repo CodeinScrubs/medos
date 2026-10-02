@@ -18,7 +18,7 @@ import { isHighlighted } from '@/features/notes/logic';
 import { patientNotesQuery } from '@/features/notes/queries';
 import { TasksSection } from '@/features/tasks/tasks-section';
 import { formatJalali, formatJalaliDateTime, formatJalaliLong, formatRelative } from '@/lib/jalali';
-import { joinLabels, toPersianDigits } from '@/lib/persian';
+import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { CallRow } from './patient-header';
@@ -54,7 +54,7 @@ export function OverviewTab({ patient }: { patient: Patient }) {
 
       <TasksSection patientId={patientId} title="کارهای این بیمار" limit={8} />
 
-      <ConsultsSection patientId={patientId} />
+      <ConsultsSection patientId={patientId} patientName={fullName(patient.firstName, patient.lastName)} />
 
       <SectionHeader
         title="پیگیری‌ها"
