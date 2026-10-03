@@ -4,9 +4,10 @@ import { Alert } from 'react-native';
 import { notify } from '@/components/feedback';
 import type { AttachmentEntity, AttachmentKind } from '@/db/schema';
 import { readSetting } from '@/db/settings';
+import { withFileJob } from '@/lib/file-work';
 import { storePhoto } from '@/platform/media';
 
-import { addAttachment } from './queries';
+import { addAttachment, checkAttachmentTarget } from './queries';
 import { keepOriginalsMode, shouldKeepOriginal } from './settings';
 
 export type PhotoSource = 'camera' | 'library';
@@ -60,29 +61,36 @@ export type AttachTarget = {
 
 /** Compress, store and attach already-picked assets. Returns the new attachment ids. */
 export async function storeAndAttach(assets: ImagePicker.ImagePickerAsset[], target: AttachTarget): Promise<string[]> {
-  const ids: string[] = [];
-  const keepOriginal = shouldKeepOriginal(await readSetting(keepOriginalsMode), target.kind);
-  for (const asset of assets) {
-    const stored = await storePhoto({ uri: asset.uri, width: asset.width, height: asset.height }, { keepOriginal });
-    ids.push(
-      await addAttachment({
-        entityType: target.entityType,
-        entityId: target.entityId,
-        patientId: target.patientId,
-        kind: target.kind,
-        relativePath: stored.relativePath,
-        thumbnailPath: stored.thumbnailPath,
-        originalPath: stored.originalPath,
-        mimeType: stored.mimeType,
-        sizeBytes: stored.sizeBytes,
-        width: stored.width,
-        height: stored.height,
-        caption: target.caption ?? null,
-        bodySite: target.bodySite ?? null,
-      }),
-    );
-  }
-  return ids;
+  // Capture caller-owned values before yielding, and protect direct callers too.
+  const captured = { ...target };
+  const sources = assets.map(({ uri, width, height }) => ({ uri, width, height }));
+  return withFileJob(async () => {
+    checkAttachmentTarget(captured);
+    const ids: string[] = [];
+    const keepOriginal = shouldKeepOriginal(await readSetting(keepOriginalsMode), captured.kind);
+    for (const source of sources) {
+      checkAttachmentTarget(captured);
+      const stored = await storePhoto(source, { keepOriginal });
+      ids.push(
+        await addAttachment({
+          entityType: captured.entityType,
+          entityId: captured.entityId,
+          patientId: captured.patientId,
+          kind: captured.kind,
+          relativePath: stored.relativePath,
+          thumbnailPath: stored.thumbnailPath,
+          originalPath: stored.originalPath,
+          mimeType: stored.mimeType,
+          sizeBytes: stored.sizeBytes,
+          width: stored.width,
+          height: stored.height,
+          caption: captured.caption ?? null,
+          bodySite: captured.bodySite ?? null,
+        }),
+      );
+    }
+    return ids;
+  });
 }
 
 /** Pick or shoot photos and attach them to an existing entity in one step. */
@@ -92,9 +100,13 @@ export async function attachPhotos({
   multiple = false,
   ...target
 }: AttachTarget & { source: PhotoSource; crop?: boolean; multiple?: boolean }): Promise<string[]> {
-  const assets = await pickPhotos(source, { crop, multiple });
-  if (!assets) return [];
-  return storeAndAttach(assets, target);
+  return withFileJob(async () => {
+    checkAttachmentTarget(target);
+    const assets = await pickPhotos(source, { crop, multiple });
+    if (!assets) return [];
+    // Nested file jobs are supported; this outer lease also owns the picker.
+    return storeAndAttach(assets, target);
+  });
 }
 
 /** "Camera or gallery?" — the question every photo button starts with. */

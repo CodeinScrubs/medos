@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
@@ -9,7 +9,8 @@ import { Badge, Button, Card, Column, EmptyState, Row, Segmented, Text } from '@
 import type { LabPanel, LabValue } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, pickPhotos, storeAndAttach } from '@/features/attachments/capture';
-import { patientMediaQuery } from '@/features/attachments/queries';
+import { checkAttachmentTarget, patientMediaQuery } from '@/features/attachments/queries';
+import { withFileJob } from '@/lib/file-work';
 import { formatJalali, formatJalaliDateTime, formatTime, toJalali } from '@/lib/jalali';
 import { hasPersianLetters, joinLabels, ltrIsolate, toPersianDigits } from '@/lib/persian';
 import { mediaUri } from '@/platform/media';
@@ -31,6 +32,7 @@ export function LabsTab({ patientId }: { patientId: string }) {
   const { spacing } = useTheme();
   const [view, setView] = useState<LabsView>('flowsheet');
   const [capturing, setCapturing] = useState(false);
+  const captureActive = useRef(false);
 
   const { data: values, error } = useLive(patientLabValuesQuery(patientId), [patientId]);
   const { data: panels } = useLive(patientLabPanelsQuery(patientId), [patientId]);
@@ -44,21 +46,29 @@ export function LabsTab({ patientId }: { patientId: string }) {
    */
   function photoPanel() {
     askPhotoSource(async (source) => {
-      const assets = await pickPhotos(source, { crop: true });
-      if (!assets) return;
+      if (captureActive.current) return;
+      captureActive.current = true;
       setCapturing(true);
       try {
-        const panelId = await createLabPanel({
-          patientId,
-          collectedAt: new Date(),
-          name: 'عکس برگه',
-          source: 'photo',
-          values: [],
+        // The picker and panel creation are outside attachPhotos; own all of them.
+        await withFileJob(async () => {
+          checkAttachmentTarget({ entityType: 'patient', entityId: patientId, patientId });
+          const assets = await pickPhotos(source, { crop: true });
+          if (!assets) return;
+          checkAttachmentTarget({ entityType: 'patient', entityId: patientId, patientId });
+          const panelId = await createLabPanel({
+            patientId,
+            collectedAt: new Date(),
+            name: 'عکس برگه',
+            source: 'photo',
+            values: [],
+          });
+          await storeAndAttach(assets, { entityType: 'lab_panel', entityId: panelId, patientId, kind: 'lab_sheet' });
         });
-        await storeAndAttach(assets, { entityType: 'lab_panel', entityId: panelId, patientId, kind: 'lab_sheet' });
       } catch (e) {
         alertError('ذخیره نشد', e);
       } finally {
+        captureActive.current = false;
         setCapturing(false);
       }
     });

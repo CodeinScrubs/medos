@@ -1190,3 +1190,33 @@ during copy while its journal retained null. The current enabled patient/note/to
 paths did not expose this race. Real migrated-SQLite cases pin source-read,
 copy and ready-publication refusal without changing the helper's existing callers.
 This guard does not enable persistent quick-capture or draft-note voices.
+
+## Photo jobs versus file maintenance (0.11.20)
+
+Photos now use the same in-process file-job exclusion as calls and recordings.
+`attachPhotos` reserves before camera permission or the picker; its lease lasts
+through every stored file and awaited attachment acknowledgement. The exported
+`storeAndAttach` also reserves, covering callers that already have assets. It
+copies target and source scalar values before yielding, preflights live targets
+before native work, and retains the existing transactional publication checks.
+Nested leases are supported and release independently in `finally`.
+
+`LabsTab` owns its wider operation: picker, panel creation, storage and attachment
+acknowledgement. Permission/picker errors are now inside its visible error path;
+cancellation creates no panel. A ref suppresses repeated chooser callbacks while
+the current job is pending; the existing button stays busy until it settles.
+
+Tradeoff: a camera/picker still open blocks backup/restore/recovery until it is
+cancelled or storage finishes. That is preferable to replacing the dataset under
+a photo copy. This adds no route, native module, dependency or general job system.
+The tests use real migrated SQLite, deferred native stand-ins and a wrapper that
+pauses acknowledgement after the real attachment insert to pin lease lifetime.
+
+This is not durable photo recovery or atomic panel-plus-file publication. A
+storage failure after panel creation can still leave an empty panel and owned
+unreferenced files; existing data is not silently deleted to conceal failure.
+Ordinary clinical writes during restore and old mounted editors after replacement
+still need write admission and dataset generation fencing together. This lease
+does not prevent a request prepared before restore from starting afterwards,
+preserve originals before the native cropper, or prove phone/power/low-space
+behavior. Those remain separate delivery gates.

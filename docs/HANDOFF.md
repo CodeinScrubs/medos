@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Exclude whole photo jobs from backup and restore
+
+**Agent:** GPT-6 via Codex
+**Commits:** acceptance `a78215c`; photo implementation in this commit.
+
+**Changed**
+- 0.11.20/code 36: photo capture reserves before permission/picker; direct
+  storage also reserves, snapshots values and checks live targets. Leases last
+  through all attachment acknowledgements. No schema/dependency/new route.
+- Lab photo callback owns picker/panel/metadata together, catches picker errors
+  and ignores duplicate callbacks while pending; cancel creates no panel.
+- Record contracts, limits and source witnesses in `validation-0.11.20.md`.
+
+**Verified**
+- Finalized witnesses on original `a78215c` handlers: 2 suites / 11 failures,
+  4 passes. Fixed handlers: all 15 pass, including a deferred acknowledgement
+  after a real SQL insert. Reviewer's witness cleanup concern corrected.
+- Full check passed: 103 suites / 1317 app tests + 3 workflows, typecheck/lint/
+  format green. Test MIME type/formatting corrected; import-order warning
+  cleaned before final push gate. Two source reviewers found no implementation
+  blocker; they ran no tests/builds/native tools.
+- Prior acceptance CI `37134013637` passed at exact `a78215c`.
+
+**Not verified**
+- 0.11.20 hosted/build/native gates yet; phone/native picker timing, natural
+  interruption, durable/atomic photo publication, ordinary writes or stale editors.
+
+**Open threads**
+- Finish current hosted/artifact/native picker-cancel/import and preservation gates.
+- Then clinical-write admission and dataset-generation fencing together; preserve
+  stale input for explicit recovery. Do not solve it by silently flushing/remounting.
+- Quick-capture journal before new-note draft voices; atomic acknowledgement and
+  pending-job reassignment/filing/cleanup guards are necessary. Raw manual forms,
+  original-before-crop, 40-patient performance and physical-phone evidence remain.
+
+**Gotchas**
+- Lab panel creation precedes photo storage; later storage failure can still
+  leave an empty panel. This lease is not a transactional panel/file journal.
+- Root/native stand-ins prove callback/exclusion contracts, not provider behavior.
+  Keep actual signed artifacts, hosted CI and phone acceptance separate.
+
 ## 2026-10-03 — Accept 0.11.19 restore and upgrade on isolated emulators
 
 **Agent:** GPT-6 via Codex

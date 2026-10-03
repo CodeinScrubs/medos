@@ -47,14 +47,24 @@ and modern upgrade/full-archive preservation now passed. Comparisons distinguish
 unchanged clinical fields from native reminder-id repair and known retained
 unreferenced QA media; this does not close whole-dataset interruption safety.
 
-Next bounded fix: photo jobs currently bypass file-maintenance exclusion in
+Source review before 0.11.20 found photo jobs bypassing file-maintenance exclusion in
 `attachments/capture.ts`; `LabsTab.photoPanel` separately picks, creates a panel
 and stores its photo. Reserve before the first picker await through metadata
-acknowledgement, covering the direct storage API and lab callback; catch picker
-errors too. Then address clinical-write admission during restore and dataset
+acknowledgement, covering the direct storage API and lab callback, including picker
+errors. The bounded photo fix is below. Next address clinical-write admission during restore and dataset
 generation fencing for loaded editors together. Busy checks alone cannot stop
 an old editor from writing after replacement ends. Preserve its unsaved text for
 explicit recovery rather than silently remounting/flushing it into the new data.
+
+2026-10-03, 0.11.20: photo APIs now reserve before the picker/storage and retain
+exclusion through metadata acknowledgement. The lab-sheet callback owns its
+picker, panel creation and attachment work, catches picker rejection and guards
+duplicate callbacks. Target/source inputs are captured; retired targets refuse
+native work. Finalized witnesses failed on the old source and pass on the new
+handlers. Current release gates are in
+[validation-0.11.20.md](validation-0.11.20.md). This does not make photo recovery
+durable or panel/file publication atomic; ordinary-write admission and dataset
+generation fencing remain the next structural safety work.
 
 2026-10-03, 0.11.18: D03/D05/D10 now include a persisted stopped-voice journal for
 existing records. Source and destination fingerprints, immutable operation id,
