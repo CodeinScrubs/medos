@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-04 — Accept signed 0.11.22 native repair and exact preservation
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `846bce1`; acceptance evidence in this commit.
+
+**Changed**
+- Record exact-source CI, signed artifacts and actual offline synthetic restore/
+  SAF export. No application changes after `846bce1`.
+
+**Verified**
+- Source/push gates: 108 suites / 1356 app tests + 3 workflows. Exact-source CI
+  `37149450106` passed, including migrations/export. Both signed ABI packages
+  inspected; installed x86_64 hash matched after `-r` upgrade from 0.11.21.
+- Real native repair of obsolete indexes, wrong normal/high flags and missing
+  legacy history. Independent seven-chunk decode compared all 39 application
+  tables: only specified derived changes, all other clinical fields/history and
+  18 media files/14 voices preserved. Cold lab display and fresh Edit opened;
+  application crash buffer empty. See `validation-0.11.22.md`.
+
+**Not verified**
+- Phone/API 26 on this version, injected native write race/rollback, power loss,
+  low space, large data and all clinical flows. Reviewers supplied useful partial
+  comments, then hit usage limits; no final independent approval.
+
+**Open threads**
+- Native reproduction: a retained patient root's header Edit rejects after restore
+  because its Scope still holds the old generation. Fix explicit fresh-workspace
+  renewal together with pending manual/draft input and old callback fencing.
+  Never auto-remount using `group.unsaved` alone: vital/diagnosis raw input can be
+  unregistered, and a saved draft can still be unpublished.
+- Remaining manual/raw-draft immutable tokens, then durable capture/draft-note
+  stopped-voice journals. Preserve text; never rebase old mutation callbacks.
+
+**Gotchas**
+- Version-only generated Gradle stamp was checked/synchronized, avoiding prebuild;
+  artifacts inspected afterwards. Builds used the exact frozen application source.
+- Cold System UI non-response resolved with Wait. Prompt Back with no software IME
+  opens discard confirmation; continue retained the QA passphrase. Busy dump idle
+  failure is not restore failure; read actual completion from a later hierarchy.
+- No new feature, dependency, migration, route, permission or archive/key scheme.
+
 ## 2026-10-03 — Keep search/lab/history repair on one current snapshot, 0.11.22
 
 **Agent:** GPT-6 via Codex

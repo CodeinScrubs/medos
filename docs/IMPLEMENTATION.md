@@ -46,6 +46,12 @@ See [validation-0.11.22.md](validation-0.11.22.md) for actual gates. This closes
 those repair interleavings, not all post-commit housekeeping or manual intents.
 Next: remaining manual/raw-draft token fences and fresh capture on retained root
 screens, then durable quick-capture/draft-note stopped-voice journals.
+Exact-source CI, both signed packages and bounded offline native repair acceptance
+passed on 2026-10-04. Independent export comparison checked all 39 application
+tables and 18 media files with only expected derived changes; cold native labs
+and fresh patient Edit passed. Native testing also reproduced the retained root
+Scope's stale Edit refusal. Fix explicit renewal without auto-remounting unregistered
+manual input; a clean SaveGroup alone cannot establish a clean workspace.
 
 2026-10-03, 0.11.21: the real-SQL witness reproduced an ordinary clinical write
 acknowledged during restore and subsequently erased. Pre-commit admission now
