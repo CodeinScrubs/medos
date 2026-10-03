@@ -65,6 +65,11 @@ handlers. Current release gates are in
 [validation-0.11.20.md](validation-0.11.20.md). This does not make photo recovery
 durable or panel/file publication atomic; ordinary-write admission and dataset
 generation fencing remain the next structural safety work.
+Exact-source CI, signed owner/emulator packages, real offline lab-picker cancel
+and gallery-photo publication now passed. Independent archives preserved all
+old rows/files; the uncropped fixture's original bytes matched and all images/
+prior voices decoded. Native held-picker overlap refusal was not established.
+Physical-phone, ordinary-write/stale-editor and durable media gates remain open.
 
 2026-10-03, 0.11.18: D03/D05/D10 now include a persisted stopped-voice journal for
 existing records. Source and destination fingerprints, immutable operation id,

@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Accept signed 0.11.20 photo capture and cancelled lab picker
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `af117a6`; acceptance evidence in this commit.
+
+**Changed**
+- Record exact-source CI, signed APK/installed identity, real picker flows and
+  independent SQL/media comparisons in `validation-0.11.20.md`. No app changes.
+
+**Verified**
+- Normal source push: 103 suites / 1317 app tests + 3 workflows; typecheck/lint/
+  format green without warnings. Exact-source CI `37135424428` passed, including
+  unchanged migrations and Android export. Both signed ABI packages inspected.
+- Offline isolated-emulator `-r` upgrade; installed package hash matches. Real
+  lab picker cancel created no panel; verified SAF archive retained all 39
+  application tables and 15 old media files exactly against accepted 0.11.19.
+- Real gallery clinical-photo publication added one correct attachment and only
+  three media files, preserving every old row/file. Original PNG bytes matched
+  source; JPEG/thumbnail decoded; all 14 prior voices decoded unchanged. Native
+  route reopened after force-stop; application crash buffer empty.
+
+**Not verified**
+- Phone/camera/permission denial, active-picker native maintenance refusal,
+  natural interruption, durable/atomic photo publication, all clinical workflows.
+- Ordinary clinical writes during restore and stale mounted editors after
+  replacement remain concrete source-reviewed defects; do not call them safe.
+
+**Open threads**
+- Next: clinical-write admission and dataset-generation fencing together, with
+  retained stale input for explicit recovery. Add witnesses for a write during
+  restore's file stage and an old note/order editor after same-ID replacement.
+- Then quick-capture voice journal before new-note draft targets, with atomic
+  kind/job acknowledgement and pending move/filing/cleanup guards. Draft voice
+  references must survive whole-field text autosaves and reopen the original UUID.
+- Empty lab panel after storage failure, original-before-crop, other raw forms,
+  40-patient performance, clinical review and physical-phone evidence stay open.
+
+**Gotchas**
+- A deeplink from an open picker allowed backup; it did not establish overlapping
+  active-picker refusal. The software lease witnesses are the evidence for that.
+- Emulator System UI cold-boot nonresponse was separate from the app. Run signing
+  inspection through `android-env.js`; direct invocation lacks Java on this host.
+- Last generated build is x86_64; the inspected arm64 owner APK is separate in
+  `dist/`. Inspect every ABI switch and clean only generated app build if needed.
+
 ## 2026-10-03 — Exclude whole photo jobs from backup and restore
 
 **Agent:** GPT-6 via Codex
