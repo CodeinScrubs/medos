@@ -7,6 +7,7 @@ import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, EmptyState, Input, Screen, SectionHeader } from '@/components/ui';
 import { useLive } from '@/db/use-live';
+import { RecordingRecovery } from '@/features/attachments/recording-recovery';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { fullName } from '@/lib/persian';
@@ -96,11 +97,12 @@ export function InboxScreen() {
         />
 
         <Button label="ثبت سریع تازه" icon="add" onPress={() => router.push('/capture')} full />
+        <RecordingRecovery />
 
         {!error && openRows.length === 0 && open !== undefined ? (
           <EmptyState
             icon="file-tray-outline"
-            title={search.trim() ? 'ثبت منتظری با این جستجو پیدا نشد' : 'چیزی در انتظار نیست'}
+            title={search.trim() ? 'ثبت منتظری با این جستجو پیدا نشد' : 'ثبت سریعی در انتظار نیست'}
             description="هرچه سریع ثبت کنید اینجا می‌ماند تا سر فرصت تبدیلش کنید به نوت یا کار."
           />
         ) : null}

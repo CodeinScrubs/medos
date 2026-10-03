@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { copyImportFile, fingerprintImportFile } from './import-file';
+import { copyImportFile, fingerprintImportFile, fingerprintRecordingSource } from './import-file';
 
 let mockBytes = new Uint8Array([1, 2, 3]);
 let mockOffset = 0;
@@ -26,11 +26,19 @@ const mockLegacyCopy = jest.fn(async (_input: unknown) => {
   mockExists = true;
 });
 const mockCreate = jest.fn();
+const mockFileUri = jest.fn();
 jest.mock('expo-file-system', () => ({
   Paths: { document: 'file:///private/' },
   FileMode: { ReadOnly: 'r' },
   File: class {
+    constructor(uri: string) {
+      mockFileUri(uri);
+    }
     copy = mockCopy;
+    open = mockOpen;
+    get size() {
+      return mockReportedSize;
+    }
   },
   Directory: class {
     exists = false;
@@ -62,6 +70,26 @@ beforeEach(() => {
 });
 
 describe('streamed import integrity', () => {
+  it('does not claim a copy exists or leak a private URI when the stopped source cannot be read', async () => {
+    mockRead.mockImplementationOnce(() => {
+      throw new Error('file:///private-patient-name.m4a');
+    });
+    await expect(fingerprintRecordingSource('file:///private-patient-name.m4a')).rejects.toThrow(
+      'فایل اولیهٔ وویس کامل خوانده نشد؛ ذخیره انجام نشد.',
+    );
+    expect(mockClose).toHaveBeenCalledTimes(1);
+    expect(mockCopy).not.toHaveBeenCalled();
+  });
+
+  it('fingerprints the exact stopped source URI with the same independent SHA-256 contract', async () => {
+    const uri = 'file:///synthetic-cache/voice.m4a';
+    expect(await fingerprintRecordingSource(uri)).toEqual({
+      checksum: createHash('sha256').update(mockBytes).digest('hex'),
+      sizeBytes: 3,
+    });
+    expect(mockFileUri).toHaveBeenCalledWith(uri);
+    expect(mockClose).toHaveBeenCalledTimes(1);
+  });
   it('accepts readable nonempty bytes when the provider reported no usable size', async () => {
     expect((await copyImportFile('content://example/audio', 'media/imports/request.m4a', 0)).sizeBytes).toBe(3);
   });

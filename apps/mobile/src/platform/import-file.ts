@@ -9,8 +9,21 @@ export type FileFingerprint = { checksum: string; sizeBytes: number };
 
 /** Bounded memory, explicit EOF, no private path in errors. */
 export async function fingerprintImportFile(path: string): Promise<FileFingerprint> {
+  return fingerprintFile(() => mediaFile(path));
+}
+
+/** A confirmed stopped recorder file, before reserving its content fingerprint. */
+export async function fingerprintRecordingSource(uri: string): Promise<FileFingerprint> {
   try {
-    const file = mediaFile(path);
+    return await fingerprintFile(() => new File(uri));
+  } catch {
+    throw new Error('فایل اولیهٔ وویس کامل خوانده نشد؛ ذخیره انجام نشد.');
+  }
+}
+
+async function fingerprintFile(openFile: () => File): Promise<FileFingerprint> {
+  try {
+    const file = openFile();
     const handle = file.open(FileMode.ReadOnly);
     const hash = sha256.create();
     let sizeBytes = 0;

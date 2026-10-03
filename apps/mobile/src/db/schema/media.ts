@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import { baseColumns, bool, jsonList } from './_shared';
 
@@ -106,3 +106,32 @@ export const attachments = sqliteTable(
 
 export type Attachment = typeof attachments.$inferSelect;
 export type NewAttachment = typeof attachments.$inferInsert;
+
+/** One stopped voice destined for an existing record; retry never creates a new job. */
+export const recordingJobs = sqliteTable(
+  'recording_jobs',
+  {
+    ...baseColumns,
+    entityType: text('entity_type', { enum: ATTACHMENT_ENTITIES }).notNull(),
+    entityId: text('entity_id').notNull(),
+    patientId: text('patient_id'),
+    sourceUri: text('source_uri').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    capturedAt: integer('captured_at', { mode: 'timestamp_ms' }).notNull(),
+    relativePath: text('relative_path').notNull(),
+    state: text('state', { enum: ['copying', 'ready', 'saved', 'discarding', 'discarded'] })
+      .notNull()
+      .default('copying'),
+    revision: integer('revision').notNull().default(0),
+    /** Source fingerprint commits before copy; the destination must match it. */
+    checksum: text('checksum'),
+    sizeBytes: integer('size_bytes'),
+    attachmentId: text('attachment_id').references(() => attachments.id),
+  },
+  (t) => [
+    uniqueIndex('recording_jobs_path_idx').on(t.relativePath),
+    index('recording_jobs_pending_idx').on(t.entityType, t.entityId, t.state, t.deletedAt),
+  ],
+);
+
+export type RecordingJob = typeof recordingJobs.$inferSelect;

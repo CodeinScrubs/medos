@@ -17,7 +17,8 @@ import { useTheme } from '@/theme';
 import { askPhotoSource, attachPhotos } from './capture';
 import { ATTACHMENT_KIND_LABELS } from './labels';
 import { deleteAttachment, patientMediaQuery } from './queries';
-import { saveRecording } from './voice-notes';
+import { RecordingRecovery } from './recording-recovery';
+import { useRecordingHandoff } from './voice-notes';
 
 type PhotoFilter = 'all' | 'clinical_photo' | 'radiology' | 'lab_sheet' | 'document';
 
@@ -43,6 +44,8 @@ export function MediaTab({ patientId }: { patientId: string }) {
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<PhotoFilter>('all');
   const [adding, setAdding] = useState(false);
+  const voiceTarget = { entityType: 'patient' as const, entityId: patientId, patientId };
+  const handoff = useRecordingHandoff(voiceTarget);
 
   const { data, error, retry } = useLive(patientMediaQuery(patientId), [patientId]);
   const all = data ?? [];
@@ -127,11 +130,11 @@ export function MediaTab({ patientId }: { patientId: string }) {
       )}
 
       <SectionHeader title="وویس‌ها" count={data !== undefined && !error ? voices.length : undefined} />
+      <RecordingRecovery target={voiceTarget} excludeId={handoff.ownedId} />
       <VoiceRecorder
         label="ضبط وویس برای این بیمار"
-        onRecorded={async (rec) => {
-          await saveRecording(rec, { entityType: 'patient', entityId: patientId, patientId });
-        }}
+        onRecorded={handoff.onRecorded}
+        onDiscarded={handoff.onDiscarded}
       />
       {voices.map((v) => {
         return (

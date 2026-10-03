@@ -12,6 +12,7 @@ import { saveRecording } from './voice-notes';
 
 // Preserve the copy/move contract: a move consumes the only retry source.
 const mockFiles = new Set<string>();
+const mockStored = new Map<string, { checksum: string; sizeBytes: number | null }>();
 let mockSize: number | null;
 let mockAfterCopy: (() => Promise<void>) | undefined;
 const mockCopies =
@@ -33,6 +34,24 @@ jest.mock('@/platform/media', () => ({
   mediaUri: (path: string) => path,
   storeFile: (...args: [string, string, { move?: boolean }?]) => mockCopies(...args),
 }));
+jest.mock('@/platform/import-file', () => ({
+  fingerprintRecordingSource: async (uri: string) => {
+    if (!mockFiles.has(uri)) throw new Error('Synthetic source unavailable');
+    return { checksum: 'a'.repeat(64), sizeBytes: 3 };
+  },
+  fingerprintImportFile: async (path: string) => {
+    const file = mockStored.get(path);
+    if (!file || file.sizeBytes == null || !Number.isSafeInteger(file.sizeBytes) || file.sizeBytes <= 0)
+      throw new Error('Synthetic unreadable/empty copy');
+    return file;
+  },
+  copyImportFile: async (uri: string, path: string) => {
+    const file = await mockCopies(uri, 'm4a');
+    const fingerprint = { checksum: 'a'.repeat(64), sizeBytes: file.sizeBytes };
+    mockStored.set(path, fingerprint);
+    return fingerprint;
+  },
+}));
 
 let t: TestDatabase;
 let patientId: string;
@@ -47,6 +66,7 @@ beforeEach(async () => {
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Voice' });
   mockFiles.clear();
+  mockStored.clear();
   mockFiles.add(recording().uri);
   mockSize = 3;
   mockAfterCopy = undefined;
@@ -62,6 +82,25 @@ beforeEach(async () => {
 });
 
 describe('stopped recording acknowledgement', () => {
+  it('reuses a stopped operation after reconstructing its JS recording object', async () => {
+    const rec = { ...recording(), operationId: 'c9fe3762-e0b5-412b-9de6-8330b4897e6a' };
+    const first = await saveRecording(rec, target());
+    const replay = { ...rec, capturedAt: new Date(rec.capturedAt) };
+    expect(await saveRecording(replay, target())).toBe(first);
+    expect(mockCopies).toHaveBeenCalledTimes(1);
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
+  });
+
+  it('cannot rebind a reconstructed stopped operation to another patient', async () => {
+    const rec = { ...recording(), operationId: '58f0446b-48bc-46a1-b143-cfc728c225ff' };
+    await saveRecording(rec, target());
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
+    await expect(
+      saveRecording({ ...rec }, { entityType: 'patient', entityId: other, patientId: other }),
+    ).rejects.toThrow();
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
+  });
+
   it('keeps the source and reuses its staged copy after a real SQLite insert failure', async () => {
     const rec = recording();
     t.sqlite.exec(

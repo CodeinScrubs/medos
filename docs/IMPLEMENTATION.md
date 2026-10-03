@@ -34,6 +34,16 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-03, 0.11.18: D03/D05/D10 now include a persisted stopped-voice journal for
+existing records. Source and destination fingerprints, immutable operation id,
+atomic attachment acknowledgement, retry without recorder cache after verified
+copy, and confirmed reference-protected cancellation have SQLite/handler tests.
+Failure-only controls use the original record and existing inbox. Lost native
+completion also offers explicit discard before storage starts. This does not
+complete draft/capture voice recovery or active/pre-journal interruption; native,
+artifact and exact-source gate status is in
+[validation-0.11.18.md](validation-0.11.18.md).
+
 2026-10-01, 0.11.13: D05/D08 now include recoverable raw admission/edit/discharge
 forms with explicit atomic publication, stale clinical-context refusal, confirmed
 comparison/load/discard and visible auxiliary-read errors. This is a software

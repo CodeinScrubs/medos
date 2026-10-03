@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Alert } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
@@ -7,34 +8,41 @@ import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import type { AttachmentEntity } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { withFileJob } from '@/lib/file-work';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { mediaUri } from '@/platform/media';
 
-import { addAttachment, checkAttachmentTarget, deleteAttachment, entityAttachmentsQuery } from './queries';
-import { stageRecording } from './recordings';
+import { deleteAttachment, entityAttachmentsQuery } from './queries';
+import { discardStoppedRecording, persistRecording, recordingOperationId } from './recording-queries';
+import { RecordingRecovery } from './recording-recovery';
 
-/** Copy and acknowledge a stopped recording without consuming the retry source. */
+/** Persist a stopped operation and acknowledge its metadata without consuming its source. */
 export async function saveRecording(
   recording: Recording,
   target: { entityType: AttachmentEntity; entityId: string; patientId?: string | null },
+  now: Date = new Date(),
 ): Promise<string> {
-  return withFileJob(async () => {
-    checkAttachmentTarget(target);
-    const stored = await stageRecording(recording, new Date());
-    return addAttachment(
-      {
-        ...target,
-        kind: 'voice',
-        relativePath: stored.relativePath,
-        sizeBytes: stored.sizeBytes,
-        mimeType: 'audio/mp4',
-        durationMs: recording.durationMs,
-        capturedAt: stored.capturedAt,
-      },
-      { reuseVoice: true },
-    );
-  });
+  return persistRecording(recording, target, now);
+}
+
+/** Keep one owner for a failed capture; recovery controls take over after remount. */
+export function useRecordingHandoff(target: {
+  entityType: AttachmentEntity;
+  entityId: string;
+  patientId?: string | null;
+}) {
+  const [ownedId, setOwnedId] = useState<string | undefined>();
+  return {
+    ownedId,
+    onRecorded: async (recording: Recording) => {
+      setOwnedId(recordingOperationId(recording));
+      await saveRecording(recording, target);
+      setOwnedId(undefined);
+    },
+    onDiscarded: async (recording: Recording) => {
+      await discardStoppedRecording(recording, target, new Date());
+      setOwnedId(undefined);
+    },
+  };
 }
 
 /**
@@ -52,10 +60,12 @@ export function VoiceNotesSection({
 }) {
   const { data, error, retry } = useLive(entityAttachmentsQuery(entityType, entityId), [entityType, entityId]);
   const voices = (data ?? []).filter((a) => a.kind === 'voice');
+  const handoff = useRecordingHandoff({ entityType, entityId, patientId });
 
   return (
     <Column gap="sm">
       <ErrorNotice error={error} what="وویس‌ها" onRetry={retry} />
+      <RecordingRecovery target={{ entityType, entityId, patientId }} excludeId={handoff.ownedId} />
       {voices.map((v) => {
         return (
           <VoiceNotePlayer
@@ -79,9 +89,8 @@ export function VoiceNotesSection({
       })}
       <VoiceRecorder
         label={voices.length ? 'وویس دیگر' : 'ضبط وویس'}
-        onRecorded={async (rec) => {
-          await saveRecording(rec, { entityType, entityId, patientId });
-        }}
+        onRecorded={handoff.onRecorded}
+        onDiscarded={handoff.onDiscarded}
       />
     </Column>
   );

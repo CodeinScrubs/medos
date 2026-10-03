@@ -48,6 +48,7 @@ jest.mock('@/theme', () => ({ MIN_TOUCH: 48, useTheme: () => ({ colors: {}, spac
 let tree: ReactTestRenderer;
 const stored = jest.fn<(recording: Recording) => Promise<void>>();
 const saved = jest.fn<() => void>();
+let discardStored: ((recording: Recording) => Promise<void>) | undefined;
 function reportCompletion(patch: Partial<RecordingStatus> = {}) {
   mockStatusListener?.({
     id: 'synthetic-recorder',
@@ -88,7 +89,7 @@ async function press(label: string) {
   });
   // The native hook polls outside React's batched button handler.
   await act(async () => {
-    tree.update(<VoiceRecorder onRecorded={stored} onSaved={saved} />);
+    tree.update(<VoiceRecorder onRecorded={stored} onDiscarded={discardStored} onSaved={saved} />);
   });
 }
 beforeEach(async () => {
@@ -110,6 +111,7 @@ beforeEach(async () => {
     reportCompletion();
   });
   stored.mockReset().mockResolvedValue(undefined);
+  discardStored = undefined;
   saved.mockClear();
   jest.mocked(alertError).mockClear();
   await act(async () => {
@@ -130,6 +132,106 @@ afterEach(async () => {
 });
 
 describe('recorder acknowledgement and screen exit', () => {
+  it('allows confirmed discard when native completion never arrives, without calling a storage callback', async () => {
+    jest.useFakeTimers();
+    const dialog = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      mockRecorder.stop.mockImplementationOnce(async () => {
+        mockRecorder.isRecording = false;
+      });
+      await press('ضبط وویس');
+      await press('پایان ضبط');
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(5000);
+      });
+      expect(stored).not.toHaveBeenCalled();
+      expect(mockScope.group.unsaved).toBe(true);
+      await press('صرف‌نظر از وویس ذخیره‌نشده');
+      const choices = dialog.mock.calls.at(-1)![2]!;
+      await act(async () => {
+        choices[1]!.onPress?.();
+        await settle();
+      });
+      expect(stored).not.toHaveBeenCalled();
+      expect(saved).not.toHaveBeenCalled();
+      expect(mockScope.group.unsaved).toBe(false);
+      reserveFileMaintenance()();
+      expect(mockRecorder.stop).toHaveBeenCalledTimes(1);
+      jest.runAllTicks();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      dialog.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it('awaits confirmed failed-handoff discard before releasing the capture and route guard', async () => {
+    const dialog = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const clearing = deferred<void>(undefined);
+    const discard = jest.fn<(recording: Recording) => Promise<void>>().mockReturnValue(clearing.promise);
+    discardStored = discard;
+    stored.mockRejectedValue(new Error('Synthetic SQL acknowledgement failure'));
+    try {
+      await press('ضبط وویس');
+      await press('پایان ضبط');
+      const captured = stored.mock.calls[0]![0];
+      expect(captured.operationId).toMatch(/^[a-f0-9-]{36}$/i);
+      await press('صرف‌نظر از وویس ذخیره‌نشده');
+      const choices = dialog.mock.calls.at(-1)![2]!;
+      choices[0]!.onPress?.();
+      expect(discard).not.toHaveBeenCalled();
+      await act(async () => {
+        choices[1]!.onPress?.();
+        await settle();
+      });
+      expect(discard).toHaveBeenCalledWith(captured);
+      expect(mockScope.group.unsaved).toBe(true);
+      expectMaintenanceBlocked();
+      await act(async () => {
+        clearing.resolve(undefined);
+        await settle();
+      });
+      expect(mockScope.group.unsaved).toBe(false);
+      reserveFileMaintenance()();
+      expect(saved).not.toHaveBeenCalled();
+      expect(mockRecorder.stop).toHaveBeenCalledTimes(1);
+    } finally {
+      dialog.mockRestore();
+    }
+  });
+
+  it('keeps failed discard retryable and never treats cleanup failure as an acknowledgement', async () => {
+    const dialog = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const discard = jest
+      .fn<(recording: Recording) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Synthetic cleanup failure'))
+      .mockResolvedValue(undefined);
+    discardStored = discard;
+    stored.mockRejectedValue(new Error('Synthetic SQL acknowledgement failure'));
+    try {
+      await press('ضبط وویس');
+      await press('پایان ضبط');
+      await press('صرف‌نظر از وویس ذخیره‌نشده');
+      await act(async () => {
+        dialog.mock.calls.at(-1)![2]![1]!.onPress?.();
+        await settle();
+      });
+      expect(mockScope.group.unsaved).toBe(true);
+      expectMaintenanceBlocked();
+      expect(saved).not.toHaveBeenCalled();
+      await press('صرف‌نظر از وویس ذخیره‌نشده');
+      await act(async () => {
+        dialog.mock.calls.at(-1)![2]![1]!.onPress?.();
+        await settle();
+      });
+      expect(discard).toHaveBeenCalledTimes(2);
+      expect(mockScope.group.unsaved).toBe(false);
+      reserveFileMaintenance()();
+    } finally {
+      dialog.mockRestore();
+    }
+  });
+
   it('reports missing native confirmation, retains the recording and retries after a late result', async () => {
     jest.useFakeTimers();
     try {

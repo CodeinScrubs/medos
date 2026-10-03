@@ -14,6 +14,7 @@ import {
   occasions,
   patients,
   patientFormDrafts,
+  recordingJobs,
   settings,
   taskDrafts,
   tasks,
@@ -69,6 +70,75 @@ const settingValue = async (t: TestDatabase, key: string) =>
   (await t.db.select().from(settings)).find((s) => s.key === key)?.value ?? null;
 
 describe('importTables', () => {
+  it('preserves durable stopped voice states and acknowledgement links through current restore', async () => {
+    const patientId = await addPatient(backup, 'Synthetic voice');
+    const captured = new Date('2026-01-01T12:00:00Z');
+    await backup.db.insert(attachments).values({
+      id: 'saved-voice',
+      ...stamps(captured),
+      entityType: 'patient',
+      entityId: patientId,
+      patientId,
+      kind: 'voice',
+      relativePath: 'media/imports/saved.m4a',
+      capturedAt: captured,
+    });
+    for (const state of ['ready', 'saved', 'discarding'] as const) {
+      await backup.db.insert(recordingJobs).values({
+        id: `synthetic-${state}`,
+        ...stamps(captured),
+        entityType: 'patient',
+        entityId: patientId,
+        patientId,
+        sourceUri: 'file:///synthetic-cache.m4a',
+        capturedAt: captured,
+        durationMs: 1200,
+        relativePath: `media/imports/${state}.m4a`,
+        checksum: 'a'.repeat(64),
+        sizeBytes: 1234,
+        state,
+        revision: 3,
+        attachmentId: state === 'saved' ? 'saved-voice' : null,
+        deletedAt: state === 'discarding' ? captured : null,
+      });
+    }
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(recordingJobs).all()).toEqual(backup.db.select().from(recordingJobs).all());
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
+  });
+
+  it('does not keep stopped operations from the replaced dataset when restoring a pre-voice-journal archive', async () => {
+    const patientId = await addPatient(live, 'Synthetic original');
+    await live.db.insert(recordingJobs).values({
+      id: 'stale-voice',
+      ...stamps(),
+      entityType: 'patient',
+      entityId: patientId,
+      patientId,
+      sourceUri: 'file:///synthetic-cache.m4a',
+      capturedAt: new Date(),
+      durationMs: 1200,
+      relativePath: 'media/imports/stale.m4a',
+    });
+    await addPatient(backup, 'Synthetic restored');
+    backup.conn.execSync('DROP TABLE recording_jobs');
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(recordingJobs).all()).toEqual([]);
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
+  });
+
   let live: TestDatabase;
   let backup: TestDatabase;
 

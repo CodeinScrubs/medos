@@ -13,22 +13,18 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { alertError, notify } from '@/components/feedback';
 import { Row, Text } from '@/components/ui';
+import { formatDuration } from '@/lib/duration';
 import { reserveFileJob } from '@/lib/file-work';
-import { toPersianDigits } from '@/lib/persian';
+import { newId } from '@/lib/ids';
 import { RecordingCompletion } from '@/lib/recording-completion';
 import { prepareAudioForPlayback } from '@/platform/audio';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
 import { useAutosaveScope } from './autosave-scope';
 
-export type Recording = { uri: string; durationMs: number; capturedAt?: Date };
+export type Recording = { uri: string; durationMs: number; capturedAt?: Date; operationId?: string };
 
-export function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return toPersianDigits(`${m}:${String(s).padStart(2, '0')}`);
-}
+export { formatDuration } from '@/lib/duration';
 
 /**
  * A record button that turns into a live timer with stop / discard.
@@ -39,11 +35,13 @@ export function formatDuration(ms: number): string {
  */
 export function VoiceRecorder({
   onRecorded,
+  onDiscarded,
   onSaved,
   label = 'وویس',
   compact = false,
 }: {
   onRecorded: (recording: Recording) => Promise<void>;
+  onDiscarded?: (recording: Recording) => Promise<void>;
   /** Optional post-ack action; never called by the screen's own exit flush. */
   onSaved?: () => void;
   label?: string;
@@ -52,6 +50,7 @@ export function VoiceRecorder({
   const { colors, radii, spacing } = useTheme();
   const [busy, setBusy] = useState(false);
   const [needsRetry, setNeedsRetry] = useState(false);
+  const [pendingDiscardable, setPendingDiscardable] = useState(false);
   const [terminalError, setTerminalError] = useState<Error | null>(null);
   const [completion] = useState(() => new RecordingCompletion());
   const active = useRef(false);
@@ -153,6 +152,7 @@ export function VoiceRecorder({
         }
         if (!keep) {
           // Only explicit discard may leave an unconfirmed/failed native capture.
+          if (pending.current && onDiscarded) await onDiscarded(pending.current);
           stopped.current = null;
           pending.current = null;
           completion.begin(null);
@@ -161,7 +161,7 @@ export function VoiceRecorder({
         if (stopped.current) {
           // Wait for the SDK's successful terminal event, never its cached URI.
           const uri = await completion.waitForUri(5000);
-          pending.current = { uri, ...stopped.current };
+          pending.current = { uri, ...stopped.current, operationId: newId() };
           stopped.current = null;
         }
         if (pending.current) {
@@ -170,12 +170,25 @@ export function VoiceRecorder({
           acknowledged = true;
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         }
-        if (mounted.current) setNeedsRetry(false);
+        if (mounted.current) {
+          setNeedsRetry(false);
+          setPendingDiscardable(false);
+        }
         return true;
       } catch (e) {
         if (mounted.current) {
           setNeedsRetry(true);
-          alertError(pending.current ? 'وویس ذخیره نشد؛ دوباره تلاش کنید' : 'ضبط تمام نشد', e);
+          // An unconfirmed stop has never reached the caller. A failed handoff
+          // needs its caller's cleanup acknowledgement before it can be dropped.
+          setPendingDiscardable(stopped.current != null || (pending.current != null && onDiscarded != null));
+          alertError(
+            !keep
+              ? 'صرف‌نظر انجام نشد؛ دوباره تلاش کنید'
+              : pending.current
+                ? 'وویس ذخیره نشد؛ دوباره تلاش کنید'
+                : 'ضبط تمام نشد',
+            e,
+          );
         }
         return false;
       }
@@ -279,7 +292,7 @@ export function VoiceRecorder({
     );
   }
 
-  return (
+  const control = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={needsRetry ? 'تلاش دوباره برای ذخیرهٔ وویس' : 'ضبط وویس'}
@@ -306,6 +319,26 @@ export function VoiceRecorder({
         {needsRetry ? 'وویس ذخیره نشد — تلاش دوباره' : busy ? 'لطفاً صبر کنید…' : label}
       </Text>
     </Pressable>
+  );
+  if (!needsRetry || !pendingDiscardable) return control;
+  return (
+    <Row gap="sm">
+      <View style={{ flex: 1 }}>{control}</View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="صرف‌نظر از وویس ذخیره‌نشده"
+        disabled={busy}
+        style={{ minHeight: MIN_TOUCH, justifyContent: 'center' }}
+        onPress={() =>
+          Alert.alert('از این وویس صرف‌نظر شود؟', 'این وویس ذخیره نمی‌شود؛ وویس‌های قبلی تغییر نمی‌کنند.', [
+            { text: 'انصراف', style: 'cancel' },
+            { text: 'صرف‌نظر', style: 'destructive', onPress: () => void finish(false) },
+          ])
+        }
+      >
+        <Text color="danger">صرف‌نظر</Text>
+      </Pressable>
+    </Row>
   );
 }
 

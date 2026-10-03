@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Journal stopped voices for existing records
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; hosted/artifact/native gates pending.
+
+**Changed**
+- Persist UUID, exact destination and source fingerprint before native copy;
+  verify destination, atomically acknowledge attachment/checksum/job and recover
+  without cache after verified staging. Migration 0020; version 0.11.18/code 34.
+- Failure-only recovery on the original record/existing inbox and a compact Today
+  entry. The active recorder owns awaited Retry/confirmed Discard; cleanup protects
+  clinical/draft references and remains retryable. No new route/dependency/permission.
+- Confirmed discard of a timed-out native completion clears only that unconfirmed
+  capture; failed metadata handoffs still require the parent's cleanup contract.
+
+**Verified**
+- Baseline 99 suites / 1249 app tests + 3 workflows. Two real-handler identity
+  witnesses failed before implementation; prior 12 cases passed.
+- Final `npm run check`: 101 suites / 1290 app tests + 3 workflows green.
+  Related regression: 6 suites / 136 tests. Missing-completion discard failed
+  before the fix and now passes; this is handler evidence, not a native failure.
+- Schema regeneration has no changes; earlier migrations remain untouched.
+- Prior evidence `fe9c382` pushed; exact-head CI `37121205308` succeeded.
+
+**Not verified**
+- Hosted/artifact/native gates, physical phone, native pre-ack interruption,
+  power/low-space or full ordinary-write/editor-versus-restore exclusion.
+
+**Open threads**
+- Finish current gates/native acceptance. Extend the journal to draft-note and
+  quick-capture targets with their own conflict/publication contracts; other raw
+  forms, original-before-crop and full dataset/clinical acceptance remain open.
+
+**Gotchas**
+- Source confirmation is still 0.11.17's SDK latch. The journal starts afterwards.
+- Source/destination verification must compare content, not filename or size alone.
+- A native duration formatter import affected read-error stand-ins; keep it pure.
+
 ## 2026-10-03 — Verify native 0.11.17 Stop, Back and archive preservation
 
 **Agent:** GPT-6 via Codex

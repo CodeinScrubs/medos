@@ -1111,3 +1111,50 @@ native implementation. No dependency, schema, permission, new screen or generali
 event bus. It does not provide durable pre-ack recovery, retain all cache files
 across crashes or validate physical microphone behavior. SDK upgrades must retain
 the terminal-event contract; those native failure and recovery gates stay separate.
+
+## Durable stopped voices on existing records (0.11.18)
+
+Patient media and `VoiceNotesSection` now use `recording_jobs`, additive migration
+0020. The recorder supplies a UUID after native completion; legacy in-process
+callers receive one stable object-bound fallback. Identity, source URI, duration,
+captured time, normalized patient and exact destination cannot change on retry.
+The destination is `media/imports/voice-<uuid>.m4a`, separate from call-import paths.
+The job is committed before the first native read/copy. A streamed source SHA-256
+and positive byte count commit before copying; only matching destination bytes
+become ready. Attachment, checksum and saved-operation link commit atomically.
+
+Ready retries use the verified destination without needing the recorder cache.
+An interrupted copy can also be recovered without its cache if it matches the
+already persisted source fingerprint. Otherwise it may replace only its own
+unreferenced partial copy, and only from a source that still matches. A changed
+ready file is refused rather than silently replaced. Every async boundary checks
+the complete captured intent; all work retains file-maintenance exclusion. Retry
+and cancellation of one UUID are serialized. Saved replay checks the bytes and
+original live attachment; a deleted or changed record is never recreated.
+
+Recovery appears only for unfinished jobs on the original record and the existing
+inbox, with one compact entry from Today. A recorder still holding a failed handoff
+keeps ownership of its Retry/confirmed Discard; the inline list excludes that job
+until remount. Its awaited discard callback prevents a cancelled journal from
+stranding the route guard. No competing guard, new route or automatic reattachment.
+If native completion never arrives, confirmation times out before storage begins;
+explicit discard may clear that unconfirmed capture without a parent callback.
+A failed metadata handoff still requires the parent's awaited cleanup contract.
+Confirmed cancellation retires the job, waits for in-flight copy, and checks again
+before removing its private unpublished destination. Live/deleted attachment and
+note-draft references protect bytes. Failed cleanup stays visible for retry; the
+original cache source is not deleted. Discard audits contain ids, never content.
+
+Tradeoff: one small SQLite journal and streamed verification instead of a WeakMap
+alone or a general job framework. No new dependency, permission or archive/key
+scheme. Full backups include journal/media; a pre-journal restore clears jobs from
+the replaced dataset. Native source confirmation remains owned by 0.11.17's latch.
+`formatDuration` is pure so recovery text does not import the recorder/native audio.
+
+This covers voices attached to existing records. New/edit note drafts and quick
+captures still use process-local `stageRecording`; adapt those targets with their
+own publication/conflict contracts next. It does not preserve active recording,
+recover before the journal or source fingerprint commits, prevent cache eviction
+before verified copy, or prove phone/power/low-space behavior. Ordinary writes and
+old editors versus restore, original-before-crop and older orphan cleanup remain
+separate work. Do not describe this as complete voice or dataset crash recovery.
