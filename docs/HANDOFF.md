@@ -33,6 +33,37 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Verify native 0.11.17 Stop, Back and archive preservation
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `8dfa56e`; evidence in this commit.
+
+**Changed**
+- Pin exact-source CI, signed arm64/x86_64 artifacts, installed hash and bounded
+  offline native acceptance in `validation-0.11.17.md`. No application change.
+
+**Verified**
+- Full source/pre-push gates: 99 suites / 1249 app tests + 3 workflows; exact-source
+  CI `37119017970` succeeded. APK ABI/libraries/version/signature passed.
+- Emulator upgrade without reset; manual Stop and active system Back each added
+  one voice. Post-ack cold reopen retained 12; new voice playback/Stop observed.
+- Independent full SAF archive authentication, integrity/FK and full audio decode
+  passed. 37 other tables, 10 old attachments and 11 old media match exactly;
+  precisely two new voices/files, original WAV unchanged, no new orphan.
+
+**Not verified**
+- Physical phone, native stop-error injection, missing/delayed terminal events,
+  pre-ack process death/power/low-space and actual concurrent maintenance/restore.
+
+**Open threads**
+- Durable stopped-voice UUID operations/recovery first. Ordinary writes/old
+  editors/photo jobs versus restore, raw manual forms, original-before-crop and
+  broader clinical acceptance remain open. Retain the old empty orphan as evidence.
+
+**Gotchas**
+- QA scrolling and cold-loading frames temporarily hid the count. Settled native
+  UI plus independently archived SQL confirmed it; this was not data loss.
+
 ## 2026-10-03 — Require native completion before acknowledging a voice
 
 **Agent:** GPT-6 via Codex
