@@ -35,6 +35,20 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-04, 0.11.23: implement explicit renewal of retained patient roots through
+the originating route's always-on guard. Keep pending manual input and the last
+patient snapshot until confirmed review/copy or closure; recovery is also available
+before the initial read completes. Per-dialog/route ownership and immutable tokens
+prevent delayed confirmations from acquiring new authority. URL-tab transitions
+use the Scope fence; scoped actions retain admission through awaits. Vital and
+diagnosis manual mutations are fenced; failed diagnosis correction retains actual
+prompt text, and duplicate Add/Submit is suppressed. Software/native evidence is
+recorded separately in [validation-0.11.23.md](validation-0.11.23.md).
+Next: remaining direct contact/star/task/consult/lab/imaging/media/order actions
+and raw-draft comparison/load/discard intents. Do not claim root renewal alone
+fences every descendant callback. Then finish durable capture/draft-note stopped
+voice journals and the remaining feature/native acceptance gates.
+
 2026-10-03, 0.11.22: all 21 real-SQL witnesses failed on pinned 0.11.21 source.
 They reproduce overwritten search indexes across twelve rebuild entry points and
 five related-name paths, an old flag applied to a corrected lab result, duplicate

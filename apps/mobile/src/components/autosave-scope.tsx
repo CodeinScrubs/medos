@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type PropsWithChildren } from 'react';
 
-import { assertDatasetWrite, datasetGeneration } from '@/lib/dataset-write';
+import { assertDatasetWrite, datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { SaveGroup } from '@/lib/save-before-leave';
 
 import { alertError, notify } from './feedback';
@@ -43,7 +43,9 @@ export function AutosaveScope({ children }: PropsWithChildren) {
           if (
             (await group.perform(() => {
               assertDatasetWrite(generation);
-              return action();
+              return withDatasetWrite(generation, async () => {
+                await action();
+              });
             })) === 'unsaved'
           ) {
             notify('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');

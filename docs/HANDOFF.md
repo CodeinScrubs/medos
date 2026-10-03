@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-04 — Renew stale patient workspaces explicitly and preserve manual input, 0.11.23
+
+**Agent:** GPT-6 via Codex
+**Commits:** application and decision record in this commit.
+
+**Changed**
+- Stale-only patient renewal retains loaded/raw input until explicit confirmation.
+  Per-dialog token, generation and route ownership guard targeted replacement;
+  the old always-on guard stays registered. Initial-read/empty roots can recover.
+- URL-tab changes use the Scope fence; manual scoped actions retain write admission
+  through awaits. Vital/diagnosis mutations keep immutable tokens. Diagnosis prompt
+  text survives failed acknowledgment; Add/Submit suppress duplicate input.
+- Version 0.11.23 / code 39; no dependency, migration, permission or archive change.
+
+**Verified**
+- Baseline `npm run check`: 108 suites / 1356 app tests + 3 workflows; previous
+  acceptance commit CI `37153996974` passed. Sixteen initial new witnesses failed
+  on `90a6f47`, after correcting harness issues. See `validation-0.11.23.md` for
+  final gates before release acceptance.
+- Final `npm run check`: typecheck, lint without warnings, formatting, 109 suites /
+  1378 app tests + 3 workflows. Targeted 41 handler tests and diff check passed;
+  two final independent source reviews completed after correcting review findings.
+
+**Not verified**
+- Signed/native/phone acceptance of this patch until evidence is recorded.
+  Mocked navigation and SQLite tests do not establish native guard/header safety.
+
+**Open threads**
+- Finish remaining direct manual and raw-draft immutable-token fences, then durable
+  quick-capture/draft-note stopped voices. Explicit renewal closes local input only;
+  it must never rebase an old callback or imply every root action is already fenced.
+
+**Gotchas**
+- Source/target-owned navigation is necessary: global router.replace queues an
+  untargeted action. A shared dialog boolean also lets a cancelled callback consume
+  a later confirmation; the per-dialog token prevents that.
+- The first full run hit one new test's cold-worker 5 s timeout; its actual-Modal/
+  SQLite file has a bounded 15 s budget. Edited imports were corrected separately.
+
 ## 2026-10-04 — Accept signed 0.11.22 native repair and exact preservation
 
 **Agent:** GPT-6 via Codex

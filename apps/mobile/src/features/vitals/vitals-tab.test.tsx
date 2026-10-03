@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
-import { Pressable } from 'react-native';
+import { Alert, Pressable } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, EmptyState, Input, SectionHeader } from '@/components/ui';
+import { restoreDatabase } from '@/db/client';
 import { vitals } from '@/db/schema';
+import { importTables } from '@/features/backup/import';
+import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -54,6 +57,28 @@ jest.mock('@/theme', () => ({ useTheme: () => ({ colors: {}, spacing: {} }) }));
 let tree: ReactTestRenderer | undefined;
 let patientId: string;
 let t: TestDatabase;
+let snapshotCounter = 0;
+function snapshot() {
+  const path = `/vitals-intent-${++snapshotCounter}.db`;
+  t.sqlite.exec(`VACUUM INTO '${path}'`);
+  return () => {
+    const replacement = reserveDatasetReplacement();
+    const trusted = restoreDatabase(replacement);
+    try {
+      trusted.sqlite.execSync('PRAGMA foreign_keys = OFF');
+      trusted.sqlite.execSync(`ATTACH DATABASE '${path}' AS restore_src`);
+      try {
+        importTables(trusted.sqlite);
+      } finally {
+        trusted.sqlite.execSync('DETACH DATABASE restore_src');
+        trusted.sqlite.execSync('PRAGMA foreign_keys = ON');
+      }
+      replacement.committed();
+    } finally {
+      replacement.release();
+    }
+  };
+}
 const input = (label: string) => tree!.root.findAllByType(Input).find((node) => node.props.label === label)!;
 const button = (label: string) => tree!.root.findAllByType(Button).find((node) => node.props.label === label)!;
 async function settle() {
@@ -93,15 +118,68 @@ beforeEach(async () => {
   mockRows = undefined;
   mockRetry.mockClear();
   jest.mocked(alertError).mockClear();
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 afterEach(async () => {
   await act(async () => {
     tree?.unmount();
   });
   tree = undefined;
+  jest.restoreAllMocks();
 });
 
 describe('real observation form handlers', () => {
+  it('retains raw input and refuses an old new measurement after real dataset replacement', async () => {
+    const restore = snapshot();
+    await render();
+    await startNew();
+    await type('نبض', '81');
+    await act(async () => restore());
+    await save();
+    expect(await patientVitalsQuery(patientId)).toHaveLength(0);
+    expect(input('نبض').props.value).toBe('81');
+    expect(alertError).toHaveBeenCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+
+  it('cannot overwrite a restored same-ID reading even when the original comparison still matches', async () => {
+    const id = await recordVital({ patientId, heartRate: 80 });
+    const restore = snapshot();
+    await render();
+    await startEdit();
+    await type('نبض', '90');
+    await act(async () => restore());
+    await save();
+    expect((await vitalQuery(id))[0]?.heartRate).toBe(80);
+    expect(input('نبض').props.value).toBe('90');
+    expect(alertError).toHaveBeenCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+
+  it('rejects an old delete confirmation after real same-ID replacement and remount', async () => {
+    const id = await recordVital({ patientId, heartRate: 80 });
+    const restore = snapshot();
+    await render();
+    await act(async () => tree!.root.findAllByType(Pressable)[0]!.props.onLongPress());
+    const remove = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((choice) => choice.text === 'حذف')!;
+    await act(async () => {
+      restore();
+      tree!.unmount();
+    });
+    await render();
+    await act(async () => {
+      remove.onPress!();
+      await settle();
+    });
+    expect((await vitalQuery(id))[0]?.deletedAt).toBeNull();
+    expect(alertError).toHaveBeenCalledWith('حذف نشد', expect.any(DatasetChangedError));
+    await startEdit();
+    await type('نبض', '85');
+    await save();
+    expect((await vitalQuery(id))[0]?.heartRate).toBe(85);
+  });
+
   it('publishes once when the same Save handler is pressed twice before rendering', async () => {
     await render();
     await startNew();

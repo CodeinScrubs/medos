@@ -1,9 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRoute, useRouter } from 'expo-router';
+import { StackActions, useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
@@ -20,6 +22,7 @@ import { PatientHeader } from '@/features/patients/patient-header';
 import { deletePatient, patientQuery } from '@/features/patients/queries';
 import { TimelineTab } from '@/features/timeline/timeline-tab';
 import { VitalsTab } from '@/features/vitals/vitals-tab';
+import { assertDatasetWrite, datasetGeneration } from '@/lib/dataset-write';
 import { useTheme } from '@/theme';
 
 type Tab = 'overview' | 'timeline' | 'notes' | 'kardex' | 'vitals' | 'labs' | 'imaging' | 'media';
@@ -52,6 +55,18 @@ export function PatientRecordScreen() {
 function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
   const scope = useAutosaveScope()!;
   const router = useRouter();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { stale } = useDatasetIntent();
+  const mounted = useRef(true);
+  const renewalPending = useRef<symbol | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      renewalPending.current = null;
+    };
+  }, []);
   const { colors, spacing, radii } = useTheme();
   const { width, fontScale } = useWindowDimensions();
   const wideTabs = (width - spacing.lg * 2) / fontScale < 320;
@@ -61,8 +76,8 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
     let current = true;
     // Route-parameter changes do not remove this screen, so the navigation exit
     // guard cannot protect its fields. Keep the old tab until they are durable.
-    void scope.group
-      .flush()
+    void scope
+      .canLeave()
       .then((saved) => {
         if (!current) return;
         if (saved) setTab(initialTab);
@@ -77,15 +92,74 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
   }, [initialTab, scope]);
 
   const { data: rows, error } = useLive(patientQuery(id), [id]);
+  // A restore that omits this id must not unmount its raw, unregistered forms.
+  // Keep the last non-stale snapshot until the owner explicitly opens a new route.
+  const [retainedRows, setRetainedRows] = useState(rows);
+  if (!stale && rows !== retainedRows) setRetainedRows(rows);
+  const displayRows = stale ? retainedRows : rows;
 
-  if (error && !rows)
+  const renew = () => {
+    if (!stale || renewalPending.current) return;
+    const expected = datasetGeneration();
+    const token = Symbol('renewal');
+    const target = navigation.getState()?.key;
+    if (!target) {
+      notify('صفحه آماده نیست', 'پس از بارگذاری دوباره تلاش کنید.');
+      return;
+    }
+    renewalPending.current = token;
+    Alert.alert(
+      'شروع با اطلاعات بازگردانی‌شده؟',
+      'پیش از ادامه، نوشته‌های ثبت‌نشدهٔ این صفحه را مرور یا کپی کنید. فرم قبلی بسته می‌شود و چیزی از آن در اطلاعات بازگردانی‌شده ثبت نمی‌شود.',
+      [
+        {
+          text: 'مرور نوشته‌ها',
+          style: 'cancel',
+          onPress: () => {
+            if (renewalPending.current === token) renewalPending.current = null;
+          },
+        },
+        {
+          text: 'شروع تازه',
+          onPress: () => {
+            if (!mounted.current || renewalPending.current !== token) return;
+            renewalPending.current = null;
+            if (!navigation.isFocused() || navigation.getState()?.key !== target) return;
+            try {
+              assertDatasetWrite(expected);
+              scope.abandonStale();
+              // Replace only this originating route, through its always-on
+              // removal guard. Global queued URL navigation has no source key.
+              navigation.dispatch({
+                ...StackActions.replace(route.name, { ...route.params, id, tab }),
+                source: route.key,
+                target,
+              });
+            } catch (e) {
+              alertError('صفحه تازه نشد', e);
+            }
+          },
+        },
+      ],
+    );
+  };
+  const staleNotice = stale ? (
+    <Column gap="xs">
+      <Text color="danger">اطلاعات از بکاپ جایگزین شد؛ نوشته‌های قبلی هنوز روی این صفحه‌اند.</Text>
+      <Button label="شروع تازه" variant="secondary" onPress={renew} />
+    </Column>
+  ) : null;
+
+  if (error && !displayRows)
     return (
       <Screen>
+        {staleNotice}
         <ErrorNotice error={error} what="پرونده" />
       </Screen>
     );
 
-  if (!rows) {
+  if (!displayRows) {
+    if (stale) return <Screen>{staleNotice}</Screen>;
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} />
@@ -93,10 +167,11 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
     );
   }
 
-  const patient = rows[0];
+  const patient = displayRows[0];
   if (!patient || patient.deletedAt) {
     return (
       <Screen>
+        {staleNotice}
         <EmptyState
           icon="alert-circle-outline"
           title="پرونده پیدا نشد"
@@ -150,6 +225,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
 
       <Screen scroll padded>
         <Column gap="md" style={{ paddingTop: spacing.md }}>
+          {staleNotice}
           <ErrorNotice error={error} what="پرونده" />
           <PatientHeader patient={patient} />
 

@@ -1316,3 +1316,35 @@ All 21 witnesses failed on pinned previous source. This is deterministic JS/SQL
 interleaving evidence, not injected native restore contention. Transactions are
 per feature/pass, not one atomic transaction over all restore housekeeping.
 Other manual/draft intent fencing and durable capture voice remain open.
+
+## Explicit patient workspace renewal (0.11.23)
+
+An old patient root keeps its Scope generation after restore. That prevents old
+header actions from writing but previously made new editing inaccessible; direct
+URL-tab flush could discard unregistered manual input. The root now retains its
+last non-stale patient rows, even when the restored database omits the id. Loading,
+error and empty roots also expose the stale-only recovery action.
+
+Renewal is an explicit local-input closure, never automatic on a clean SaveGroup.
+The user may review/copy before confirming. Each dialog owns a unique token and
+captures the current replacement generation. Confirmation checks token, mount,
+focus and navigator identity, then abandons only the old Scope and dispatches a
+REPLACE with its source route and target navigator keys. The installed router
+supports forwarding that action through the always-on removal guard. A newly
+created route captures a fresh intent; every old saver/callback remains old.
+Global queued URL replacement without source ownership and keyed guard remount
+inside the retained route were rejected. Native guard replay remains an acceptance
+gate separate from mocked navigation tests.
+
+URL-tab transitions now use canLeave's pre/post-flush checks. Scoped actions hold
+withDatasetWrite through all awaited work, so restore cannot erase an admitted
+manual action. Vital save/delete and diagnosis add/correct/status/delete retain
+immutable tokens. Diagnosis add uses latest input refs and a synchronous submission
+guard. The existing PromptModal gains an optional pending state; diagnosis correction
+retains text until actual acknowledgment and keeps it on failure.
+
+Tradeoff: explicit renewal closes local old input after confirmation rather than
+automatically merging unrelated datasets. A long admitted action postpones restore.
+These tokens and retained forms are process-local, not durable drafts or permanent
+history. Other manual callbacks still need fencing. No schema, route, dependency,
+permission, clinical rule or archive/key scheme change.

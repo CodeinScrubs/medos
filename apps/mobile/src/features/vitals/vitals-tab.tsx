@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
@@ -10,6 +11,7 @@ import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
 import type { Vital } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali, formatJalaliDateTime } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -53,6 +55,7 @@ const EMPTY: VitalForm = {
  * and the person reading it already knows.
  */
 export function VitalsTab({ patientId }: { patientId: string }) {
+  const { generation } = useDatasetIntent();
   const { colors, spacing } = useTheme();
   const now = useNow();
   const { data, error, retry } = useLive(patientVitalsQuery(patientId), [patientId]);
@@ -120,8 +123,10 @@ export function VitalsTab({ patientId }: { patientId: string }) {
     submitting.current = true;
     setBusy(true);
     try {
-      if (editing) await updateVital(editing.id, vitalEditPatch(editing, raw, values), new Date(now), editing);
-      else await recordVital({ patientId, ...values }, new Date(now));
+      await withDatasetWrite(generation, async () => {
+        if (editing) await updateVital(editing.id, vitalEditPatch(editing, raw, values), new Date(now), editing);
+        else await recordVital({ patientId, ...values }, new Date(now));
+      });
       replaceForm(EMPTY);
       setEditing(null);
       setOpen(false);
@@ -341,7 +346,10 @@ export function VitalsTab({ patientId }: { patientId: string }) {
                       {
                         text: 'حذف',
                         style: 'destructive',
-                        onPress: () => void deleteVital(row.id, new Date(now)).catch((e) => alertError('حذف نشد', e)),
+                        onPress: () =>
+                          void withDatasetWrite(generation, () => deleteVital(row.id, new Date(now))).catch((e) =>
+                            alertError('حذف نشد', e),
+                          ),
                       },
                     ])
                   }

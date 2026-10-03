@@ -19,6 +19,7 @@ export function PromptModal({
   multiline = false,
   optional = true,
   secret = false,
+  busy = false,
   onSubmit,
   onCancel,
 }: {
@@ -36,6 +37,8 @@ export function PromptModal({
    * words, and submitted exactly as typed.
    */
   secret?: boolean;
+  /** Retain text and prevent edits/dismissal until its caller acknowledges submission. */
+  busy?: boolean;
   onSubmit: (text: string) => void;
   onCancel: () => void;
 }) {
@@ -54,6 +57,7 @@ export function PromptModal({
   // Back with the IME hidden and a backdrop tap retain the discard guard;
   // the explicit «انصراف» button still cancels straight away.
   function dismiss() {
+    if (busy) return;
     if (!text.trim() || text === initialValue) {
       onCancel();
       return;
@@ -65,6 +69,7 @@ export function PromptModal({
   }
 
   function requestClose() {
+    if (busy) return;
     // Android Modal intercepts Back in its own window. The existing controller
     // tracks that window's IME; first Back should only hide it, retaining text.
     if (KeyboardController.isVisible()) {
@@ -96,6 +101,7 @@ export function PromptModal({
               ) : null}
               <Input
                 value={text}
+                editable={!busy}
                 onChangeText={setText}
                 placeholder={placeholder}
                 multiline={multiline && !secret}
@@ -109,12 +115,23 @@ export function PromptModal({
                 <View style={styles.flex}>
                   <Button
                     label={submitLabel}
-                    onPress={() => onSubmit(secret ? text : text.trim())}
-                    disabled={!optional && !text.trim()}
+                    onPress={() => {
+                      if (!busy) onSubmit(secret ? text : text.trim());
+                    }}
+                    disabled={busy || (!optional && !text.trim())}
+                    loading={busy}
                     full
                   />
                 </View>
-                <Button label="انصراف" variant="ghost" onPress={onCancel} haptic={false} />
+                <Button
+                  label="انصراف"
+                  variant="ghost"
+                  onPress={() => {
+                    if (!busy) onCancel();
+                  }}
+                  disabled={busy}
+                  haptic={false}
+                />
               </Row>
             </Column>
           </Pressable>

@@ -48,6 +48,24 @@ afterEach(() => {
 });
 
 describe('prompt text survives Android Back', () => {
+  it('retains typed text and rejects Back, backdrop, submit and cancellation while awaiting acknowledgment', () => {
+    render();
+    act(() => input().props.onChangeText('Pending text'));
+    act(() => tree!.update(<PromptModal visible title="Test" busy onCancel={cancel} onSubmit={submit} />));
+    expect(input().props.value).toBe('Pending text');
+    expect(input().props.editable).toBe(false);
+    back();
+    const backdrop = tree!.root.findByType(Modal).findAll((node) => typeof node.props.onPress === 'function')[0]!;
+    act(() => {
+      backdrop.props.onPress();
+      button('ثبت').props.onPress();
+      button('انصراف').props.onPress();
+    });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    expect(input().props.value).toBe('Pending text');
+  });
   it.each([false, true])('hides the IME first, then offers the existing discard choice (secret=%s)', (secret) => {
     render(secret);
     act(() => input().props.onChangeText('  Text to preserve  '));
