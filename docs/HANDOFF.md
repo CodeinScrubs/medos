@@ -33,6 +33,49 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Accept signed 0.11.21 native restore and stale-note preservation
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `4ecb0d7`; acceptance evidence in this commit.
+
+**Changed**
+- Record exact-source CI, signed package identities, native stale-note navigation
+  and independent full-archive preservation in `validation-0.11.21.md`.
+  No application source changes after `4ecb0d7`.
+
+**Verified**
+- Source push: 107 suites / 1335 app tests + 3 workflows; all gates green.
+  Exact-source CI `37143560846` passed, including migrations and Android export.
+  Signed arm64/x86_64 packages inspected; native installed hash matched.
+- Offline isolated-emulator `-r` upgrade. Actual old-archive restore preserved
+  mounted same-ID note text, disabled Save and offered working review/local-only
+  close. Independent SAF export/decryption compared all 39 application tables
+  and 18 media files exactly, including 14 old voices. Cold note reopened with
+  restored text and fresh enabled Save; application crash buffer empty.
+
+**Not verified**
+- Physical phone/API 26 on this version, native order/dialog/write-race coverage,
+  power loss, low space, active/pre-journal media recovery and all clinical flows.
+- Other manual forms/raw-draft conflict actions and unleased async continuations
+  remain unfenced. Post-commit housekeeping permits new ordinary intents.
+  Final reviewer attempts hit their usage limit; root owns the checks/review.
+
+**Open threads**
+- Reproduce source-reviewed races in search reindex, lab reflag and baseline
+  version repairs, then make their actual read/write units synchronous/atomic.
+- Extend immutable dataset tokens and input retention to remaining manual/draft
+  actions; cover fresh capture on retained root screens after restore. Existing
+  raw-form `seed.generation` is a UI reset counter, not the dataset generation.
+- Durable quick-capture/draft-note stopped-voice journals remain next media work.
+
+**Gotchas**
+- Native restore took longer than the first bounded UI poll: completion was read
+  from a fresh hierarchy, never inferred from the prompt disappearing.
+- Windows prebuild `EBUSY`: stop matching Gradle daemon and launch from a parent
+  directory; generated build junction targets must be verified explicitly.
+- Cold emulator System UI non-response was resolved with observed Wait; separate
+  it from app crashes. No new dependency/route/migration/permission/key scheme.
+
 ## 2026-10-03 — Fence database replacement and stale note/order intents, 0.11.21
 
 **Agent:** GPT-6 via Codex

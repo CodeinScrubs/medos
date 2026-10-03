@@ -49,6 +49,14 @@ post-commit housekeeping. Other manual forms, delayed raw-draft comparison/load/
 discard handlers and unleased async query continuations still need generation
 coverage. Next: finish those intent boundaries, then durable quick-capture and
 draft-note voice acknowledgement. No speculative route/framework/dependency work.
+Exact-source CI and both signed packages passed. On the isolated offline modern
+emulator, old-archive restore retained actual mounted note input with disabled
+Save and confirmed local-only exit. Independent export comparison preserved all
+39 application tables and 18 media files exactly; cold fresh-intent opening and
+empty application crash buffer passed. This is not native coverage of every editor
+or physical-phone acceptance. Source review also found awaited row snapshots in
+post-commit search/lab/version repairs; reproduce those races and move each repair's
+read/write boundary into a synchronous transaction before broadening repair overlap.
 
 2026-10-03, 0.11.19: native API 26 restore exposed an authenticated AES output
 capacity tail in installed expo-crypto. The reader now accepts only exact plaintext
