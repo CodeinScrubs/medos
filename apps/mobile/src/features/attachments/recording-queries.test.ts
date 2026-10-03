@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
-import { attachments, auditLog, noteDrafts, recordingJobs } from '@/db/schema';
+import { attachments, auditLog, captureInbox, noteDrafts, recordingJobs } from '@/db/schema';
+import { createCapture, updateCapture } from '@/features/capture/queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import { reserveFileMaintenance } from '@/lib/file-work';
 import { stamps } from '@/lib/ids';
@@ -91,6 +92,47 @@ async function failPublication() {
 }
 
 describe('durable stopped voice jobs', () => {
+  it('rechecks a null capture owner after reading the source and before copying', async () => {
+    const captureId = await createCapture({ kind: 'voice', shiftId: null });
+    mockFingerprint.mockImplementationOnce(async () => {
+      await updateCapture(captureId, { patientId });
+      return { ...fingerprint };
+    });
+    await expect(persistRecording(recording(), { entityType: 'capture', entityId: captureId }, now)).rejects.toThrow();
+    expect(mockCopy).not.toHaveBeenCalled();
+    expect(recordingJobQuery(recording().operationId).get()).toMatchObject({ patientId: null, checksum: null });
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+  });
+
+  it('refuses publication of a ready capture job whose null owner has changed', async () => {
+    const captureId = await createCapture({ kind: 'voice', shiftId: null });
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_voice BEFORE INSERT ON attachments BEGIN SELECT RAISE(ABORT, 'Synthetic failure'); END;",
+    );
+    await expect(persistRecording(recording(), { entityType: 'capture', entityId: captureId }, now)).rejects.toThrow();
+    t.sqlite.exec('DROP TRIGGER fail_voice');
+    await updateCapture(captureId, { patientId });
+    await expect(resumeRecording(recording().operationId, now)).rejects.toThrow();
+    expect(recordingJobQuery(recording().operationId).get()).toMatchObject({ state: 'ready', patientId: null });
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a null capture owner reassigned during copy and retains the original journal', async () => {
+    const captureId = await createCapture({ kind: 'voice', shiftId: null });
+    mockAfterCopy = () => updateCapture(captureId, { patientId });
+    await expect(persistRecording(recording(), { entityType: 'capture', entityId: captureId }, now)).rejects.toThrow();
+    expect(recordingJobQuery(recording().operationId).get()).toMatchObject({ state: 'copying', patientId: null });
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+    await expect(resumeRecording(recording().operationId, now)).rejects.toThrow();
+    t.db.update(captureInbox).set({ patientId: null }).where(eq(captureInbox.id, captureId)).run();
+    mockAfterCopy = undefined;
+    const id = await resumeRecording(recording().operationId, now);
+    expect(t.db.select().from(attachments).get()).toMatchObject({ id, patientId: null });
+    expect(await resumeRecording(recording().operationId, now)).toBe(id);
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+  });
+
   it('does not copy when the source fingerprint cannot be committed', async () => {
     t.sqlite.exec(
       "CREATE TRIGGER fail_digest BEFORE UPDATE ON recording_jobs WHEN OLD.checksum IS NULL AND NEW.checksum IS NOT NULL BEGIN SELECT RAISE(ABORT, 'Synthetic digest'); END;",

@@ -2,7 +2,7 @@ import { scryptAsync } from '@noble/hashes/scrypt.js';
 import * as Crypto from 'expo-crypto';
 
 /**
- * Encryption primitives for backups (and later the credential vault).
+ * Encryption primitives for backups.
  *
  * Only standard, audited building blocks are used: scrypt from @noble/hashes
  * for key derivation, and AES-256-GCM from the platform — Android's own
@@ -178,8 +178,20 @@ export async function chunkCipher(key: Uint8Array, noncePrefix: Uint8Array, aad:
       return sealed.ciphertext({ includeTag: true });
     },
     async open(index, last, sealed) {
+      const expected = sealed.length - TAG_BYTES;
+      if (expected < 0) throw new Error('Invalid sealed data');
       const data = Crypto.AESSealedData.fromParts(chunkNonce(noncePrefix, index, last), sealed, TAG_BYTES);
-      return Crypto.aesDecryptAsync(data, nativeKey, { additionalData: aad });
+      const plaintext = await Crypto.aesDecryptAsync(data, nativeKey, { additionalData: aad });
+      if (plaintext.length === expected) return plaintext;
+      // expo-crypto returns the allocated Cipher.getOutputSize buffer, not the
+      // doFinal byte count. AndroidOpenSSL on API 26 leaves a 16-byte zero tail.
+      // Authentication must succeed first; only that observed capacity shape is
+      // accepted. The ciphertext length fixes the boundary, including real zeros.
+      if (plaintext.length !== expected + TAG_BYTES) throw new Error('Invalid decrypted length');
+      for (let i = expected; i < plaintext.length; i += 1) {
+        if (plaintext[i] !== 0) throw new Error('Invalid decrypted capacity');
+      }
+      return plaintext.subarray(0, expected);
     },
   };
 }

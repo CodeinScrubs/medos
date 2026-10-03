@@ -1,4 +1,5 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
+import * as Crypto from 'expo-crypto';
 import type { FileHandle } from 'expo-file-system';
 
 import { DEFAULT_KDF, equalBytes, randomBytes, SALT_BYTES, TAG_BYTES } from '@/lib/crypto';
@@ -125,6 +126,30 @@ async function readArchive(bytes: Uint8Array, key = KEY): Promise<Entry[]> {
 const manifest = { type: ENTRY_MANIFEST, path: 'manifest.json', data: encodeJson({ app: 'MedOS', n: 1 }) };
 
 describe('backup file format', () => {
+  it.each(['multiple chunks', 'empty final chunk'])(
+    'reads unchanged archives with AndroidOpenSSL capacity tails: %s',
+    async (shape) => {
+      const entries: Entry[] = [
+        { type: ENTRY_FILE, path: 'x', data: noise(shape === 'multiple chunks' ? 3 * CHUNK + 123 : CHUNK - 22) },
+      ];
+      const archive = await writeArchive(entries);
+      const decrypt = Crypto.aesDecryptAsync;
+      const spy = jest.spyOn(Crypto, 'aesDecryptAsync').mockImplementation(async (...args) => {
+        const plain = await decrypt(...args);
+        if (!(plain instanceof Uint8Array)) throw new Error('Unexpected test output encoding');
+        const output = new Uint8Array(plain.length + TAG_BYTES);
+        output.set(plain);
+        return output;
+      });
+      try {
+        expectSameEntries(await readArchive(archive), entries);
+        expect(spy).toHaveBeenCalledTimes(shape === 'multiple chunks' ? 4 : 2);
+      } finally {
+        spy.mockRestore();
+      }
+    },
+  );
+
   it('round-trips a manifest, a multi-chunk database and media', async () => {
     const entries: Entry[] = [
       manifest,

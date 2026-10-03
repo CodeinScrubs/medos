@@ -1158,3 +1158,35 @@ recover before the journal or source fingerprint commits, prevent cache eviction
 before verified copy, or prove phone/power/low-space behavior. Ordinary writes and
 old editors versus restore, original-before-crop and older orphan cleanup remain
 separate work. Do not describe this as complete voice or dataset crash recovery.
+
+## Authenticated AES output capacity and immutable null owners (0.11.19)
+
+An unchanged, independently authenticated 0.11.17 archive failed native restore
+on API 26. The installed expo-crypto Android implementation allocates
+`Cipher.getOutputSize`, ignores the byte count returned by `doFinal`, and returns
+the entire backing array. A direct native probe on AndroidOpenSSL measured
+1,048,592 allocated bytes, 1,048,576 written/plaintext bytes, and an exact matching
+prefix. The extra 16 zero bytes break framing between decrypted archive chunks.
+
+`chunkCipher.open` still awaits native GCM authentication first. Plaintext length
+is sealed length minus the fixed 16-byte tag. Exact output passes unchanged; only
+the observed additional 16 all-zero bytes may be excluded at that known boundary.
+Short, other-sized or nonzero extra output fails closed. Actual trailing zero
+plaintext and the authenticated empty final chunk remain intact. No nonce, AAD,
+writer, header, KDF or passphrase normalization rule changes.
+
+Tradeoff: a narrow reader compatibility boundary is smaller and more reviewable
+than replacing the provider, patching node_modules or adding a native fork. It
+accepts only the observed authenticated capacity shape, not arbitrary padding.
+Tests reproduce that shape after real WebCrypto authentication and still reject
+wrong key/header/nonce/index/last flag, altered ciphertext/tag and damaged archives.
+Native restore acceptance remains separate from the software witness.
+
+Recording journals also compare `attachmentPatientInTransaction`'s canonical
+result to the captured patient id, including null, after native reads/copy and
+inside publication. The general attachment helper treats null as unspecified;
+ignoring its returned owner let a future generic capture acquire a new patient
+during copy while its journal retained null. The current enabled patient/note/topic
+paths did not expose this race. Real migrated-SQLite cases pin source-read,
+copy and ready-publication refusal without changing the helper's existing callers.
+This guard does not enable persistent quick-capture or draft-note voices.

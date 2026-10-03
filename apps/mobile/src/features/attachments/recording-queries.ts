@@ -93,6 +93,11 @@ function current(tx: DbTransaction, expected: RecordingJob): RecordingJob {
   return row;
 }
 
+/** Null is a captured owner too; it must not become an implicit new patient. */
+function requireOwner(tx: DbTransaction, row: RecordingJob): void {
+  if (attachmentPatientInTransaction(tx, row) !== row.patientId) conflict();
+}
+
 function requireFingerprint(file: FileFingerprint): void {
   if (!/^[0-9a-f]{64}$/.test(file.checksum) || !Number.isSafeInteger(file.sizeBytes) || file.sizeBytes <= 0)
     throw new Error('فایل وویس کامل خوانده نشد؛ دوباره تلاش کنید.');
@@ -203,7 +208,7 @@ function transition(expected: RecordingJob, patch: Partial<RecordingJob>, now: D
   assertFileWorkAvailable();
   return db.transaction((tx) => {
     const row = current(tx, expected);
-    attachmentPatientInTransaction(tx, row);
+    requireOwner(tx, row);
     if (row.state !== 'copying' || row.attachmentId || referenced(tx, row.relativePath)) conflict();
     tx.update(recordingJobs)
       .set({ ...patch, revision: row.revision + 1, ...touch(now) })
@@ -237,7 +242,7 @@ function commit(expected: RecordingJob, file: FileFingerprint, now: Date): strin
   assertFileWorkAvailable();
   return db.transaction((tx) => {
     const row = current(tx, expected);
-    attachmentPatientInTransaction(tx, row);
+    requireOwner(tx, row);
     if (!matches(row, file)) throw new Error('محتوای فایل وویس تغییر کرده است؛ دوباره ثبت نشد.');
     if (row.state === 'saved') return savedAttachment(tx, row);
     if (row.state !== 'ready' || row.attachmentId || referenced(tx, row.relativePath)) conflict();
@@ -286,7 +291,7 @@ async function run(expected: RecordingJob, now: Date): Promise<string> {
         if (!matches(row, source)) throw new Error('فایل اولیهٔ وویس تغییر کرده است؛ کپی جایگزین نشد.');
         db.transaction((tx) => {
           const checked = current(tx, row);
-          attachmentPatientInTransaction(tx, checked);
+          requireOwner(tx, checked);
           if (referenced(tx, checked.relativePath)) conflict();
         });
         actual = await copyImportFile(row.sourceUri, row.relativePath, row.sizeBytes);

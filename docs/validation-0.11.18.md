@@ -39,19 +39,64 @@ device failures.
   missing-confirmation case and the migrated-SQLite operation/restore tests.
 - `npm run db:generate` reported no schema changes after migration 0020; earlier
   migration files remain unchanged.
-- Final `npm run check` passed typecheck, lint, formatting and 101 suites / 1290
-  app tests + 3 workflows. Exact-source hosted CI and normal pre-push repetition
-  are pending until the implementation commit is pushed.
+- Final `npm run check` and the successful normal pre-push repetition passed
+  typecheck, lint, formatting and 101 suites / 1290 app tests + 3 workflows.
+  Implementation `2adbc75be71c0a4beb678a96c86c8f85e1963f16` was pushed; exact-source
+  hosted CI `37125837796` succeeded.
 
 ## Native/artifact acceptance
 
-Pending: freeze source, inspect signed arm64/x86_64 packages and actual installed
-hash; upgrade the owned modern emulator without erasing its accepted dataset;
-record Stop/Back, cold reopen and independently authenticate/decode a full SAF
-archive and compare all prior rows/media. Native pre-ack failure/recovery/cancel
-requires separate explicit evidence; a software stand-in or post-ack force-stop
-does not establish it. An additional testable emulator may be used for controlled
-SQL fault injection; do not confuse that with a natural hardware/power failure.
+Frozen source `2adbc75` produced inspected, signed 0.11.18/code 34 packages:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Owner arm64 `dist/MedOS-0.11.18.apk` | 52,828,683 | `c4054be301a85974bf062be064e8b98d0ccb1553ba4741bbafa93266c3b5cffe` |
+| Private x86_64 emulator copy | 54,437,010 | `29a487b44aaf6f8c4aa4e8289c9e5f588f6973c979f114a5c55addf288ff0a6a` |
+
+Both passed required native-library/ABI, version/package and signature checks;
+certificate SHA-256 is
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+Modern emulator upgrade used `install -r`, retained the dataset and matched the
+pulled installed APK hash. Airplane mode stayed on. Manual Stop and active system
+Back each added one voice (12 -> 14); cold reopening after acknowledgement retained
+14. New-voice playback/Stop controls were observed, not physical audio quality.
+
+A full SAF archive completed destination-content verification. Independent
+decryption authenticated all seven chunks: 6,474,457 bytes, SHA-256
+`718698963c45aa0e9f2d0471cb8621d9538f7b6ffe22fd793d2495e075d429a2`.
+SQLite integrity was ok, foreign-key failures zero, migrations 21. All 37 other
+application tables, 12 old attachments and 13 old media files matched exactly.
+Two new voices matched two saved recording jobs and their exact size/SHA/target/
+time. All 14 referenced voices fully decoded with FFmpeg; measured durations
+matched metadata within one second. The original WAV bytes remained unchanged.
+One pre-existing zero-byte unreferenced M4A remained; no new orphan or duplicate.
+
+On a separate rootable API 26 emulator, a controlled SQLite trigger rejected a
+stopped voice's attachment insert. Native state was ready, positive file size and
+matching SHA, with zero attachments. The process was stopped before acknowledgement;
+only the verified cache source was removed. Cold-open Inbox Retry produced exactly
+one saved attachment/job with the same destination/SHA and absent cache. A second
+rejected voice was stopped before acknowledgement, then explicitly cancelled after
+cold reopening. Its job was soft-retired/discarded, only its unpublished destination
+removed, cache source retained and the first acknowledged attachment/bytes unchanged.
+Native SQLite integrity and foreign keys passed; the recovered AAC fully decoded.
+This is controlled SQL failure and
+process-stop evidence, not a natural power failure or physical microphone test.
+
+The API 26 dataset was initially empty. An accepted 0.11.17 SAF archive failed before
+database/media replacement despite the exact source and picked-copy hash matching.
+A direct native JCA probe reproduced installed expo-crypto's returned capacity tail:
+AndroidOpenSSL estimated 1,048,592 bytes but wrote 1,048,576 bytes, with the correct
+plaintext prefix and 16 extra zero bytes. That is a release defect addressed by
+0.11.19, not successful 0.11.18 restore acceptance. The controlled voice tests then
+used an explicitly seeded synthetic patient, not a supposedly restored dataset.
+
+Private evidence is under `private/validation-0.11.18/`. Host-memory contention
+caused an initial build/pre-push OOM; sequential retries passed. API 26 private QA
+helpers needed the actual UIAutomator output path, no modern test-base jar, one UI
+automation job at a time and restored app SQLite SELinux labels after root probing.
+These helper/host failures are not product crash claims. Slow helper retries caused
+long synthetic recordings; do not interpret their duration as app latency.
 
 ## Still open
 

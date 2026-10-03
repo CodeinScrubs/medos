@@ -2,7 +2,8 @@
 
 This is the current delivery backlog, not a claim of completeness. Read it with
 `AGENTS.md` and the latest `HANDOFF.md` entry. The owner authorized implementation,
-commits and GitHub pushes on 2026-09-23, with **no subagents**. Continue in priority
+commits and GitHub pushes on 2026-09-23. The current delegation limit (2026-10-03)
+is **at most two subagents**, with the primary agent owning integration and checks. Continue in priority
 order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Product and decision record
@@ -33,6 +34,14 @@ order; do not treat a successful test suite as acceptance of the entire product.
   long on-screen explanations, or speculative native dependencies.
 
 ## Priority 0: data integrity and recovery
+
+2026-10-03, 0.11.19: native API 26 restore exposed an authenticated AES output
+capacity tail in installed expo-crypto. The reader now accepts only exact plaintext
+length or the observed extra 16 zero bytes, after authentication; archive/key
+schemes and writer remain unchanged. Recording transitions/publication compare
+the canonical owner including null, closing a future generic capture race before
+enabling that journal for draft/capture UI. Evidence and remaining gates are in
+[validation-0.11.19.md](validation-0.11.19.md).
 
 2026-10-03, 0.11.18: D03/D05/D10 now include a persisted stopped-voice journal for
 existing records. Source and destination fingerprints, immutable operation id,

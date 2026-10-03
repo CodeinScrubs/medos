@@ -33,6 +33,46 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Repair API 26 backup reading and enforce null recording owners
+
+**Agent:** GPT-6 via Codex
+**Commits:** prior application `2adbc75`; implementation/evidence in this commit.
+
+**Changed**
+- 0.11.19/code 35: accept only exact or observed authenticated AES capacity
+  output, retaining real trailing zeros; no backup/key/native dependency change.
+- Recording transitions/publication compare canonical patient including null.
+  This closes a future generic capture race; draft/capture UI is still separate.
+- Record 0.11.18 artifact/modern native/pre-ack recovery and cancellation evidence.
+  Current delegation limit is two; both reviewers were read-only, integration
+  and native verification stayed with the primary agent.
+
+**Verified**
+- Prior source/pre-push: 101 suites / 1290 app tests + 3 workflows; exact-source
+  CI `37125837796` succeeded. Signed packages and installed hash passed.
+- Offline modern upgrade, Stop/Back, post-ack cold reopen and full SAF archive:
+  37 tables/12 old attachments/13 old media preserved; 14 referenced voices
+  decoded. Native controlled SQL rejection, pre-ack process stop, cache-free
+  recovery and explicit cold-open cancellation passed on isolated API 26.
+- Native API 26 JCA probe reproduced extra capacity; nine software witnesses
+  failed before these fixes with 82 other cases passing. Initial green targeted
+  run: 3 suites / 91 tests. Final full check: 101 suites / 1302 app tests + 3
+  workflows, typecheck/lint/format all green.
+
+**Not verified**
+- 0.11.19 artifact/hosted/native gates yet, physical phone, natural power/low-space
+  and complete ordinary-write/editor-versus-restore exclusion.
+
+**Open threads**
+- Finish 0.11.19 push/hosted/build/native old/current restore and preservation.
+  Then durable draft/capture targets, remaining manual forms and media/restore work.
+
+**Gotchas**
+- API 26 restore on 0.11.18 is a confirmed reader defect, not successful restore.
+  Fault tests used an explicitly seeded synthetic patient after that failure.
+- Sequential builds/checks avoid host OOM. Root QA helpers need correct app DB
+  labels and isolated UI automation; helper failures are not product failures.
+
 ## 2026-10-03 — Journal stopped voices for existing records
 
 **Agent:** GPT-6 via Codex

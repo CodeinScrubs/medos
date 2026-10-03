@@ -1,5 +1,6 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { gcm } from '@noble/ciphers/aes.js';
+import * as Crypto from 'expo-crypto';
 
 import {
   chunkCipher,
@@ -28,6 +29,23 @@ const hex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padSt
 const utf8 = (text: string) => new TextEncoder().encode(text);
 const SALT = Uint8Array.from({ length: 16 }, (_, i) => i + 1);
 const FAST: KdfParams = { log2N: 10, r: 8, p: 1, scheme: 2 };
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+/** Authenticate with the real stand-in before reproducing AndroidOpenSSL's capacity tail. */
+function nativeCapacityTail(extra = 16, lastByte = 0) {
+  const decrypt = Crypto.aesDecryptAsync;
+  return jest.spyOn(Crypto, 'aesDecryptAsync').mockImplementation(async (...args) => {
+    const plain = await decrypt(...args);
+    if (!(plain instanceof Uint8Array)) throw new Error('Unexpected test output encoding');
+    const output = new Uint8Array(plain.length + extra);
+    output.set(plain.subarray(0, output.length));
+    if (extra > 0) output[output.length - 1] = lastByte;
+    return output;
+  });
+}
 
 describe('normalizePassphrase', () => {
   it('scheme 1 applies NFKC and nothing else', () => {
@@ -145,6 +163,46 @@ describe('chunkCipher', () => {
     expect(sealed).toEqual(gcm(key, chunkNonce(prefix, 7, true), aad).encrypt(chunk));
     const fromReference = gcm(key, chunkNonce(prefix, 8, false), aad).encrypt(chunk);
     expect(await cipher.open(8, false, fromReference)).toEqual(chunk);
+  });
+
+  it.each([Uint8Array.of(65, 0, 0), new Uint8Array(0)])(
+    'reads authenticated AndroidOpenSSL output without trimming actual zero bytes (%j)',
+    async (plain) => {
+      nativeCapacityTail();
+      const cipher = await chunkCipher(key, prefix, aad);
+      const reference = gcm(key, chunkNonce(prefix, 0, true), aad).encrypt(plain);
+      expect(await cipher.open(0, true, reference)).toEqual(plain);
+    },
+  );
+
+  it.each<[string, number, number]>([
+    ['short output', -1, 0],
+    ['one extra byte', 1, 0],
+    ['unexpected capacity', 32, 0],
+    ['nonzero capacity tail', 16, 1],
+  ])('rejects authenticated native %s', async (_, extra, lastByte) => {
+    nativeCapacityTail(extra, lastByte);
+    const cipher = await chunkCipher(key, prefix, aad);
+    await expect(cipher.open(0, true, await cipher.seal(0, true, chunk))).rejects.toThrow();
+  });
+
+  it('still authenticates every chunk before accepting a native capacity tail', async () => {
+    const decrypt = nativeCapacityTail();
+    const cipher = await chunkCipher(key, prefix, aad);
+    const sealed = await cipher.seal(3, false, chunk);
+    await expect(cipher.open(4, false, sealed)).rejects.toThrow();
+    await expect(cipher.open(3, true, sealed)).rejects.toThrow();
+    await expect((await chunkCipher(key, prefix, utf8('other header'))).open(3, false, sealed)).rejects.toThrow();
+    await expect((await chunkCipher(randomBytes(32), prefix, aad)).open(3, false, sealed)).rejects.toThrow();
+    await expect((await chunkCipher(key, randomBytes(7), aad)).open(3, false, sealed)).rejects.toThrow();
+    for (const at of [0, sealed.length - 1]) {
+      const altered = sealed.slice();
+      altered[at] = altered[at]! ^ 1;
+      await expect(cipher.open(3, false, altered)).rejects.toThrow();
+    }
+    decrypt.mockClear();
+    await expect(cipher.open(3, false, new Uint8Array(15))).rejects.toThrow();
+    expect(decrypt).not.toHaveBeenCalled();
   });
 });
 
