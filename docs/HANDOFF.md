@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Verify 0.11.16 upgrade, chart and acknowledged voice backup
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `3204076`; evidence in this commit.
+
+**Changed**
+- Pin signed APKs, exact-source CI, installed hash, bounded offline native cases
+  and independent archive/data preservation in `validation-0.11.16.md`.
+- Record the installed SDK's resolved-stop/terminal-error path as an uncovered
+  contract. No application, dependency, schema or permission change here.
+
+**Verified**
+- Full source gate: 98 suites / 1229 app tests + 3 workflows; exact-source main CI
+  `37072631672` succeeded. Owner/emulator APK libraries, signature, version/ABI
+  and emulator installed hash; upgrade retained data without reset.
+- Native pulse chart endpoint dates fit at font scales 1.0/1.6. Manual Stop and
+  tab exit each added one voice; post-ack cold reopen retained ten and playback
+  state/Stop worked. Old/new vital rows survived cold reopening.
+- Native SAF archive: five authenticated chunks; integrity/FKs pass. 36 other
+  tables, two old vitals, eight old attachment rows and nine old files exact;
+  one new vital/two new voices. Ten referenced audio files fully decode.
+
+**Not verified**
+- Physical phone, pre-ack process-death/power/low-space, native stop-error
+  injection, Back/gesture exit or restore during recording. The auto-backup
+  probe finished before observed recording and proves no actual overlap.
+
+**Open threads**
+- First cover `expo-audio` terminal error/completion, then durable stopped-voice
+  UUID recovery. Dataset/ordinary-write/old-editor restore exclusion, remaining
+  raw forms and original-before-crop remain open. Do not claim project completion.
+
+**Gotchas**
+- Wait for the query's count, not just its recorder button, on cold launch.
+- Compare native phase timestamps; folder changes alone cannot prove overlap.
+- The owned emulator had system-level ANRs before app interaction. Preserve its
+  disk data. Configure Java through `android-env.js` for APK signature checks.
+
 ## 2026-10-03 — Cover recording lifecycle and fit chart dates
 
 **Agent:** GPT-6 via Codex
