@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, Column, Row, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatDuration } from '@/lib/duration';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
@@ -37,7 +39,16 @@ const TARGET_LABELS = {
 };
 
 /** Failure-only recovery on the original record or the existing inbox. No new route/guard. */
-export function RecordingRecovery({ target, excludeId }: { target?: AttachmentTarget; excludeId?: string }) {
+export function RecordingRecovery({
+  target,
+  excludeId,
+  generation: expectedGeneration,
+}: {
+  target?: AttachmentTarget;
+  excludeId?: string;
+  generation?: number;
+}) {
+  const { generation, stale } = useDatasetIntent(expectedGeneration);
   const [limit, setLimit] = useState(20);
   const [busy, setBusy] = useState<string | null>(null);
   const working = useRef(false);
@@ -54,8 +65,10 @@ export function RecordingRecovery({ target, excludeId }: { target?: AttachmentTa
     working.current = true;
     setBusy(id);
     try {
-      if (discard) await discardRecording(id, new Date());
-      else await resumeRecording(id, new Date());
+      await withDatasetWrite(generation, async () => {
+        if (discard) await discardRecording(id, new Date());
+        else await resumeRecording(id, new Date());
+      });
       retry();
     } catch (e) {
       alertError(discard ? 'پاک‌کردن کپی ناتمام انجام نشد' : 'وویس ذخیره نشد', e);
@@ -88,7 +101,7 @@ export function RecordingRecovery({ target, excludeId }: { target?: AttachmentTa
                 variant="secondary"
                 size="sm"
                 loading={busy === job.id}
-                disabled={busy != null}
+                disabled={stale || busy != null}
                 onPress={() => void act(job.id, false)}
               />
             ) : null}
@@ -96,7 +109,7 @@ export function RecordingRecovery({ target, excludeId }: { target?: AttachmentTa
               label={job.state === 'discarding' ? 'تکمیل حذف کپی' : 'صرف‌نظر'}
               variant="ghost"
               size="sm"
-              disabled={busy != null}
+              disabled={stale || busy != null}
               onPress={() => {
                 if (job.state === 'discarding') {
                   void act(job.id, true);

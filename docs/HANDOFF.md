@@ -33,6 +33,48 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Fence database replacement and stale note/order intents, 0.11.21
+
+**Agent:** GPT-6 via Codex
+**Commits:** application and decision record in this commit.
+
+**Changed**
+- Reject ordinary SQL before restore commits; use revocable injected restore
+  authority on the same connection. Guard native preparation, prepared execution,
+  raw batches and public `$client`; never log SQL/parameters.
+- All Autosave writers keep their original generation and an async admission
+  lease. Stale note/order forms retain input; their write/publish/discard and
+  existing-record voice callbacks reject replacement, including old dialogs.
+  Confirmed stale exit abandons local state only. Version/code 0.11.21/37.
+
+**Verified**
+- Original ordinary-write witness failed on the old source. Full `npm run check`:
+  107 suites / 1335 app tests + 3 workflow tests, typecheck/lint/format green.
+- Real migrated-SQL import, actual mounted editor/voice/navigation handlers,
+  installed Expo driver with native stand-ins and failure/lease boundaries.
+  Root reviewed source; reviewers supplied earlier findings, but final reviewer
+  attempts hit their account usage limit and supplied no final approval.
+
+**Not verified**
+- Exact-source hosted CI, new signed APKs and native acceptance still pending.
+- No physical phone. Live/native behavior is not proven by synchronous mocks.
+- Other manual forms/raw-draft conflict handlers and unleased async continuations
+  remain unfenced. New intents can write during post-commit housekeeping.
+
+**Open threads**
+- Finish 0.11.21 artifact/native gates and record exact identity/preservation.
+- Extend immutable tokens to remaining manual writes and confirmed draft actions;
+  then durable quick-capture/draft-note voice journals before acknowledgement.
+  Keep pending values visible; never rebase an old callback to today's generation.
+
+**Gotchas**
+- Prepare-time checks alone miss already-prepared SQL; logger execution checks
+  alone miss PRAGMA preparation. Need both plus the raw allowlisted facade.
+- Commit generation outside media rollback catch, before awaits. Restore factory
+  failure must release both reservations. Scope is pre-commit, not whole restore.
+- Retained EditGate seed uses state, not render-time ref mutation. No new route,
+  migration, dependency, permission or archive/key scheme. See validation-0.11.21.
+
 ## 2026-10-03 — Accept signed 0.11.20 photo capture and cancelled lab picker
 
 **Agent:** GPT-6 via Codex

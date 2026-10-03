@@ -139,6 +139,13 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
   acknowledgement. Each recorder belongs to its screen's one `AutosaveScope`, alongside
   text fields; never add a competing removal guard to that route or flush the whole group
   from the recorder's own callback. In-process staging is not crash-recovery evidence.
+- A mounted editing intent keeps its original `datasetGeneration()` across restore.
+  Carry that token into write/publish/discard callbacks, including delayed dialog
+  confirmations; `withDatasetWrite(token, work)` holds admission through awaits.
+  Never obtain a fresh token in an old callback or remount to discard unsaved input.
+  `EditGate`'s `fenceDataset` is opt-in: enable it only with fenced mutations.
+  Restore's trusted database belongs only to the engine; ordinary code must not
+  access Drizzle's internal session or use restore authority. See architecture.
 - Anything time-dependent takes `now` as a parameter; screens get it from `useNow()`.
 - Date fields report validity separately from their parsed value. Wire `onValidityChange`
   to `useDateValidation().setValid`, and call `check()` before saving; never save an old

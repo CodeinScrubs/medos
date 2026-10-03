@@ -1220,3 +1220,62 @@ still need write admission and dataset generation fencing together. This lease
 does not prevent a request prepared before restore from starting afterwards,
 preserve originals before the native cropper, or prove phone/power/low-space
 behavior. Those remain separate delivery gates.
+
+## Database replacement and editing intents (0.11.21)
+
+**Problem.** An ordinary clinical write could succeed while restore was decrypting,
+then be erased by its SQL import. A loaded note/order with a UUID also present in
+the backup could later overwrite the newly restored row from old local fields.
+An in-process file lease alone does not cover either behavior.
+
+**Decision.** `lib/dataset-write.ts` owns a process-local generation and admitted
+async-writer count. Restore reserves replacement before its first await and refuses
+an active admitted writer. Before import commits, ordinary writes are rejected.
+Failed import does not advance the generation; successful synchronous import
+advances it before any await or housekeeping. Subscriber failures are contained
+outside the media rollback catch. The explicit revocable restore capability is
+passed to a separate Drizzle/connection facade on the same native connection;
+there is no ambient trusted flag around async work. Factory failure releases both
+dataset and file reservations.
+
+`db/write-admission.ts` checks the installed Expo driver's private `prepareSync`
+adapter and Drizzle logger immediately before execution, including statements
+prepared before restore. Preparation also needs a check because SQLite may apply
+PRAGMAs there. The public raw connection and `$client` expose only an allowlisted
+synchronous facade. Raw batches always require admission; unknown SQL, WITH,
+PRAGMA and semicolon-bearing reads are conservative. The logger never prints SQL
+or parameters. Internal session access/restore authority outside the engine is
+lint-restricted. This is an application consistency boundary, not a security SQL
+parser or authorization mechanism. Changing Drizzle/Expo needs adapter regression
+review; contract tests exercise the installed Expo driver with native stand-ins.
+
+**Tradeoff.** Ordinary admission resumes immediately after SQL commits. Existing
+post-commit housekeeping can repair/search/schedule using ordinary queries, and
+new intents can write; file maintenance remains held until restore finishes.
+This does not make every housekeeping step atomic or exclude all clinical writes
+throughout housekeeping. Tokens are in memory: a JS restart destroys old editors,
+so this mechanism is not a persisted revision/conflict protocol.
+
+Every `Autosave` captures an immutable generation and holds an async writer lease
+through acknowledgement. A stale failure retains its latest pending value and
+does not schedule automatic retry into the new dataset. `AutosaveScope` checks
+before/after flush and before navigation/actions. The always-on removal hook lets
+the user explicitly close a stale form without flushing it; it does not silently
+delete a restored draft. This covers scheduler writes, not arbitrary manual query
+callbacks or all draft comparison/load/discard handlers.
+
+Note and kardex editors opt into `EditGate`'s retained initial seed and pass the
+original generation to draft writes, publication, discard and order queries.
+They remain mounted after same-ID or missing-record replacement: local input is
+available for review/copy, save is disabled, and confirmed stale-note cancellation
+abandons only local state. Existing-record voice handoffs/recovery/delete dialogs
+also carry the original token and a lease across persistence. Old confirmation
+callbacks reject before touching restored metadata. No new route, dependency,
+permission, migration or archive/key scheme is introduced.
+
+Other manual forms and async queries that do not carry an immutable token remain
+follow-up work. Current UI retention is not crash recovery, a recovery export or
+a guarantee that every editor survives every live-query refresh. Draft-note and
+quick-capture stopped voices still need durable journals before acknowledgement.
+Native navigation/SQLite timing, process death, power loss, low storage and phone
+acceptance remain separate from migrated-SQLite and mounted-handler witnesses.

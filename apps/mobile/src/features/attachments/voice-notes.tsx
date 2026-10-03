@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Column } from '@/components/ui';
@@ -8,6 +9,7 @@ import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import type { AttachmentEntity } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { assertDatasetWrite, withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { mediaUri } from '@/platform/media';
 
@@ -25,21 +27,26 @@ export async function saveRecording(
 }
 
 /** Keep one owner for a failed capture; recovery controls take over after remount. */
-export function useRecordingHandoff(target: {
-  entityType: AttachmentEntity;
-  entityId: string;
-  patientId?: string | null;
-}) {
+export function useRecordingHandoff(
+  target: {
+    entityType: AttachmentEntity;
+    entityId: string;
+    patientId?: string | null;
+  },
+  expectedGeneration?: number,
+) {
+  const { generation } = useDatasetIntent(expectedGeneration);
   const [ownedId, setOwnedId] = useState<string | undefined>();
   return {
     ownedId,
     onRecorded: async (recording: Recording) => {
+      assertDatasetWrite(generation);
       setOwnedId(recordingOperationId(recording));
-      await saveRecording(recording, target);
+      await withDatasetWrite(generation, () => saveRecording(recording, target));
       setOwnedId(undefined);
     },
     onDiscarded: async (recording: Recording) => {
-      await discardStoppedRecording(recording, target, new Date());
+      await withDatasetWrite(generation, () => discardStoppedRecording(recording, target, new Date()));
       setOwnedId(undefined);
     },
   };
@@ -53,19 +60,26 @@ export function VoiceNotesSection({
   entityType,
   entityId,
   patientId,
+  generation: expectedGeneration,
 }: {
   entityType: AttachmentEntity;
   entityId: string;
   patientId?: string | null;
+  generation?: number;
 }) {
+  const { generation, stale } = useDatasetIntent(expectedGeneration);
   const { data, error, retry } = useLive(entityAttachmentsQuery(entityType, entityId), [entityType, entityId]);
   const voices = (data ?? []).filter((a) => a.kind === 'voice');
-  const handoff = useRecordingHandoff({ entityType, entityId, patientId });
+  const handoff = useRecordingHandoff({ entityType, entityId, patientId }, generation);
 
   return (
     <Column gap="sm">
       <ErrorNotice error={error} what="وویس‌ها" onRetry={retry} />
-      <RecordingRecovery target={{ entityType, entityId, patientId }} excludeId={handoff.ownedId} />
+      <RecordingRecovery
+        target={{ entityType, entityId, patientId }}
+        excludeId={handoff.ownedId}
+        generation={generation}
+      />
       {voices.map((v) => {
         return (
           <VoiceNotePlayer
@@ -74,24 +88,32 @@ export function VoiceNotesSection({
             relativePath={v.relativePath}
             durationMs={v.durationMs}
             caption={v.caption ?? formatJalaliDateTime(v.capturedAt)}
-            onLongPress={() =>
-              Alert.alert('حذف وویس؟', undefined, [
-                { text: 'انصراف', style: 'cancel' },
-                {
-                  text: 'حذف',
-                  style: 'destructive',
-                  onPress: () => void deleteAttachment(v.id).catch((e) => alertError('وویس حذف نشد', e)),
-                },
-              ])
+            onLongPress={
+              stale
+                ? undefined
+                : () =>
+                    Alert.alert('حذف وویس؟', undefined, [
+                      { text: 'انصراف', style: 'cancel' },
+                      {
+                        text: 'حذف',
+                        style: 'destructive',
+                        onPress: () =>
+                          void withDatasetWrite(generation, () => deleteAttachment(v.id)).catch((e) =>
+                            alertError('وویس حذف نشد', e),
+                          ),
+                      },
+                    ])
             }
           />
         );
       })}
-      <VoiceRecorder
-        label={voices.length ? 'وویس دیگر' : 'ضبط وویس'}
-        onRecorded={handoff.onRecorded}
-        onDiscarded={handoff.onDiscarded}
-      />
+      {!stale && (
+        <VoiceRecorder
+          label={voices.length ? 'وویس دیگر' : 'ضبط وویس'}
+          onRecorded={handoff.onRecorded}
+          onDiscarded={handoff.onDiscarded}
+        />
+      )}
     </Column>
   );
 }

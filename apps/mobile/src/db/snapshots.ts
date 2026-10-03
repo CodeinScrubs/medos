@@ -4,6 +4,7 @@ import { newId } from '@/lib/ids';
 
 import { sqlite } from './client';
 import { sqlPath } from './files';
+import type { SqlConnection } from './write-admission';
 
 /**
  * Plain local copies of the database, taken automatically before anything that
@@ -22,7 +23,12 @@ export type SnapshotKind = 'pre-restore' | 'pre-migration';
  * VACUUM INTO writes a compacted, transactionally consistent copy even while
  * the app is writing — a byte copy of a WAL-mode database file is not safe.
  */
-export function snapshotDatabase(kind: SnapshotKind, keep = 3, now = Date.now()): File {
+export function snapshotDatabase(
+  kind: SnapshotKind,
+  keep = 3,
+  now = Date.now(),
+  connection: SqlConnection = sqlite,
+): File {
   if (!Number.isInteger(keep) || keep < 1) throw new Error('Invalid safety-snapshot retention.');
   const dir = new Directory(Paths.document, SNAPSHOT_DIR);
   if (!dir.exists) dir.create({ intermediates: true });
@@ -35,7 +41,7 @@ export function snapshotDatabase(kind: SnapshotKind, keep = 3, now = Date.now())
   // Old snapshots remain valid inputs to retention; no filename migration.
   const target = new File(dir, `${kind}-${now}-${newId()}.db`);
   try {
-    sqlite.execSync(`VACUUM INTO '${sqlPath(target.uri)}'`);
+    connection.execSync(`VACUUM INTO '${sqlPath(target.uri)}'`);
     if (!target.exists || (target.size ?? 0) <= 0) throw new Error('نسخهٔ ایمنی ساخته نشد.');
   } catch (e) {
     // A failed VACUUM can leave a partial destination. Never prune good copies

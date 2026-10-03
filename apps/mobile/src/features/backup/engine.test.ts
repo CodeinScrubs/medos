@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Directory, File, FileMode } from 'expo-file-system';
 
+import * as databaseClient from '@/db/client';
 import { patients, backupRuns, settings } from '@/db/schema';
 import { readSetting, writeSetting } from '@/db/settings';
+import { recordVital } from '@/features/vitals/queries';
 import { deriveKey, equalBytes } from '@/lib/crypto';
+import { datasetGeneration, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { FileWorkBusyError, withFileJob } from '@/lib/file-work';
 import { stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
@@ -102,6 +105,55 @@ function restore(onProgress?: Parameters<typeof restoreBackup>[0]['onProgress'])
 const name = () => t.db.select({ name: patients.firstName }).from(patients).get()!.name;
 
 describe('backup orchestration (real archive/authentication and migrated SQLite; native files stood in)', () => {
+  it('refuses an ordinary clinical write during unpacking instead of acknowledging data the import erases', async () => {
+    let attempted: Promise<boolean> | undefined;
+    await restore((progress) => {
+      if (progress.phase === 'files' && !attempted) {
+        attempted = recordVital({ patientId: 'patient', heartRate: 80 }).then(
+          () => true,
+          () => false,
+        );
+      }
+    });
+    expect(attempted).toBeDefined();
+    expect(await attempted).toBe(false);
+    expect(name()).toBe('Saved');
+    await expect(recordVital({ patientId: 'patient', heartRate: 81 })).resolves.toBeTruthy();
+  });
+
+  it('advances editor identity at SQL commit before housekeeping/done and leaves it unchanged on failed authentication', async () => {
+    const before = datasetGeneration();
+    const damaged = memoryFiles.get(fixtureUri)!.slice();
+    damaged[damaged.length - 1] = damaged[damaged.length - 1]! ^ 1;
+    memoryFiles.set('file:///external/damaged.medosbak', damaged);
+    await expect(
+      restoreBackup({ fileUri: 'file:///external/damaged.medosbak', passphrase: 'synthetic test input' }),
+    ).rejects.toThrow();
+    expect(datasetGeneration()).toBe(before);
+    let doneGeneration: number | undefined;
+    await restore((progress) => {
+      if (progress.phase === 'done') {
+        doneGeneration = datasetGeneration();
+        throw new Error('Synthetic postcommit display failure');
+      }
+    });
+    expect(datasetGeneration()).toBe(before + 1);
+    expect(doneGeneration).toBe(before + 1);
+    expect(name()).toBe('Saved');
+  });
+
+  it('releases both reservations if constructing the trusted database handle fails', async () => {
+    const factory = jest.spyOn(databaseClient, 'restoreDatabase').mockImplementationOnce(() => {
+      throw new Error('Synthetic factory failure');
+    });
+    await expect(restore()).rejects.toThrow('Synthetic factory failure');
+    factory.mockRestore();
+    const replacement = reserveDatasetReplacement();
+    replacement.release();
+    await expect(withFileJob(async () => 'released')).resolves.toBe('released');
+    await expect(restore()).resolves.toBeTruthy();
+  });
+
   it('treats Android picker cancellation as no change to the configured folder', async () => {
     await writeSetting(backupFolderUri, 'file:///external/original');
     await expect(chooseBackupFolder()).resolves.toBeNull();
@@ -386,10 +438,12 @@ describe('backup orchestration (real archive/authentication and migrated SQLite;
   );
 
   it('rolls back clinical import and restores displaced bytes after a real SQL failure', async () => {
+    const generation = datasetGeneration();
     t.sqlite.exec(
       "CREATE TRIGGER refuse_restore BEFORE INSERT ON patients BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
     );
     await expect(restore()).rejects.toThrow('synthetic failure');
+    expect(datasetGeneration()).toBe(generation);
     expect(name()).toBe('Current');
     expect(equalBytes(memoryFiles.get(mediaUri)!, new Uint8Array([8, 7, 6]))).toBe(true);
     expect(await readSetting(restoreInFlight)).toBeNull();

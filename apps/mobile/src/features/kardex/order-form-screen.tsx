@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { EditGate } from '@/components/edit-gate';
 import { alertError, notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
@@ -37,8 +38,10 @@ export function OrderFormScreen() {
   const { id: patientId, orderId } = useLocalSearchParams<{ id: string; orderId?: string }>();
   const { data, error, retry } = useLive(orderQuery(orderId ?? ''), [orderId]);
   return (
-    <EditGate editing={Boolean(orderId)} rows={data} error={error} onRetry={retry} what="کاردکس">
-      {(order, readNotice) => <OrderForm readNotice={readNotice} patientId={patientId} order={order} />}
+    <EditGate editing={Boolean(orderId)} rows={data} error={error} onRetry={retry} what="کاردکس" fenceDataset>
+      {(order, readNotice, generation) => (
+        <OrderForm readNotice={readNotice} patientId={patientId} order={order} generation={generation} />
+      )}
     </EditGate>
   );
 }
@@ -47,14 +50,17 @@ function OrderForm({
   patientId,
   order,
   readNotice,
+  generation,
 }: {
   readNotice: ReactNode;
   patientId: string;
   order: Order | null;
+  generation: number;
 }) {
   const { data: patientRows } = useLive(patientQuery(patientId), [patientId]);
   const patient = patientRows?.[0];
   const router = useRouter();
+  const { stale } = useDatasetIntent(generation);
   const { colors, radii, spacing } = useTheme();
   const isEdit = order != null;
 
@@ -121,8 +127,8 @@ function OrderForm({
       notes: notes.trim() || null,
     };
     try {
-      if (order) await updateOrder(order.id, payload);
-      else await createOrder({ patientId, ...payload });
+      if (order) await updateOrder(order.id, payload, generation);
+      else await createOrder({ patientId, ...payload }, generation);
       router.back();
     } catch (e) {
       alertError('ذخیره نشد', e);
@@ -238,6 +244,7 @@ function OrderForm({
               icon="checkmark"
               onPress={() => void save()}
               loading={saving}
+              disabled={stale}
               full
             />
           </View>

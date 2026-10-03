@@ -42,6 +42,16 @@ const restrict = (...patterns) => [
         name: '@expo/vector-icons',
         message: 'Import the icon family directly, e.g. @expo/vector-icons/Ionicons, to avoid bundling unused fonts.',
       },
+      {
+        name: '@/db/client',
+        importNames: ['restoreDatabase'],
+        message: 'Only the backup engine may obtain explicit restore authority.',
+      },
+      {
+        name: '@/lib/dataset-write',
+        importNames: ['reserveDatasetReplacement'],
+        message: 'Only the backup engine may reserve dataset replacement.',
+      },
     ],
     patterns,
   },
@@ -173,6 +183,10 @@ module.exports = defineConfig([
           selector: "CallExpression[callee.object.name=/^(db|tx)$/][callee.property.name='delete']",
           message: 'Clinical data is never hard-deleted. Stamp deletedAt with softDelete() instead.',
         },
+        {
+          selector: "MemberExpression[object.name=/^(db|tx)$/][property.name='session']",
+          message: 'Do not reach through the internal Drizzle session; use the guarded database API.',
+        },
         /*
          * <Stack.Screen options> inside a screen re-applies the header on every
          * render, including a render while the screen is closing — which stops
@@ -195,6 +209,18 @@ module.exports = defineConfig([
   },
 
   /* ----------------------------------------------------------------- node */
+  {
+    files: ['src/features/backup/engine.ts', 'src/test/**/*.{ts,tsx}', '**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: '@expo/vector-icons', message: 'Import icon families directly.' }],
+          patterns: [APP],
+        },
+      ],
+    },
+  },
   {
     files: ['*.config.js', 'plugins/**/*.js', 'scripts/**/*.js', 'metro.config.js', 'babel.config.js'],
     languageOptions: {

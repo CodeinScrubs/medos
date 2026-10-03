@@ -1,6 +1,6 @@
 import { newId, stamps } from '@/lib/ids';
 
-import { db } from './client';
+import { db, type Database } from './client';
 import { auditLog } from './schema';
 
 /**
@@ -65,10 +65,11 @@ export async function audit(
     summary?: string;
     detail?: Record<string, unknown>;
   } = {},
+  database: Database = db,
 ): Promise<void> {
   const now = new Date();
   try {
-    await db.insert(auditLog).values({
+    await database.insert(auditLog).values({
       id: newId(),
       ...stamps(now),
       at: now,

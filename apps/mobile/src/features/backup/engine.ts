@@ -4,18 +4,20 @@ import * as Device from 'expo-device';
 import { Directory, File, FileMode, Paths, type FileHandle } from 'expo-file-system';
 
 import { audit } from '@/db/audit';
-import { db, sqlite } from '@/db/client';
+import { db, restoreDatabase, sqlite, type Database } from '@/db/client';
 import { sqlPath } from '@/db/files';
 import { backupRuns } from '@/db/schema';
 import { runSeeds } from '@/db/seed';
 import { readSetting, settingQuery, writeSetting } from '@/db/settings';
 import { snapshotDatabase } from '@/db/snapshots';
+import type { SqlConnection } from '@/db/write-admission';
 import { reconcileAllPatientStatuses } from '@/features/encounters/status';
 import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
 import { backfillNoteVersionsIfNeeded } from '@/features/notes/version-queries';
 import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
+import { reserveDatasetReplacement, type DatasetReplacement } from '@/lib/dataset-write';
 import { FileWorkBusyError, fileJobsActive, reserveFileMaintenance } from '@/lib/file-work';
 import { newId, stamps, touch } from '@/lib/ids';
 import { redactErrorText } from '@/lib/redact';
@@ -512,33 +514,37 @@ export async function recoverInterruptedRestore(): Promise<{ putBack: number; fa
 }
 
 /** Caller already holds the same exclusion as backup and restore. */
-async function recoverRestoreMedia(): Promise<{ putBack: number; failed: DisplacedMedia[] }> {
+async function recoverRestoreMedia(database: Database = db): Promise<{ putBack: number; failed: DisplacedMedia[] }> {
   const marker = await readRestoreMarker();
   const root = new Directory(Paths.document, DISPLACED_ROOT);
 
   if (!marker) {
     // The restore committed (or none ran): whatever it set aside is obsolete.
     if (root.exists) removeQuietly(root);
-    await writeSetting(restoreMediaUnresolved, 0);
+    await writeSetting(restoreMediaUnresolved, 0, database);
     return { putBack: 0, failed: [] };
   }
 
   const dir = new Directory(Paths.document, `${DISPLACED_ROOT}/${marker.dir}`);
   const displaced = listDisplaced(dir);
   const failed = putBackDisplacedMedia(mediaFs, livePaths, displaced);
-  await writeSetting(restoreMediaUnresolved, failed.length);
+  await writeSetting(restoreMediaUnresolved, failed.length, database);
   if (failed.length === 0) {
     removeQuietly(dir);
-    await writeSetting(restoreInFlight, null);
+    await writeSetting(restoreInFlight, null, database);
   } else {
     logError(new Error(`${failed.length} restored file(s) could not be put back`), {
       source: 'handled',
       context: `restore recovery: kept in ${DISPLACED_ROOT}/${marker.dir}`,
     });
   }
-  await audit('backup.restoreRolledBack', {
-    detail: { putBack: displaced.length - failed.length, kept: failed.length },
-  });
+  await audit(
+    'backup.restoreRolledBack',
+    {
+      detail: { putBack: displaced.length - failed.length, kept: failed.length },
+    },
+    database,
+  );
   return { putBack: displaced.length - failed.length, failed };
 }
 
@@ -639,29 +645,29 @@ export type RestoreResult = {
 };
 
 /** Attach the restored snapshot and copy it into the live database. */
-function importDatabase(snapshot: File): { tables: number; rows: number } {
+function importDatabase(snapshot: File, connection: SqlConnection): { tables: number; rows: number } {
   // Foreign keys are enforced per statement; while tables are emptied and
   // refilled one by one they are briefly inconsistent, so enforcement pauses.
-  sqlite.execSync('PRAGMA foreign_keys = OFF');
+  connection.execSync('PRAGMA foreign_keys = OFF');
   try {
-    sqlite.execSync(`ATTACH DATABASE '${sqlPath(snapshot.uri)}' AS restore_src`);
+    connection.execSync(`ATTACH DATABASE '${sqlPath(snapshot.uri)}' AS restore_src`);
     try {
-      return importTables(sqlite);
+      return importTables(connection);
     } finally {
       // Detaching and re-enabling foreign keys happen after the import has
       // either committed or rolled back. Letting them throw here would report
       // a committed restore as a failed one, and the caller would undo the
       // media of a dataset that is already live.
-      tidyUp('DETACH DATABASE restore_src');
+      tidyUp('DETACH DATABASE restore_src', connection);
     }
   } finally {
-    tidyUp('PRAGMA foreign_keys = ON');
+    tidyUp('PRAGMA foreign_keys = ON', connection);
   }
 }
 
-function tidyUp(statement: string): void {
+function tidyUp(statement: string, connection: SqlConnection): void {
   try {
-    sqlite.execSync(statement);
+    connection.execSync(statement);
   } catch (e) {
     logError(e, { source: 'handled', context: `restore cleanup: ${statement}` });
   }
@@ -696,6 +702,21 @@ export async function restoreBackup({
 }): Promise<RestoreResult> {
   if (running) throw new Error('یک بکاپ در حال انجام است؛ چند لحظه بعد دوباره امتحان کنید.');
   const releaseFiles = reserveFileMaintenance();
+  let replacement: DatasetReplacement;
+  try {
+    replacement = reserveDatasetReplacement();
+  } catch (error) {
+    releaseFiles();
+    throw error;
+  }
+  let trusted: ReturnType<typeof restoreDatabase>;
+  try {
+    trusted = restoreDatabase(replacement);
+  } catch (error) {
+    replacement.release();
+    releaseFiles();
+    throw error;
+  }
   // Reserve before the first await: foreground automatic backup or another
   // restore must not enter while recovery still owns the displaced files.
   running = true;
@@ -706,7 +727,7 @@ export async function restoreBackup({
   // copy of every file this restore replaced.
   let kept: Directory | null = null;
   try {
-    const unfinished = await recoverRestoreMedia();
+    const unfinished = await recoverRestoreMedia(trusted.db);
     if (unfinished.failed.length > 0) {
       throw new Error('بازگردانی قبلی ناتمام است. ابتدا از پیام «بازگردانی ناتمام» فایل‌ها را برگردانید.');
     }
@@ -758,7 +779,7 @@ export async function restoreBackup({
     if (!dbFile) throw new Error('دیتابیس داخل این بکاپ نبود.');
 
     // 2. Keep a way back.
-    snapshotDatabase('pre-restore');
+    snapshotDatabase('pre-restore', 3, Date.now(), trusted.sqlite);
 
     /*
      * 3. Media into place, keeping whatever was there.
@@ -772,7 +793,7 @@ export async function restoreBackup({
     kept = keptDir;
     // Written before the first file moves and wiped by the import itself: see
     // `restoreInFlight`. Between the two, a killed app is recoverable.
-    await writeSetting(restoreInFlight, { dir: keptDir.name, at: Date.now() });
+    await writeSetting(restoreInFlight, { dir: keptDir.name, at: Date.now() }, trusted.db);
     const paths: MediaPaths = {
       target: (path) => new File(Paths.document, path).uri,
       displaced: (path) => new File(keptDir, path).uri,
@@ -794,10 +815,14 @@ export async function restoreBackup({
     let imported: { tables: number; rows: number };
     try {
       onProgress?.({ phase: 'database', fraction: 0 });
-      imported = importDatabase(dbFile);
+      imported = importDatabase(dbFile, trusted.sqlite);
     } catch (e) {
       throw new MediaRestoreError(e, putBackDisplacedMedia(mediaFs, paths, displaced));
     }
+
+    // Outside the media-rollback catch: subscriber failures cannot undo media
+    // after SQL committed. Old editing intents are invalid before any await.
+    replacement.committed();
 
     // Committed: the files that were replaced are not coming back.
     removeQuietly(kept);
@@ -863,7 +888,7 @@ export async function restoreBackup({
     // and the error the user reads says so.
     if (e instanceof MediaRestoreError && e.notPutBack.length > 0) {
       // The marker stays too: those files are still the live database's.
-      await writeSetting(restoreMediaUnresolved, e.notPutBack.length).catch((error) =>
+      await writeSetting(restoreMediaUnresolved, e.notPutBack.length, trusted.db).catch((error) =>
         logError(error, { source: 'handled', context: 'restore: recording unresolved media' }),
       );
       logError(e, {
@@ -874,7 +899,7 @@ export async function restoreBackup({
       // A failed recovery belongs to an earlier attempt. Do not clear its
       // marker or only remaining copies when this attempt has not staged any.
       removeQuietly(kept);
-      await writeSetting(restoreInFlight, null).catch(() => undefined);
+      await writeSetting(restoreInFlight, null, trusted.db).catch(() => undefined);
     }
     throw e;
   } finally {
@@ -886,6 +911,7 @@ export async function restoreBackup({
     } finally {
       removeQuietly(work);
       running = false;
+      replacement.release();
       releaseFiles();
     }
   }

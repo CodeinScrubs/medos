@@ -6,12 +6,9 @@
  * test suite against a real SQLite.
  */
 
-export type SqlConnection = {
-  execSync(sql: string): void;
-  getAllSync<T>(sql: string): T[];
-  getFirstSync<T>(sql: string): T | null;
-  withTransactionSync(task: () => void): void;
-};
+import type { SqlConnection } from '@/db/write-admission';
+
+export type { SqlConnection };
 
 /**
  * Tables that describe this phone rather than the clinical record, and so are

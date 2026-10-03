@@ -4,6 +4,7 @@ import { db } from '@/db/client';
 import { orders, type Order } from '@/db/schema';
 import { startsWith } from '@/db/search';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { endAtForStatus } from './logic';
@@ -55,36 +56,44 @@ export type OrderInput = {
   notes?: string | null;
 };
 
-export async function createOrder(input: OrderInput): Promise<string> {
-  const id = newId();
-  await db.insert(orders).values({
-    id,
-    ...stamps(),
-    patientId: input.patientId,
-    encounterId: await resolveActiveEncounterId(input.patientId),
-    kind: input.kind,
-    name: input.name.trim(),
-    brandName: input.brandName ?? null,
-    dose: input.dose ?? null,
-    route: input.route ?? null,
-    frequency: input.frequency ?? null,
-    rate: input.rate ?? null,
-    duration: input.duration ?? null,
-    isPrn: input.isPrn ?? false,
-    prnCondition: input.prnCondition ?? null,
-    startAt: input.startAt ?? new Date(),
-    indication: input.indication ?? null,
-    notes: input.notes ?? null,
-    status: 'active',
+export async function createOrder(input: OrderInput, generation = datasetGeneration()): Promise<string> {
+  return withDatasetWrite(generation, async () => {
+    const id = newId();
+    await db.insert(orders).values({
+      id,
+      ...stamps(),
+      patientId: input.patientId,
+      encounterId: await resolveActiveEncounterId(input.patientId),
+      kind: input.kind,
+      name: input.name.trim(),
+      brandName: input.brandName ?? null,
+      dose: input.dose ?? null,
+      route: input.route ?? null,
+      frequency: input.frequency ?? null,
+      rate: input.rate ?? null,
+      duration: input.duration ?? null,
+      isPrn: input.isPrn ?? false,
+      prnCondition: input.prnCondition ?? null,
+      startAt: input.startAt ?? new Date(),
+      indication: input.indication ?? null,
+      notes: input.notes ?? null,
+      status: 'active',
+    });
+    return id;
   });
-  return id;
 }
 
-export async function updateOrder(id: string, patch: Partial<Omit<OrderInput, 'patientId'>>): Promise<void> {
-  await db
-    .update(orders)
-    .set({ ...patch, ...touch() })
-    .where(and(alive, eq(orders.id, id)));
+export async function updateOrder(
+  id: string,
+  patch: Partial<Omit<OrderInput, 'patientId'>>,
+  generation = datasetGeneration(),
+): Promise<void> {
+  await withDatasetWrite(generation, async () => {
+    await db
+      .update(orders)
+      .set({ ...patch, ...touch() })
+      .where(and(alive, eq(orders.id, id)));
+  });
 }
 
 /**

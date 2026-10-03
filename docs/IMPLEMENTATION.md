@@ -35,6 +35,21 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-03, 0.11.21: the real-SQL witness reproduced an ordinary clinical write
+acknowledged during restore and subsequently erased. Pre-commit admission now
+guards native preparation, Drizzle execution and the public raw facade. Restore
+uses explicitly injected, revocable authority; successful SQL replacement advances
+an in-process generation synchronously, while failed replacement leaves it unchanged.
+All Autosave schedulers retain their original token and hold admitted-writer leases
+across async acknowledgement. Note/kardex manual writes and existing-record voice
+actions carry the immutable token. Stale note/order input stays mounted for review;
+confirmed exit is local only. See `validation-0.11.21.md` for actual gates.
+This is deliberately pre-commit exclusion: ordinary queries can run during
+post-commit housekeeping. Other manual forms, delayed raw-draft comparison/load/
+discard handlers and unleased async query continuations still need generation
+coverage. Next: finish those intent boundaries, then durable quick-capture and
+draft-note voice acknowledgement. No speculative route/framework/dependency work.
+
 2026-10-03, 0.11.19: native API 26 restore exposed an authenticated AES output
 capacity tail in installed expo-crypto. The reader now accepts only exact plaintext
 length or the observed extra 16 zero bytes, after authentication; archive/key

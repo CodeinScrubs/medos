@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { z } from 'zod';
 
-import { db } from './client';
+import { db, type Database } from './client';
 import { settings } from './schema';
 
 /**
@@ -42,13 +42,13 @@ export async function readSetting<T>(def: SettingDef<T>): Promise<T> {
   return parseSetting(def, rows[0]);
 }
 
-export async function writeSetting<T>(def: SettingDef<T>, value: T): Promise<void> {
+export async function writeSetting<T>(def: SettingDef<T>, value: T, database: Database = db): Promise<void> {
   // Validate on the way in too, so a bad write fails at the call site rather
   // than surfacing later as a silently ignored value.
   const checked = def.schema.parse(value);
   const json = JSON.stringify(checked);
   const now = new Date();
-  await db
+  await database
     .insert(settings)
     .values({ key: def.key, value: json, updatedAt: now })
     .onConflictDoUpdate({ target: settings.key, set: { value: json, updatedAt: now } });

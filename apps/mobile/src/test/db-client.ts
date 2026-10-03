@@ -1,6 +1,10 @@
+import { drizzle } from 'drizzle-orm/sql-js';
+
 import type { Database } from '@/db/client';
 import * as schema from '@/db/schema';
+import { admittedConnection, restrictDatabaseClient, writeAdmission } from '@/db/write-admission';
 import type { SqlConnection } from '@/features/backup/import';
+import type { DatasetReplacement } from '@/lib/dataset-write';
 
 import type { TestDatabase } from './sqljs';
 
@@ -40,5 +44,16 @@ function forward<T extends object>(target: () => T): T {
 export const DATABASE_NAME = 'test.db';
 export { schema };
 export const db: Database = forward(() => need().db);
-export const sqlite: SqlConnection = forward(() => need().conn);
+export const sqlite: SqlConnection = forward(() => admittedConnection(need().conn));
+export function restoreDatabase(replacement: DatasetReplacement) {
+  replacement.authorize();
+  const connection = admittedConnection(need().conn, replacement.authorize);
+  return {
+    db: restrictDatabaseClient(
+      drizzle(need().sqlite, { schema, logger: writeAdmission(replacement.authorize) }),
+      connection,
+    ) as unknown as Database,
+    sqlite: connection,
+  };
+}
 export type { Database };

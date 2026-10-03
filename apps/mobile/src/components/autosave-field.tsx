@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { Button, Column, Input, Text, type InputProps } from '@/components/ui';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { DatasetChangedError } from '@/lib/dataset-write';
 
 import { useAutosaveScope } from './autosave-scope';
 
@@ -67,7 +68,13 @@ export function AutosaveField({
         }}
       />
       {state.status === 'failed' ? (
-        <Button label="ذخیره نشد؛ تلاش دوباره" variant="ghost" size="sm" onPress={() => void saver.flush()} />
+        state.error instanceof DatasetChangedError ? (
+          <Text variant="tiny" color="danger">
+            فرم قدیمی است؛ نوشته را کپی کنید و فرم را دوباره باز کنید.
+          </Text>
+        ) : (
+          <Button label="ذخیره نشد؛ تلاش دوباره" variant="ghost" size="sm" onPress={() => void saver.flush()} />
+        )
       ) : state.status === 'pending' || state.status === 'writing' ? (
         <Text variant="tiny" color="textMuted">
           در حال ذخیره…

@@ -3,13 +3,15 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { noteDrafts, notes, patients } from '@/db/schema';
 import { addAttachmentInTransaction } from '@/features/attachments/queries';
+import { assertDatasetWrite, datasetGeneration } from '@/lib/dataset-write';
 import { softDelete } from '@/lib/ids';
 
 import { draftHasContent } from './draft-queries';
 import { createNoteInTransaction, updateNoteInTransaction } from './queries';
 
 /** Publish the persisted draft, its history and voice metadata as one operation. */
-export async function commitNoteDraft(draftId: string): Promise<string> {
+export async function commitNoteDraft(draftId: string, generation = datasetGeneration()): Promise<string> {
+  assertDatasetWrite(generation);
   return db.transaction((tx) => {
     const draft = tx
       .select()

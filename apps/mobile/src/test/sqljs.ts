@@ -5,6 +5,7 @@ import initSqlJs, { type Database as SqlJsDatabase, type SqlJsStatic } from 'sql
 import type { Database } from '@/db/client';
 import migrations from '@/db/migrations/migrations';
 import * as schema from '@/db/schema';
+import { admittedConnection, restrictDatabaseClient, writeAdmission } from '@/db/write-admission';
 import type { SqlConnection } from '@/features/backup/import';
 
 /**
@@ -30,7 +31,10 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   SQL ??= await initSqlJs();
   const sqlite = new SQL.Database();
   sqlite.exec('PRAGMA foreign_keys = ON;');
-  const db = drizzle(sqlite, { schema }) as unknown as Database;
+  const db = restrictDatabaseClient(
+    drizzle(sqlite, { schema, logger: writeAdmission() }),
+    admittedConnection(sqlJsConnection(sqlite)),
+  ) as unknown as Database;
   await migrate(db, migrations);
   return { sqlite, db, conn: sqlJsConnection(sqlite) };
 }

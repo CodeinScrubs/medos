@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { Autosave, type AutosaveState } from './autosave';
+import { DatasetBusyError, DatasetChangedError, reserveDatasetReplacement } from './dataset-write';
 
 /*
  * Time is faked so the ceiling can be tested at all: the case that matters is
@@ -37,6 +38,41 @@ function build(write: (v: string) => Promise<void>) {
 }
 
 describe('Autosave', () => {
+  it('retains old pending text without invoking its writer or retrying after a replacement', async () => {
+    const write = jest.fn(async (_value: string) => {});
+    const { saver, states } = build(write);
+    saver.change('old pending text');
+    const replacement = reserveDatasetReplacement();
+    replacement.committed();
+    replacement.release();
+    expect(await saver.flush()).toBe(false);
+    expect(saver.unsaved).toBe(true);
+    expect(states.at(-1)).toMatchObject({ status: 'failed', error: expect.any(DatasetChangedError) });
+    tick(30000);
+    await Promise.resolve();
+    expect(write).not.toHaveBeenCalled();
+    saver.cancel();
+  });
+
+  it('holds admission through a delayed writer and releases it after rejection', async () => {
+    let reject!: (error: Error) => void;
+    const { saver } = build(
+      () =>
+        new Promise<void>((_resolve, no) => {
+          reject = no;
+        }),
+    );
+    saver.change('delayed');
+    const pending = saver.flush();
+    await Promise.resolve();
+    expect(() => reserveDatasetReplacement()).toThrow(DatasetBusyError);
+    reject(new Error('Synthetic write failure'));
+    expect(await pending).toBe(false);
+    saver.cancel();
+    const replacement = reserveDatasetReplacement();
+    replacement.release();
+  });
+
   it('retains a conflict without repeated background retries, then retries explicitly', async () => {
     let conflict = true;
     const write = jest.fn(async (_value: string) => {

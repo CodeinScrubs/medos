@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
@@ -32,6 +33,7 @@ import { VoiceNotesSection } from '@/features/attachments/voice-notes';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { assertDatasetWrite, DatasetChangedError, withDatasetWrite } from '@/lib/dataset-write';
 import { withFileJob } from '@/lib/file-work';
 import { newId } from '@/lib/ids';
 import { mediaUri } from '@/platform/media';
@@ -78,14 +80,15 @@ function NoteGate({ patientId, noteId, type }: { patientId: string; noteId?: str
   // The type comes from the URL, so it is checked rather than trusted.
   const initialType = NOTE_TYPES.find((t) => t === type) ?? 'progress';
   return (
-    <EditGate editing={Boolean(noteId)} rows={data} error={error} onRetry={retry} what="نوت">
-      {(note) => (
+    <EditGate editing={Boolean(noteId)} rows={data} error={error} onRetry={retry} what="نوت" fenceDataset>
+      {(note, readNotice, generation) => (
         <DraftGate
           patientId={patientId}
           note={note}
           initialType={initialType}
-          noteError={noteId ? error : undefined}
           retryNote={retry}
+          generation={generation}
+          readNotice={readNotice}
         />
       )}
     </EditGate>
@@ -103,14 +106,16 @@ function DraftGate({
   patientId,
   note,
   initialType,
-  noteError,
   retryNote,
+  generation,
+  readNotice,
 }: {
   patientId: string;
   note: Note | null;
   initialType: NoteType;
-  noteError?: Error;
   retryNote: () => void;
+  generation: number;
+  readNotice: ReactNode;
 }) {
   const { colors, spacing } = useTheme();
   const { data, error, retry } = useLive(noteDraftQuery(patientId, note?.id ?? null), [patientId, note?.id]);
@@ -134,11 +139,13 @@ function DraftGate({
       note={note}
       initialType={initialType}
       draft={data[0] ?? null}
-      readError={noteError ?? error}
+      readError={error}
       retryRead={() => {
         retryNote();
         retry();
       }}
+      generation={generation}
+      readNotice={readNotice}
     />
   );
 }
@@ -169,6 +176,8 @@ function NoteEditor({
   draft,
   readError,
   retryRead,
+  generation,
+  readNotice,
 }: {
   patientId: string;
   note: Note | null;
@@ -176,8 +185,11 @@ function NoteEditor({
   draft: NoteDraft | null;
   readError?: Error;
   retryRead: () => void;
+  generation: number;
+  readNotice: ReactNode;
 }) {
   const router = useRouter();
+  const { stale } = useDatasetIntent(generation);
   const { colors, spacing } = useTheme();
   const isEdit = note != null;
   // Both read the draft as it was on mount: the row changes underneath as this
@@ -197,10 +209,11 @@ function NoteEditor({
   const saver = useMemo(
     () =>
       new Autosave<NoteDraftFields>({
-        write: (value) => writeNoteDraft(draftId, { patientId, noteId: note?.id ?? null }, value),
+        write: (value) => writeNoteDraft(draftId, { patientId, noteId: note?.id ?? null }, value, generation),
         onState: setAutosave,
+        generation,
       }),
-    [draftId, patientId, note?.id],
+    [draftId, patientId, note?.id, generation],
   );
 
   const scope = useAutosaveScope()!;
@@ -247,6 +260,7 @@ function NoteEditor({
   const committing = useRef(false);
 
   async function onRecorded(recording: Recording) {
+    assertDatasetWrite(generation);
     await withFileJob(async () => {
       const stored = await stageRecording(recording, new Date());
       if (!latest.current.voices.some((voice) => voice.relativePath === stored.relativePath)) {
@@ -272,6 +286,7 @@ function NoteEditor({
     committing.current = true;
     setSaving(true);
     try {
+      assertDatasetWrite(generation);
       if (!(await scope.group.flush())) {
         notify('ذخیره نشد', 'متن یا وویس روی صفحه باقی مانده؛ دوباره تلاش کنید.');
         return;
@@ -287,7 +302,7 @@ function NoteEditor({
         notify('ذخیره نشد', 'نوشته روی صفحه باقی مانده؛ دوباره تلاش کنید.');
         return;
       }
-      await commitNoteDraft(draftId);
+      await commitNoteDraft(draftId, generation);
       saver.cancel();
       router.back();
     } catch (e) {
@@ -303,12 +318,13 @@ function NoteEditor({
     committing.current = true;
     setSaving(true);
     try {
+      assertDatasetWrite(generation);
       // Wait for in-flight writes before retiring the draft; failed deletion stays visible.
       if (!(await scope.group.flush())) {
         notify('پیش‌نویس حذف نشد', 'متن یا وویس هنوز ذخیره نشده است؛ دوباره تلاش کنید.');
         return;
       }
-      await discardNoteDraft(draftId);
+      await discardNoteDraft(draftId, generation);
       saver.cancel();
       router.back();
     } catch (e) {
@@ -321,6 +337,22 @@ function NoteEditor({
 
   function leave() {
     if (committing.current) return;
+    if (stale) {
+      Alert.alert('بستن فرم قبلی', 'نوشتهٔ روی این صفحه دور ریخته می‌شود. اطلاعات بازگردانی‌شده تغییر نمی‌کند.', [
+        { text: 'ادامهٔ مرور', style: 'cancel' },
+        {
+          text: 'بستن فرم',
+          style: 'destructive',
+          onPress: () => {
+            // Local abandonment only: never retire a restored same-ID draft.
+            saver.cancel();
+            scope.abandonStale();
+            router.back();
+          },
+        },
+      ]);
+      return;
+    }
     if (!draftHasContent(latest.current) && !scope.group.unsaved) {
       void discardAndLeave();
       return;
@@ -333,8 +365,8 @@ function NoteEditor({
           // Only leave if the text actually reached storage. `flush` resolves
           // either way; treating that as success would close the screen on the
           // one copy of the note that exists.
-          void scope.group
-            .flush()
+          void scope
+            .canLeave()
             .then((stored) => {
               if (stored) router.back();
               else {
@@ -357,7 +389,9 @@ function NoteEditor({
 
   const autosaveLine =
     autosave.status === 'failed'
-      ? 'پیش‌نویس ذخیره نشد — دوباره تلاش می‌شود'
+      ? autosave.error instanceof DatasetChangedError
+        ? 'فرم قبلی ذخیره نمی‌شود؛ نوشته روی صفحه باقی مانده است'
+        : 'پیش‌نویس ذخیره نشد — دوباره تلاش می‌شود'
       : autosave.status === 'pending' || autosave.status === 'writing'
         ? 'در حال ذخیره‌ی پیش‌نویس…'
         : autosave.status === 'saved'
@@ -387,12 +421,20 @@ function NoteEditor({
                   }
                 />
               ) : null}
-              <Button label="ثبت" variant="secondary" size="sm" loading={saving} onPress={() => void save()} />
+              <Button
+                label="ثبت"
+                variant="secondary"
+                size="sm"
+                loading={saving}
+                disabled={stale}
+                onPress={() => void save()}
+              />
             </Row>
           ),
         }}
       />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
         <ErrorNotice error={readError} what="نوت و پیش‌نویس" onRetry={retryRead} />
         {recovered ? (
           <Text variant="caption" color="textMuted">
@@ -490,7 +532,7 @@ function NoteEditor({
 
         <SectionHeader title="وویس" />
         {note ? (
-          <VoiceNotesSection entityType="note" entityId={note.id} patientId={patientId} />
+          <VoiceNotesSection entityType="note" entityId={note.id} patientId={patientId} generation={generation} />
         ) : (
           <Column gap="sm">
             {fields.voices.map((v, i) => (
@@ -502,7 +544,9 @@ function NoteEditor({
                 onLongPress={() => update({ voices: fields.voices.filter((_, j) => j !== i) })}
               />
             ))}
-            <VoiceRecorder label={fields.voices.length ? 'وویس دیگر' : 'ضبط وویس'} onRecorded={onRecorded} />
+            {!stale && (
+              <VoiceRecorder label={fields.voices.length ? 'وویس دیگر' : 'ضبط وویس'} onRecorded={onRecorded} />
+            )}
           </Column>
         )}
 
@@ -521,7 +565,14 @@ function NoteEditor({
 
         <Row gap="sm" style={{ marginTop: spacing.sm }}>
           <View style={{ flex: 1 }}>
-            <Button label="ثبت در پرونده" icon="checkmark" onPress={() => void save()} loading={saving} full />
+            <Button
+              label="ثبت در پرونده"
+              icon="checkmark"
+              onPress={() => void save()}
+              loading={saving}
+              disabled={stale}
+              full
+            />
           </View>
           <Button label="انصراف" variant="ghost" onPress={leave} haptic={false} disabled={saving} />
         </Row>
@@ -542,7 +593,7 @@ function NoteEditor({
           update({ doctorId: item.id });
           setPickingDoctor(false);
         }}
-        onCreate={quickCreateDoctor}
+        onCreate={(text) => withDatasetWrite(generation, () => quickCreateDoctor(text))}
         createLabel="افزودن پزشک"
       />
     </Screen>

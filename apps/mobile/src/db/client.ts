@@ -1,7 +1,10 @@
-import { drizzle } from 'drizzle-orm/expo-sqlite';
+import { drizzle, type ExpoSQLiteDatabase } from 'drizzle-orm/expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 
+import type { DatasetReplacement } from '@/lib/dataset-write';
+
 import * as schema from './schema';
+import { admittedConnection, admittedDriver, restrictDatabaseClient, writeAdmission } from './write-admission';
 
 export const DATABASE_NAME = 'medos.db';
 
@@ -16,7 +19,7 @@ export const DATABASE_NAME = 'medos.db';
  * anywhere re-renders every screen observing that table, with no cache to
  * invalidate by hand.
  */
-export const sqlite = SQLite.openDatabaseSync(DATABASE_NAME, { enableChangeListener: true });
+const nativeDatabase = SQLite.openDatabaseSync(DATABASE_NAME, { enableChangeListener: true });
 
 /*
  * Connection settings, applied the moment the database opens — before
@@ -34,12 +37,35 @@ export const sqlite = SQLite.openDatabaseSync(DATABASE_NAME, { enableChangeListe
  *   here is the sentence someone just typed into a note. FULL costs an fsync
  *   per commit; a phone that dies mid-shift costs more.
  */
-sqlite.execSync('PRAGMA journal_mode = WAL;');
-sqlite.execSync('PRAGMA synchronous = FULL;');
-sqlite.execSync('PRAGMA foreign_keys = ON;');
-sqlite.execSync('PRAGMA busy_timeout = 5000;');
+nativeDatabase.execSync('PRAGMA journal_mode = WAL;');
+nativeDatabase.execSync('PRAGMA synchronous = FULL;');
+nativeDatabase.execSync('PRAGMA foreign_keys = ON;');
+nativeDatabase.execSync('PRAGMA busy_timeout = 5000;');
 
-export const db = drizzle(sqlite, { schema });
+export const sqlite =
+  admittedConnection<
+    Pick<SQLite.SQLiteDatabase, 'execSync' | 'getAllSync' | 'getFirstSync' | 'withTransactionSync' | 'databasePath'>
+  >(nativeDatabase);
+export const db: ExpoSQLiteDatabase<typeof schema> & { readonly $client: typeof sqlite } = restrictDatabaseClient(
+  drizzle(admittedDriver(nativeDatabase), { schema, logger: writeAdmission() }),
+  sqlite,
+);
+
+/** Only the restore engine owns this revocable authority; never ambient across awaits. */
+export function restoreDatabase(replacement: DatasetReplacement) {
+  replacement.authorize();
+  const connection = admittedConnection<typeof sqlite>(nativeDatabase, replacement.authorize);
+  return {
+    db: restrictDatabaseClient(
+      drizzle(admittedDriver(nativeDatabase, replacement.authorize), {
+        schema,
+        logger: writeAdmission(replacement.authorize),
+      }),
+      connection,
+    ),
+    sqlite: connection,
+  };
+}
 
 export type Database = typeof db;
 /** Synchronous write context, shared by operations that must commit together. */

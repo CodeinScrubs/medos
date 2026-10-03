@@ -15,6 +15,8 @@
  * this must never do is claim the text is safe when it is not.
  */
 
+import { DatasetChangedError, datasetGeneration, withDatasetWrite } from './dataset-write';
+
 export type AutosaveState =
   /** Nothing has changed since the last successful write. */
   | { status: 'idle' }
@@ -34,6 +36,8 @@ export type AutosaveOptions<T> = {
   /** Conflicts need a user decision, not a background retry loop. Pending text is retained. */
   shouldRetry?: (error: unknown) => boolean;
   now?: () => number;
+  /** The mounted editing intent's identity, never refreshed by a live query. */
+  generation?: number;
 };
 
 export class Autosave<T> {
@@ -43,6 +47,7 @@ export class Autosave<T> {
   private readonly onState: (state: AutosaveState) => void;
   private readonly shouldRetry: (error: unknown) => boolean;
   private readonly now: () => number;
+  private readonly generation: number;
 
   private timer: ReturnType<typeof setTimeout> | null = null;
   private chain: Promise<void> = Promise.resolve();
@@ -59,6 +64,7 @@ export class Autosave<T> {
     this.onState = options.onState ?? (() => {});
     this.shouldRetry = options.shouldRetry ?? (() => true);
     this.now = options.now ?? Date.now;
+    this.generation = options.generation ?? datasetGeneration();
   }
 
   /** Record a new value and schedule the write. */
@@ -128,7 +134,7 @@ export class Autosave<T> {
     this.writing = true;
     this.onState({ status: 'writing' });
     try {
-      await this.write(item.value);
+      await withDatasetWrite(this.generation, () => this.write(item.value));
       if (this.pending == null) {
         this.firstChangeAt = null;
         this.onState({ status: 'saved', at: this.now() });
@@ -142,7 +148,7 @@ export class Autosave<T> {
       // Keep the newer value if one arrived meanwhile; never overwrite it.
       if (this.pending == null) this.pending = item;
       this.onState({ status: 'failed', error, at: this.now() });
-      if (!this.stopped && this.shouldRetry(error)) this.arm(this.delayMs);
+      if (!this.stopped && !(error instanceof DatasetChangedError) && this.shouldRetry(error)) this.arm(this.delayMs);
     } finally {
       this.writing = false;
     }

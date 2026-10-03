@@ -2,6 +2,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { noteDrafts, notes, patients, type DraftVoice, type NoteDraft, type NoteType } from '@/db/schema';
+import { assertDatasetWrite, datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
 /*
@@ -92,7 +93,9 @@ export async function writeNoteDraft(
   id: string,
   target: { patientId: string; noteId: string | null },
   fields: NoteDraftFields,
+  generation = datasetGeneration(),
 ): Promise<void> {
+  assertDatasetWrite(generation);
   const now = new Date();
   db.transaction((tx) => {
     const current = tx.select().from(noteDrafts).where(eq(noteDrafts.id, id)).get();
@@ -130,8 +133,10 @@ export async function writeNoteDraft(
 }
 
 /** The draft is no longer wanted: saved into a note, or thrown away. */
-export async function discardNoteDraft(id: string): Promise<void> {
-  await db.update(noteDrafts).set(softDelete()).where(eq(noteDrafts.id, id));
+export async function discardNoteDraft(id: string, generation = datasetGeneration()): Promise<void> {
+  await withDatasetWrite(generation, async () => {
+    await db.update(noteDrafts).set(softDelete()).where(eq(noteDrafts.id, id));
+  });
 }
 
 /** Does this draft hold anything a person would miss? */

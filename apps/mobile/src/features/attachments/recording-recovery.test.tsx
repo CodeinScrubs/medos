@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button } from '@/components/ui';
 import type { RecordingJob } from '@/db/schema';
+import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 
 import { RecordingRecovery, RecordingRecoveryNotice } from './recording-recovery';
 
@@ -72,6 +73,31 @@ async function render(notice = false, onReview = jest.fn()) {
 const action = (label: string) => tree.root.findAllByType(Button).find((b) => b.props.label === label)!.props.onPress;
 
 describe('stopped voice recovery controls', () => {
+  it('rejects old retry and already-open discard confirmation callbacks after replacement', async () => {
+    await render();
+    const retry = action('تلاش دوباره');
+    await act(async () => action('صرف‌نظر')());
+    const discard = jest.mocked(Alert.alert).mock.calls.at(-1)![2]![1]!.onPress!;
+    await act(async () => {
+      const replacement = reserveDatasetReplacement();
+      replacement.committed();
+      replacement.release();
+    });
+    await act(async () => {
+      retry();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      discard();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockResume).not.toHaveBeenCalled();
+    expect(mockDiscard).not.toHaveBeenCalled();
+    expect(alertError).toHaveBeenCalledWith('وویس ذخیره نشد', expect.any(DatasetChangedError));
+    expect(alertError).toHaveBeenCalledWith('پاک‌کردن کپی ناتمام انجام نشد', expect.any(DatasetChangedError));
+  });
   it('adds no UI for empty/loading jobs and no banner without an actual pending job', async () => {
     mockData = undefined;
     await render();
