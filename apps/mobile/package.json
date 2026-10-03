@@ -1,7 +1,7 @@
 {
   "name": "@medos/mobile",
   "main": "expo-router/entry",
-  "version": "0.11.16",
+  "version": "0.11.17",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@noble/hashes": "^2.4.0",

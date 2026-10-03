@@ -1081,3 +1081,33 @@ label could create six dates or a closely spaced final pair and clip the endpoin
 Tradeoff: fewer date captions on a narrow phone instead of collisions. All readings
 and exact timestamps remain in the list. Width is a conservative estimate, not
 native font measurement; real SVG rendering still needs screenshot acceptance.
+
+## Native recording completion (0.11.17)
+
+Installed expo-audio 57.0.5 can resolve Android `stop()` after catching a native
+RuntimeException, leaving a cached URI while reporting `RecordingStatus.hasError`
+on the main queue. A rejected-Promise stand-in was insufficient. VoiceRecorder
+now listens to that public terminal event and uses a small pure
+`RecordingCompletion` latch before handing a file to its caller. The expected URI
+comes from the newly prepared native file; a previous-file completion is ignored.
+A native error remains an error until explicit discard/new capture, even if a
+later status contains a cached URL. Native error text is not stored as clinical
+content.
+
+The listener retained by the SDK uses stable refs. Stop duration/captured time
+remain intact while confirmation is pending, and file-job ownership spans the
+wait and the caller's awaited acknowledgement. Missing confirmation reports
+failure after five seconds; a late successful event allows retry without another
+stop or file copy. A reported native failure instead shows one confirmed-discard
+action on the existing recorder. Discard clears the unacknowledged capture only,
+never an existing clinical attachment. The route still has one AutosaveScope.
+Forced unmount waits for outstanding work/confirmation timeout before releasing
+ownership and never navigates a removed screen.
+
+Tradeoff: a short asynchronous confirmation wait rather than treating the cached
+URI as success; a lost terminal event requires retry. This uses the SDK's event
+contract instead of relying on an undocumented JS return Bundle or patching its
+native implementation. No dependency, schema, permission, new screen or generalized
+event bus. It does not provide durable pre-ack recovery, retain all cache files
+across crashes or validate physical microphone behavior. SDK upgrades must retain
+the terminal-event contract; those native failure and recovery gates stay separate.

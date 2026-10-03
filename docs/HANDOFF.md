@@ -33,6 +33,42 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Require native completion before acknowledging a voice
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; native/artifact gates pending.
+
+**Changed**
+- Consume expo-audio terminal completion/error instead of trusting resolved stop
+  and cached URI. A pure latch correlates the prepared file, retains errors and
+  waits up to five seconds. Late confirmation retries the same stopped capture.
+- Keep maintenance excluded through confirmation and acknowledgement; failed
+  native recordings require explicit confirmed discard on the same control.
+  Retain one route guard. Version 0.11.17 / code 33; no dependency/schema/permission.
+
+**Verified**
+- Baseline full gate: 98 suites / 1229 app tests + 3 workflows. Four new recorder
+  witnesses failed while 24 prior cases passed. Fixed related gates: 5 suites /
+  90 tests, including timeout/late retry, native errors, confirmed discard and
+  unmount settlement. See validation-0.11.17.md for the contract and limits.
+- Full current-source `npm run check`: 99 suites / 1249 app tests + 3 workflows,
+  including typecheck, lint and formatting.
+- 0.11.16 evidence commit `903d195` is pushed; exact-head CI `37117584115` succeeded.
+
+**Not verified**
+- Hosted CI, current APK/native success/error behavior, physical phone,
+  pre-ack process death/power/low-space or native concurrent restore/maintenance.
+
+**Open threads**
+- Finish current gates/artifacts and native Stop/Back/archive acceptance, then
+  durable stopped-voice UUID recovery. Dataset/ordinary-write/old-editor restore
+  exclusion, raw forms and original-before-crop remain open.
+
+**Gotchas**
+- Android stop can resolve after RuntimeException; its terminal event owns success.
+- Retain the initial SDK listener contract in stand-ins. A fake-clock React
+  microtask is not a leaked completion timeout; do not clear actual deadlines.
+
 ## 2026-10-03 — Verify 0.11.16 upgrade, chart and acknowledged voice backup
 
 **Agent:** GPT-6 via Codex

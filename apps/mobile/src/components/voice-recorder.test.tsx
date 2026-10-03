@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type { RecordingStatus } from 'expo-audio';
+import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
@@ -12,6 +14,7 @@ let mockScope: { group: SaveGroup };
 const mockPermission = jest.fn<() => Promise<{ granted: boolean }>>();
 const mockPlayback = jest.fn<() => Promise<void>>();
 let mockDurationMs = 1000;
+let mockStatusListener: ((status: RecordingStatus) => void) | undefined;
 const mockRecorder = {
   isRecording: false,
   uri: 'file:///synthetic.m4a',
@@ -24,7 +27,10 @@ jest.mock('expo-audio', () => ({
   RecordingPresets: { HIGH_QUALITY: {} },
   requestRecordingPermissionsAsync: () => mockPermission(),
   setAudioModeAsync: async () => {},
-  useAudioRecorder: () => mockRecorder,
+  useAudioRecorder: (_options: unknown, listener?: (status: RecordingStatus) => void) => {
+    mockStatusListener ??= listener;
+    return mockRecorder;
+  },
   useAudioRecorderState: () => ({ isRecording: mockRecorder.isRecording, durationMillis: mockDurationMs }),
 }));
 jest.mock('expo-haptics', () => ({
@@ -42,6 +48,16 @@ jest.mock('@/theme', () => ({ MIN_TOUCH: 48, useTheme: () => ({ colors: {}, spac
 let tree: ReactTestRenderer;
 const stored = jest.fn<(recording: Recording) => Promise<void>>();
 const saved = jest.fn<() => void>();
+function reportCompletion(patch: Partial<RecordingStatus> = {}) {
+  mockStatusListener?.({
+    id: 'synthetic-recorder',
+    isFinished: true,
+    hasError: false,
+    error: null,
+    url: mockRecorder.uri || null,
+    ...patch,
+  });
+}
 let deferredCleanups: (() => void)[];
 function deferred<T>(fallback: T) {
   let resolve!: (value: T) => void;
@@ -78,6 +94,7 @@ async function press(label: string) {
 beforeEach(async () => {
   deferredCleanups = [];
   mockDurationMs = 1000;
+  mockStatusListener = undefined;
   mockScope = { group: new SaveGroup() };
   mockPermission.mockReset().mockResolvedValue({ granted: true });
   mockPlayback.mockReset().mockResolvedValue(undefined);
@@ -90,6 +107,7 @@ beforeEach(async () => {
   });
   mockRecorder.stop.mockReset().mockImplementation(async () => {
     mockRecorder.isRecording = false;
+    reportCompletion();
   });
   stored.mockReset().mockResolvedValue(undefined);
   saved.mockClear();
@@ -104,6 +122,7 @@ afterEach(async () => {
     await settle();
     stored.mockResolvedValue(undefined);
     mockRecorder.uri = 'file:///synthetic.m4a';
+    reportCompletion();
     await mockScope.group.flush();
     tree.unmount();
     await settle();
@@ -111,6 +130,164 @@ afterEach(async () => {
 });
 
 describe('recorder acknowledgement and screen exit', () => {
+  it('reports missing native confirmation, retains the recording and retries after a late result', async () => {
+    jest.useFakeTimers();
+    try {
+      mockRecorder.stop.mockImplementationOnce(async () => {
+        mockRecorder.isRecording = false;
+      });
+      await press('ضبط وویس');
+      await press('پایان ضبط');
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(5000);
+      });
+      expect(stored).not.toHaveBeenCalled();
+      expect(mockScope.group.unsaved).toBe(true);
+      expect(button('تلاش دوباره برای ذخیرهٔ وویس')).toBeDefined();
+      expectMaintenanceBlocked();
+      await act(async () => {
+        reportCompletion();
+      });
+      await press('تلاش دوباره برای ذخیرهٔ وویس');
+      expect(stored).toHaveBeenCalledTimes(1);
+      expect(mockRecorder.stop).toHaveBeenCalledTimes(1);
+      expect(saved).toHaveBeenCalledTimes(1);
+      // React may leave a fake microtask queued; do not advance/cancel deadlines.
+      jest.runAllTicks();
+      expect(jest.getTimerCount()).toBe(0);
+      reserveFileMaintenance()();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('blocks a reported recording error until explicit confirmed discard, then allows another capture', async () => {
+    const dialog = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      await press('ضبط وویس');
+      await act(async () => {
+        reportCompletion({ isFinished: false, hasError: true, url: null });
+      });
+      const leave = jest.fn<() => void>();
+      await act(async () => {
+        expect(await mockScope.group.perform(leave)).toBe('unsaved');
+      });
+      expect(stored).not.toHaveBeenCalled();
+      expect(leave).not.toHaveBeenCalled();
+      await press('صرف‌نظر از ضبط ناموفق');
+      const choices = dialog.mock.calls.at(-1)?.[2];
+      expect(choices?.map((choice) => choice.text)).toEqual(['انصراف', 'صرف‌نظر']);
+      choices?.[0]?.onPress?.();
+      expect(mockScope.group.unsaved).toBe(true);
+      expectMaintenanceBlocked();
+      await act(async () => {
+        choices?.[1]?.onPress?.();
+        await settle();
+      });
+      expect(mockScope.group.unsaved).toBe(false);
+      expect(saved).not.toHaveBeenCalled();
+      expect(stored).not.toHaveBeenCalled();
+      reserveFileMaintenance()();
+      await press('ضبط وویس');
+      await press('پایان ضبط');
+      expect(stored).toHaveBeenCalledTimes(1);
+      expect(saved).toHaveBeenCalledTimes(1);
+    } finally {
+      dialog.mockRestore();
+    }
+  });
+
+  it('releases only after missing confirmation settles when its screen is unmounted', async () => {
+    jest.useFakeTimers();
+    try {
+      mockRecorder.stop.mockImplementationOnce(async () => {
+        mockRecorder.isRecording = false;
+      });
+      await press('ضبط وویس');
+      await press('پایان ضبط');
+      await act(async () => {
+        tree.unmount();
+      });
+      expectMaintenanceBlocked();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(5000);
+      });
+      expect(stored).not.toHaveBeenCalled();
+      expect(saved).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+      reserveFileMaintenance()();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('refuses an Android resolved stop that reports a native error despite a cached URI', async () => {
+    mockRecorder.stop.mockImplementationOnce(async () => {
+      mockRecorder.isRecording = false;
+      reportCompletion({ hasError: true, error: 'Synthetic native stop error', url: null });
+    });
+    await press('ضبط وویس');
+    await press('پایان ضبط');
+    expect(stored).not.toHaveBeenCalled();
+    expect(saved).not.toHaveBeenCalled();
+    expectMaintenanceBlocked();
+    const leave = jest.fn<() => void>();
+    await act(async () => {
+      expect(await mockScope.group.perform(leave)).toBe('unsaved');
+    });
+    expect(leave).not.toHaveBeenCalled();
+  });
+
+  it('waits for terminal confirmation after stop resolves, retaining file ownership', async () => {
+    mockRecorder.stop.mockImplementationOnce(async () => {
+      mockRecorder.isRecording = false;
+    });
+    await press('ضبط وویس');
+    await press('پایان ضبط');
+    expect(stored).not.toHaveBeenCalled();
+    expect(saved).not.toHaveBeenCalled();
+    expectMaintenanceBlocked();
+    await act(async () => {
+      reportCompletion();
+      await settle();
+    });
+    expect(stored).toHaveBeenCalledTimes(1);
+    expect(saved).toHaveBeenCalledTimes(1);
+    reserveFileMaintenance()();
+  });
+
+  it('refuses a delayed terminal failure without copying the cached URI', async () => {
+    mockRecorder.stop.mockImplementationOnce(async () => {
+      mockRecorder.isRecording = false;
+    });
+    await press('ضبط وویس');
+    await press('پایان ضبط');
+    await act(async () => {
+      reportCompletion({ hasError: true, error: 'Synthetic late stop error', url: null });
+      await settle();
+    });
+    expect(stored).not.toHaveBeenCalled();
+    expect(mockScope.group.unsaved).toBe(true);
+    expectMaintenanceBlocked();
+  });
+
+  it('ignores a previous-file completion instead of trusting the current cached URI', async () => {
+    mockRecorder.stop.mockImplementationOnce(async () => {
+      mockRecorder.isRecording = false;
+      reportCompletion({ url: 'file:///previous-recording.m4a' });
+    });
+    await press('ضبط وویس');
+    await press('پایان ضبط');
+    expect(stored).not.toHaveBeenCalled();
+    expectMaintenanceBlocked();
+    await act(async () => {
+      reportCompletion();
+      await settle();
+    });
+    expect(stored).toHaveBeenCalledTimes(1);
+    expect(stored.mock.calls[0]?.[0].uri).toBe('file:///synthetic.m4a');
+  });
+
   it('excludes maintenance before permission returns and through active recording', async () => {
     const permission = deferred({ granted: false });
     mockPermission.mockReturnValue(permission.promise);
@@ -159,6 +336,7 @@ describe('recorder acknowledgement and screen exit', () => {
     mockRecorder.stop.mockImplementation(async () => {
       await stopped.promise;
       mockRecorder.isRecording = false;
+      reportCompletion();
     });
     const acknowledge = deferred(undefined);
     stored.mockReturnValue(acknowledge.promise);
@@ -406,7 +584,7 @@ describe('recorder acknowledgement and screen exit', () => {
     expect(stored).toHaveBeenCalledTimes(1);
   });
 
-  it('retains stopped timing and blocks exit if the native file URI is temporarily missing', async () => {
+  it('retains stopped timing while waiting for the completed URL instead of a cached URI', async () => {
     await press('ضبط وویس');
     mockRecorder.uri = '';
     await press('پایان ضبط');
@@ -414,7 +592,11 @@ describe('recorder acknowledgement and screen exit', () => {
     expect(mockScope.group.unsaved).toBe(true);
     mockRecorder.currentTime = 0;
     mockRecorder.uri = 'file:///synthetic.m4a';
-    await press('تلاش دوباره برای ذخیرهٔ وویس');
+    expect(stored).not.toHaveBeenCalled();
+    await act(async () => {
+      reportCompletion();
+      await settle();
+    });
     expect(stored.mock.calls[0]?.[0].durationMs).toBe(1200);
     expect(mockRecorder.stop).toHaveBeenCalledTimes(1);
   });

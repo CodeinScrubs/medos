@@ -5,15 +5,17 @@ import {
   setAudioModeAsync,
   useAudioRecorder,
   useAudioRecorderState,
+  type RecordingStatus,
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { alertError, notify } from '@/components/feedback';
 import { Row, Text } from '@/components/ui';
 import { reserveFileJob } from '@/lib/file-work';
 import { toPersianDigits } from '@/lib/persian';
+import { RecordingCompletion } from '@/lib/recording-completion';
 import { prepareAudioForPlayback } from '@/platform/audio';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
@@ -48,10 +50,10 @@ export function VoiceRecorder({
   compact?: boolean;
 }) {
   const { colors, radii, spacing } = useTheme();
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const state = useAudioRecorderState(recorder, 250);
   const [busy, setBusy] = useState(false);
   const [needsRetry, setNeedsRetry] = useState(false);
+  const [terminalError, setTerminalError] = useState<Error | null>(null);
+  const [completion] = useState(() => new RecordingCompletion());
   const active = useRef(false);
   const startedAt = useRef<Date | undefined>(undefined);
   const pending = useRef<Recording | null>(null);
@@ -61,6 +63,15 @@ export function VoiceRecorder({
   const mounted = useRef(false);
   const releaseFiles = useRef<(() => void) | null>(null);
   const scope = useAutosaveScope();
+  // expo-audio retains the listener from the initial render: use stable refs,
+  // not a captured React state snapshot. Native stop errors can resolve stop().
+  function receiveStatus(status: RecordingStatus) {
+    if (!active.current && !stopped.current) return;
+    completion.receive(status);
+    if (completion.error && mounted.current) setTerminalError(completion.error);
+  }
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, receiveStatus);
+  const state = useAudioRecorderState(recorder, 250);
 
   function releaseFileOwnership() {
     releaseFiles.current?.();
@@ -99,6 +110,7 @@ export function VoiceRecorder({
         if (!mounted.current) return true;
         await recorder.prepareToRecordAsync();
         if (!mounted.current) return true;
+        completion.begin(recorder.uri);
         recorder.record();
         active.current = true;
         startedAt.current = new Date();
@@ -133,15 +145,23 @@ export function VoiceRecorder({
           const durationMs = Math.max(state.durationMillis, Math.round(recorder.currentTime * 1000));
           await recorder.stop();
           active.current = false;
-          if (keep && durationMs >= 500) {
+          if (keep && (durationMs >= 500 || completion.error)) {
             stopped.current = { durationMs, capturedAt: startedAt.current };
           }
           // Playback setup is housekeeping: it must not prevent file acknowledgement.
           void prepareAudioForPlayback().catch(() => undefined);
         }
+        if (!keep) {
+          // Only explicit discard may leave an unconfirmed/failed native capture.
+          stopped.current = null;
+          pending.current = null;
+          completion.begin(null);
+          if (mounted.current) setTerminalError(null);
+        }
         if (stopped.current) {
-          if (!recorder.uri) throw new Error('فایل ضبط‌شده در دسترس نیست.');
-          pending.current = { uri: recorder.uri, ...stopped.current };
+          // Wait for the SDK's successful terminal event, never its cached URI.
+          const uri = await completion.waitForUri(5000);
+          pending.current = { uri, ...stopped.current };
           stopped.current = null;
         }
         if (pending.current) {
@@ -202,6 +222,25 @@ export function VoiceRecorder({
       flush: () => latest.current.flush(),
     });
   }, [scope]);
+
+  if (terminalError) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="صرف‌نظر از ضبط ناموفق"
+        disabled={busy}
+        onPress={() =>
+          Alert.alert('از این ضبط صرف‌نظر شود؟', 'پایان این ضبط تأیید نشده و وویس ذخیره نشده است.', [
+            { text: 'انصراف', style: 'cancel' },
+            { text: 'صرف‌نظر', style: 'destructive', onPress: () => void finish(false) },
+          ])
+        }
+        style={{ minHeight: MIN_TOUCH, justifyContent: 'center', opacity: busy ? 0.6 : 1 }}
+      >
+        <Text color="danger">ضبط تأیید نشد — صرف‌نظر از این ضبط</Text>
+      </Pressable>
+    );
+  }
 
   if (state.isRecording) {
     return (
