@@ -35,6 +35,18 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-03, 0.11.22: all 21 real-SQL witnesses failed on pinned 0.11.21 source.
+They reproduce overwritten search indexes across twelve rebuild entry points and
+five related-name paths, an old flag applied to a corrected lab result, duplicate
+baseline history from parallel repair and incomplete lab/history after a later
+SQL failure. Each feature repair now keeps current reads/maps and writes inside
+one synchronous transaction. Clinical fields/timestamps and history semantics
+are unchanged; no UI, dependency, migration or archive scheme change.
+See [validation-0.11.22.md](validation-0.11.22.md) for actual gates. This closes
+those repair interleavings, not all post-commit housekeeping or manual intents.
+Next: remaining manual/raw-draft token fences and fresh capture on retained root
+screens, then durable quick-capture/draft-note stopped-voice journals.
+
 2026-10-03, 0.11.21: the real-SQL witness reproduced an ordinary clinical write
 acknowledged during restore and subsequently erased. Pre-commit admission now
 guards native preparation, Drizzle execution and the public raw facade. Restore

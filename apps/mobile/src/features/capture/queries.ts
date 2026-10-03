@@ -394,9 +394,9 @@ export function captureMediaQuery() {
 }
 
 export async function reindexCaptures(): Promise<number> {
-  const rows = await db.select().from(captureInbox);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(captureInbox).all();
     for (const row of rows) {
       const next = captureSearchText(row);
       if (next === row.searchText) continue;

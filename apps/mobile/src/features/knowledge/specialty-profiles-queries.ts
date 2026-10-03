@@ -84,11 +84,11 @@ export async function deleteSpecialtyProfile(id: string): Promise<void> {
 }
 
 export async function reindexSpecialtyProfiles(): Promise<number> {
-  const rows = await db.select().from(specialtyProfiles);
-  const specialtyRows = await db.select().from(specialties);
-  const wordsById = new Map(specialtyRows.map((s) => [s.id, [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]]));
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(specialtyProfiles).all();
+    const specialtyRows = tx.select().from(specialties).all();
+    const wordsById = new Map(specialtyRows.map((s) => [s.id, [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]]));
     for (const p of rows) {
       const next = specialtyProfileSearchText(p, p.specialtyId ? (wordsById.get(p.specialtyId) ?? []) : []);
       if (next === p.searchText) continue;

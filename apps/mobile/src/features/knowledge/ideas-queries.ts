@@ -105,9 +105,9 @@ export async function suggestIdeaAreas(limit = 10): Promise<string[]> {
 }
 
 export async function reindexIdeas(): Promise<number> {
-  const rows = await db.select().from(ideas);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(ideas).all();
     for (const i of rows) {
       const next = ideaSearchText(i);
       if (next === i.searchText) continue;

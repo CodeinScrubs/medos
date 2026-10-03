@@ -265,9 +265,9 @@ export async function deleteConsult(id: string): Promise<void> {
 }
 
 export async function reindexConsults(): Promise<number> {
-  const rows = await db.select().from(consultations);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(consultations).all();
     for (const row of rows) {
       const next = consultSearchText(row);
       if (next === row.searchText) continue;

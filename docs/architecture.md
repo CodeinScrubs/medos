@@ -1279,3 +1279,40 @@ a guarantee that every editor survives every live-query refresh. Draft-note and
 quick-capture stopped voices still need durable journals before acknowledgement.
 Native navigation/SQLite timing, process death, power loss, low storage and phone
 acceptance remain separate from migrated-SQLite and mounted-handler witnesses.
+
+## Atomic derived-data repairs (0.11.22)
+
+**Problem.** Post-commit restore housekeeping permits ordinary edits. Search
+rebuilds previously awaited row and related-name snapshots before entering their
+write transaction. A newer acknowledged edit could then lose its search index.
+Lab reflagging similarly applied an older value/range verdict to a corrected
+result. Legacy note-history backfill checked and inserted across awaits: parallel
+passes inserted duplicate baselines, and a later failure left earlier inserts.
+
+**Decision.** Each of the twelve feature search rebuilds reads its rows and any
+related-name maps through the same synchronous transaction that writes its index.
+Lab reflagging reads/calculates/writes the entire pass in one transaction. Legacy
+history reads notes, checks existing versions and inserts missing baselines in
+one transaction. Use `.all()`, `.get()` and `.run()` with no async callback. A later
+SQL failure rolls back the complete lab/history pass. Version settings and audit
+records still follow successful repair; a marker-write failure can safely retry
+the idempotent pass. Clinical values, edit timestamps, baseline semantics and
+existing history are unchanged. No index normalization/version, migration,
+dependency, UI or archive scheme changes.
+
+**Tradeoff.** A synchronous repair blocks competing JS work while it runs. Search
+already used synchronous write transactions; lab/history now keep their entire
+read/write unit together. This favors consistent records over yielding between
+rows. Large-dataset duration and phone responsiveness are not measured here;
+if those need batching, each batch must freshly read and conditionally update
+its own current rows, with a separately designed completion marker.
+
+Real migrated SQLite witnesses schedule a genuine edit immediately after a
+SELECT finishes. They replace no SQL results: the old awaited implementation
+lets that edit run before stale writes; the new transaction completes first.
+They cover all twelve rebuild entry points, five related-name paths, a corrected
+lab value, concurrent baseline repair, and later lab/history SQL failures.
+All 21 witnesses failed on pinned previous source. This is deterministic JS/SQL
+interleaving evidence, not injected native restore contention. Transactions are
+per feature/pass, not one atomic transaction over all restore housekeeping.
+Other manual/draft intent fencing and durable capture voice remain open.

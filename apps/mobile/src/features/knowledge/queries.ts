@@ -181,14 +181,13 @@ export async function suggestTopicTags(limit = 12): Promise<string[]> {
 
 /** Rebuild every topic's search index; see features/search/reindex.ts. */
 export async function reindexTopics(): Promise<number> {
-  const rows = await db.select().from(topics);
-  const doctorRows = await db.select().from(doctors);
-  const specialtyRows = await db.select().from(specialties);
-  const nameById = new Map(doctorRows.map((d) => [d.id, doctorDisplayName(d)]));
-  const wordsById = new Map(specialtyRows.map((s) => [s.id, [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]]));
-
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(topics).all();
+    const doctorRows = tx.select().from(doctors).all();
+    const specialtyRows = tx.select().from(specialties).all();
+    const nameById = new Map(doctorRows.map((d) => [d.id, doctorDisplayName(d)]));
+    const wordsById = new Map(specialtyRows.map((s) => [s.id, [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]]));
     for (const t of rows) {
       const extra = [
         t.taughtById ? (nameById.get(t.taughtById) ?? '') : '',

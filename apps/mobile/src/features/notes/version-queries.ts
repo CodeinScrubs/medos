@@ -136,32 +136,36 @@ export function writeNoteVersion(
  * the note's own creation time, not today.
  */
 export async function backfillNoteVersions(): Promise<number> {
-  const rows = await db.select().from(notes).where(isNull(notes.deletedAt)).orderBy(asc(notes.createdAt));
+  return db.transaction((tx) => {
+    const rows = tx.select().from(notes).where(isNull(notes.deletedAt)).orderBy(asc(notes.createdAt)).all();
+    let written = 0;
+    for (const note of rows) {
+      const existing = tx
+        .select({ id: noteVersions.id })
+        .from(noteVersions)
+        .where(eq(noteVersions.noteId, note.id))
+        .limit(1)
+        .get();
+      if (existing) continue;
 
-  let written = 0;
-  for (const note of rows) {
-    const [existing] = await db
-      .select({ id: noteVersions.id })
-      .from(noteVersions)
-      .where(eq(noteVersions.noteId, note.id))
-      .limit(1);
-    if (existing) continue;
-
-    await db.insert(noteVersions).values({
-      id: newId(),
-      createdAt: note.createdAt,
-      updatedAt: note.createdAt,
-      deletedAt: null,
-      noteId: note.id,
-      patientId: note.patientId,
-      reason: 'baseline',
-      restoredFromId: null,
-      ...fieldsOf(note),
-      contentHash: contentHashOf(note),
-    });
-    written += 1;
-  }
-  return written;
+      tx.insert(noteVersions)
+        .values({
+          id: newId(),
+          createdAt: note.createdAt,
+          updatedAt: note.createdAt,
+          deletedAt: null,
+          noteId: note.id,
+          patientId: note.patientId,
+          reason: 'baseline',
+          restoredFromId: null,
+          ...fieldsOf(note),
+          contentHash: contentHashOf(note),
+        })
+        .run();
+      written += 1;
+    }
+    return written;
+  });
 }
 
 /*

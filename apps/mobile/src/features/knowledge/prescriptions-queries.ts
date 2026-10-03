@@ -139,9 +139,9 @@ export async function deletePrescription(id: string): Promise<void> {
 }
 
 export async function reindexPrescriptions(): Promise<number> {
-  const rows = await db.select().from(prescriptionTemplates);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(prescriptionTemplates).all();
     for (const r of rows) {
       const next = prescriptionSearchText(r, Array.isArray(r.items) ? r.items : []);
       if (next === r.searchText) continue;

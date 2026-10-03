@@ -157,9 +157,9 @@ export async function deleteCredential(id: string): Promise<void> {
 }
 
 export async function reindexCredentials(): Promise<number> {
-  const rows = await db.select().from(credentials);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(credentials).all();
     for (const row of rows) {
       const next = credentialSearchText(row);
       if (next === row.searchText) continue;

@@ -223,9 +223,9 @@ export async function deletePatientContact(id: string): Promise<void> {
 
 /** Rebuild every patient's search index; see features/search/reindex.ts. */
 export async function reindexPatients(): Promise<number> {
-  const rows = await db.select().from(patients);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(patients).all();
     for (const p of rows) {
       const next = patientSearchText(p, patientSearchContext(p.id, tx));
       if (next === p.searchText) continue;

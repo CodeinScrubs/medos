@@ -33,6 +33,41 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Keep search/lab/history repair on one current snapshot, 0.11.22
+
+**Agent:** GPT-6 via Codex
+**Commits:** application and decision record in this commit.
+
+**Changed**
+- Move current row/related-name reads into each search rebuild's synchronous
+  write transaction. Reflag labs and backfill legacy versions as atomic passes.
+  Preserve clinical fields/timestamps and all existing history. Version/code
+  0.11.22/38. No UI, dependency, route, permission, migration or archive change.
+
+**Verified**
+- All 21 finalized real-SQL witnesses failed on pinned `02d2432`: twelve search
+  entry points, five related-name paths, corrected lab flag, parallel baselines
+  and later lab/history SQL failures. Owned source restored byte-for-byte.
+- Full `npm run check`: 108 suites / 1356 app tests + 3 workflows, all gates green.
+  Root reviewed runtime diff and tests. See `validation-0.11.22.md`.
+
+**Not verified**
+- Exact-source CI, signed 0.11.22 packages and native acceptance pending.
+- Physical phone, large-data responsiveness, power/low-space and whole restore
+  housekeeping. Repairs are per feature/pass, not one global transaction.
+  The two existing reviewers hit their usage limit; no final reviewer approval.
+
+**Open threads**
+- Finish 0.11.22 exact-source artifact/native gates, then remaining manual/raw-
+  draft token fences and fresh capture on retained root screens after restore.
+- Durable quick-capture/draft-note stopped-voice journals follow. Keep pending
+  values visible; never rebase old callbacks or delete historical baselines.
+
+**Gotchas**
+- Test search predicates need `and(...matchesSearch(...))`; afterEach must return
+  void. Scoped ESLint uses mobile cwd; Prettier always uses repo root.
+- Synchronous repairs prevent yield races but large-dataset duration is unmeasured.
+
 ## 2026-10-03 — Accept signed 0.11.21 native restore and stale-note preservation
 
 **Agent:** GPT-6 via Codex

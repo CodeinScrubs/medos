@@ -153,11 +153,11 @@ export async function quickCreateDoctor(text: string): Promise<{ id: string; lab
 
 /** Rebuild every doctor's search index; see features/search/reindex.ts. */
 export async function reindexDoctors(): Promise<number> {
-  const specs = await db.select().from(specialties);
-  const wordsById = new Map(specs.map((s) => [s.id, [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]]));
-  const rows = await db.select().from(doctors);
   let changed = 0;
   db.transaction((tx) => {
+    const specs = tx.select().from(specialties).all();
+    const wordsById = new Map(specs.map((s) => [s.id, [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]]));
+    const rows = tx.select().from(doctors).all();
     for (const d of rows) {
       const words = [d.specialtyId, d.subspecialtyId].flatMap((id) => (id ? (wordsById.get(id) ?? []) : []));
       const next = doctorSearchText(d, words);

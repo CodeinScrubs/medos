@@ -240,9 +240,9 @@ export async function restoreTask(id: string): Promise<void> {
 }
 
 export async function reindexTasks(): Promise<number> {
-  const rows = await db.select().from(tasks);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(tasks).all();
     for (const row of rows) {
       const next = taskSearchText(row);
       if (next === row.searchText) continue;

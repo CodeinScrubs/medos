@@ -31,18 +31,20 @@ export async function reflagLabValuesIfNeeded(): Promise<void> {
   const current = await readSetting(flaggedVersion);
   if (current === LAB_FLAG_VERSION) return;
 
-  const rows = await db.select().from(labValues);
   let changed = 0;
   let cleared = 0;
-  for (const row of rows) {
-    const next = computeFlag(parseLabValue(row.value), row.refLow, row.refHigh);
-    if (next === row.flag) continue;
-    // `touch()` is deliberately not called: nobody edited this result, and an
-    // updatedAt that moves would make every old row look freshly changed.
-    await db.update(labValues).set({ flag: next }).where(eq(labValues.id, row.id));
-    changed += 1;
-    if (next == null) cleared += 1;
-  }
+  db.transaction((tx) => {
+    // Never apply the verdict of a pre-await snapshot to a corrected value.
+    const rows = tx.select().from(labValues).all();
+    for (const row of rows) {
+      const next = computeFlag(parseLabValue(row.value), row.refLow, row.refHigh);
+      if (next === row.flag) continue;
+      // Derived metadata only: the clinical edit time must remain untouched.
+      tx.update(labValues).set({ flag: next }).where(eq(labValues.id, row.id)).run();
+      changed += 1;
+      if (next == null) cleared += 1;
+    }
+  });
   await writeSetting(flaggedVersion, LAB_FLAG_VERSION);
 
   if (changed > 0) {

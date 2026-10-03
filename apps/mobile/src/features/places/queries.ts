@@ -163,11 +163,11 @@ export async function deleteExtension(id: string): Promise<void> {
 
 /** Rebuild the search index of every place and extension; see features/search/reindex.ts. */
 export async function reindexPlaces(): Promise<number> {
-  const placeRows = await db.select().from(places);
-  const extRows = await db.select().from(extensions);
-  const nameById = new Map(placeRows.map((p) => [p.id, p.name]));
   let changed = 0;
   db.transaction((tx) => {
+    const placeRows = tx.select().from(places).all();
+    const extRows = tx.select().from(extensions).all();
+    const nameById = new Map(placeRows.map((p) => [p.id, p.name]));
     for (const p of placeRows) {
       const next = placeSearchText(p);
       if (next === p.searchText) continue;

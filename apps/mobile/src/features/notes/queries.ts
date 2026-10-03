@@ -202,9 +202,9 @@ export async function restoreNote(id: string): Promise<void> {
 
 /** Rebuild every note's search index; see features/search/reindex.ts. */
 export async function reindexNotes(): Promise<number> {
-  const rows = await db.select().from(notes);
   let changed = 0;
   db.transaction((tx) => {
+    const rows = tx.select().from(notes).all();
     for (const n of rows) {
       const next = noteSearchText(n);
       if (next === n.searchText) continue;
