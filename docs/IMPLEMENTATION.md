@@ -42,6 +42,19 @@ schemes and writer remain unchanged. Recording transitions/publication compare
 the canonical owner including null, closing a future generic capture race before
 enabling that journal for draft/capture UI. Evidence and remaining gates are in
 [validation-0.11.19.md](validation-0.11.19.md).
+Exact-source CI, signed packages, actual offline API 26 old/current SAF restores
+and modern upgrade/full-archive preservation now passed. Comparisons distinguish
+unchanged clinical fields from native reminder-id repair and known retained
+unreferenced QA media; this does not close whole-dataset interruption safety.
+
+Next bounded fix: photo jobs currently bypass file-maintenance exclusion in
+`attachments/capture.ts`; `LabsTab.photoPanel` separately picks, creates a panel
+and stores its photo. Reserve before the first picker await through metadata
+acknowledgement, covering the direct storage API and lab callback; catch picker
+errors too. Then address clinical-write admission during restore and dataset
+generation fencing for loaded editors together. Busy checks alone cannot stop
+an old editor from writing after replacement ends. Preserve its unsaved text for
+explicit recovery rather than silently remounting/flushing it into the new data.
 
 2026-10-03, 0.11.18: D03/D05/D10 now include a persisted stopped-voice journal for
 existing records. Source and destination fingerprints, immutable operation id,

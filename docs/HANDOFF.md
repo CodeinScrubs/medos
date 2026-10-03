@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-03 — Accept 0.11.19 restore and upgrade on isolated emulators
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `059c686`; acceptance evidence in this commit.
+
+**Changed**
+- Record exact-source CI, signed packages, installed hashes and independent
+  native backup comparisons in `validation-0.11.19.md`; no app source changes.
+- Next source review identifies photo jobs outside maintenance exclusion, writes
+  during restore, and stale loaded editors. These remain open, not accepted.
+
+**Verified**
+- Normal push/full gate: 101 suites / 1302 app tests + 3 workflow tests; hosted
+  source CI `37130150766` green, migrations unchanged and Android bundle passed.
+- Signed arm64/x86_64 packages and installed x86_64 hashes. Offline actual API 26
+  SAF restores of 0.11.17/18 passed; wrong key preserved prior data. Independent
+  comparisons retained all source clinical fields/media; only native reminder
+  id repair and one exact known prior unreferenced QA file were allowed.
+- Modern offline `-r` upgrade/full SAF archive preserved all 39 application
+  tables and 15 media files exactly. All 14 referenced restored/modern voices
+  fully decoded; SQLite integrity/FK checks passed. No new voice was added.
+
+**Not verified**
+- Physical phone, active/pre-journal interruption, natural power/low space,
+  ordinary writes/stale editors/photo work versus restore, complete clinical flows.
+
+**Open threads**
+- First exclude the whole photo picker/store/metadata job (including LabsTab's
+  panel creation) from file maintenance. Then fence ordinary writes and stale
+  mounted editors together; a temporary busy check alone is insufficient.
+- Extend voice recovery to quick captures before new-note drafts. Captures need
+  atomic kind/job acknowledgement and pending-job move/filing/empty-cleanup
+  guards. Draft voices need references independent of whole-field text autosaves.
+
+**Gotchas**
+- API 26 restore compares clinical fields separately from native reminder IDs;
+  owned unreferenced prior media is retained, not implicitly purged.
+- Modern install initially refused while Android was still booting; retry after
+  boot succeeded without reset. Its System UI cold-boot dialog was separate from
+  MedOS. Keep heavy checks/builds/native QA sequential and UI automation isolated.
+
 ## 2026-10-03 — Repair API 26 backup reading and enforce null recording owners
 
 **Agent:** GPT-6 via Codex
