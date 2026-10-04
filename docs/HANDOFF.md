@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-04 — Preserve note, follow-up, viewer and lab-entry intent
+
+**Agent:** GPT-6 via Codex
+**Commits:** application change in this commit.
+
+**Changed**
+- Fence NoteCard pin/delete, FollowUpCard.perform, viewer caption/delete/share
+  and LabEntry creation/update/paste with immutable inherited intent and awaited
+  admission. Keep actual input on failure; suppress duplicate/early lab Save.
+- Reuse existing prompt busy behavior. No new dialogs, guards, dependencies or
+  schema; version 0.11.25 / Android code 41.
+
+**Verified**
+- Clean baseline: 111 suites / 1421 app tests + 3 workflows.
+- Before fixes, 30 valid witnesses failed on unchanged production: stale writes,
+  lost caption/missing-panel input and absent acknowledgment exclusion.
+- Four targeted suites / 43 tests passed after integration. Two independent source
+  reviews found no blocker; root performed integration and checks.
+- Final `npm run check`: typecheck, zero-warning lint, formatting, 114 suites /
+  1462 app tests plus three workflow tests. Diff whitespace passed.
+
+**Not verified**
+- Exact-source CI, signed artifacts and native acceptance pending below.
+- Physical phone/API 26, every form, stopped-voice interruption, power loss,
+  low space, large datasets or whole-product completion.
+
+**Open threads**
+- Finish exact-source signed/offline native acceptance and independent archive
+  preservation. Then patient/admission/follow-up/consult-answer form intents,
+  durable stopped voices for capture/note drafts and remaining product gates.
+
+**Gotchas**
+- Synchronous useLive stand-ins require explicit retained-screen refresh for a
+  missing restored lab panel. Caption lease witnesses must release acknowledgment
+  even when the unfixed prompt already disappeared. Neither is device evidence.
+
+
 ## 2026-10-04 — Accept signed 0.11.24 descendant intent and preservation
 
 **Agent:** GPT-6 via Codex

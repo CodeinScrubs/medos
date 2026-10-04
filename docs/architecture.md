@@ -1381,3 +1381,31 @@ navigation/native stand-ins establish no device behavior. Follow-up card actions
 note-card pin/delete, media viewer edits, lab entry and remaining unscoped forms
 still need separate fencing. This patch does not make every clinical workflow safe
 across restore. No schema, dependency, permission, formula or archive/key change.
+
+## Note, follow-up, viewer and lab-entry intent (0.11.25)
+
+NoteCard pin/unpin and final nested deletion inherit the original screen intent.
+The lease spans the complete query promise, including note history and audit.
+FollowUpCard.perform uses the same token for completion, postponement, status,
+deletion, reminder retry and native dialing. Its existing completion prompt stays
+busy through native reminder acknowledgment and keeps text on failure.
+
+The media viewer fences caption publication, deletion and native sharing. Sharing
+holds admission until the native sheet returns; this establishes no delivery.
+Caption publication closes its actual prompt only after acknowledgment. A synchronous
+busy ref prevents duplicate submit/delayed cancellation before React commits state.
+Failure retains typed text, and every asynchronous button failure is caught.
+
+Lab entry opts into EditGate retention and passes its original generation into
+creation, updates and native clipboard reads. A restored missing panel cannot
+unmount an old raw form or turn it into a new-panel creation. Save/Paste mutexes
+prevent duplicate publication and early Save while native clipboard content is
+pending. Paste merges into current local rows; unrelated edits made during the
+native read survive. Existing inputs lock during Save acknowledgment. Parsing,
+reference ranges, flags and photo-panel source semantics are unchanged.
+
+No additional dialog, route, removal guard, dependency, schema, clinical formula
+or backup/key scheme. This uses existing boundaries, not a new framework. Manual
+raw forms and process-local captions/outcomes are not crash recovery. Unscoped
+patient/admission/follow-up/consult-answer forms and durable draft/capture stopped
+voices remain separately tracked; this does not fence every clinical workflow.

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { EditGate } from '@/components/edit-gate';
@@ -15,6 +15,7 @@ import type { LabPanel, LabValue } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { entityAttachmentsQuery } from '@/features/attachments/queries';
 import { patientQuery } from '@/features/patients/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 import { ageInYears } from '@/lib/jalali';
 import { toLatinDigits, toPersianDigits } from '@/lib/persian';
@@ -62,6 +63,7 @@ export function LabEntryScreen() {
   const { data: values, error: valuesError, retry: retryValues } = useLive(panelValuesQuery(panelId ?? ''), [panelId]);
   return (
     <EditGate
+      fenceDataset
       editing={Boolean(panelId)}
       rows={panels && values ? panels : undefined}
       error={panelError ?? valuesError}
@@ -71,8 +73,14 @@ export function LabEntryScreen() {
       }}
       what="آزمایش"
     >
-      {(panel, readNotice) => (
-        <LabEntry patientId={patientId} panel={panel} values={values ?? []} readNotice={readNotice} />
+      {(panel, readNotice, generation) => (
+        <LabEntry
+          patientId={patientId}
+          panel={panel}
+          values={values ?? []}
+          readNotice={readNotice}
+          generation={generation}
+        />
       )}
     </EditGate>
   );
@@ -83,11 +91,13 @@ function LabEntry({
   panel,
   values,
   readNotice,
+  generation,
 }: {
   patientId: string;
   panel: LabPanel | null;
   values: LabValue[];
   readNotice: ReactNode;
+  generation: number;
 }) {
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
@@ -100,6 +110,9 @@ function LabEntry({
   const [labName, setLabName] = useState(panel?.labName ?? '');
   const [notes, setNotes] = useState(panel?.notes ?? '');
   const [saving, setSaving] = useState(false);
+  const saveBusy = useRef(false);
+  const pasteBusy = useRef(false);
+  const [pasting, setPasting] = useState(false);
   const dateValidation = useDateValidation();
   const [editingRange, setEditingRange] = useState<EntryRow | null>(null);
 
@@ -170,83 +183,100 @@ function LabEntry({
   }
 
   async function pasteFromClipboard() {
-    const text = await Clipboard.getStringAsync();
-    const lines = parsePastedTable(text);
-    if (lines.length === 0) {
-      notify(
-        'چیزی برای چسباندن نیست',
-        'در اکسل یا Google Sheets دو ستون «نام آزمایش» و «مقدار» را انتخاب و کپی کنید، بعد دوباره بزنید.',
-      );
-      return;
-    }
+    if (saveBusy.current || pasteBusy.current) return;
+    pasteBusy.current = true;
+    setPasting(true);
+    try {
+      await withDatasetWrite(generation, async () => {
+        const text = await Clipboard.getStringAsync();
+        const lines = parsePastedTable(text);
+        if (lines.length === 0) {
+          notify(
+            'چیزی برای چسباندن نیست',
+            'در اکسل یا Google Sheets دو ستون «نام آزمایش» و «مقدار» را انتخاب و کپی کنید، بعد دوباره بزنید.',
+          );
+          return;
+        }
 
-    const next = [...rows];
-    for (const [analyte, value, unit] of lines) {
-      const idx = next.findIndex((r) => r.analyte.toLowerCase() === analyte.toLowerCase());
-      const existing = next[idx];
-      if (existing) {
-        next[idx] = { ...existing, value, unit: existing.unit ?? unit ?? null };
-        continue;
-      }
-      const def = analyteDef(analyte);
-      const range = rangeFor(def, rangeContext);
-      next.push({
-        key: newId(),
-        analyte: def?.analyte ?? analyte,
-        value,
-        unit: unit ?? def?.unit ?? null,
-        refLow: range?.low ?? null,
-        refHigh: range?.high ?? null,
-        qualitative: Boolean(def?.qualitative),
-        custom: !def,
+        setRows((current) => {
+          const next = [...current];
+          for (const [analyte, value, unit] of lines) {
+            const idx = next.findIndex((r) => r.analyte.toLowerCase() === analyte.toLowerCase());
+            const existing = next[idx];
+            if (existing) {
+              next[idx] = { ...existing, value, unit: existing.unit ?? unit ?? null };
+              continue;
+            }
+            const def = analyteDef(analyte);
+            const range = rangeFor(def, rangeContext);
+            next.push({
+              key: newId(),
+              analyte: def?.analyte ?? analyte,
+              value,
+              unit: unit ?? def?.unit ?? null,
+              refLow: range?.low ?? null,
+              refHigh: range?.high ?? null,
+              qualitative: Boolean(def?.qualitative),
+              custom: !def,
+            });
+          }
+          return next;
+        });
+        notify(
+          'چسبانده شد',
+          `${toPersianDigits(lines.length)} مقدار وارد شد. قبل از ذخیره، واحدها و محدوده‌ها را یک نگاه بیندازید.`,
+        );
       });
+    } finally {
+      pasteBusy.current = false;
+      setPasting(false);
     }
-    setRows(next);
-    notify(
-      'چسبانده شد',
-      `${toPersianDigits(lines.length)} مقدار وارد شد. قبل از ذخیره، واحدها و محدوده‌ها را یک نگاه بیندازید.`,
-    );
   }
 
   const filledCount = rows.filter((r) => r.analyte.trim() && r.value.trim()).length;
 
   async function save() {
-    if (!dateValidation.check()) return;
-    if (filledCount === 0 && !(sheetPhotos && sheetPhotos.length > 0)) {
-      notify('هیچ مقداری وارد نشده');
-      return;
-    }
-    const unreadable = rows.filter((r) => !r.qualitative && isUnreadableNumber(r.value, !r.custom));
-    if (unreadable.length > 0) {
-      notify(
-        'این مقدارها عدد خوانا نیستند',
-        `${unreadable.map((r) => `${r.analyte}: ${r.value.trim()}`).join('\n')}\n\nاعشار را با نقطه بنویسید (مثلاً 5.8). نتیجه‌ی متنی مثل «hemolyzed» را در یادداشت برگه بنویسید.`,
-      );
-      return;
-    }
+    if (saveBusy.current || pasteBusy.current) return;
+    saveBusy.current = true;
     setSaving(true);
-    const payload = {
-      collectedAt,
-      name: name.trim() || null,
-      // A photo panel keeps its origin when values are transcribed into it later.
-      source: panel?.source ?? 'manual',
-      labName: labName.trim() || null,
-      notes: notes.trim() || null,
-      values: rows.map((r) => ({
-        analyte: r.analyte,
-        value: r.value,
-        unit: r.unit,
-        refLow: r.refLow,
-        refHigh: r.refHigh,
-      })),
-    };
     try {
-      if (panel) await updateLabPanel(panel.id, payload);
-      else await createLabPanel({ patientId, ...payload });
-      router.back();
+      await withDatasetWrite(generation, async () => {
+        if (!dateValidation.check()) return;
+        if (filledCount === 0 && !(sheetPhotos && sheetPhotos.length > 0)) {
+          notify('هیچ مقداری وارد نشده');
+          return;
+        }
+        const unreadable = rows.filter((r) => !r.qualitative && isUnreadableNumber(r.value, !r.custom));
+        if (unreadable.length > 0) {
+          notify(
+            'این مقدارها عدد خوانا نیستند',
+            `${unreadable.map((r) => `${r.analyte}: ${r.value.trim()}`).join('\n')}\n\nاعشار را با نقطه بنویسید (مثلاً 5.8). نتیجه‌ی متنی مثل «hemolyzed» را در یادداشت برگه بنویسید.`,
+          );
+          return;
+        }
+        const payload = {
+          collectedAt,
+          name: name.trim() || null,
+          // A photo panel keeps its origin when values are transcribed into it later.
+          source: panel?.source ?? 'manual',
+          labName: labName.trim() || null,
+          notes: notes.trim() || null,
+          values: rows.map((r) => ({
+            analyte: r.analyte,
+            value: r.value,
+            unit: r.unit,
+            refLow: r.refLow,
+            refHigh: r.refHigh,
+          })),
+        };
+        if (panel) await updateLabPanel(panel.id, payload);
+        else await createLabPanel({ patientId, ...payload });
+        router.back();
+      });
     } catch (e) {
       alertError('ذخیره نشد', e);
     } finally {
+      saveBusy.current = false;
       setSaving(false);
     }
   }
@@ -278,6 +308,7 @@ function LabEntry({
         )}
 
         <QuickDateField
+          disabled={saving}
           onValidityChange={dateValidation.setValid}
           label="زمان نمونه‌گیری"
           value={collectedAt}
@@ -295,6 +326,7 @@ function LabEntry({
               const used = presetKeys.includes(p.key);
               return (
                 <Pressable
+                  disabled={saving}
                   key={p.key}
                   onPress={() => addPreset(p.key)}
                   style={[
@@ -324,11 +356,21 @@ function LabEntry({
               variant="ghost"
               size="sm"
               full
-              onPress={() => void pasteFromClipboard()}
+              disabled={saving}
+              loading={pasting}
+              onPress={() => void pasteFromClipboard().catch((e) => alertError('چسبانده نشد', e))}
             />
           </View>
           <View style={styles.grow}>
-            <Button label="آنالیت دیگر" icon="add" variant="ghost" size="sm" full onPress={addCustomRow} />
+            <Button
+              label="آنالیت دیگر"
+              icon="add"
+              variant="ghost"
+              size="sm"
+              full
+              disabled={saving}
+              onPress={addCustomRow}
+            />
           </View>
         </Row>
 
@@ -338,6 +380,7 @@ function LabEntry({
               <View key={r.key}>
                 {i > 0 && <Divider />}
                 <LabRowEditor
+                  disabled={saving}
                   row={r}
                   onChange={(patch) => patchRow(r.key, patch)}
                   onRemove={() => removeRow(r.key)}
@@ -356,6 +399,7 @@ function LabEntry({
 
         <SectionHeader title="جزئیات" />
         <Input
+          editable={!saving}
           label="نام پنل"
           value={name}
           onChangeText={(t) => {
@@ -364,21 +408,23 @@ function LabEntry({
           }}
           ltr
         />
-        <Input label="آزمایشگاه" value={labName} onChangeText={setLabName} />
-        <Input label="یادداشت" value={notes} onChangeText={setNotes} multiline />
+        <Input label="آزمایشگاه" value={labName} onChangeText={setLabName} editable={!saving} />
+        <Input label="یادداشت" value={notes} onChangeText={setNotes} multiline editable={!saving} />
 
         <Button
           label={filledCount > 0 ? `ذخیره (${toPersianDigits(filledCount)} مقدار)` : 'ذخیره'}
           icon="checkmark"
           onPress={() => void save()}
           loading={saving}
+          disabled={pasting}
           full
           style={{ marginTop: spacing.sm }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} disabled={saving} />
       </Column>
 
       <PromptModal
+        busy={saving}
         visible={editingRange != null}
         title={`محدوده‌ی نرمال ${editingRange?.analyte ?? ''}`}
         message="مثلاً ۱۳۵-۱۴۵ یا <5 یا >40. خالی بگذارید تا پرچم H/L نزند."
@@ -399,11 +445,13 @@ function LabEntry({
 }
 
 function LabRowEditor({
+  disabled,
   row,
   onChange,
   onRemove,
   onEditRange,
 }: {
+  disabled: boolean;
   row: EntryRow;
   onChange: (patch: Partial<EntryRow>) => void;
   onRemove: () => void;
@@ -433,6 +481,7 @@ function LabRowEditor({
         <View style={styles.grow}>
           {row.custom ? (
             <TextInput
+              editable={!disabled}
               value={row.analyte}
               onChangeText={(t) => onChange({ analyte: t })}
               placeholder="Analyte"
@@ -445,7 +494,7 @@ function LabRowEditor({
               {row.analyte}
             </Text>
           )}
-          <Pressable onPress={onEditRange} hitSlop={6}>
+          <Pressable onPress={onEditRange} hitSlop={6} disabled={disabled}>
             <Text variant="tiny" color="textFaint" ltr>
               {[row.unit, range ? `ref ${range}` : row.qualitative ? null : 'no ref range'].filter(Boolean).join(' · ')}
             </Text>
@@ -453,6 +502,7 @@ function LabRowEditor({
         </View>
 
         <TextInput
+          editable={!disabled}
           value={row.value}
           onChangeText={(t) => onChange({ value: row.qualitative ? t : toLatinDigits(t) })}
           keyboardType={row.qualitative ? 'default' : 'numbers-and-punctuation'}
@@ -486,7 +536,7 @@ function LabRowEditor({
               {FLAG_LABEL[flag]}
             </Text>
           ) : row.custom ? (
-            <Pressable onPress={onRemove} hitSlop={8} accessibilityLabel="حذف ردیف">
+            <Pressable onPress={onRemove} hitSlop={8} accessibilityLabel="حذف ردیف" disabled={disabled}>
               <Ionicons name="close" size={16} color={colors.textFaint} />
             </Pressable>
           ) : null}

@@ -4,11 +4,13 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { Badge, Card, Column, Row, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import type { FollowUp, Patient } from '@/db/schema';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliWithWeekday, formatRelative, formatTime } from '@/lib/jalali';
 import { joinLabels, normalizePhone } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
@@ -46,8 +48,10 @@ export function FollowUpCard({
   onPromptChange?: (id: string, open: boolean) => void;
 }) {
   const router = useRouter();
+  const { generation } = useDatasetIntent();
   const { colors, spacing } = useTheme();
   const [prompting, setPrompting] = useState(false);
+  const [working, setWorking] = useState(false);
   const busy = useRef(false);
   const now = new Date(useNow());
 
@@ -68,12 +72,14 @@ export function FollowUpCard({
   async function perform(action: () => Promise<unknown>) {
     if (busy.current) return;
     busy.current = true;
+    setWorking(true);
     try {
-      await action();
+      await withDatasetWrite(generation, action);
     } catch (error) {
       alertError('عملیات انجام نشد', error);
     } finally {
       busy.current = false;
+      setWorking(false);
     }
   }
 
@@ -206,6 +212,7 @@ export function FollowUpCard({
 
       <PromptModal
         visible={prompting}
+        busy={working}
         title="پیگیری انجام شد"
         message="در یک خط بنویسید چه شد (اختیاری)."
         placeholder="مثلاً حالش خوب است، آزمایش نرمال"

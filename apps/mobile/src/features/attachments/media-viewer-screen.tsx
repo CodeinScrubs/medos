@@ -1,16 +1,18 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { notify, alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Column, IconButton, Row, Text } from '@/components/ui';
 import { ZoomableImage } from '@/components/zoomable-image';
 import { useLive } from '@/db/use-live';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { mediaExists, mediaUri } from '@/platform/media';
 import { mediaViewerColors } from '@/theme';
@@ -23,6 +25,9 @@ export function MediaViewerScreen() {
   const { attachmentId } = useLocalSearchParams<{ attachmentId: string }>();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const { generation } = useDatasetIntent();
+  const captionBusy = useRef(false);
+  const [savingCaption, setSavingCaption] = useState(false);
 
   const { data } = useLive(attachmentQuery(attachmentId), [attachmentId]);
   const item = data?.[0];
@@ -34,12 +39,32 @@ export function MediaViewerScreen() {
   const missing = shown ? !mediaExists(shown) : false;
 
   async function share() {
-    if (!uri) return;
-    if (!(await Sharing.isAvailableAsync())) {
-      notify('اشتراک‌گذاری روی این گوشی در دسترس نیست');
-      return;
+    await withDatasetWrite(generation, async () => {
+      if (!uri) return;
+      if (!(await Sharing.isAvailableAsync())) {
+        notify('اشتراک‌گذاری روی این گوشی در دسترس نیست');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: item?.mimeType ?? 'image/jpeg' });
+    });
+  }
+
+  async function saveCaption(text: string) {
+    if (captionBusy.current) return;
+    captionBusy.current = true;
+    setSavingCaption(true);
+    try {
+      await withDatasetWrite(generation, async () => {
+        if (!item) return;
+        await updateAttachment(item.id, { caption: text || null });
+        setEditing(false);
+      });
+    } catch (e) {
+      alertError('توضیح ذخیره نشد', e);
+    } finally {
+      captionBusy.current = false;
+      setSavingCaption(false);
     }
-    await Sharing.shareAsync(uri, { mimeType: item?.mimeType ?? 'image/jpeg' });
   }
 
   function remove() {
@@ -50,7 +75,10 @@ export function MediaViewerScreen() {
         text: 'حذف',
         style: 'destructive',
         onPress: () => {
-          void deleteAttachment(item.id).then(() => router.back());
+          void withDatasetWrite(generation, async () => {
+            await deleteAttachment(item.id);
+            router.back();
+          }).catch((e) => alertError('عکس حذف نشد', e));
         },
       },
     ]);
@@ -85,7 +113,7 @@ export function MediaViewerScreen() {
               icon="share-outline"
               label="اشتراک‌گذاری"
               color={mediaViewerColors.text}
-              onPress={() => void share()}
+              onPress={() => void share().catch((e) => alertError('اشتراک‌گذاری انجام نشد', e))}
             />
             <IconButton icon="trash-outline" label="حذف" color={mediaViewerColors.text} onPress={remove} />
           </Row>
@@ -110,15 +138,14 @@ export function MediaViewerScreen() {
 
       <PromptModal
         visible={editing}
+        busy={savingCaption}
         title="توضیح عکس"
         initialValue={item?.caption ?? ''}
         placeholder="مثلاً ضایعه‌ی ساق پای چپ، روز سوم درمان"
-        onCancel={() => setEditing(false)}
-        onSubmit={(text) => {
-          setEditing(false);
-          if (item)
-            void updateAttachment(item.id, { caption: text || null }).catch((e) => alertError('توضیح ذخیره نشد', e));
+        onCancel={() => {
+          if (!captionBusy.current) setEditing(false);
         }}
+        onSubmit={(text) => void saveCaption(text)}
       />
     </View>
   );

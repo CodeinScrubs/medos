@@ -3,12 +3,14 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, ChipSelect, Column, EmptyState, Row, Text } from '@/components/ui';
 import type { Note, NoteType } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { patientMediaQuery } from '@/features/attachments/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime, formatRelativeTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -82,6 +84,7 @@ export function NotesTab({ patientId }: { patientId: string }) {
 function NoteCard({ note, patientId, voices }: { note: Note; patientId: string; voices: number }) {
   const router = useRouter();
   const { colors } = useTheme();
+  const { generation } = useDatasetIntent();
   const isEvent = note.type === 'event';
 
   function actions() {
@@ -91,7 +94,10 @@ function NoteCard({ note, patientId, voices }: { note: Note; patientId: string; 
       [
         {
           text: note.isPinned ? 'برداشتن سنجاق' : 'سنجاق کردن',
-          onPress: () => void setNotePinned(note.id, !note.isPinned).catch((e) => alertError('تغییر ثبت نشد', e)),
+          onPress: () =>
+            void withDatasetWrite(generation, () => setNotePinned(note.id, !note.isPinned)).catch((e) =>
+              alertError('تغییر ثبت نشد', e),
+            ),
         },
         {
           text: 'حذف',
@@ -102,7 +108,8 @@ function NoteCard({ note, patientId, voices }: { note: Note; patientId: string; 
               {
                 text: 'حذف',
                 style: 'destructive',
-                onPress: () => void deleteNote(note.id).catch((e) => alertError('حذف نشد', e)),
+                onPress: () =>
+                  void withDatasetWrite(generation, () => deleteNote(note.id)).catch((e) => alertError('حذف نشد', e)),
               },
             ]),
         },

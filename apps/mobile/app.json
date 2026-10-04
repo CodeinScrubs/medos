@@ -2,7 +2,7 @@
   "expo": {
     "name": "MedOS",
     "slug": "medos",
-    "version": "0.11.24",
+    "version": "0.11.25",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "medos",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "android": {
       "package": "com.shayan.medos",
-      "versionCode": 40,
+      "versionCode": 41,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#0E4A5F",

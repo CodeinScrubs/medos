@@ -35,6 +35,17 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-04, 0.11.25: fence NoteCard pin/nested delete, FollowUpCard.perform,
+media viewer caption/delete/share and lab entry creation/update/paste. Keep original
+Scope/Gate ownership, actual prompt/raw input on failure and admission through SQL/
+native acknowledgment. Save/Paste mutexes prevent duplicate or early lab publication;
+async paste preserves unrelated current edits. No new dialogs/guards/dependencies.
+See [validation-0.11.25.md](validation-0.11.25.md) for evidence and limitations.
+Next: patient/admission/follow-up/consult-answer form intents, then durable stopped
+voice publication for draft/capture. Manual lab raw input still needs a separate
+durable recovery design; retained mounted input is not crash recovery. Broader
+clinical/native/physical-phone/product gates below remain open.
+
 2026-10-04, 0.11.24: fence manual patient actions and task/consult/schedule raw
 draft publication, load/adopt/discard and reminder retry. Late descendants inherit
 their retained Scope's original generation; clean flush cannot confer current
