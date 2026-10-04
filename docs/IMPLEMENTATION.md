@@ -41,6 +41,12 @@ Scope/Gate ownership, actual prompt/raw input on failure and admission through S
 native acknowledgment. Save/Paste mutexes prevent duplicate or early lab publication;
 async paste preserves unrelated current edits. No new dialogs/guards/dependencies.
 See [validation-0.11.25.md](validation-0.11.25.md) for evidence and limitations.
+Final 114 suites / 1462 app tests + three workflows, exact-source CI, both signed
+ABI packages and bounded offline native acceptance passed. Old pin/delete, follow-up
+completion, lab Save and viewer caption/delete/share refused; typed outcome/lab/
+caption input remained. Independent export preserved all 39 app tables and 18 files
+exactly. Fresh pin/history, completion, caption and lab note persisted after cold
+reopen with only expected changes; 33 other app tables and all files were unchanged.
 Next: patient/admission/follow-up/consult-answer form intents, then durable stopped
 voice publication for draft/capture. Manual lab raw input still needs a separate
 durable recovery design; retained mounted input is not crash recovery. Broader
@@ -332,4 +338,5 @@ Each change must leave a focused commit with Agent trailer, rationale in archite
 only when a design decision changes, regression evidence, and a latest handoff with
 the exact **Open threads** heading. Update this ledger as work passes acceptance;
 keep the wider requested scope visible. A milestone is not complete just because its
-tables or screens exist. No subagents in this execution, per owner instruction.
+tables or screens exist. Delegation follows the current owner limit at the top of
+this ledger; the primary agent owns integration and verification.

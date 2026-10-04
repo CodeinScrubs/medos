@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-04 — Accept signed 0.11.25 manual intent and preservation
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `eb150a5`; acceptance record in this commit.
+
+**Changed**
+- Record exact signed/native evidence in `validation-0.11.25.md`; application
+  source stayed frozen. No extra dependencies, dialogs or removal guards.
+- Correct IMPLEMENTATION's outdated no-delegation footer to its current owner
+  limit (at most two); root owned integration and all executed checks.
+
+**Verified**
+- 114 suites / 1462 app tests + three workflows; ordinary push-hook repeat and
+  exact-source CI `37213357700` passed. Signed arm64/x86_64 packages inspected;
+  installed emulator APK hash matched after data-preserving upgrade.
+- Offline native old note pin/delete, follow-up completion, lab Save and viewer
+  caption/delete/share refused. Actual outcome/lab/caption input remained.
+- Independent full SAF export preserved all 39 app tables and 18 files exactly.
+  Fresh pin/one history version, completion/outcome, caption and lab note persisted
+  after cold reopen; 33 other app tables and every media file stayed unchanged.
+- Final application crash buffer empty; emulator stopped before arm64 build.
+
+**Not verified**
+- Physical phone/API 26, all forms, actual native share/reminder delivery,
+  stopped-voice interruption, power loss/low space or whole-product completeness.
+
+**Open threads**
+- Next bounded integrity work: patient/contact/admission/follow-up/consult-answer
+  form intents and delayed reload/adopt/publication callbacks. Carry original
+  ownership before first load and through awaits; retain raw input after restore.
+- Then durable stopped voices for capture/note drafts and separate manual lab raw
+  recovery. Remaining feature, performance, clinical and phone gates remain in
+  IMPLEMENTATION; do not equate this release with a completed product.
+
+**Gotchas**
+- Initial CI watcher hit an EOF; direct API subsequently verified exact SHA success.
+- Cold boot System UI ANR handled before acceptance. Restore busy dump could not
+  idle; a later hierarchy confirmed completion. Follow-up/task share a description:
+  select the observed follow-up reason and class; the ambiguous helper refused.
+
+
 ## 2026-10-04 — Preserve note, follow-up, viewer and lab-entry intent
 
 **Agent:** GPT-6 via Codex
