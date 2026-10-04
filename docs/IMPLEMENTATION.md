@@ -45,6 +45,15 @@ evidence. Next bounded integrity work: note-card pin/delete, follow-up card acti
 media viewer delete/caption, lab entry and other unscoped patient/admission/follow-up/
 consult-answer forms. Then durable stopped voices for capture/note drafts. Neither
 this patch nor patient renewal establishes every descendant or whole-product safety.
+Exact-source CI, both signed packages and bounded offline native acceptance now
+passed. A consultation composer mounted after restore retained old ownership,
+refused publication and kept actual input. The old task checkbox also refused.
+Independent export preserved all 39 application tables and 18 files exactly;
+explicit renewal allowed a fresh consultation/request status that survived cold
+reopen. Physical phone/API 26 and other forms remain open. Start the next bounded
+patch with NoteCard's pin/nested delete and FollowUpCard.perform: protect complete
+note history and retain completion outcome across failure, through native reminder
+acknowledgment. Avoid UI changes or new guards in that patch.
 
 2026-10-04, 0.11.23: implement explicit renewal of retained patient roots through
 the originating route's always-on guard. Keep pending manual input and the last

@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-04 — Accept signed 0.11.24 descendant intent and preservation
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `f055cbc`; acceptance record in this commit.
+
+**Changed**
+- Record exact signed/native evidence in `validation-0.11.24.md`. Application
+  source remained frozen during builds; no dependencies or UI added.
+
+**Verified**
+- 111 suites / 1421 app tests + 3 workflows, ordinary push-hook repeat and
+  exact-source CI `37201713147` passed. Both signed ABI packages inspected;
+  pulled installed x86_64 hash matched after data-preserving upgrade. Arm64 built.
+- Offline native SAF restore: composer opened late under old root refused
+  publication and retained actual service/question. Old task checkbox refused.
+  Independent seven-chunk export preserved all 39 app tables and 18 files exactly.
+- Native renewal replaced the old root; fresh consultation/request status survived
+  force-stop/reopen exactly once. Final app crash buffer empty.
+
+**Not verified**
+- Physical phone/API 26, every card/form, camera/voice interruption, low space,
+  power-loss durability, large-dataset performance or complete product acceptance.
+
+**Open threads**
+- Next: NoteCard pin/nested delete and FollowUpCard.perform generation fences.
+  Test complete note/version rows and retained completion outcome; keep admission
+  through audit and native reminder acknowledgment. No new UI/guard needed.
+- Then media viewer delete/caption, lab entry, remaining unscoped forms and durable
+  capture/note-draft stopped voices. See IMPLEMENTATION for broader feature gates.
+
+**Gotchas**
+- Cold boot showed a System UI ANR. Restore briefly prevented an idle hierarchy
+  read. A clipped publication button was rejected by the QA helper; fresh scrolling
+  revealed it. No failed tool attempt was treated as a result.
+- The source archive is accepted 0.11.23; comparison precedes deliberate fresh
+  consultation mutations. Signing material and synthetic QA stay ignored/private.
+
 ## 2026-10-04 — Fence retained patient descendants and raw draft actions, 0.11.24
 
 **Agent:** GPT-6 via Codex
