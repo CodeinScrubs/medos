@@ -1,6 +1,7 @@
 # 0.11.23 — Explicit patient workspace renewal and manual clinical intents
 
-Status: software gates passed. Signed/native acceptance is a separate gate.
+Status: software, signed artifacts and bounded native renewal/preservation gates
+passed. Physical-phone and broader feature acceptance remain separate gates.
 
 ## Scope and regression evidence
 
@@ -71,5 +72,71 @@ large-dataset performance and validated clinical tools remain separate work.
   an unavailable navigator rather than dereferencing it. This is distinct from the
   earlier cold-worker timeout and its bounded test-file budget.
 
-Exact-source hosted CI and inspected signed artifacts/native behavior remain
-pending until the release acceptance entry is appended.
+## Exact-source native acceptance — 2026-10-04
+
+Application source was frozen at `645a2f37332498f89c0e86cd3cc1c541faefb025`.
+Hosted CI `37156228486` passed, including migration regeneration and Android
+export. No application source was edited during the signed builds.
+
+The signed x86_64 package was inspected before upgrading the isolated retained
+Android 36.1 AVD on `emulator-5556` with `adb install --user 0 -r`. Version
+0.11.23 / code 39, min SDK 24 / target 36, required native libraries and the
+existing release certificate were checked. The pulled installed base APK hash
+matched the inspected artifact. The device's connectivity command reported
+airplane mode enabled; the shell's attempted airplane broadcast was refused,
+so that broadcast is not evidence of offline state.
+
+Actual native sequence, using only synthetic records and observed hierarchy bounds:
+
+1. Enter an unsaved pulse of 81 on the patient root, then push the backup route.
+2. Select the accepted 0.11.22 SAF archive, verifying its device SHA-256 before
+   selection. Restore with the synthetic QA passphrase; the native result reports
+   one patient and 18 files.
+3. Return to the retained root. Its actual field still contains 81. Save refuses
+   the stale intent and shows the dataset-changed explanation; dismissal retains
+   81. The root offers Start fresh.
+4. Cancel renewal with Review writings: 81 remains. Reopen and confirm Start
+   fresh: targeted native replacement removes the old form and stale notice.
+5. The fresh root's header Edit opens the real patient editor; Back returns safely.
+6. Produce a full SAF backup before any fresh clinical mutation. An independent
+   Node AES-GCM/scrypt decoder authenticates all seven chunks. Compare all 39
+   application tables and all 18 media entries against the accepted source:
+   every compared row, timestamp, version and file hash matches exactly. SQLite
+   integrity is `ok` and foreign-key checks are empty. Audit/backup bookkeeping,
+   device settings and migration bookkeeping are explicitly excluded; no reminder
+   repair allowance was needed. The 14 voice attachment rows are preserved, not
+   a claim that every historical QA recording is playable.
+7. After that preservation export, create a fresh pulse of 82 successfully.
+   Force-stop/reopen the app and observe the saved 82. This deliberate later
+   mutation is outside the unchanged-data comparison in step 6.
+
+The final application crash buffer was empty. Cold emulator boot initially showed
+Digital Wellbeing and System UI ANRs; these were dismissed before acceptance,
+and are not reported as MedOS crashes. Two busy restore hierarchy reads could
+not reach idle; a later hierarchy confirmed completion. A fast-dump helper also
+failed one pull; no result was inferred from that failure.
+
+Private logs, synthetic archives, XML, screenshots and comparison scripts remain
+under `private/validation-0.11.23/`; they are not public application assets.
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Signed x86_64 QA APK | 54,456,198 | `c26b37ed1dbee0de4faac4b633d3023828d9c79cf240a3ebb8bccc53e5f3475c` |
+| Signed arm64 owner APK, `dist/MedOS-0.11.23.apk` | 52,847,871 | `10a1069166d0d9766c26f42fc5ca6141eaf60b34b97530a6d0738d448ad66a6c` |
+| Source 0.11.22 SAF archive | 6,518,993 | `ad08313b9e0672f8190f98e4c8fe69688b3310aca26d1726d5836160e0b425a2` |
+| 0.11.23 preservation export | 6,518,993 | `06dc816ba7836d4ed9f748c45e76c6e87f54c27bc62ff8375cef33216c617d81` |
+
+`npm run apk` completed the arm64 build in 5 min 22 s after the emulator was
+stopped. Its actual package/version/ABI and essential libraries passed inspection;
+APK signature v2 verified with the same release certificate SHA-256
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+Only the version/code stamp changed in generated native configuration; there was
+no full clean prebuild. Build/toolchain warnings about CMake path length, Gradle
+deprecations and the signature tool's Java native access were recorded, not treated
+as application failures or silently hidden. The owner package was not installed
+on a physical phone.
+
+This is bounded modern-emulator acceptance of renewal and vital intent fencing.
+It does not establish physical-phone/API 26 UI behavior, native diagnosis-prompt
+failure recovery, every patient mutation, power-loss durability or full-product
+completion. Remaining work listed above is still open.

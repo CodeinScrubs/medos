@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-04 — Accept signed 0.11.23 patient renewal and preservation
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `645a2f3`; acceptance record in this commit.
+
+**Changed**
+- Record exact signed/native evidence in `validation-0.11.23.md`. No application
+  changes after `645a2f3`; QA files and signing material stay private.
+
+**Verified**
+- Source gates: 109 suites / 1378 app tests + 3 workflows. Exact-source hosted CI
+  `37156228486` passed. Both signed ABI packages inspected; installed x86_64
+  hash matched after an upgrade preserving app data. Owner arm64 APK built.
+- Offline synthetic SAF restore retained actual unsaved vital input. Stale Save
+  refused; renewal cancellation retained input; confirmed native targeted replace
+  produced a fresh root. Header Edit and Back worked without a MedOS crash.
+- Independent seven-chunk export comparison preserved all 39 application tables
+  and all 18 files exactly. After that comparison, a fresh vital save survived
+  force-stop/reopen. Final application crash buffer empty.
+
+**Not verified**
+- Physical phone/API 26 UI, native diagnosis failure prompts, interruption/low
+  space, every remaining descendant action, or whole-product completeness.
+
+**Open threads**
+- Fence direct order/task/Undo/consult/lab/media/contact/star/imaging callbacks and
+  raw-draft publish/comparison/load/discard. A late-mounted child in a retained
+  stale Scope must inherit its original generation, not acquire current authority.
+  Then finish durable stopped voices for capture/note drafts and feature gates.
+
+**Gotchas**
+- Cold emulator boot showed System UI/Digital Wellbeing ANRs before acceptance.
+  Restore briefly prevented idle hierarchy dumps; completion was later observed.
+  The shell airplane broadcast was refused; connectivity command verified enabled.
+- The actual retained SAF folder is `Download/MedOSQA/`. Do not assume another
+  spelling; select archives using observed hierarchy and verified source hash.
+
 ## 2026-10-04 — Renew stale patient workspaces explicitly and preserve manual input, 0.11.23
 
 **Agent:** GPT-6 via Codex

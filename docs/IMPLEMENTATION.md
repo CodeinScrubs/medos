@@ -48,6 +48,12 @@ Next: remaining direct contact/star/task/consult/lab/imaging/media/order actions
 and raw-draft comparison/load/discard intents. Do not claim root renewal alone
 fences every descendant callback. Then finish durable capture/draft-note stopped
 voice journals and the remaining feature/native acceptance gates.
+Exact-source CI, signed owner/emulator packages and bounded native renewal now
+passed. The actual retained vital field survived restore and rejected old Save;
+review cancellation retained it, confirmation replaced the originating route,
+and fresh header Edit worked. Independent export preserved all 39 application
+tables and 18 media files exactly. A subsequent fresh vital save survived cold
+reopen. This does not cover every descendant mutation or physical-phone behavior.
 
 2026-10-03, 0.11.22: all 21 real-SQL witnesses failed on pinned 0.11.21 source.
 They reproduce overwritten search indexes across twelve rebuild entry points and
