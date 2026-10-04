@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { PickerModal } from '@/components/picker-modal';
 import { Badge, Button, EmptyState, Input, SectionHeader, Text } from '@/components/ui';
 import { tablesOf } from '@/db/query-tables';
+import { datasetGeneration } from '@/lib/dataset-write';
 import { SaveGroup } from '@/lib/save-before-leave';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase } from '@/test/sqljs';
@@ -48,7 +49,11 @@ const mockCache = new Map<string, unknown[]>();
 const mockErrors = new Map<string, Error>();
 const mockLoading = new Set<string>();
 const mockRetried: string[] = [];
-const mockScope = { perform: (action: () => void) => action(), group: new SaveGroup() };
+const mockScope = {
+  perform: (action: () => void) => action(),
+  group: new SaveGroup(),
+  generation: datasetGeneration(),
+};
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[]; toSQL(): unknown }) => {
     const { tablesOf: tables } = jest.requireActual<typeof import('@/db/query-tables')>('@/db/query-tables');
@@ -140,6 +145,7 @@ async function retryAll() {
 }
 
 beforeEach(async () => {
+  mockScope.generation = datasetGeneration();
   useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Example', lastName: 'Patient', status: 'outpatient' });
   mockCache.clear();

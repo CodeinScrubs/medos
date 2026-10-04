@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Segmented, Text } from '@/components/ui';
@@ -10,6 +11,7 @@ import type { LabPanel, LabValue } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, pickPhotos, storeAndAttach } from '@/features/attachments/capture';
 import { checkAttachmentTarget, patientMediaQuery } from '@/features/attachments/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { withFileJob } from '@/lib/file-work';
 import { formatJalali, formatJalaliDateTime, formatTime, toJalali } from '@/lib/jalali';
 import { hasPersianLetters, joinLabels, ltrIsolate, toPersianDigits } from '@/lib/persian';
@@ -28,6 +30,7 @@ const COL_W = 70;
 type LabsView = 'flowsheet' | 'panels';
 
 export function LabsTab({ patientId }: { patientId: string }) {
+  const { generation } = useDatasetIntent();
   const router = useRouter();
   const { spacing } = useTheme();
   const [view, setView] = useState<LabsView>('flowsheet');
@@ -51,20 +54,22 @@ export function LabsTab({ patientId }: { patientId: string }) {
       setCapturing(true);
       try {
         // The picker and panel creation are outside attachPhotos; own all of them.
-        await withFileJob(async () => {
-          checkAttachmentTarget({ entityType: 'patient', entityId: patientId, patientId });
-          const assets = await pickPhotos(source, { crop: true });
-          if (!assets) return;
-          checkAttachmentTarget({ entityType: 'patient', entityId: patientId, patientId });
-          const panelId = await createLabPanel({
-            patientId,
-            collectedAt: new Date(),
-            name: 'عکس برگه',
-            source: 'photo',
-            values: [],
-          });
-          await storeAndAttach(assets, { entityType: 'lab_panel', entityId: panelId, patientId, kind: 'lab_sheet' });
-        });
+        await withDatasetWrite(generation, () =>
+          withFileJob(async () => {
+            checkAttachmentTarget({ entityType: 'patient', entityId: patientId, patientId });
+            const assets = await pickPhotos(source, { crop: true });
+            if (!assets) return;
+            checkAttachmentTarget({ entityType: 'patient', entityId: patientId, patientId });
+            const panelId = await createLabPanel({
+              patientId,
+              collectedAt: new Date(),
+              name: 'عکس برگه',
+              source: 'photo',
+              values: [],
+            });
+            await storeAndAttach(assets, { entityType: 'lab_panel', entityId: panelId, patientId, kind: 'lab_sheet' });
+          }),
+        );
       } catch (e) {
         alertError('ذخیره نشد', e);
       } finally {
@@ -325,6 +330,7 @@ function PanelList({
   sheets: { id: string; entityId: string; thumbnailPath: string | null; relativePath: string }[];
 }) {
   const router = useRouter();
+  const { generation } = useDatasetIntent();
   const { colors, radii, spacing } = useTheme();
 
   const countByPanel = useMemo(() => {
@@ -359,7 +365,10 @@ function PanelList({
                 {
                   text: 'حذف',
                   style: 'destructive',
-                  onPress: () => void deleteLabPanel(p.id).catch((e) => alertError('حذف نشد', e)),
+                  onPress: () =>
+                    void withDatasetWrite(generation, () => deleteLabPanel(p.id)).catch((e) =>
+                      alertError('حذف نشد', e),
+                    ),
                 },
               ])
             }

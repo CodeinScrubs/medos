@@ -4,13 +4,14 @@ import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
+import { datasetGeneration } from '@/lib/dataset-write';
 import { FileWorkBusyError, reserveFileMaintenance } from '@/lib/file-work';
 import { SaveGroup } from '@/lib/save-before-leave';
 
 import { VoiceRecorder, type Recording } from './voice-recorder';
 
 jest.mock('@expo/vector-icons/Ionicons', () => 'Icon');
-let mockScope: { group: SaveGroup };
+let mockScope: { group: SaveGroup; generation: number };
 const mockPermission = jest.fn<() => Promise<{ granted: boolean }>>();
 const mockPlayback = jest.fn<() => Promise<void>>();
 let mockDurationMs = 1000;
@@ -96,7 +97,7 @@ beforeEach(async () => {
   deferredCleanups = [];
   mockDurationMs = 1000;
   mockStatusListener = undefined;
-  mockScope = { group: new SaveGroup() };
+  mockScope = { group: new SaveGroup(), generation: datasetGeneration() };
   mockPermission.mockReset().mockResolvedValue({ granted: true });
   mockPlayback.mockReset().mockResolvedValue(undefined);
   mockRecorder.isRecording = false;

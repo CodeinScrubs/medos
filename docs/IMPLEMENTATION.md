@@ -35,6 +35,17 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-04, 0.11.24: fence manual patient actions and task/consult/schedule raw
+draft publication, load/adopt/discard and reminder retry. Late descendants inherit
+their retained Scope's original generation; clean flush cannot confer current
+authority. Undo retains its original token after row removal, and async media/native
+acknowledgment keeps admission until completion. No new UI or dependencies.
+See [validation-0.11.24.md](validation-0.11.24.md) for reproduction and acceptance
+evidence. Next bounded integrity work: note-card pin/delete, follow-up card actions,
+media viewer delete/caption, lab entry and other unscoped patient/admission/follow-up/
+consult-answer forms. Then durable stopped voices for capture/note drafts. Neither
+this patch nor patient renewal establishes every descendant or whole-product safety.
+
 2026-10-04, 0.11.23: implement explicit renewal of retained patient roots through
 the originating route's always-on guard. Keep pending manual input and the last
 patient snapshot until confirmed review/copy or closure; recovery is also available

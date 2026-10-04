@@ -3,11 +3,13 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Text } from '@/components/ui';
 import type { ImagingStudy } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -56,6 +58,7 @@ export function ImagingTab({ patientId }: { patientId: string }) {
 }
 
 function StudyCard({ study, patientId }: { study: ImagingStudy; patientId: string }) {
+  const { generation } = useDatasetIntent();
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
 
@@ -70,7 +73,10 @@ function StudyCard({ study, patientId }: { study: ImagingStudy; patientId: strin
           {
             text: 'حذف',
             style: 'destructive',
-            onPress: () => void deleteImagingStudy(study.id).catch((e) => alertError('حذف نشد', e)),
+            onPress: () =>
+              void withDatasetWrite(generation, () => deleteImagingStudy(study.id)).catch((e) =>
+                alertError('حذف نشد', e),
+              ),
           },
         ])
       }

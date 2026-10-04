@@ -3,9 +3,11 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Linking, Pressable, StyleSheet } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError, notify } from '@/components/feedback';
 import { Avatar, Badge, Card, Column, IconButton, Row, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatAge } from '@/lib/jalali';
 import { formatPhone, joinLabels, normalizePhone, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -21,6 +23,7 @@ import { setPatientStarred } from './queries';
  * status, the one-line summary and the allergies — the rest is in the tabs.
  */
 export function PatientHeader({ patient }: { patient: Patient }) {
+  const { generation } = useDatasetIntent();
   const { colors, spacing } = useTheme();
   const status = PATIENT_STATUS[patient.status];
   const age = formatAge(patient.birthDate, patient.ageYears);
@@ -64,7 +67,9 @@ export function PatientHeader({ patient }: { patient: Patient }) {
             color={patient.starred ? colors.accent : colors.textFaint}
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              void setPatientStarred(patient.id, !patient.starred).catch((e) => alertError('ستاره ثبت نشد', e));
+              void withDatasetWrite(generation, () => setPatientStarred(patient.id, !patient.starred)).catch((e) =>
+                alertError('ستاره ثبت نشد', e),
+              );
             }}
           />
         </Row>

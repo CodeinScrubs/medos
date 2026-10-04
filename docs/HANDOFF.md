@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-04 — Fence retained patient descendants and raw draft actions, 0.11.24
+
+**Agent:** GPT-6 via Codex
+**Commits:** application and decision record in this commit.
+
+**Changed**
+- Scope generation inheritance closes late-mounted child authority after restore.
+  Task/consult/schedule savers and manual publish/load/adopt/discard retain original
+  tokens; clean flush cannot authorize restored rows. Schedule opening/retry fenced.
+- Direct order/task/Undo/consult/star/contact/imaging/panel/media actions fenced.
+  Undo survives row unmount with its old token; capture leases span native/file/DB
+  acknowledgment. No extra normal-path UI or dependency. Version 0.11.24 / code 40.
+
+**Verified**
+- 33 valid pre-fix witnesses failed on unchanged 0.11.23 application source;
+  targeted final nine suites / 131 tests passed. Two independent source reviews
+  found no remaining blocker in this patch; reviewers ran no tools/checks themselves.
+- Final `npm run check`: typecheck, lint without warnings, formatting, 111 suites /
+  1421 app tests plus three workflow tests. Diff check passed; lock versions scoped.
+- Final full source gates and signed/native evidence: see `validation-0.11.24.md`.
+
+**Not verified**
+- Physical phone, every patient action/form, durable stopped voices, native
+  interruption/low-space or whole-product completeness. Tokens are process-local.
+
+**Open threads**
+- Fence note-card pin/delete, follow-up card actions, media viewer delete/caption,
+  lab entry and remaining unscoped forms. Then durable capture/note-draft voices.
+- Do not invert imports: dataset-intent imports Scope, so Scope/removal guard must
+  continue using low-level dataset-write instead of importing dataset-intent.
+
+**Gotchas**
+- Four initial draft harness TypeErrors were corrected before valid red witnesses
+  were rerun; see validation record. Full typecheck caught a missing required
+  source in the new lab test fixture; fixed as manual. No production contract relaxed.
+- Test observer globals are assigned in effects after commit, not during render.
+
 ## 2026-10-04 — Accept signed 0.11.23 patient renewal and preservation
 
 **Agent:** GPT-6 via Codex

@@ -140,6 +140,11 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
   text fields; never add a competing removal guard to that route or flush the whole group
   from the recorder's own callback. In-process staging is not crash-recovery evidence.
 - A mounted editing intent keeps its original `datasetGeneration()` across restore.
+  `useDatasetIntent()` inherits the enclosing AutosaveScope's original generation,
+  including children mounted after replacement. Pass that generation explicitly to
+  their Autosave constructors. Fence manual publication, load/adopt/discard and
+  delayed confirmation callbacks before any reset or mutation: a clean flush alone
+  does not check dataset ownership. Undo retains the originating action's token.
   Carry that token into write/publish/discard callbacks, including delayed dialog
   confirmations; `withDatasetWrite(token, work)` holds admission through awaits.
   Never obtain a fresh token in an old callback or remount to discard unsaved input.

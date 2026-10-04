@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, SectionHeader, Text } from '@/components/ui';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { currentEncounterQuery } from '@/features/encounters/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -85,6 +87,7 @@ export function KardexTab({ patientId }: { patientId: string }) {
 
 function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
   const router = useRouter();
+  const { generation } = useDatasetIntent();
   const { colors, radii, spacing } = useTheme();
 
   const day = therapyDay(order);
@@ -95,7 +98,9 @@ function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
 
   function change(status: Order['status']) {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    void setOrderStatus(order.id, status).catch((e) => alertError('تغییر ثبت نشد', e));
+    void withDatasetWrite(generation, () => setOrderStatus(order.id, status)).catch((e) =>
+      alertError('تغییر ثبت نشد', e),
+    );
   }
 
   function confirmDiscontinue() {
@@ -114,7 +119,8 @@ function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
         {
           text: 'حذف',
           style: 'destructive',
-          onPress: () => void deleteOrder(order.id).catch((e) => alertError('حذف نشد', e)),
+          onPress: () =>
+            void withDatasetWrite(generation, () => deleteOrder(order.id)).catch((e) => alertError('حذف نشد', e)),
         },
       ],
     );

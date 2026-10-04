@@ -2,10 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError } from '@/components/feedback';
 import { Badge, Card, Column, Row, Text } from '@/components/ui';
 import { useUndo } from '@/components/undo-toast';
 import type { Patient, Task } from '@/db/schema';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
@@ -25,6 +27,7 @@ export function TaskRow({
   showPatient?: boolean;
 }) {
   const { colors } = useTheme();
+  const { generation } = useDatasetIntent();
   const offerUndo = useUndo();
   const [busy, setBusy] = useState(false);
   async function toggle() {
@@ -32,9 +35,13 @@ export function TaskRow({
     setBusy(true);
     try {
       const completing = task.status === 'open';
-      await setTaskStatus(task.id, completing ? 'done' : 'open');
+      await withDatasetWrite(generation, () => setTaskStatus(task.id, completing ? 'done' : 'open'));
       // The row leaves the open list at once; a slip of the thumb gets a way back.
-      if (completing) offerUndo({ message: `«${task.title}» انجام شد`, undo: () => setTaskStatus(task.id, 'open') });
+      if (completing)
+        offerUndo({
+          message: `«${task.title}» انجام شد`,
+          undo: () => withDatasetWrite(generation, () => setTaskStatus(task.id, 'open')),
+        });
     } catch (e) {
       alertError('وضعیت کار تغییر نکرد', e);
     } finally {

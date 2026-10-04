@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, View } from 'react-native';
 
 import { useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
 import { Button, Card, Column, Input, Row, Text } from '@/components/ui';
 import type { ConsultRequestDraft } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 
 import {
@@ -78,6 +80,7 @@ export function RequestDraftEditor({
   onReset: (draft: ConsultRequestDraft | null) => void;
 }) {
   const scope = useAutosaveScope()!;
+  const { generation } = useDatasetIntent();
   const [fields, setFields] = useState<RequestDraftFields>({
     specialty: initial?.specialty ?? '',
     reason: initial?.reason ?? '',
@@ -103,6 +106,7 @@ export function RequestDraftEditor({
           revision = await saveRequestDraft(id, patientId, value, revision);
         },
         onState: setState,
+        generation,
         shouldRetry: (error) => !(error instanceof RequestDraftConflict),
       }),
     };
@@ -130,7 +134,7 @@ export function RequestDraftEditor({
     acting.current = true;
     setBusy(true);
     try {
-      await action();
+      await withDatasetWrite(generation, action);
       setFailed(false);
     } catch (error) {
       setFailed(true);

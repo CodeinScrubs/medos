@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, View } from 'react-native';
 
 import { useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, Card, Column, Input, Row, Text } from '@/components/ui';
 import type { TaskDraft } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 
 import { commitTaskDraft, saveTaskDraft, TaskDraftConflict, taskDraftQuery } from './draft-queries';
@@ -53,6 +55,7 @@ export function TaskDraftEditor({
   onReset: (draft: TaskDraft | null) => void;
 }) {
   const scope = useAutosaveScope()!;
+  const { generation } = useDatasetIntent();
   const [title, setTitle] = useState(initial?.title ?? '');
   const latest = useRef(title);
   const acting = useRef(false);
@@ -77,6 +80,7 @@ export function TaskDraftEditor({
           revision = await saveTaskDraft(id, target, text, revision);
         },
         onState: setState,
+        generation,
         shouldRetry: (error) => !(error instanceof TaskDraftConflict),
       }),
     };
@@ -104,7 +108,7 @@ export function TaskDraftEditor({
     acting.current = true;
     setBusy(true);
     try {
-      await action();
+      await withDatasetWrite(generation, action);
       setFailed(false);
     } catch (error) {
       setFailed(true);

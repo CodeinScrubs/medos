@@ -1348,3 +1348,36 @@ automatically merging unrelated datasets. A long admitted action postpones resto
 These tokens and retained forms are process-local, not durable drafts or permanent
 history. Other manual callbacks still need fencing. No schema, route, dependency,
 permission, clinical rule or archive/key scheme change.
+
+## Descendant intent inheritance and manual publication (0.11.24)
+
+A retained patient Scope owns its original generation. Previously a descendant
+mounted after restore captured the current generation independently. That gave an
+old screen fresh write authority. Also, a clean Autosave flush returned immediately,
+letting manual task/consult publication modify a restored draft with the same id
+and revision. Delayed comparison/load/adopt callbacks could discard local input.
+
+The Scope exposes its immutable generation. `useDatasetIntent` captures an explicit
+token first, otherwise the enclosing Scope token, otherwise the current generation
+for an independent new intent. It never rebases on later props or context updates.
+AutosaveField, task quick-add, consult request and schedule savers receive this
+token explicitly. Their manual actions acquire write admission before flush,
+publication, comparison, load/adopt/discard, cancellation or reset, and retain it
+through acknowledgment. Schedule opening and reminder retry use the same boundary.
+
+Order status/deletion, task completion/Undo, consult request/cancellation, patient
+star/contact deletion, imaging/panel deletion and media capture/deletion carry the
+original token. Undo remains bound after its originating row unmounts. Photo/lab
+capture admission spans the native picker, file staging and metadata acknowledgment;
+the existing file-work lease still independently protects file maintenance.
+
+No extra navigation guard, route or normal-path confirmation was added. A fresh
+Scope deliberately captures new authority; explicit patient renewal remains the
+way out of an old root. The tradeoff is that long admitted native actions postpone
+restore. Tokens and retained input remain process-local, not crash recovery.
+
+Actual handler witnesses import real migrated SQLite with unchanged ids/revisions;
+navigation/native stand-ins establish no device behavior. Follow-up card actions,
+note-card pin/delete, media viewer edits, lab entry and remaining unscoped forms
+still need separate fencing. This patch does not make every clinical workflow safe
+across restore. No schema, dependency, permission, formula or archive/key change.

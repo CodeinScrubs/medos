@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, ChipSelect, Column, SectionHeader, Text } from '@/components/ui';
@@ -10,6 +11,7 @@ import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder } from '@/components/voice-recorder';
 import type { AttachmentKind } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
@@ -39,6 +41,7 @@ const PHOTO_KINDS: AttachmentKind[] = ['photo', 'clinical_photo', 'radiology', '
  * are filed as radiology. It saves a question on every capture.
  */
 export function MediaTab({ patientId }: { patientId: string }) {
+  const { generation } = useDatasetIntent();
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
   const { width } = useWindowDimensions();
@@ -65,16 +68,18 @@ export function MediaTab({ patientId }: { patientId: string }) {
     askPhotoSource(async (source) => {
       setAdding(true);
       try {
-        await attachPhotos({
-          source,
-          entityType: 'patient',
-          entityId: patientId,
-          patientId,
-          kind: addKind,
-          // Camera shots get the cropper; gallery picks allow several at once.
-          crop: source === 'camera',
-          multiple: source === 'library',
-        });
+        await withDatasetWrite(generation, () =>
+          attachPhotos({
+            source,
+            entityType: 'patient',
+            entityId: patientId,
+            patientId,
+            kind: addKind,
+            // Camera shots get the cropper; gallery picks allow several at once.
+            crop: source === 'camera',
+            multiple: source === 'library',
+          }),
+        );
       } catch (e) {
         alertError('عکس ذخیره نشد', e);
       } finally {
@@ -113,7 +118,10 @@ export function MediaTab({ patientId }: { patientId: string }) {
                   {
                     text: 'حذف',
                     style: 'destructive',
-                    onPress: () => void deleteAttachment(a.id).catch((e) => alertError('عکس حذف نشد', e)),
+                    onPress: () =>
+                      void withDatasetWrite(generation, () => deleteAttachment(a.id)).catch((e) =>
+                        alertError('عکس حذف نشد', e),
+                      ),
                   },
                 ])
               }
@@ -150,7 +158,10 @@ export function MediaTab({ patientId }: { patientId: string }) {
                 {
                   text: 'حذف',
                   style: 'destructive',
-                  onPress: () => void deleteAttachment(v.id).catch((e) => alertError('وویس حذف نشد', e)),
+                  onPress: () =>
+                    void withDatasetWrite(generation, () => deleteAttachment(v.id)).catch((e) =>
+                      alertError('وویس حذف نشد', e),
+                    ),
                 },
               ])
             }

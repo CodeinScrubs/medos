@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 
 import { useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, Row, SectionHeader, Text } from '@/components/ui';
 import type { Consultation } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -39,6 +41,7 @@ const URGENCY: Record<Consultation['urgency'], { label: string; tone: 'danger' |
 export function ConsultsSection({ patientId }: { patientId: string }) {
   const router = useRouter();
   const scope = useAutosaveScope()!;
+  const { generation } = useDatasetIntent();
   const { spacing } = useTheme();
   const { data, error } = useLive(patientConsultsQuery(patientId), [patientId]);
   const rows = data ?? [];
@@ -51,7 +54,10 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
       {
         text: 'لغو کانسالت',
         style: 'destructive',
-        onPress: () => void cancelConsult(consultId).catch((e) => alertError('تغییر ثبت نشد', e)),
+        onPress: () =>
+          void withDatasetWrite(generation, () => cancelConsult(consultId)).catch((e) =>
+            alertError('تغییر ثبت نشد', e),
+          ),
       },
     ]);
   }
@@ -135,7 +141,11 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
                     icon="send-outline"
                     variant="secondary"
                     size="sm"
-                    onPress={() => void markConsultRequested(consult.id).catch((e) => alertError('تغییر ثبت نشد', e))}
+                    onPress={() =>
+                      void withDatasetWrite(generation, () => markConsultRequested(consult.id)).catch((e) =>
+                        alertError('تغییر ثبت نشد', e),
+                      )
+                    }
                   />
                 ) : null}
                 {consult.status === 'pending' || consult.status === 'requested' ? (

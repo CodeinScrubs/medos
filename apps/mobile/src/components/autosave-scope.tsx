@@ -7,6 +7,7 @@ import { alertError, notify } from './feedback';
 import { useSaveBeforeLeave } from './use-save-before-leave';
 
 type Scope = {
+  readonly generation: number;
   group: SaveGroup;
   perform(action: () => void | Promise<void>): Promise<void>;
   abandonStale(): void;
@@ -22,6 +23,7 @@ export function AutosaveScope({ children }: PropsWithChildren) {
     const generation = datasetGeneration();
     let abandoned = false;
     return {
+      generation,
       group,
       abandonStale() {
         if (generation === datasetGeneration()) throw new Error('A current intent must be saved before leaving.');

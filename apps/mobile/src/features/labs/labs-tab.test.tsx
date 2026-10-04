@@ -4,8 +4,11 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
 import { Button } from '@/components/ui';
+import { restoreDatabase } from '@/db/client';
 import { attachments, labPanels } from '@/db/schema';
+import { importTables } from '@/features/backup/import';
 import { createPatient, deletePatient } from '@/features/patients/queries';
+import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { fileJobsActive, FileWorkBusyError, reserveFileMaintenance } from '@/lib/file-work';
 import type { storePhoto } from '@/platform/media';
 import { useTestDatabase } from '@/test/db-client';
@@ -51,6 +54,28 @@ jest.mock('@/features/attachments/capture', () => ({
 let t: TestDatabase;
 let patientId: string;
 let tree: ReactTestRenderer | undefined;
+let snapshotCounter = 0;
+function snapshot() {
+  const path = `/lab-intent-${++snapshotCounter}.db`;
+  t.sqlite.exec(`VACUUM INTO '${path}'`);
+  return () => {
+    const replacement = reserveDatasetReplacement();
+    const trusted = restoreDatabase(replacement);
+    try {
+      trusted.sqlite.execSync('PRAGMA foreign_keys = OFF');
+      trusted.sqlite.execSync(`ATTACH DATABASE '${path}' AS restore_src`);
+      try {
+        importTables(trusted.sqlite);
+      } finally {
+        trusted.sqlite.execSync('DETACH DATABASE restore_src');
+        trusted.sqlite.execSync('PRAGMA foreign_keys = ON');
+      }
+      replacement.committed();
+    } finally {
+      replacement.release();
+    }
+  };
+}
 const picked = (): ImagePickerResult => ({
   canceled: false,
   assets: [{ uri: 'file:///synthetic-lab.jpg', width: 640, height: 480 }],
@@ -93,6 +118,17 @@ afterEach(() => {
 });
 
 describe('lab photo callback', () => {
+  it('refuses a source selection held across same-ID replacement before opening the picker', async () => {
+    const restore = snapshot();
+    await act(async () => restore());
+    await choose();
+    expect(alertError).toHaveBeenCalledWith('ذخیره نشد', expect.any(DatasetChangedError));
+    expect(mockPicker).not.toHaveBeenCalled();
+    expect(mockStore).not.toHaveBeenCalled();
+    expect(t.db.select().from(labPanels).all()).toHaveLength(0);
+    expect(t.db.select().from(attachments).all()).toHaveLength(0);
+    expect(fileJobsActive()).toBe(false);
+  });
   it('contains picker rejection in visible feedback and releases the job', async () => {
     const error = new Error('Synthetic picker rejected');
     mockPicker.mockRejectedValue(error);

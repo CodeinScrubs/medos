@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 
 import { useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError } from '@/components/feedback';
 import { Button, ChipSelect, Column, Input, Row, Text, Toggle } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import type { Task, TaskScheduleDraft } from '@/db/schema';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { addDays, formatClock } from '@/lib/time';
 
@@ -22,6 +24,7 @@ import {
 
 export function TaskSchedule({ task }: { task: Task }) {
   const now = useNow();
+  const { generation: intentGeneration } = useDatasetIntent();
   const [seed, setSeed] = useState<Task | null>(() => (task.scheduleDraft ? task : null));
   const [generation, setGeneration] = useState(0);
   const opening = useRef(false);
@@ -29,10 +32,12 @@ export function TaskSchedule({ task }: { task: Task }) {
     if (opening.current) return;
     opening.current = true;
     try {
-      const current = (await taskQuery(task.id))[0];
-      if (!current) throw new Error('کار در دسترس نیست.');
-      setSeed(current);
-      setGeneration((value) => value + 1);
+      await withDatasetWrite(intentGeneration, async () => {
+        const current = (await taskQuery(task.id))[0];
+        if (!current) throw new Error('کار در دسترس نیست.');
+        setSeed(current);
+        setGeneration((value) => value + 1);
+      });
     } catch (error) {
       alertError('موعد باز نشد', error);
     } finally {
@@ -59,7 +64,11 @@ export function TaskSchedule({ task }: { task: Task }) {
           label="هماهنگی اعلان؛ تلاش مجدد"
           size="sm"
           variant="ghost"
-          onPress={() => void reconcileTaskReminder(task.id, true)}
+          onPress={() =>
+            void withDatasetWrite(intentGeneration, async () => {
+              await reconcileTaskReminder(task.id, true);
+            }).catch((error) => alertError('اعلان هماهنگ نشد', error))
+          }
         />
       ) : null}
       {seed ? (
@@ -90,6 +99,7 @@ function ScheduleEditor({
 }) {
   const now = useNow();
   const scope = useAutosaveScope()!;
+  const { generation } = useDatasetIntent();
   const [fields, setFields] = useState(() => initialTaskSchedule(initial, new Date(now)));
   const latest = useRef(fields);
   const acting = useRef(false);
@@ -105,6 +115,7 @@ function ScheduleEditor({
         revision = value;
       },
       saver: new Autosave<TaskScheduleDraft>({
+        generation,
         write: async (value) => {
           revision = await saveTaskScheduleDraft(initial.id, value, revision);
         },
@@ -135,7 +146,7 @@ function ScheduleEditor({
     acting.current = true;
     setBusy(true);
     try {
-      await action();
+      await withDatasetWrite(generation, action);
       setFailed(false);
     } catch (error) {
       setFailed(true);

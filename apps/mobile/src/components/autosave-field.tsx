@@ -6,6 +6,7 @@ import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { DatasetChangedError } from '@/lib/dataset-write';
 
 import { useAutosaveScope } from './autosave-scope';
+import { useDatasetIntent } from './dataset-intent';
 
 /**
  * A field that writes itself, a second or two behind the keyboard.
@@ -38,12 +39,13 @@ export function AutosaveField({
 }) {
   const [text, setText] = useState(initialValue ?? '');
   const scope = useAutosaveScope();
+  const { generation } = useDatasetIntent();
   const [state, setState] = useState<AutosaveState>({ status: 'idle' });
 
   // Built once, from the first `onSave`. It cannot depend on the prop: that is
   // usually an inline arrow, and rebuilding the scheduler every render would
   // throw away whatever it was waiting to write.
-  const [saver] = useState(() => new Autosave<string>({ write: onSave, onState: setState }));
+  const [saver] = useState(() => new Autosave<string>({ write: onSave, onState: setState, generation }));
 
   useEffect(() => scope?.group.register(saver), [scope, saver]);
 

@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, DataRow, Divider, Row, SectionHeader, Text } from '@/components/ui';
 import type { Patient } from '@/db/schema';
@@ -17,6 +18,7 @@ import { patientFollowUpsQuery } from '@/features/followups/queries';
 import { isHighlighted } from '@/features/notes/logic';
 import { patientNotesQuery } from '@/features/notes/queries';
 import { TasksSection } from '@/features/tasks/tasks-section';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali, formatJalaliDateTime, formatJalaliLong, formatRelative } from '@/lib/jalali';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -26,6 +28,7 @@ import { PatientSnapshot } from './patient-snapshot';
 import { deletePatientContact, patientContactsQuery } from './queries';
 
 export function OverviewTab({ patient }: { patient: Patient }) {
+  const { generation } = useDatasetIntent();
   const router = useRouter();
   const { colors } = useTheme();
   const patientId = patient.id;
@@ -141,7 +144,10 @@ export function OverviewTab({ patient }: { patient: Patient }) {
                   {
                     text: 'حذف',
                     style: 'destructive',
-                    onPress: () => void deletePatientContact(c.id).catch((e) => alertError('حذف نشد', e)),
+                    onPress: () =>
+                      void withDatasetWrite(generation, () => deletePatientContact(c.id)).catch((e) =>
+                        alertError('حذف نشد', e),
+                      ),
                   },
                 ])
               }

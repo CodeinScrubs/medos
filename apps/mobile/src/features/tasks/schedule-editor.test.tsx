@@ -1,9 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
+import { useEffect } from 'react';
+import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
-import { AutosaveScope } from '@/components/autosave-scope';
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
+import { alertError } from '@/components/feedback';
 import { Button, Input, Toggle } from '@/components/ui';
+import { restoreDatabase } from '@/db/client';
 import { tasks } from '@/db/schema';
+import { importTables } from '@/features/backup/import';
+import { DatasetBusyError, DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
+import * as notifications from '@/platform/notifications';
 import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications, scheduled } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -33,6 +41,8 @@ jest.mock('@/components/ui', () => ({
 }));
 let t: TestDatabase;
 let tree: ReactTestRenderer | undefined;
+let scope: NonNullable<ReturnType<typeof useAutosaveScope>>;
+let snapshotCounter = 0;
 const future = new Date(2030, 6, 12, 18, 0);
 const current = () => t.db.select().from(tasks).get()!;
 const button = (label: string) => tree!.root.findAllByType(Button).find((node) => node.props.label === label)!;
@@ -45,9 +55,51 @@ async function render() {
   await act(async () => {
     tree = create(
       <AutosaveScope>
+        <CaptureScope />
         <TaskSchedule task={current()} />
       </AutosaveScope>,
     );
+  });
+}
+function CaptureScope() {
+  const value = useAutosaveScope()!;
+  useEffect(() => {
+    scope = value;
+  }, [value]);
+  return null;
+}
+function snapshot() {
+  const path = `/schedule-intent-${++snapshotCounter}.db`;
+  t.sqlite.exec(`VACUUM INTO '${path}'`);
+  return () => {
+    const replacement = reserveDatasetReplacement();
+    const trusted = restoreDatabase(replacement);
+    try {
+      trusted.sqlite.execSync('PRAGMA foreign_keys = OFF');
+      trusted.sqlite.execSync(`ATTACH DATABASE '${path}' AS restore_src`);
+      try {
+        importTables(trusted.sqlite);
+      } finally {
+        trusted.sqlite.execSync('DETACH DATABASE restore_src');
+        trusted.sqlite.execSync('PRAGMA foreign_keys = ON');
+      }
+      replacement.committed();
+    } finally {
+      replacement.release();
+    }
+  };
+}
+async function seedDraft() {
+  await saveTaskScheduleDraft(
+    current().id,
+    { ...initialTaskSchedule(current(), future), hasDue: true, dateText: scheduleDateText(future), clockText: '18:00' },
+    current().scheduleDraftRevision,
+  );
+}
+async function invoke(onPress: (() => void) | undefined) {
+  await act(async () => {
+    onPress!();
+    await settle();
   });
 }
 async function click(label: string) {
@@ -67,6 +119,8 @@ beforeEach(async () => {
   t = useTestDatabase(await createTestDatabase());
   resetNotifications();
   await createTask({ title: 'Review' });
+  jest.mocked(alertError).mockClear();
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.useFakeTimers();
 });
 afterEach(async () => {
@@ -74,10 +128,173 @@ afterEach(async () => {
     tree?.unmount();
   });
   tree = undefined;
+  jest.restoreAllMocks();
   jest.useRealTimers();
 });
 
 describe('task schedule editor', () => {
+  it('refuses a late opening from an already retained schedule widget after real restore', async () => {
+    const restore = snapshot();
+    await render();
+    const original = current();
+    await act(async () => restore());
+    await click('موعد و یادآور');
+    expect(tree!.root.findAllByType(Toggle)).toHaveLength(0);
+    expect(current()).toEqual(original);
+    expect(alertError).toHaveBeenCalledWith('موعد باز نشد', expect.any(DatasetChangedError));
+  });
+
+  it('refuses publication by a schedule editor mounted late inside a retained stale scope', async () => {
+    await seedDraft();
+    const restore = snapshot();
+    const original = current();
+    await act(async () => {
+      tree = create(
+        <AutosaveScope>
+          <CaptureScope />
+        </AutosaveScope>,
+      );
+    });
+    await act(async () => restore());
+    await act(async () => {
+      tree!.update(
+        <AutosaveScope>
+          <CaptureScope />
+          <TaskSchedule task={current()} />
+        </AutosaveScope>,
+      );
+    });
+    await act(async () => input('ساعت موعد').props.onChangeText('19:00'));
+    await click('ذخیرهٔ موعد');
+    expect(current()).toEqual(original);
+    expect(input('ساعت موعد').props.value).toBe('19:00');
+    expect(alertError).toHaveBeenCalledWith('موعد ثبت نشد', expect.any(DatasetChangedError));
+  });
+
+  it('retains a late schedule draft and refuses direct autosaver flush in the stale retained scope', async () => {
+    await seedDraft();
+    const restore = snapshot();
+    const original = current();
+    await act(async () => {
+      tree = create(
+        <AutosaveScope>
+          <CaptureScope />
+        </AutosaveScope>,
+      );
+    });
+    const register = jest.spyOn(scope.group, 'register');
+    await act(async () => restore());
+    await act(async () => {
+      tree!.update(
+        <AutosaveScope>
+          <CaptureScope />
+          <TaskSchedule task={current()} />
+        </AutosaveScope>,
+      );
+    });
+    await act(async () => input('ساعت موعد').props.onChangeText('19:'));
+    const saver = register.mock.calls[0]![0];
+    let saved: boolean | undefined;
+    await act(async () => {
+      saved = await saver.flush();
+    });
+    expect(saved).toBe(false);
+    expect(saver.unsaved).toBe(true);
+    expect(current()).toEqual(original);
+    expect(input('ساعت موعد').props.value).toBe('19:');
+  });
+
+  it('rejects a held discard confirmation after real same-ID restore without erasing the draft', async () => {
+    await seedDraft();
+    const restore = snapshot();
+    const original = current();
+    await render();
+    await click('کنارگذاشتن پیش‌نویس موعد');
+    const discard = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((choice) => choice.text === 'کنار گذاشتن')!;
+    await act(async () => restore());
+    await invoke(discard.onPress);
+    expect(current()).toEqual(original);
+    expect(input('ساعت موعد').props.value).toBe('18:00');
+    expect(alertError).toHaveBeenCalledWith('موعد ثبت نشد', expect.any(DatasetChangedError));
+  });
+
+  it('rejects a held saved-version reload after restore and preserves local unfinished text', async () => {
+    await seedDraft();
+    await render();
+    const row = current();
+    await saveTaskScheduleDraft(
+      row.id,
+      { ...initialTaskSchedule(row, future), clockText: '20:00' },
+      row.scheduleDraftRevision,
+    );
+    await type('ساعت موعد', 'my unfinished clock');
+    await click('بررسی نسخهٔ ذخیره‌شده');
+    await click('بارگذاری نسخهٔ ذخیره‌شده');
+    const reload = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((choice) => choice.text === 'بارگذاری')!;
+    const original = current();
+    const restore = snapshot();
+    await act(async () => restore());
+    await invoke(reload.onPress);
+    expect(current()).toEqual(original);
+    expect(input('ساعت موعد').props.value).toBe('my unfinished clock');
+    expect(alertError).toHaveBeenCalledWith('موعد ثبت نشد', expect.any(DatasetChangedError));
+  });
+
+  it('rejects an old reminder-retry callback instead of reconciling a restored task', async () => {
+    t.db
+      .update(tasks)
+      .set({ dueAt: future, reminderEnabled: true, reminderRevision: 1, reminderAppliedRevision: -1 })
+      .where(eq(tasks.id, current().id))
+      .run();
+    const restore = snapshot();
+    const original = current();
+    await render();
+    const retry = button('هماهنگی اعلان؛ تلاش مجدد').props.onPress;
+    await act(async () => restore());
+    await invoke(retry);
+    expect(current()).toEqual(original);
+    expect(scheduled.size).toBe(0);
+    expect(alertError).toHaveBeenCalledWith('اعلان هماهنگ نشد', expect.any(DatasetChangedError));
+  });
+
+  it('keeps publication admitted while the committed deadline awaits its native reminder acknowledgement', async () => {
+    await seedDraft();
+    await render();
+    await act(async () => toggle('اعلان در موعد').props.onChange(true));
+    let acknowledge!: (value: string) => void;
+    const pending = new Promise<string>((resolve) => {
+      acknowledge = resolve;
+    });
+    const native = jest.spyOn(notifications, 'scheduleReminder').mockImplementation(() => pending);
+    await click('ذخیرهٔ موعد');
+    expect(native).toHaveBeenCalledTimes(1);
+    expect(current().dueAt).toEqual(future);
+    expect(current().scheduleDraft).toBeNull();
+    let admissionError: unknown;
+    try {
+      // Release a mistakenly admitted reservation before the witness fails;
+      // otherwise the red run would contaminate following tests.
+      const replacement = reserveDatasetReplacement();
+      replacement.release();
+    } catch (error) {
+      admissionError = error;
+    }
+    await act(async () => {
+      acknowledge(taskReminderId(current().id));
+      await settle();
+    });
+    expect(admissionError).toBeInstanceOf(DatasetBusyError);
+    const replacement = reserveDatasetReplacement();
+    replacement.release();
+    expect(button('موعد و یادآور')).toBeDefined();
+  });
+
   it('recovers incomplete text after remount without changing the live deadline', async () => {
     await render();
     await click('موعد و یادآور');
