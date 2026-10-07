@@ -91,7 +91,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
     };
   }, [initialTab, scope]);
 
-  const { data: rows, error } = useLive(patientQuery(id), [id]);
+  const { data: rows, error, retry } = useLive(patientQuery(id), [id]);
   // A restore that omits this id must not unmount its raw, unregistered forms.
   // Keep the last non-stale snapshot until the owner explicitly opens a new route.
   const [retainedRows, setRetainedRows] = useState(rows);
@@ -154,7 +154,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
     return (
       <Screen>
         {staleNotice}
-        <ErrorNotice error={error} what="پرونده" />
+        <ErrorNotice error={error} what="پرونده" onRetry={retry} />
       </Screen>
     );
 
@@ -226,7 +226,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
       <Screen scroll padded>
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           {staleNotice}
-          <ErrorNotice error={error} what="پرونده" />
+          <ErrorNotice error={error} what="پرونده" onRetry={retry} />
           <PatientHeader patient={patient} />
 
           {/*

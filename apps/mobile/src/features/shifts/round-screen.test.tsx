@@ -36,6 +36,7 @@ jest.mock('@/components/ui', () => ({
   Card: 'Card',
   Column: 'Column',
   EmptyState: 'EmptyState',
+  IconButton: 'IconButton',
   Input: 'Input',
   Row: 'Row',
   Screen: 'Screen',
@@ -68,6 +69,7 @@ async function render(Component = RoundScreen) {
     tree = create(<Component />);
     await settle();
   });
+  if (Component === ShiftScreen) await press('تحویل شیفت');
 }
 async function refreshTable(tableName: string) {
   await act(async () => {
@@ -126,6 +128,7 @@ describe('round footer with real autosave scope, useLive and SQLite', () => {
       expect(member(firstMember).deletedAt).not.toBeNull();
       expect(member(firstMember).handoffNote).toBe(text);
       expect(member(secondMember).handoffNote).toBeNull();
+      if (Component === ShiftScreen) await press('تحویل شیفت');
       expect(input().props.value).toBe('');
     },
   );
@@ -226,6 +229,7 @@ describe('round footer with real autosave scope, useLive and SQLite', () => {
       await press('ذخیره و ادامه');
       expect(member(firstMember).handoffNote).toBe('Text belongs to the previous shift');
       expect(member(nextMember).handoffNote).toBeNull();
+      if (Component === ShiftScreen) await press('تحویل شیفت');
       expect(input().props.value).toBe('');
     },
   );

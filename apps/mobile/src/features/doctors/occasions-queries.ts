@@ -1,8 +1,9 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { doctors, occasions, type Occasion } from '@/db/schema';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { fromIsoDate, isValidJalali } from '@/lib/jalali';
 
@@ -89,56 +90,69 @@ function values(input: OccasionInput) {
   return next;
 }
 
-export async function createOccasion(input: OccasionInput): Promise<string> {
-  const id = newId();
-  const row = values(input);
-  db.transaction((tx) => {
-    if (
-      !tx
-        .select({ id: doctors.id })
-        .from(doctors)
-        .where(and(eq(doctors.id, row.doctorId), isNull(doctors.deletedAt)))
-        .get()
-    )
-      throw new Error('پزشک پیدا نشد یا حذف شده است.');
-    tx.insert(occasions)
-      .values({ id, ...stamps(), ...row })
-      .run();
+export async function createOccasion(input: OccasionInput, generation = datasetGeneration()): Promise<string> {
+  return withDatasetWrite(generation, async () => {
+    const id = db.transaction((tx) => createOccasionInTransaction(tx, input));
+    await reconcileOccasionReminder(id, true);
+    return id;
   });
-  await reconcileOccasionReminder(id, true);
+}
+
+export async function updateOccasion(
+  id: string,
+  patch: Partial<OccasionInput>,
+  generation = datasetGeneration(),
+): Promise<void> {
+  await withDatasetWrite(generation, async () => {
+    db.transaction((tx) => updateOccasionInTransaction(tx, id, patch));
+    await reconcileOccasionReminder(id, true);
+  });
+}
+
+function requireDoctor(tx: DbTransaction, doctorId: string): void {
+  if (
+    !tx
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
+      .get()
+  )
+    throw new Error('پزشک پیدا نشد یا حذف شده است.');
+}
+
+export function createOccasionInTransaction(tx: DbTransaction, input: OccasionInput): string {
+  const row = values(input);
+  requireDoctor(tx, row.doctorId);
+  const id = newId();
+  tx.insert(occasions)
+    .values({ id, ...stamps(), ...row })
+    .run();
   return id;
 }
 
-export async function updateOccasion(id: string, patch: Partial<OccasionInput>): Promise<void> {
-  db.transaction((tx) => {
-    const current = tx
-      .select()
-      .from(occasions)
-      .where(and(alive, eq(occasions.id, id)))
-      .get();
-    if (!current) throw new Error('مناسبت پیدا نشد یا حذف شده است.');
-    const next = values({ ...current, ...patch } as OccasionInput);
-    if (
-      !tx
-        .select({ id: doctors.id })
-        .from(doctors)
-        .where(and(eq(doctors.id, next.doctorId), isNull(doctors.deletedAt)))
-        .get()
-    )
-      throw new Error('پزشک پیدا نشد یا حذف شده است.');
-    tx.update(occasions)
-      .set({ ...next, ...touch(), reminderRevision: current.reminderRevision + 1 })
-      .where(eq(occasions.id, id))
-      .run();
-  });
-  await reconcileOccasionReminder(id, true);
+export function updateOccasionInTransaction(tx: DbTransaction, id: string, patch: Partial<OccasionInput>): void {
+  const current = tx
+    .select()
+    .from(occasions)
+    .where(and(alive, eq(occasions.id, id)))
+    .get();
+  if (!current) throw new Error('مناسبت پیدا نشد یا حذف شده است.');
+  const next = values({ ...current, ...patch } as OccasionInput);
+  if (next.doctorId !== current.doctorId) throw new Error('این مناسبت متعلق به پزشک دیگری است.');
+  requireDoctor(tx, next.doctorId);
+  tx.update(occasions)
+    .set({ ...next, ...touch(), reminderRevision: current.reminderRevision + 1 })
+    .where(eq(occasions.id, id))
+    .run();
 }
 
-export async function deleteOccasion(id: string): Promise<void> {
-  db.update(occasions)
-    .set({ ...softDelete(), reminderRevision: sql`${occasions.reminderRevision} + 1` })
-    .where(and(alive, eq(occasions.id, id)))
-    .run();
-  await audit('occasion.deleted', { entityType: 'occasion', entityId: id });
-  await reconcileOccasionReminder(id);
+export async function deleteOccasion(id: string, generation = datasetGeneration()): Promise<void> {
+  await withDatasetWrite(generation, async () => {
+    db.update(occasions)
+      .set({ ...softDelete(), reminderRevision: sql`${occasions.reminderRevision} + 1` })
+      .where(and(alive, eq(occasions.id, id)))
+      .run();
+    await audit('occasion.deleted', { entityType: 'occasion', entityId: id });
+    await reconcileOccasionReminder(id);
+  });
 }

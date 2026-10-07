@@ -1,11 +1,21 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { validDateAndClock, validateDateInput } from './date-input';
+import { dateInputText, validDateAndClock, validateDateInput } from './date-input';
 import { fromJalali, toIsoDate } from './jalali';
 
 const options = { now: new Date('2026-09-23T12:00:00Z'), required: true, allowFuture: false };
 
 describe('visible date input validity', () => {
+  it('renders unsupported dates as invalid text and refuses a short year with an unusable clock', () => {
+    const raw = dateInputText(new Date('9999-01-01T12:00:00Z'));
+    expect(raw).toBe('9999-01-01');
+    expect(validateDateInput(raw, { ...options, allowFuture: true })).toEqual({ valid: false, reason: 'invalid' });
+    expect(dateInputText(new Date(NaN))).toBe('—');
+    expect(validateDateInput('05/07/16', { ...options, now: new Date(NaN) })).toEqual({
+      valid: false,
+      reason: 'invalid',
+    });
+  });
   it('uses the supplied clock for two-digit year expansion as well as future validation', () => {
     const now = fromJalali(1416, 1, 2);
     expect(validateDateInput('16/01/01', { now, required: true, allowFuture: false })).toEqual({

@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, exists, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, isNull, or, sql } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db } from '@/db/client';
-import { encounters, patients, shiftPatients, shifts, type Shift, type ShiftPatient } from '@/db/schema';
+import { encounters, patients, shiftPatients, shifts, tasks, type Shift, type ShiftPatient } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 /*
@@ -39,24 +40,92 @@ export function activeShiftWorkspaceQuery() {
     .where(and(alive, eq(shifts.isActive, true)))
     .orderBy(desc(shifts.startAt), desc(shifts.id))
     .limit(1);
-  return db
-    .select({ shift: shifts, member: shiftPatients, patient: patients, encounter: encounters })
-    .from(shifts)
-    .leftJoin(shiftPatients, and(eq(shiftPatients.shiftId, shifts.id), memberAlive))
-    .leftJoin(patients, and(eq(shiftPatients.patientId, patients.id), isNull(patients.deletedAt)))
-    .leftJoin(
-      encounters,
+  const nextTask = db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(
       and(
-        eq(shiftPatients.encounterId, encounters.id),
-        eq(encounters.patientId, patients.id),
-        isNull(encounters.deletedAt),
+        isNull(tasks.deletedAt),
+        eq(tasks.status, 'open'),
+        eq(tasks.patientId, patients.id),
+        or(isNull(tasks.encounterId), eq(tasks.encounterId, encounters.id)),
+        or(isNull(tasks.shiftId), eq(tasks.shiftId, shifts.id)),
       ),
     )
-    .where(eq(shifts.id, activeId))
-    .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt), asc(shiftPatients.id));
+    .orderBy(
+      asc(sql`CASE ${tasks.priority} WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END`),
+      asc(sql`CASE WHEN ${tasks.dueAt} IS NULL THEN 1 ELSE 0 END`),
+      asc(tasks.dueAt),
+      desc(tasks.createdAt),
+      desc(tasks.id),
+    )
+    .limit(1);
+  return (
+    db
+      .select({ shift: shifts, member: shiftPatients, patient: patients, encounter: encounters, nextTask: tasks })
+      .from(shifts)
+      .leftJoin(shiftPatients, and(eq(shiftPatients.shiftId, shifts.id), memberAlive))
+      .leftJoin(patients, and(eq(shiftPatients.patientId, patients.id), isNull(patients.deletedAt)))
+      .leftJoin(
+        encounters,
+        and(
+          eq(shiftPatients.encounterId, encounters.id),
+          eq(encounters.patientId, patients.id),
+          isNull(encounters.deletedAt),
+        ),
+      )
+      // Keep a real join: useLive must observe task changes, not only the subquery.
+      .leftJoin(tasks, eq(tasks.id, nextTask))
+      .where(eq(shifts.id, activeId))
+      .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt), asc(shiftPatients.id))
+  );
 }
 
 export type ActiveShiftWorkspaceRow = Awaited<ReturnType<typeof activeShiftWorkspaceQuery>>[number];
+
+/** Persist the full visible round order, rejecting a list that changed since it was shown. */
+export async function reorderShiftPatients(
+  shiftId: string,
+  orderedIds: string[],
+  expectedIds: string[],
+  generation = datasetGeneration(),
+): Promise<void> {
+  await withDatasetWrite(generation, async () =>
+    db.transaction((tx) => {
+      if (
+        !tx
+          .select({ id: shifts.id })
+          .from(shifts)
+          .where(and(alive, eq(shifts.id, shiftId), eq(shifts.isActive, true)))
+          .get()
+      )
+        throw new Error('این شیفت دیگر باز نیست.');
+      const current = tx
+        .select({ id: shiftPatients.id })
+        .from(shiftPatients)
+        .innerJoin(patients, and(eq(patients.id, shiftPatients.patientId), isNull(patients.deletedAt)))
+        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
+        .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt), asc(shiftPatients.id))
+        .all()
+        .map((m) => m.id);
+      if (
+        JSON.stringify(current) !== JSON.stringify(expectedIds) ||
+        orderedIds.length !== current.length ||
+        new Set(orderedIds).size !== current.length ||
+        orderedIds.some((id) => !current.includes(id))
+      )
+        throw new Error('لیست شیفت تغییر کرده است؛ ترتیب تازه را بررسی کنید.');
+      const now = new Date();
+      orderedIds.forEach((id, sortOrder) =>
+        tx
+          .update(shiftPatients)
+          .set({ sortOrder, ...touch(now) })
+          .where(and(eq(shiftPatients.id, id), eq(shiftPatients.shiftId, shiftId), memberAlive))
+          .run(),
+      );
+    }),
+  );
+}
 
 export function shiftsQuery(limit = 30) {
   return db.select().from(shifts).where(alive).orderBy(desc(shifts.startAt), desc(shifts.id)).limit(limit);

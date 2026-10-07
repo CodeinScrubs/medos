@@ -568,6 +568,14 @@ describe('shift and round read recovery', () => {
       const id = await startShift();
       await addPatientToShift(id, patientId);
       await render(<Component />);
+      if (Component === ShiftScreen) {
+        await act(async () => {
+          tree.root
+            .findAllByType(Button)
+            .find((n) => n.props.label === 'تحویل شیفت')!
+            .props.onPress();
+        });
+      }
       const handoff = () => tree.root.findAllByType(Input).find((n) => n.props.label === 'یادداشت تحویل شیفت')!;
       await act(async () => {
         handoff().props.onChangeText('Current handoff text');
@@ -655,7 +663,8 @@ describe('shift and capture summaries', () => {
     expect(tree.root.findAllByType(Badge)).toHaveLength(1);
     fail(shiftPatientsQuery(id));
     await refresh(<ShiftCard />);
-    expect(tree.root.findAllByType(Badge)).toHaveLength(0);
+    expect(tree.root.findAllByType(Badge).some((n) => n.props.label?.includes('دیده‌شده'))).toBe(false);
+    expect(tree.root.findAllByType(Badge).some((n) => n.props.label === 'وضعیت نامشخص')).toBe(true);
     expect(notices()).toHaveLength(1);
   });
 

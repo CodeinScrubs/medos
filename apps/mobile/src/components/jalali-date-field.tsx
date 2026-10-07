@@ -106,6 +106,12 @@ export function JalaliDateField({
 function isoToJalaliText(iso: string | null): string {
   const d = fromIsoDate(iso);
   if (!d) return '';
-  const { jy, jm, jd } = toJalali(d);
-  return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
+  try {
+    const { jy, jm, jd } = toJalali(d);
+    return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
+  } catch {
+    // Keep an unsupported stored value visible and invalid, rather than crashing
+    // or silently turning it into an empty (optional) date.
+    return iso!;
+  }
 }

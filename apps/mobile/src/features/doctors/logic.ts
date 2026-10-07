@@ -112,7 +112,14 @@ export function occasionEditorDate(o: OccasionTiming, now = new Date()): string 
  * even if that date has passed.
  */
 export function occasionNextDate(o: OccasionTiming, now: Date = new Date()): Date | null {
-  if (o.isRecurring && o.jalaliMonth && o.jalaliDay) return nextJalaliOccurrence(o.jalaliMonth, o.jalaliDay, now);
+  if (o.isRecurring) {
+    if (o.jalaliMonth == null || o.jalaliDay == null || !isValidJalali(1403, o.jalaliMonth, o.jalaliDay)) return null;
+    try {
+      return nextJalaliOccurrence(o.jalaliMonth, o.jalaliDay, now);
+    } catch {
+      return null;
+    }
+  }
   return fromIsoDate(o.onDate);
 }
 
@@ -124,26 +131,36 @@ export function occasionNextDate(o: OccasionTiming, now: Date = new Date()): Dat
  * none. A one-off occasion whose moment has passed gets no reminder.
  */
 export function occasionReminderAt(o: OccasionTiming, now: Date = new Date()): Date | null {
-  if (!o.isEnabled) return null;
+  if (!o.isEnabled || !Number.isInteger(o.remindDaysBefore) || o.remindDaysBefore < 0 || o.remindDaysBefore > 365)
+    return null;
   const first = occasionNextDate(o, now);
   if (!first) return null;
 
   const remindFor = (day: Date) => atTime(addDays(day, -o.remindDaysBefore), OCCASION_REMINDER_HOUR);
-  const remindAt = remindFor(first);
-  if (remindAt.getTime() > now.getTime()) return remindAt;
-
-  if (!(o.isRecurring && o.jalaliMonth && o.jalaliDay)) return null;
-  const next = nextJalaliOccurrence(o.jalaliMonth, o.jalaliDay, addDays(first, 1));
-  const nextRemindAt = remindFor(next);
-  return nextRemindAt.getTime() > now.getTime() ? nextRemindAt : null;
+  let day = first;
+  // A 365-day lead can have passed for this occurrence AND the next one.
+  // Three occurrences cover the allowed lead, including a leap-day fallback.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const remindAt = remindFor(day);
+    if (remindAt.getTime() > now.getTime()) return remindAt;
+    if (!o.isRecurring) return null;
+    const next = occasionNextDate(o, addDays(day, 1));
+    if (!next) return null;
+    day = next;
+  }
+  return null;
 }
 
 /** A birthday from a profile's stored date, as the Jalali month/day it recurs on. */
 export function birthdayJalaliMonthDay(birthDate: string | null | undefined): { month: number; day: number } | null {
   const date = fromIsoDate(birthDate);
   if (!date) return null;
-  const { jm, jd } = toJalali(date);
-  return { month: jm, day: jd };
+  try {
+    const { jm, jd } = toJalali(date);
+    return { month: jm, day: jd };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -167,7 +184,9 @@ export function parseOccasionReminder(data: unknown): OccasionReminderPayload | 
 
 /** "۲ روز دیگر" / "فردا" / "امروز" — how a list says how long the wait is. */
 export function daysUntilLabel(days: number): string {
-  if (days <= 0) return 'امروز';
+  if (days === 0) return 'امروز';
+  if (days === -1) return 'دیروز';
+  if (days < 0) return `${toPersianDigits(-days)} روز پیش`;
   if (days === 1) return 'فردا';
   return `${toPersianDigits(days)} روز دیگر`;
 }
@@ -196,10 +215,6 @@ export const DEFAULT_GREETING: Record<Occasion['kind'], string> = {
  */
 export function greetingText(template: string, vars: { name: string; occasion?: string | null }): string {
   return template
-    .split(GREETING_TOKENS.name)
-    .join(vars.name)
-    .split(GREETING_TOKENS.occasion)
-    .join(vars.occasion ?? '')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/\{نام\}|\{مناسبت\}/g, (token) => (token === GREETING_TOKENS.name ? vars.name : (vars.occasion ?? '')))
     .trim();
 }

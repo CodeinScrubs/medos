@@ -264,6 +264,29 @@ export const scheduledMessages = sqliteTable(
   ],
 );
 
+/** Raw unsubmitted occasion input. Publication alone changes dates or native reminders. */
+export const occasionFormDrafts = sqliteTable(
+  'occasion_form_drafts',
+  {
+    ...baseColumns,
+    doctorId: text('doctor_id')
+      .notNull()
+      .references(() => doctors.id),
+    occasionId: text('occasion_id').references(() => occasions.id),
+    /** The existing occasion id, or `new`; one open draft per editing target. */
+    formKey: text('form_key').notNull(),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedOccasionId: text('committed_occasion_id').references(() => occasions.id),
+  },
+  (t) => [
+    uniqueIndex('occasion_form_drafts_open_target_idx')
+      .on(t.doctorId, t.formKey)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type OccasionFormDraft = typeof occasionFormDrafts.$inferSelect;
+
 /* -------------------------------------------------------------------------- */
 /*  Relations                                                                   */
 /* -------------------------------------------------------------------------- */

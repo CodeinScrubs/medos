@@ -13,6 +13,7 @@ import {
   formatRelativeTime,
   fromIsoDate,
   fromJalali,
+  isValidJalali,
   jalaliMonthLength,
   nextJalaliOccurrence,
   parseJalaliInput,
@@ -91,6 +92,17 @@ describe('parseJalaliInput', () => {
       expect(parseJalaliInput(bad, now)).toBeNull();
     }
   });
+
+  it.each(['-1403/5/12', '1403/5/-12', '+1403/5/12', '1403abc5xyz12', 'date:1403/5/12', '1403/5/12?', '1403//5/12'])(
+    'never strips malformed date text into a valid date (%s)',
+    (text) => {
+      expect(parseJalaliInput(text, now)).toBeNull();
+    },
+  );
+
+  it('accepts Arabic digits and whitespace around separators', () => {
+    expect(parseJalaliInput('١٤٠٣ / ٥ / ١٢', now)).toEqual(fromJalali(1403, 5, 12));
+  });
 });
 
 describe('formatting', () => {
@@ -115,6 +127,46 @@ describe('formatting', () => {
     expect(formatJalali('yesterday')).toBe('—');
     expect(formatJalali(null)).toBe('—');
     expect(formatJalali(new Date(Number.NaN))).toBe('—');
+    expect(() => formatJalali('9999-01-01')).not.toThrow();
+    expect(formatJalali('9999-01-01')).toBe('—');
+  });
+});
+
+describe('calendar input boundaries', () => {
+  it.each([
+    [1403.5, 1, 1],
+    [1403, 1.5, 1],
+    [1403, 1, 1.5],
+    [Number.NaN, 1, 1],
+    [3178, 1, 1],
+  ])('rejects non-integer or unsupported dates (%s, %s, %s)', (year, month, day) => {
+    expect(isValidJalali(year, month, day)).toBe(false);
+  });
+
+  it('never rolls an impossible date into another day', () => {
+    expect(() => fromJalali(1404, 12, 30)).toThrow();
+    expect(() => nextJalaliOccurrence(7, 31, fromJalali(1405, 1, 1))).toThrow();
+  });
+
+  it('matches the independent ICU Persian calendar for every month boundary from 1300 through 1500', () => {
+    const independent = new Intl.DateTimeFormat('en-US-u-ca-persian', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      numberingSystem: 'latn',
+    });
+    for (let year = 1300; year <= 1500; year++) {
+      for (let month = 1; month <= 12; month++) {
+        for (const day of [1, jalaliMonthLength(year, month)]) {
+          const date = fromJalali(year, month, day);
+          const parts = independent.formatToParts(date);
+          expect(parts.find((p) => p.type === 'year')?.value).toBe(String(year));
+          expect(parts.find((p) => p.type === 'month')?.value).toBe(String(month));
+          expect(parts.find((p) => p.type === 'day')?.value).toBe(String(day));
+          expect(toJalali(date)).toEqual({ jy: year, jm: month, jd: day });
+        }
+      }
+    }
   });
 });
 

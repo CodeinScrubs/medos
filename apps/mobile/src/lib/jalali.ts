@@ -44,19 +44,22 @@ export type JalaliDate = { jy: number; jm: number; jd: number };
 /* -------------------------------------------------------------------------- */
 
 export function toJalali(date: Date): JalaliDate {
+  if (!Number.isFinite(date.getTime())) throw new RangeError('Invalid calendar date');
   return toJalaali(date);
 }
 
 /** Local midnight of a Jalali day. */
 export function fromJalali(jy: number, jm: number, jd: number): Date {
+  if (!isValidJalali(jy, jm, jd)) throw new RangeError('Invalid Jalali date');
   return jalaaliToDateObject(jy, jm, jd);
 }
 
 export function isValidJalali(jy: number, jm: number, jd: number): boolean {
-  return isValidJalaaliDate(jy, jm, jd);
+  return [jy, jm, jd].every(Number.isInteger) && isValidJalaaliDate(jy, jm, jd);
 }
 
 export function jalaliMonthLength(jy: number, jm: number): number {
+  if (!isValidJalali(jy, jm, 1)) throw new RangeError('Invalid Jalali month');
   return jalaaliMonthLength(jy, jm);
 }
 
@@ -95,11 +98,19 @@ export function fromIsoDate(iso: string | null | undefined): Date | null {
  */
 export function parseJalaliInput(input: string | null | undefined, now: Date = new Date()): Date | null {
   if (!input) return null;
-  const parts = toLatinDigits(input).split(/\D+/).filter(Boolean).map(Number);
-  if (parts.length !== 3) return null;
-  let [jy, jm, jd] = parts as [number, number, number];
+  // Do not strip signs, letters or repeated separators and then invent a date.
+  const parts = /^\s*(\d{1,2}|\d{4})\s*([/.-])\s*(\d{1,2})\s*\2\s*(\d{1,2})\s*$/.exec(toLatinDigits(input));
+  if (!parts) return null;
+  let jy = Number(parts[1]);
+  const jm = Number(parts[3]);
+  const jd = Number(parts[4]);
   if (jy < 100) {
-    const current = toJalali(now).jy;
+    let current: number;
+    try {
+      current = toJalali(now).jy;
+    } catch {
+      return null;
+    }
     jy += Math.floor(current / 100) * 100;
     if (jy > current + 1) jy -= 100;
   }
@@ -127,7 +138,14 @@ function coerce(value: DateInput): Date | null {
   if (value instanceof Date) date = value;
   else if (typeof value === 'number') date = new Date(value);
   else date = fromIsoDate(value) ?? (ISO_DATETIME_RE.test(value.trim()) ? new Date(value.trim()) : null);
-  return date && !Number.isNaN(date.getTime()) ? date : null;
+  if (!date || !Number.isFinite(date.getTime())) return null;
+  // A damaged/unsupported stored date must not crash a whole patient screen.
+  try {
+    const { jy, jm, jd } = toJalali(date);
+    return isValidJalali(jy, jm, jd) ? date : null;
+  } catch {
+    return null;
+  }
 }
 
 /** `۱۴۰۳/۰۵/۱۲` */
@@ -264,6 +282,8 @@ export function ageInYears(birthDate: DateInput, fallbackYears?: number | null, 
  * rather than skipping the year.
  */
 export function nextJalaliOccurrence(jm: number, jd: number, from: Date = new Date()): Date {
+  // Only the legitimate leap-day birthday may fall back to another day.
+  if (!isValidJalali(1403, jm, jd)) throw new RangeError('Invalid recurring Jalali date');
   const { jy } = toJalali(from);
   const inYear = (y: number) => fromJalali(y, jm, Math.min(jd, jalaliMonthLength(y, jm)));
   const thisYear = inYear(jy);

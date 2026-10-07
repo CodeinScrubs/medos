@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { tablesOf } from '@/db/query-tables';
 import { auditLog, encounters, shiftPatients, shifts } from '@/db/schema';
 import { createNote, deleteNote, latestPatientNoteQuery, patientNotesQuery } from '@/features/notes/queries';
+import { datasetGeneration, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -14,6 +15,7 @@ import {
   endShift,
   removePatientFromShift,
   saveShiftPatientText,
+  reorderShiftPatients,
   setShiftPatientReviewed,
   shiftHistoryPatientsQuery,
   shiftQuery,
@@ -55,7 +57,13 @@ describe('a shift', () => {
     expect(row?.member?.id).toBe(member);
     expect(row?.patient?.id).toBe(patientId);
     expect(row?.encounter?.id).toBe(episode);
-    expect(tablesOf(activeShiftWorkspaceQuery())).toEqual(['shifts', 'shift_patients', 'patients', 'encounters']);
+    expect(tablesOf(activeShiftWorkspaceQuery())).toEqual([
+      'shifts',
+      'shift_patients',
+      'patients',
+      'encounters',
+      'tasks',
+    ]);
     await deleteEncounter(episode);
     expect((await activeShiftWorkspaceQuery())[0]?.encounter).toBeNull();
     await deletePatient(patientId);
@@ -63,6 +71,61 @@ describe('a shift', () => {
     expect((await activeShiftWorkspaceQuery())[0]?.patient).toBeNull();
     await endShift(current);
     expect(await activeShiftWorkspaceQuery()).toEqual([]);
+  });
+
+  it('projects only the next open standing or captured-episode task for this shift, without duplicate patients', async () => {
+    const otherShift = await startShift();
+    const shift = await startShift();
+    const episode = await openEncounter({ patientId, kind: 'admission' });
+    await addPatientToShift(shift, patientId);
+    const standing = await createTask({ patientId, title: 'Standing task', priority: 'low' });
+    const current = await createTask({ patientId, encounterId: episode, title: 'Current task', priority: 'high' });
+    const other = await createPatient({ firstName: 'Other', lastName: 'Patient' });
+    const otherEpisode = await openEncounter({ patientId: other, kind: 'admission' });
+    await createTask({ patientId, encounterId: otherEpisode, title: 'Foreign episode', priority: 'high' });
+    await createTask({ patientId, shiftId: otherShift, title: 'Other shift', priority: 'high' });
+    const rows = await activeShiftWorkspaceQuery();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.nextTask?.id).toBe(current);
+    await setTaskStatus(current, 'done');
+    expect((await activeShiftWorkspaceQuery())[0]?.nextTask?.id).toBe(standing);
+    await setTaskStatus(standing, 'cancelled');
+    expect((await activeShiftWorkspaceQuery())[0]?.nextTask).toBeNull();
+  });
+
+  it('persists a checked round order without changing patient, task or encounter data', async () => {
+    const shift = await startShift();
+    const ids: string[] = [];
+    for (let n = 0; n < 40; n++) {
+      const id = await createPatient({ firstName: 'Example', lastName: `Patient ${n}` });
+      ids.push(await addPatientToShift(shift, id));
+    }
+    const before = t.sqlite.export();
+    await reorderShiftPatients(shift, [...ids].reverse(), ids);
+    expect((await shiftPatientsQuery(shift)).map((r) => r.member.id)).toEqual([...ids].reverse());
+    expect((await activeShiftWorkspaceQuery()).filter((r) => r.patient)).toHaveLength(40);
+    expect(t.sqlite.export()).not.toEqual(before);
+    expect((await shiftPatientsQuery(shift)).every((r) => !r.member.reviewedAt && !r.member.deletedAt)).toBe(true);
+  });
+
+  it('rejects an incomplete, duplicate, foreign or stale order atomically', async () => {
+    const shift = await startShift();
+    const first = await addPatientToShift(shift, patientId);
+    const secondId = await createPatient({ firstName: 'Second', lastName: 'Patient' });
+    const second = await addPatientToShift(shift, secondId);
+    const before = await shiftPatientsQuery(shift);
+    for (const invalid of [[first], [first, first], [first, 'foreign']])
+      await expect(reorderShiftPatients(shift, invalid, [first, second])).rejects.toThrow();
+    await expect(reorderShiftPatients(shift, [second, first], [second, first])).rejects.toThrow();
+    expect(await shiftPatientsQuery(shift)).toEqual(before);
+    const token = datasetGeneration();
+    const replacement = reserveDatasetReplacement();
+    replacement.committed();
+    replacement.release();
+    await expect(reorderShiftPatients(shift, [second, first], [first, second], token)).rejects.toThrow();
+    expect(await shiftPatientsQuery(shift)).toEqual(before);
+    await endShift(shift);
+    await expect(reorderShiftPatients(shift, [second, first], [first, second])).rejects.toThrow();
   });
 
   it('refuses adding a patient or marking reviewed through a stale closed-shift action', async () => {

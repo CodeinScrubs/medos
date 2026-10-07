@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import type { useAutosaveScope } from '@/components/autosave-scope';
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, IconButton } from '@/components/ui';
@@ -14,6 +15,8 @@ import { deletePatient } from './queries';
 let mockParams: { id: string; tab?: string };
 let mockUnsaved = false;
 let mockRows: { id: string; firstName: string; lastName: string }[] | undefined = [];
+let mockReadError: Error | undefined;
+const mockRetryRead = jest.fn();
 let mockFocused = true;
 let mockScope: NonNullable<ReturnType<typeof useAutosaveScope>>;
 const mockFlush = jest.fn<() => Promise<boolean>>();
@@ -41,7 +44,7 @@ jest.mock('expo-router', () => ({
   useRoute: () => ({ key: 'patient-route', name: 'patient/[id]/index', params: mockParams }),
 }));
 jest.mock('@/db/use-live', () => ({
-  useLive: () => ({ data: mockRows }),
+  useLive: () => ({ data: mockRows, error: mockReadError, retry: mockRetryRead }),
 }));
 jest.mock('./queries', () => ({ patientQuery: () => null, deletePatient: jest.fn() }));
 jest.mock('@/components/ui', () => ({
@@ -123,6 +126,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockParams = { id: 'patient' };
   mockRows = [{ id: 'patient', firstName: 'Test', lastName: 'Patient' }];
+  mockReadError = undefined;
   mockFocused = true;
   mockUnsaved = false;
   mockFlush.mockResolvedValue(true);
@@ -139,6 +143,28 @@ afterEach(async () => {
 });
 
 describe('patient tab navigation', () => {
+  it('retries a failed refresh without replacing the mounted editor or its ownership', async () => {
+    const original = mockScope;
+    mockUnsaved = true;
+    mockReadError = new Error('Synthetic read failure');
+    await refresh();
+    expect(mockScope).toBe(original);
+    expect(shown('DraftEditor')).toBe(true);
+    const notice = tree.root.findAllByType(ErrorNotice).find((node) => node.props.error === mockReadError)!;
+    await act(async () => notice.props.onRetry());
+    expect(mockRetryRead).toHaveBeenCalledTimes(1);
+    expect(mockScope).toBe(original);
+    expect(mockUnsaved).toBe(true);
+  });
+
+  it('also offers retry before the first patient read', async () => {
+    mockRows = undefined;
+    mockReadError = new Error('Synthetic first read failure');
+    await refresh();
+    const notice = tree.root.findAllByType(ErrorNotice).find((node) => node.props.error === mockReadError)!;
+    await act(async () => notice.props.onRetry());
+    expect(mockRetryRead).toHaveBeenCalledTimes(1);
+  });
   it.each([undefined, []])('offers explicit renewal when restore precedes any patient seed (%s)', async (initial) => {
     await act(async () => tree.unmount());
     mockRows = initial;

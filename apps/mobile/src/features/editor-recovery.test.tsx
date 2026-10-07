@@ -15,6 +15,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 import { ConsultAnswerScreen } from './consults/answer-screen';
 import { consultQuery } from './consults/queries';
 import { DoctorFormScreen } from './doctors/doctor-form-screen';
+import { occasionFormQuery } from './doctors/occasion-form-queries';
 import { OccasionFormScreen } from './doctors/occasion-form-screen';
 import { createOccasion, occasionQuery } from './doctors/occasions-queries';
 import { createDoctor, doctorQuery } from './doctors/queries';
@@ -374,12 +375,12 @@ describe('editors survive database read failures', () => {
     ['lab panel', 'panelId', labPanelQuery, () => <LabEntryScreen />],
     ['lab values', 'panelId', panelValuesQuery, () => <LabEntryScreen />],
     ['note', 'noteId', noteQuery, () => <NoteEditorScreen />],
-    ['occasion', 'occasionId', occasionQuery, () => <OccasionFormScreen />],
+    ['occasion', 'occasionId', (id) => occasionFormQuery('example', id), () => <OccasionFormScreen />],
     ['task', 'taskId', taskQuery, () => <TaskScreen />],
     ['consult answer', 'consultId', consultQuery, () => <ConsultAnswerScreen />],
     ['shift history', 'shiftId', shiftQuery, () => <ShiftHistoryScreen />],
   ])('offers retry instead of endless loading for a failed %s read', async (_label, param, query, element) => {
-    mockParams = { id: patientId, [param]: 'example' };
+    mockParams = { id: patientId, doctorId: 'example', [param]: 'example' };
     const key = tablesOf(query('example'))[0]!;
     mockCache.set(key, undefined);
     mockErrors.set(key, new Error('Synthetic read failure'));
@@ -463,7 +464,7 @@ describe('editors survive database read failures', () => {
     jest.spyOn(notifications, 'scheduleReminder').mockRejectedValueOnce(new Error('Native unavailable'));
     const alert = jest.spyOn(Alert, 'alert');
     await act(async () => {
-      const submit = tree.root.findAllByType(Button).find((node) => node.props.label === 'ذخیره')!.props.onPress;
+      const submit = tree.root.findAllByType(Button).find((node) => node.props.label === 'ثبت تغییرات')!.props.onPress;
       submit();
       submit();
       await settle();
@@ -478,8 +479,9 @@ describe('editors survive database read failures', () => {
 
   it('shows an initial occasion read failure without leaving an endless loading indicator', async () => {
     mockParams = { doctorId: 'example', occasionId: 'example' };
-    mockCache.set('occasions', undefined);
-    mockErrors.set('occasions', new Error('Synthetic read failure'));
+    const key = tablesOf(occasionFormQuery('example', 'example'))[0]!;
+    mockCache.set(key, undefined);
+    mockErrors.set(key, new Error('Synthetic read failure'));
     await render(<OccasionFormScreen />);
     expectReadError();
     expect(tree.root.findAllByType(ActivityIndicator)).toHaveLength(0);
@@ -497,7 +499,7 @@ describe('editors survive database read failures', () => {
     mockParams = { doctorId, occasionId };
     await render(<OccasionFormScreen />);
     await type('عنوان', 'Latest title');
-    mockErrors.set('occasions', new Error('Synthetic read failure'));
+    mockErrors.set(tablesOf(occasionFormQuery(doctorId, occasionId))[0]!, new Error('Synthetic read failure'));
     await refresh(<OccasionFormScreen />);
     expectReadError();
     expect(input('عنوان').props.value).toBe('Latest title');
@@ -507,7 +509,7 @@ describe('editors survive database read failures', () => {
     await act(async () => {
       tree.root
         .findAllByType(Button)
-        .find((node) => node.props.label === 'ذخیره')!
+        .find((node) => node.props.label === 'ثبت تغییرات')!
         .props.onPress();
       await settle();
     });
@@ -516,7 +518,7 @@ describe('editors survive database read failures', () => {
     await act(async () => {
       tree.root
         .findAllByType(Button)
-        .find((node) => node.props.label === 'ذخیره')!
+        .find((node) => node.props.label === 'ثبت تغییرات')!
         .props.onPress();
       await settle();
     });

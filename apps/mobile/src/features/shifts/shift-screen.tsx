@@ -1,32 +1,25 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
-import { AutosaveField } from '@/components/autosave-field';
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
-import { Badge, Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { Badge, Button, Card, Column, EmptyState, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
-import { locationLabel } from '@/features/encounters/status';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
-import { MIN_TOUCH, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 
-import {
-  addPatientToShift,
-  endShift,
-  removePatientFromShift,
-  saveShiftPatientText,
-  setShiftPatientReviewed,
-  shiftProgress,
-  startShift,
-} from './queries';
+import { matchesShiftDeck } from './deck';
+import { addPatientToShift, endShift, reorderShiftPatients, shiftProgress, startShift } from './queries';
+import { ShiftPatientRow } from './shift-patient-row';
 import { ShiftWorkspaceNotice, useShiftWorkspace } from './workspace';
 
 /**
@@ -52,6 +45,10 @@ function ShiftScreenContent() {
   const { colors, spacing } = useTheme();
   const { shift, rows, error, loading, blocked, changing, shiftChanging, saving, retry } = useShiftWorkspace();
   const progress = blocked ? null : shiftProgress(rows);
+  const now = new Date(useNow());
+  const [search, setSearch] = useState('');
+  const [ordering, setOrdering] = useState(false);
+  const shownCount = rows.filter((row) => matchesShiftDeck(row, search)).length;
 
   const [picking, setPicking] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -92,7 +89,9 @@ function ShiftScreenContent() {
     writing.current = true;
     setBusy(true);
     try {
-      for (const p of admittedNotInShift) await addPatientToShift(shift.id, p.id);
+      await withDatasetWrite(scope.generation, async () => {
+        for (const p of admittedNotInShift) await addPatientToShift(shift.id, p.id);
+      });
     } catch (e) {
       alertError('اضافه نشد', e);
     } finally {
@@ -106,13 +105,30 @@ function ShiftScreenContent() {
     writing.current = true;
     setBusy(true);
     try {
-      await startShift();
+      await withDatasetWrite(scope.generation, () => startShift());
     } catch (e) {
       alertError('شیفت شروع نشد', e);
     } finally {
       writing.current = false;
       setBusy(false);
     }
+  }
+
+  function move(index: number, direction: -1 | 1) {
+    if (!shift || blocked || writing.current) return;
+    const next = index + direction;
+    if (next < 0 || next >= rows.length) return;
+    const expected = rows.map((r) => r.member.id);
+    const order = [...expected];
+    [order[index], order[next]] = [order[next]!, order[index]!];
+    writing.current = true;
+    setBusy(true);
+    void scope
+      .perform(() => reorderShiftPatients(shift.id, order, expected, scope.generation))
+      .finally(() => {
+        writing.current = false;
+        setBusy(false);
+      });
   }
 
   function finish() {
@@ -129,6 +145,7 @@ function ShiftScreenContent() {
         <ScreenOptions options={{ title: 'شیفت' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="شیفت" onRetry={retryReads} />
+          <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
           <Button label="شیفت‌های قبلی" variant="ghost" onPress={() => router.push('/shift-history')} />
         </Column>
       </Screen>
@@ -219,6 +236,34 @@ function ShiftScreenContent() {
         ) : null}
 
         <SectionHeader title="بیماران این شیفت" count={progress?.total} />
+        {rows.length > 0 ? (
+          <>
+            <Input
+              label="جستجو در شیفت"
+              value={search}
+              onChangeText={setSearch}
+              icon="search-outline"
+              placeholder="نام، تخت، تشخیص یا کار بعدی…"
+            />
+            <Row gap="sm" justify="space-between">
+              <Text variant="caption" color="textMuted">
+                {toPersianDigits(shownCount)} از {toPersianDigits(rows.length)}
+              </Text>
+              <Button
+                label={ordering ? 'پایان مرتب‌کردن' : 'ترتیب راند'}
+                variant="ghost"
+                size="sm"
+                disabled={blocked || busy}
+                onPress={() => setOrdering((value) => !value)}
+              />
+            </Row>
+            {shownCount === 0 ? (
+              <Text variant="caption" color="textMuted">
+                در این شیفت پیدا نشد.
+              </Text>
+            ) : null}
+          </>
+        ) : null}
 
         {progress?.total === 0 ? (
           <EmptyState
@@ -228,96 +273,20 @@ function ShiftScreenContent() {
           />
         ) : null}
 
-        {rows.map(({ member, patient, encounter }) => {
-          const seen = member.reviewedAt != null;
-          const where = locationLabel(encounter ?? undefined);
-          return (
-            <Card key={`${member.shiftId}:${member.id}:${patient.id}`}>
-              <Column gap="sm">
-                <Row gap="sm" align="flex-start">
-                  <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: seen, disabled: blocked }}
-                    disabled={blocked}
-                    accessibilityLabel={seen ? 'برگرداندن به دیده‌نشده' : 'دیدم'}
-                    style={{
-                      minWidth: MIN_TOUCH,
-                      minHeight: MIN_TOUCH,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    onPress={() =>
-                      void setShiftPatientReviewed(member.id, !seen).catch((e) => alertError('ثبت نشد', e))
-                    }
-                  >
-                    <Ionicons
-                      name={seen ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={26}
-                      color={seen ? colors.success : colors.textFaint}
-                    />
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.grow}
-                    onPress={() =>
-                      void scope.perform(() => router.push({ pathname: '/patient/[id]', params: { id: patient.id } }))
-                    }
-                  >
-                    <Column gap="xxs">
-                      <Row gap="xs">
-                        <Text variant="bodyStrong" numberOfLines={1} style={styles.grow}>
-                          {fullName(patient.firstName, patient.lastName)}
-                        </Text>
-                        {/* Discharged mid-shift: still on the list for the handoff, but not on the ward. */}
-                        {encounter?.dischargedAt ? <Badge label="ترخیص شد" tone="neutral" /> : null}
-                      </Row>
-                      {where ? (
-                        <Text variant="caption" color="textMuted">
-                          {where}
-                        </Text>
-                      ) : null}
-                      {member.shiftSummary || patient.summary ? (
-                        <Text variant="caption" color="textMuted" numberOfLines={2}>
-                          {member.shiftSummary ?? patient.summary}
-                        </Text>
-                      ) : null}
-                    </Column>
-                  </Pressable>
-                </Row>
-
-                <AutosaveField
-                  label="یادداشت تحویل شیفت"
-                  initialValue={member.handoffNote}
-                  onSave={(value) => saveShiftPatientText(member, { handoffNote: value })}
-                  placeholder="چیزی که نفر بعد باید بداند"
-                  multiline
-                />
-
-                <Row gap="sm">
-                  <Button
-                    label="نوت"
-                    icon="document-text-outline"
-                    variant="secondary"
-                    size="sm"
-                    onPress={() =>
-                      void scope.perform(() =>
-                        router.push({ pathname: '/patient/[id]/note', params: { id: patient.id, type: 'progress' } }),
-                      )
-                    }
-                  />
-                  <Button
-                    label="برداشتن از شیفت"
-                    variant="ghost"
-                    size="sm"
-                    haptic={false}
-                    disabled={blocked}
-                    onPress={() => void scope.perform(() => removePatientFromShift(member.id))}
-                  />
-                </Row>
-              </Column>
-            </Card>
-          );
-        })}
+        {rows.map((row, index) => (
+          <View key={row.member.id} style={!matchesShiftDeck(row, search) ? { display: 'none' } : undefined}>
+            <ShiftPatientRow
+              row={row}
+              now={now}
+              blocked={blocked || busy}
+              ordering={ordering}
+              first={index === 0}
+              last={index === rows.length - 1}
+              onUp={() => move(index, -1)}
+              onDown={() => move(index, 1)}
+            />
+          </View>
+        ))}
         <Button
           label="شیفت‌های قبلی"
           variant="ghost"
@@ -348,7 +317,7 @@ function ShiftScreenContent() {
           setSelectedPatientId(item.id);
           writing.current = true;
           setBusy(true);
-          void addPatientToShift(shift.id, item.id)
+          void withDatasetWrite(scope.generation, () => addPatientToShift(shift.id, item.id))
             .then(() => {
               setPicking(false);
               setSelectedPatientId(null);

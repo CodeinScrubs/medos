@@ -115,6 +115,7 @@ describe('occasion dates', () => {
   it('reads a birthday as the Jalali day it recurs on', () => {
     expect(birthdayJalaliMonthDay('1991-08-03')).toEqual({ month: 5, day: 12 });
     expect(birthdayJalaliMonthDay(null)).toBeNull();
+    expect(birthdayJalaliMonthDay('9999-01-01')).toBeNull();
   });
 });
 
@@ -245,6 +246,12 @@ describe('greetings', () => {
     );
     // A template with no tokens is sent exactly as written.
     expect(greetingText('سلام', { name: 'دکتر احمدی' })).toBe('سلام');
+    expect(
+      greetingText('سلام {نام}\n\n  {مناسبت} مبارک\nبا احترام', { name: 'دکتر احمدی', occasion: 'روز پزشک' }),
+    ).toBe('سلام دکتر احمدی\n\n  روز پزشک مبارک\nبا احترام');
+    expect(greetingText('{نام} — {مناسبت}', { name: 'Literal {مناسبت}', occasion: 'Birthday' })).toBe(
+      'Literal {مناسبت} — Birthday',
+    );
   });
 });
 

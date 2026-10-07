@@ -9,8 +9,14 @@ export type DateInputResult =
 export type DateTimeInput = { dateText: string; clockText: string; customOpen: boolean };
 
 export function dateInputText(date: Date): string {
-  const { jy, jm, jd } = toJalali(date);
-  return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
+  try {
+    const { jy, jm, jd } = toJalali(date);
+    return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
+  } catch {
+    // Preserve an unsupported stored date as invalid editor text. Clearing it
+    // would turn a damaged value into a seemingly intentional empty field.
+    return Number.isFinite(date.getTime()) ? toIsoDate(date) : '—';
+  }
 }
 
 /** Validation describes the visible text, never a previous successfully parsed value. */

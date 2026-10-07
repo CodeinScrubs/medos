@@ -8,13 +8,13 @@ an AI session. It assumes nothing about the project.
 One physician's personal clinical record, on their own Android phone. Expo SDK 57 /
 React Native, expo-router, SQLite through Drizzle, everything offline, encrypted backup
 files the owner controls. Persian right-to-left interface, Gregorian dates stored and
-Jalali dates displayed. Roughly 15k lines of TypeScript, one app, no backend.
+Jalali dates displayed. One app, no backend, no telemetry or multi-user account system.
 
 ## First: does it hold together?
 
 ```bash
 npm install
-npm run check     # typecheck, lint (incl. architecture rules), formatting, ~280 tests
+npm run check     # typecheck, architecture lint, formatting, app and workflow tests
 npm run brief     # version, recent commits with the agent that made them, open threads
 ```
 
@@ -38,8 +38,9 @@ bundle for Android.
 lib  <  theme, db, platform  <  components  <  features  <  app
 ```
 
-`lib/` is pure TypeScript (Persian text, Jalali dates, number parsing, crypto) with no
-React and no database — the part a future web dashboard would share. `features/<name>/`
+`lib/` separates text/date/number rules from React and the database. Some modules
+(ids and cryptographic bindings) still need platform adapters; do not assume that
+the whole directory runs unchanged in a web client. `features/<name>/`
 holds one module each: screens, `queries.ts` (all the SQL), `logic.ts` (pure rules, easy to
 test), `labels.ts`, `settings.ts`. `app/` is routes only; each file re-exports one screen.
 
@@ -61,8 +62,44 @@ This is a medical record kept by one person, so the failures that matter are qui
   golden keys in `lib/crypto.test.ts`; the file format is version-tagged; restore verifies
   the whole file, keeps a snapshot, and rolls back on a foreign-key violation.
 - **Data disappearing.** Nothing is hard-deleted; `deletedAt` is stamped and every query
-  filters on it. (Today only patients can be restored from the UI — see the open threads in
-  `docs/HANDOFF.md`.)
+  filters on it. Recovery UI coverage differs by entity; read the current
+  execution ledger rather than assuming that soft deletion alone makes every
+  record easy to recover.
+- **Writing into a replaced dataset.** A mounted editing intent retains its original
+  generation, including late child editors and delayed dialog callbacks. The
+  native restore engine alone has replacement authority. Examine `dataset-intent`,
+  `AutosaveScope`, `lib/dataset-write.ts` and `db/write-admission.ts` together.
+- **Success before acknowledgment.** Autosave must retain failed text and navigation
+  must await a true flush. Message preparation is `ready`; only the owner's
+  confirmation is `sent`. An Android reminder being scheduled is not evidence
+  that it was delivered on the owner's phone.
+
+## Current review focus
+
+Start with the newest entry in `docs/HANDOFF.md`, then its version-specific
+validation report and `docs/IMPLEMENTATION.md`. Read the exact commit named there;
+earlier test counts, PR checks and APKs are evidence for their own source only.
+
+For the 0.11.29 change, review these bounded areas:
+
+| Area | Read together | Principal checks |
+|---|---|---|
+| Active shift deck | `features/shifts/queries.ts`, `workspace.tsx`, `deck.ts`, `shift-card.tsx`, `shift-patient-row.tsx` | One watched snapshot; tasks belong to the pinned encounter/shift; filtering keeps pending editors mounted; reorder is an atomic compared permutation |
+| Occasion recovery | `occasion-form-draft.ts`, `occasion-form-queries.ts`, `use-occasion-form.ts`, `occasion-form-screen.tsx` | Exact raw input; synchronous publication/retirement; revision/base conflicts; one exit guard; original generation through retries/dialogs |
+| Message handover | `greeting-composer.tsx`, `messages-queries.ts`, `occasions-section.tsx` | Every channel accessible; failed opening creates no log; SQL retry does not reopen; sent time is idempotent; full history remains accessible |
+| Calendar | `lib/jalali.ts`, `lib/date-input.ts`, their tests | Strict syntax, month/leap boundaries, unsupported stored-date recovery and independent ICU comparison in the documented practical range |
+
+The following integration test accelerates a 24-hour shift in real SQLite. It is
+not a 24-hour Android soak test or a physical-device performance measurement.
+
+```bash
+npm run test --workspace=@medos/mobile -- --runInBand --runTestsByPath src/features/shifts/heavy-shift.test.ts src/features/shifts/shift-deck.test.tsx src/features/doctors/occasion-form-screen.test.tsx src/features/doctors/greeting-composer.test.tsx src/features/backup/restore.test.ts
+```
+
+A senior review should also check open P0 items in the ledger, package advisories,
+signed APK/upgrade evidence and the separate physical-phone acceptance gates.
+Green tests or an emulator smoke run do not establish complete paper replacement,
+power-loss safety or clinical validity of a calculator.
 
 ## How work arrives here
 

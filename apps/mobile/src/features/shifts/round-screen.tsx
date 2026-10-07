@@ -112,6 +112,7 @@ function RoundScreenContent() {
       <Screen>
         <ScreenOptions options={{ title: 'راند' }} />
         <ErrorNotice error={error} what="راند" onRetry={retry} />
+        <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
       </Screen>
     );
   }
@@ -279,13 +280,16 @@ function RoundCard({ row }: { row: RoundRow }) {
   } = useLive(patientConsultsQuery(patient.id), [patient.id]);
   const lastNote = (notes ?? [])[0] ?? null;
   const where = locationLabel(encounter ?? undefined);
-  const elapsed = formatAdmissionElapsed(
-    admissionElapsed(
-      encounter?.admittedAt,
-      encounter?.admittedAtHasTime ?? false,
-      encounter?.dischargedAt ?? new Date(now),
-    ),
-  );
+  const elapsed =
+    encounter && !encounter.isActive && !encounter.dischargedAt
+      ? null
+      : formatAdmissionElapsed(
+          admissionElapsed(
+            encounter?.admittedAt,
+            encounter?.admittedAtHasTime ?? false,
+            encounter?.dischargedAt ?? new Date(now),
+          ),
+        );
 
   return (
     <Column gap="md">
@@ -302,6 +306,9 @@ function RoundCard({ row }: { row: RoundRow }) {
                 ) : null}
                 {elapsed ? <Badge label={elapsed} /> : null}
                 {encounter?.dischargedAt ? <Badge label="ترخیص شد" tone="neutral" /> : null}
+                {encounter && !encounter.isActive && !encounter.dischargedAt ? (
+                  <Badge label="دورهٔ قبلی؛ پرونده را مرور کنید" />
+                ) : null}
                 {member.reviewedAt ? <Badge label="دیده شد" tone="success" /> : null}
               </Row>
               {patient.summary ? (

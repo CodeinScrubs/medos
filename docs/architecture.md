@@ -1466,3 +1466,55 @@ contact/lab raw input or durable stopped-voice publication in capture/note draft
 Physical-device timing, interruptions, large records and broader product acceptance
 remain separate gates. Replacing the framework would not supply this ownership
 protocol automatically.
+
+## Shift deck, raw occasions and truthful message history (0.11.29)
+
+The active shift projection now joins its next open task in the same SQLite
+statement as the pinned encounter and membership. A real task join makes task
+updates observable by `useLive`; standing tasks and the pinned encounter qualify,
+while another encounter or shift does not. The Today deck shows four patients,
+with inline search/expansion reaching every member. The shift page uses the same
+brief: identity, location, admission/duration, impression, important note and next
+task. Task and record links open their exact destinations. Handoff editors are
+collapsed until requested. Filtering hides keyed rows instead of unmounting their
+pending autosavers. Reordering flushes the one Scope, compares the complete live
+membership list, and writes a validated permutation in one synchronous transaction.
+Accessible up/down controls are deliberately used instead of a new drag dependency.
+
+An occasion editor is a raw document before it is a scheduled date. Additive
+migration 0021 stores versioned exact fields, immutable initial/base values,
+revision and publication id in `occasion_form_drafts`. Incomplete dates and
+messages autosave without changing the occasion or Android notification. Explicit
+publication validates the current raw fields, compares the original occasion,
+updates/creates it and retires the draft atomically. Replay returns the same
+publication. Native scheduling follows the commit; its failure is a pending
+reminder with feedback/retry, never a reason to duplicate the occasion. Raw save,
+comparison, adoption, discard and delayed confirmations keep the original dataset
+generation. The route has one always-on Scope guard. Successful database
+acknowledgment is durable; the last unacknowledged debounce interval is not.
+
+Android alerts permit only three buttons. Message handover therefore uses a
+single sheet exposing each configured channel and copy, rather than an alert
+which silently loses a channel. Validate the live doctor/occasion and contact
+snapshot before opening. A failed opening creates no history. After successful
+handover, SQL retry records the same prepared message without reopening the
+external app. Only explicit owner confirmation changes `ready` to `sent`, once,
+and a newer prepared message does not hide the last confirmed sent time. History
+is collapsed by default with incremental access to all rows, including messages
+whose occasion was subsequently deleted. External opening is not delivery.
+
+Jalali input accepts explicit slash/dash date syntax and folded Persian/Arabic
+digits, with consistent separators and integer/calendar validation. Invalid or
+unsupported stored dates remain visible as invalid input rather than rolling
+over, disappearing or crashing an editor. Annual recurrence preserves Jalali
+month/day; Esfand 30 falls on Esfand 29 in a non-leap year. Lunar occasions default
+to a one-off date; no lunar-to-solar annual automation is implied. Independent ICU
+boundary comparisons cover Jalali 1300–1500. This is a tested practical range,
+not a claim of agreement between all calendar algorithms forever.
+
+No route, permission, framework or clinical rule is added. The archive/key
+schemes are unchanged; old archives import without the new table, current ones
+retain its raw drafts. Two compatible transitive patches update shell-quote and
+source-map-js; remaining advisory exposure is recorded separately. Native
+upgrade, heavy-record navigation, process interruption and physical-phone gates
+must be evaluated independently from SQLite/React handler tests.

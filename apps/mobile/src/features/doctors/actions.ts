@@ -30,7 +30,7 @@ export async function callNumber(phone: string | null | undefined): Promise<bool
 export async function copyText(text: string | null | undefined): Promise<void> {
   if (!text) return;
   await Clipboard.setStringAsync(text);
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 }
 
 /**

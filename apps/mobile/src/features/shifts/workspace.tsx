@@ -1,21 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
 import { useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { Button, Column, Text } from '@/components/ui';
-import type { Encounter, Patient, Shift, ShiftPatient } from '@/db/schema';
+import type { Encounter, Patient, Shift, ShiftPatient, Task } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { DatasetChangedError } from '@/lib/dataset-write';
 
 import { activeShiftWorkspaceQuery, type ActiveShiftWorkspaceRow } from './queries';
 
 type Workspace = {
   shift: Shift | null;
-  rows: { member: ShiftPatient; patient: Patient; encounter: Encounter | null }[];
+  rows: { member: ShiftPatient; patient: Patient; encounter: Encounter | null; nextTask: Task | null }[];
 };
 
 function workspace(rows: ActiveShiftWorkspaceRow[]): Workspace {
   return {
     shift: rows[0]?.shift ?? null,
-    rows: rows.flatMap(({ member, patient, encounter }) => (member && patient ? [{ member, patient, encounter }] : [])),
+    rows: rows.flatMap(({ member, patient, encounter, nextTask }) =>
+      member && patient ? [{ member, patient, encounter, nextTask }] : [],
+    ),
   };
 }
 
@@ -35,7 +41,9 @@ function identity(view: Workspace): string {
  */
 export function useShiftWorkspace() {
   const { group } = useAutosaveScope()!;
-  const { data, error, retry } = useLive(activeShiftWorkspaceQuery());
+  const { stale } = useDatasetIntent();
+  const { data, error: readError, retry } = useLive(activeShiftWorkspaceQuery());
+  const error = useMemo(() => readError ?? (stale ? new DatasetChangedError() : undefined), [readError, stale]);
   const incoming = useMemo(() => (data === undefined ? undefined : workspace(data)), [data]);
   const key = incoming === undefined ? undefined : identity(incoming);
   const [displayed, setDisplayed] = useState<{
@@ -96,6 +104,45 @@ export function ShiftWorkspaceNotice({
   saving: boolean;
   onRetry: () => void;
 }) {
+  const { stale } = useDatasetIntent();
+  const scope = useAutosaveScope()!;
+  const router = useRouter();
+  const pending = useRef<symbol | null>(null);
+  useEffect(
+    () => () => {
+      pending.current = null;
+    },
+    [],
+  );
+  if (stale)
+    return (
+      <Button
+        label="بستن شیفت قدیمی"
+        variant="secondary"
+        onPress={() => {
+          if (pending.current) return;
+          const token = Symbol();
+          pending.current = token;
+          const consume = (accept: boolean) => {
+            if (pending.current !== token) return;
+            pending.current = null;
+            if (accept) {
+              scope.abandonStale();
+              router.back();
+            }
+          };
+          Alert.alert(
+            'بستن صفحهٔ قدیمی؟',
+            'پیش از بستن، نوشته‌های روی صفحه را مرور یا کپی کنید.',
+            [
+              { text: 'ماندن', style: 'cancel', onPress: () => consume(false) },
+              { text: 'بستن', onPress: () => consume(true) },
+            ],
+            { cancelable: true, onDismiss: () => consume(false) },
+          );
+        }}
+      />
+    );
   return changing ? (
     <Column gap="xs">
       <Text variant="caption" color="textMuted">

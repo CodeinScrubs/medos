@@ -33,6 +33,62 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Compact shift deck and recoverable Jalali occasions
+
+**Agent:** GPT-6 via Codex
+**Commits:** application in this commit; baseline `80dc57f`; acceptance pending.
+
+**Changed**
+- One watched shift/encounter/next-task snapshot, direct patient/task links,
+  inline all-member search, compact Today deck, preserved hidden handoff editors
+  and atomic accessible reorder. Root patient errors now retry in place.
+- Raw occasion recovery/publication through additive migration 0021, original
+  dataset intent and one Scope guard. Native failure stays a repairable reminder.
+- Every message channel accessible; prepared/sent history and SQL retry are
+  truthful and idempotent. Strict Jalali/raw-date handling avoids rollover/crash;
+  lunar events default one-off. Greeting paragraphs remain intact.
+- Two compatible transitive dependency patches; no new dependency, route,
+  permission, framework, clinical formula or archive/key scheme. 0.11.29/code45.
+- Senior review guide and execution ledger separate reviewability from release
+  sign-off. Work performed solo; no PR remotely merged/approved/commented on.
+
+**Verified**
+- Clean baseline check: 118 suites / 1536 app tests + three workflows.
+- First full post-change run found six integration failures, including missing
+  reminder-failure feedback. Corrected recovery run: four suites / 106 checks.
+- Full source run: 124 suites / 1608 app tests + three workflows; two import
+  warnings corrected. Versioned full run repeated green with zero lint warnings.
+- Final source check, including contact-title snapshot regression: 124 suites /
+  1609 app tests + three workflows; typecheck/formatting and zero-warning lint.
+- Tehran-timezone heavy/calendar/raw-occasion run: three suites / 54 checks;
+  accelerated 24h/40-patient test has 960 tasks, 240 notes/480 versions, 1440
+  lab values, exact handoff/reorder/scope, failure blocking and SQL restore.
+- Migration regeneration reports no further schema changes. Audit refreshed:
+  46 affected entries before / 44 after, critical count now zero; five
+  underlying advisories remain, with exact paths/sources in validation-0.11.29.
+
+**Not verified**
+- Signed new APK, exact-source CI and native 40-patient/current-archive acceptance
+  are pending at this source checkpoint; record executed results before delivery.
+- Physical A52s, OEM/background reminder delivery, full native 24h soak,
+  power/low-space/process-death matrix, clinical/tool or whole-product acceptance.
+
+**Open threads**
+- Finish current signed build/upgrade/heavy-record/cold-recovery/restore evidence.
+- Durable stopped voices for new note/capture and manual lab/contact raw recovery
+  remain P0 work; broader trash/moves/rich text/workbook/AI goals stay in the ledger.
+- Remaining advisories need runtime/tool reachability review; decode 0.5.0 is
+  ESM and cannot be blindly substituted into CJS query-string 7.
+
+**Gotchas**
+- Occasion initial read is one joined query from doctors, not the old occasion
+  table read; retain failure assertions when updating cache stand-ins. Shift
+  handoff now explicitly opens before typing; failed progress means unknown.
+- Do not equate a debounce being staged with acknowledgment, an app opening
+  with message delivery, or accelerated SQLite time with native battery/OEM time.
+- The final full source gate includes the added contact-title snapshot check.
+  Never modify source after APK bundling starts.
+
 ## 2026-10-07 — Keep patient overview failure distinct from missing records
 
 **Agent:** GPT-6 via Codex

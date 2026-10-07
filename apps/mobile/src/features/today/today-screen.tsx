@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
@@ -35,6 +35,7 @@ import { useTheme } from '@/theme';
 export function TodayScreen() {
   const { spacing } = useTheme();
   const router = useRouter();
+  const [hasShift, setHasShift] = useState<boolean | undefined>();
 
   // "Today" moves on at midnight even if the screen was left open: the due
   // list is re-queried when the date changes, and counts use the same now.
@@ -88,7 +89,7 @@ export function TodayScreen() {
           />
           <RestoreTrouble />
           <BackupNudge now={now.getTime()} />
-          <ShiftCard />
+          <ShiftCard onShiftPresence={setHasShift} />
 
           <Row gap="sm" style={{ marginTop: spacing.lg }}>
             <StatTile
@@ -144,7 +145,7 @@ export function TodayScreen() {
 
           <DueTasksSection now={now} />
 
-          {(admitted?.length ?? 0) > 0 && (
+          {hasShift !== true && (admitted?.length ?? 0) > 0 && (
             <>
               <SectionHeader
                 title="بیماران بستری"

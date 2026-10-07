@@ -11,6 +11,7 @@ import {
   followUps,
   imagingStudies,
   notes,
+  occasionFormDrafts,
   occasions,
   patients,
   patientFormDrafts,
@@ -19,6 +20,7 @@ import {
   taskDrafts,
   tasks,
 } from '@/db/schema';
+import { encodeOccasionForm, initialOccasionForm } from '@/features/doctors/occasion-form-draft';
 import { encodePatientForm, initialPatientFields } from '@/features/patients/form-draft';
 import { newId, stamps } from '@/lib/ids';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -145,6 +147,80 @@ describe('importTables', () => {
   beforeEach(async () => {
     live = await createTestDatabase();
     backup = await createTestDatabase();
+  });
+
+  it('round-trips exact raw occasion drafts and their retired publication links', async () => {
+    backup.db
+      .insert(doctors)
+      .values({ id: 'draft-doctor', ...stamps(), firstName: 'Synthetic', lastName: 'Colleague' })
+      .run();
+    backup.db
+      .insert(occasions)
+      .values({
+        id: 'draft-occasion',
+        ...stamps(),
+        doctorId: 'draft-doctor',
+        kind: 'birthday',
+        title: 'Synthetic birthday',
+        jalaliMonth: 12,
+        jalaliDay: 30,
+      })
+      .run();
+    const document = initialOccasionForm(null, null, new Date('2026-10-07'));
+    document.fields.dateText = '1405/12/';
+    document.fields.messageTemplate = '  Exact raw text\n\nLast line\n';
+    for (const retired of [false, true])
+      backup.db
+        .insert(occasionFormDrafts)
+        .values({
+          id: retired ? 'retired-draft' : 'open-draft',
+          ...stamps(),
+          doctorId: 'draft-doctor',
+          occasionId: null,
+          formKey: 'new',
+          body: encodeOccasionForm(document),
+          revision: retired ? 8 : 7,
+          committedOccasionId: retired ? 'draft-occasion' : null,
+          deletedAt: retired ? new Date('2026-10-07') : null,
+        })
+        .run();
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(occasionFormDrafts).all()).toEqual(backup.db.select().from(occasionFormDrafts).all());
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
+  });
+
+  it('does not retain an old occasion draft when restoring an archive from before that table existed', async () => {
+    live.db
+      .insert(doctors)
+      .values({ id: 'old-draft-doctor', ...stamps(), firstName: 'Synthetic', lastName: 'Colleague' })
+      .run();
+    live.db
+      .insert(occasionFormDrafts)
+      .values({
+        id: 'old-draft',
+        ...stamps(),
+        doctorId: 'old-draft-doctor',
+        formKey: 'new',
+        body: encodeOccasionForm(initialOccasionForm(null, null, new Date('2026-10-07'))),
+      })
+      .run();
+    await addPatient(backup, 'Older archive');
+    backup.conn.execSync('DROP TABLE occasion_form_drafts');
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(occasionFormDrafts).all()).toEqual([]);
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
   });
 
   it('imports legacy occasions with durable repair defaults and preserves their old native ids', async () => {

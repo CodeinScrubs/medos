@@ -35,6 +35,24 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-07, 0.11.29: the active shift/Today deck now exposes compact patient
+identity, admission, pinned-episode context and the next correctly scoped task.
+Search reaches all members; hidden handoff editors stay mounted. Accessible
+reorder flushes the one Scope and atomically compares/updates the complete live
+membership permutation. Root patient read retry is wired. Raw occasion forms
+are durably staged by additive migration 0021; publication/retirement is atomic
+and idempotent, with original intent through comparison/discard/native scheduling.
+Message channels are accessible in one sheet; handover is prepared, sent status
+requires explicit confirmation, retry does not reopen and all history is reachable.
+Strict Jalali/date recovery and 1300–1500 ICU boundary checks cover leap rollover;
+lunar occasions default to one-off. See validation-0.11.29.md for exact evidence.
+The software heavy-shift test accelerates 24 hours for 40 patients with 960 tasks,
+240 notes / 480 versions and 1,440 lab values; it is not a native 24-hour soak.
+Compatible shell-quote/source-map-js patches remove two advisories (current scan
+46 affected entries before, 44 after; five underlying advisories remain). This
+closes neither every raw-form/stopped-voice gap nor physical-phone, clinical or
+whole-product acceptance. No automatic messaging or new clinical formula is added.
+
 2026-10-07 PR audit: all five heads and their older-base CI were checked. A local
 integration passed all 1530 existing app tests, but 24 targeted checks failed
 (one rollback check passed). PRs 1/4 are blocked as submitted; PRs 3/5 need

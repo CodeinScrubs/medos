@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
@@ -20,31 +20,20 @@ import {
   Screen,
   Text,
 } from '@/components/ui';
-import { useNow } from '@/components/use-now';
-import { RATING_AXES, type Doctor, type DoctorProfile, type Occasion, type ScheduledMessage } from '@/db/schema';
+import { RATING_AXES, type Doctor, type DoctorProfile } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { topicsByTeacherQuery } from '@/features/knowledge/queries';
 import { openInMaps } from '@/features/places/actions';
 import { placeQuery } from '@/features/places/queries';
-import { formatJalali, formatJalaliLong, daysBetween } from '@/lib/jalali';
+import { withDatasetWrite } from '@/lib/dataset-write';
+import { formatJalali, formatJalaliLong } from '@/lib/jalali';
 import { formatPhone, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { callNumber, copyText, sendSms, sendTelegram, sendWhatsApp } from './actions';
-import { OCCASION_KIND_LABELS, RATING_STEP_LABELS, RELATIONSHIP_LABELS } from './labels';
-import {
-  DEFAULT_GREETING,
-  daysUntilLabel,
-  doctorDisplayName,
-  greetingText,
-  latestRating,
-  occasionNextDate,
-  ratedAxisCount,
-  ratingAverage,
-} from './logic';
-import { confirmGreetingSent, doctorMessagesQuery, logGreetingPrepared } from './messages-queries';
-import { OccasionReminderStatus } from './occasion-reminder-status';
-import { deleteOccasion, doctorOccasionsQuery } from './occasions-queries';
+import { RATING_STEP_LABELS, RELATIONSHIP_LABELS } from './labels';
+import { doctorDisplayName, latestRating, ratedAxisCount, ratingAverage } from './logic';
+import { OccasionsSection } from './occasions-section';
 import { deleteDoctor, doctorQuery, setDoctorStarred } from './queries';
 import { doctorProfileQuery, doctorRatingsQuery } from './ratings-queries';
 
@@ -53,15 +42,16 @@ export function DoctorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { spacing } = useTheme();
+  const { generation, stale } = useDatasetIntent();
 
-  const { data, error } = useLive(doctorQuery(id ?? ''), [id]);
+  const { data, error, retry } = useLive(doctorQuery(id ?? ''), [id]);
   const doctor = data?.[0];
 
   if (!doctor) {
     return (
       <Screen>
         <ScreenOptions options={{ title: 'پزشک' }} />
-        <ErrorNotice error={error} what="پرونده‌ی پزشک" />
+        <ErrorNotice error={error} what="پرونده‌ی پزشک" onRetry={retry} />
         {data && !error ? (
           <EmptyState
             icon="alert-circle-outline"
@@ -84,8 +74,11 @@ export function DoctorScreen() {
               <IconButton
                 icon={doctor.starred ? 'star' : 'star-outline'}
                 label={doctor.starred ? 'برداشتن ستاره' : 'ستاره‌دار کردن'}
+                disabled={stale || !!error}
                 onPress={() =>
-                  void setDoctorStarred(doctor.id, !doctor.starred).catch((e) => alertError('تغییر ثبت نشد', e))
+                  void withDatasetWrite(generation, () => setDoctorStarred(doctor.id, !doctor.starred)).catch((e) =>
+                    alertError('تغییر ثبت نشد', e),
+                  )
                 }
               />
               <IconButton
@@ -99,10 +92,16 @@ export function DoctorScreen() {
       />
 
       <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <ErrorNotice error={error} what="پرونده‌ی پزشک" onRetry={retry} />
+        {stale ? (
+          <Text variant="caption" color="danger">
+            اطلاعات بازگردانی شده؛ برای تغییر، این پرونده را دوباره باز کنید.
+          </Text>
+        ) : null}
         <Header doctor={doctor} />
         <QuickActions doctor={doctor} />
         <RatingSection doctor={doctor} />
-        <OccasionsSection doctor={doctor} />
+        <OccasionsSection doctor={doctor} generation={generation} stale={stale || !!error} />
         <TaughtSection doctor={doctor} />
         <ProfileSection doctor={doctor} />
         <ContactSection doctor={doctor} />
@@ -123,6 +122,7 @@ export function DoctorScreen() {
           label="حذف پزشک"
           icon="trash-outline"
           variant="danger"
+          disabled={stale || !!error}
           full
           onPress={() =>
             Alert.alert('حذف این پزشک؟', `${doctorDisplayName(doctor)} از فهرست برداشته می‌شود.`, [
@@ -132,7 +132,7 @@ export function DoctorScreen() {
                 style: 'destructive',
                 onPress: () => {
                   // `deleteDoctor` cancels the alarms and takes the occasions.
-                  void deleteDoctor(doctor.id)
+                  void withDatasetWrite(generation, () => deleteDoctor(doctor.id))
                     .then(() => router.back())
                     .catch((error: unknown) => alertError('حذف نشد', error));
                 },
@@ -196,7 +196,12 @@ function QuickActions({ doctor }: { doctor: Doctor }) {
       onPress: () => void sendTelegram(doctor.telegram, ''),
     });
   }
-  if (phone) actions.push({ icon: 'copy-outline', label: 'کپی شماره', onPress: () => void copyText(phone) });
+  if (phone)
+    actions.push({
+      icon: 'copy-outline',
+      label: 'کپی شماره',
+      onPress: () => void copyText(phone).catch((e) => alertError('کپی نشد', e)),
+    });
   if (place) actions.push({ icon: 'map-outline', label: 'نقشه', onPress: () => void openInMaps(place) });
 
   if (actions.length === 0) return null;
@@ -262,10 +267,6 @@ function RatingSection({ doctor }: { doctor: Doctor }) {
       filledCount={ratings.length}
     >
       <Column gap="md">
-        <Text variant="tiny" color="textFaint">
-          یادداشت خصوصی خودتان درباره‌ی یک همکار واقعی. هیچ‌وقت نمایش داده، به اشتراک گذاشته یا خروجی گرفته نمی‌شود.
-        </Text>
-
         {current ? (
           <Column gap="sm">
             {RATING_AXES.map((axis) => {
@@ -333,176 +334,6 @@ function RatingSection({ doctor }: { doctor: Doctor }) {
         />
       </Column>
     </CollapsibleSection>
-  );
-}
-
-function OccasionsSection({ doctor }: { doctor: Doctor }) {
-  const router = useRouter();
-  const now = useNow();
-  const { data, error } = useLive(doctorOccasionsQuery(doctor.id), [doctor.id]);
-  const { data: messages, error: messagesError } = useLive(doctorMessagesQuery(doctor.id), [doctor.id]);
-  const rows = useMemo(() => {
-    const withDate = (data ?? []).map((o) => ({ occasion: o, at: occasionNextDate(o, new Date(now)) }));
-    return withDate.sort((a, b) => (a.at?.getTime() ?? Infinity) - (b.at?.getTime() ?? Infinity));
-  }, [data, now]);
-
-  return (
-    <CollapsibleSection
-      title="مناسبت‌ها"
-      icon="gift-outline"
-      subtitle={
-        error || messagesError
-          ? 'خواندن اطلاعات کامل نشد'
-          : data && rows.length === 0
-            ? 'تولد و مناسبت‌ها را اینجا اضافه کنید'
-            : undefined
-      }
-      defaultOpen={rows.length > 0}
-      filledCount={rows.length}
-    >
-      <Column gap="sm">
-        <ErrorNotice error={error} what="مناسبت‌ها" />
-        <ErrorNotice error={messagesError} what="سابقهٔ تبریک" />
-        {rows.map(({ occasion, at }) => (
-          <OccasionRow
-            key={occasion.id}
-            doctor={doctor}
-            occasion={occasion}
-            at={at}
-            lastMessage={(messages ?? []).find((m) => m.occasionId === occasion.id) ?? null}
-          />
-        ))}
-        <Button
-          label="افزودن مناسبت"
-          icon="add"
-          variant="secondary"
-          full
-          onPress={() => router.push({ pathname: '/doctor/occasion', params: { doctorId: doctor.id } })}
-        />
-      </Column>
-    </CollapsibleSection>
-  );
-}
-
-function OccasionRow({
-  doctor,
-  occasion,
-  at,
-  lastMessage,
-}: {
-  doctor: Doctor;
-  occasion: Occasion;
-  at: Date | null;
-  lastMessage: ScheduledMessage | null;
-}) {
-  const router = useRouter();
-  const { colors } = useTheme();
-  const days = at ? (daysBetween(at, new Date()) ?? 0) : null;
-
-  /** Build the text and hand it to a messenger — MedOS never sends it itself. */
-  function greet() {
-    const text = greetingText(occasion.messageTemplate || DEFAULT_GREETING[occasion.kind], {
-      name: doctorDisplayName(doctor),
-      occasion: occasion.title,
-    });
-    const phone = doctor.whatsapp || doctor.phone || doctor.phoneAlt;
-
-    /*
-     * The send button is in the messenger, not here, so "sent" is recorded
-     * when the text is handed over. Knowing months later that this person was
-     * already congratulated this year is the point of keeping the log.
-     */
-    const hand = (channel: ScheduledMessage['channel'], go: () => Promise<boolean>) => () => {
-      void (async () => {
-        // A messenger that opened is all this can know. Whether the message
-        // was actually sent is the user's to say, on the row afterwards.
-        if (await go()) {
-          await logGreetingPrepared({ doctorId: doctor.id, occasionId: occasion.id, channel, body: text });
-        }
-      })().catch((error: unknown) => alertError('آماده‌سازی یا ثبت پیام کامل نشد', error));
-    };
-
-    const options: { text: string; onPress?: () => void; style?: 'cancel' }[] = [];
-    if (phone) options.push({ text: 'پیامک', onPress: hand('sms', () => sendSms(phone, text)) });
-    if (phone) options.push({ text: 'واتس‌اپ', onPress: hand('whatsapp', () => sendWhatsApp(phone, text)) });
-    if (doctor.telegram) {
-      options.push({ text: 'تلگرام', onPress: hand('telegram', () => sendTelegram(doctor.telegram, text)) });
-    }
-    options.push({ text: 'کپی متن', onPress: () => void copyText(text) });
-    options.push({ text: 'بستن', style: 'cancel' });
-    Alert.alert('متن تبریک', text, options);
-  }
-
-  return (
-    <Card tone="alt">
-      <Row gap="sm" justify="space-between">
-        <Column gap="xxs" style={styles.grow}>
-          <Row gap="xs">
-            <Text variant="bodyStrong">{occasion.title}</Text>
-            <Badge label={OCCASION_KIND_LABELS[occasion.kind]} />
-            {!occasion.isEnabled && <Badge label="یادآور خاموش" tone="neutral" />}
-          </Row>
-          <Text variant="caption" color="textMuted">
-            {at ? formatJalaliLong(at) : 'بدون تاریخ'}
-            {days != null ? ` — ${daysUntilLabel(days)}` : ''}
-          </Text>
-          <OccasionReminderStatus occasion={occasion} />
-          {lastMessage?.status === 'sent' && lastMessage.sentAt ? (
-            <Text variant="tiny" color="textFaint">
-              آخرین تبریک: {formatJalali(lastMessage.sentAt)}
-            </Text>
-          ) : null}
-          {lastMessage?.status === 'ready' ? (
-            <Row gap="xs">
-              <Text variant="tiny" color="textFaint">
-                متن {formatJalali(lastMessage.createdAt)} آماده شد
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="ثبت اینکه فرستاده شد"
-                hitSlop={8}
-                onPress={() =>
-                  void confirmGreetingSent(lastMessage.id).catch((error: unknown) => alertError('ثبت نشد', error))
-                }
-              >
-                <Text variant="tiny" color="primary">
-                  فرستادم
-                </Text>
-              </Pressable>
-            </Row>
-          ) : null}
-        </Column>
-        <Row gap="xxs">
-          <IconButton icon="send-outline" label="متن تبریک" onPress={greet} />
-          <IconButton
-            icon="create-outline"
-            label="ویرایش مناسبت"
-            onPress={() =>
-              router.push({
-                pathname: '/doctor/occasion',
-                params: { doctorId: doctor.id, occasionId: occasion.id },
-              })
-            }
-          />
-          <IconButton
-            icon="trash-outline"
-            label="حذف مناسبت"
-            color={colors.danger}
-            onPress={() =>
-              Alert.alert('حذف مناسبت؟', occasion.title, [
-                { text: 'انصراف', style: 'cancel' },
-                {
-                  text: 'حذف',
-                  style: 'destructive',
-                  onPress: () =>
-                    void deleteOccasion(occasion.id).catch((error: unknown) => alertError('حذف نشد', error)),
-                },
-              ])
-            }
-          />
-        </Row>
-      </Row>
-    </Card>
   );
 }
 

@@ -27,6 +27,18 @@ afterEach(() => {
 });
 
 describe('date fields block stale-value saves', () => {
+  it('keeps an unsupported stored Gregorian year visible and invalid instead of crashing or clearing it', () => {
+    const changed = jest.fn<(iso: string | null) => void>();
+    const validity = jest.fn<(valid: boolean) => void>();
+    act(() => {
+      tree = create(
+        <JalaliDateField label="date" value="9999-01-01" onChange={changed} onValidityChange={validity} allowFuture />,
+      );
+    });
+    expect(tree.root.findByType(Input).props.value).toBe('9999-01-01');
+    expect(validity).toHaveBeenLastCalledWith(false);
+    expect(changed).not.toHaveBeenCalled();
+  });
   it('restores controlled incomplete day/clock without rewriting them from a parsed fallback', () => {
     const validity = jest.fn<(valid: boolean) => void>();
     const changed = jest.fn<(next: Date) => void>();

@@ -1,29 +1,35 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { EditGate } from '@/components/edit-gate';
-import { alertError, notify } from '@/components/feedback';
+import { ErrorNotice } from '@/components/error-notice';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { ScreenOptions } from '@/components/screen-options';
-import { Button, ChipSelect, Column, Input, Screen, Text, Toggle } from '@/components/ui';
+import { Button, Card, ChipSelect, Column, Input, Screen, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
 import type { Occasion } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { formatJalaliLong, toJalali } from '@/lib/jalali';
-import { RLM } from '@/lib/persian';
+import { formatJalaliLong, fromIsoDate } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
 import { OCCASION_KIND_LABELS } from './labels';
-import { DEFAULT_GREETING, occasionEditorDate, occasionNextDate, occasionReminderAt } from './logic';
-import { createOccasion, occasionQuery, updateOccasion } from './occasions-queries';
-import { doctorProfileQuery } from './ratings-queries';
+import { DEFAULT_GREETING, occasionNextDate, occasionReminderAt } from './logic';
+import {
+  decodeOccasionForm,
+  initialOccasionForm,
+  occasionFormValues,
+  type OccasionFormFields,
+} from './occasion-form-draft';
+import { occasionFormQuery, type OccasionFormRow } from './occasion-form-queries';
+import { useOccasionForm } from './use-occasion-form';
 
-const KIND_OPTIONS = (Object.keys(OCCASION_KIND_LABELS) as Occasion['kind'][]).map((k) => ({
-  value: k,
-  label: OCCASION_KIND_LABELS[k],
+const KIND_OPTIONS = (Object.keys(OCCASION_KIND_LABELS) as Occasion['kind'][]).map((value) => ({
+  value,
+  label: OCCASION_KIND_LABELS[value],
 }));
-
 const LEAD_OPTIONS = [
   { value: '0', label: 'همان روز' },
   { value: '1', label: 'یک روز قبل' },
@@ -31,194 +37,293 @@ const LEAD_OPTIONS = [
   { value: '7', label: 'یک هفته قبل' },
 ];
 
-/**
- * A date worth a message: a birthday, a graduation, anything recurring.
- *
- * A recurring occasion is stored as a Jalali month and day, not a date. A
- * Persian birthday recurs on the Persian calendar, and converting a stored
- * Gregorian date back every year drifts across leap years — the one place in
- * MedOS where a Jalali value is what gets saved.
- *
- * Params: `doctorId`, and `occasionId` when editing.
- */
 export function OccasionFormScreen() {
   const { doctorId, occasionId } = useLocalSearchParams<{ doctorId: string; occasionId?: string }>();
-  const { data, error, retry } = useLive(occasionQuery(occasionId ?? ''), [occasionId]);
   return (
-    <EditGate editing={Boolean(occasionId)} rows={data} error={error} onRetry={retry} what="مناسبت">
-      {(occasion, readNotice) => <OccasionForm doctorId={doctorId} occasion={occasion} readNotice={readNotice} />}
+    <AutosaveScope key={`${doctorId}:${occasionId ?? 'new'}`}>
+      <OccasionFormGate doctorId={doctorId ?? ''} occasionId={occasionId ?? null} />
+    </AutosaveScope>
+  );
+}
+
+/** Seed only once; a failed refresh, parent deletion or restore cannot discard raw input. */
+function OccasionFormGate({ doctorId, occasionId }: { doctorId: string; occasionId: string | null }) {
+  const { stale } = useDatasetIntent();
+  const scope = useAutosaveScope()!;
+  const router = useRouter();
+  const query = useLive(occasionFormQuery(doctorId, occasionId), [doctorId, occasionId]);
+  const [retained, setRetained] = useState<OccasionFormRow[]>();
+  const [reset, setReset] = useState(0);
+  if (!stale && !retained && query.data?.[0]) setRetained([query.data[0]]);
+  const rows = retained ?? query.data;
+  let invalidDraft: Error | undefined;
+  if (rows?.[0]?.draft) {
+    try {
+      decodeOccasionForm(rows[0].draft.body);
+    } catch (e) {
+      invalidDraft = e instanceof Error ? e : new Error('پیش‌نویس خوانده نشد.');
+    }
+  }
+  if (invalidDraft)
+    return (
+      <Screen scroll>
+        <ErrorNotice error={invalidDraft} what="پیش‌نویس مناسبت" />
+        <Text selectable>{rows?.[0]?.draft?.body}</Text>
+        <Button
+          label="بازگشت"
+          variant="ghost"
+          onPress={() => {
+            if (stale) scope.abandonStale();
+            router.back();
+          }}
+        />
+      </Screen>
+    );
+  if (stale && !retained)
+    return (
+      <Screen>
+        <Text color="danger">اطلاعات جایگزین شده؛ فرم را دوباره باز کنید.</Text>
+        <Button
+          label="بازگشت"
+          onPress={() => {
+            scope.abandonStale();
+            router.back();
+          }}
+        />
+      </Screen>
+    );
+  return (
+    <EditGate editing rows={rows} error={query.error} onRetry={query.retry} what="مناسبت و مخاطب" fenceDataset>
+      {(row, notice) =>
+        row ? (
+          <OccasionForm
+            key={reset}
+            seed={row}
+            readNotice={
+              <>
+                {notice}
+                {!stale && retained && query.data?.length === 0 && !query.error ? (
+                  <Text color="danger">مخاطب یا مناسبت دیگر در دسترس نیست؛ نوشته حفظ شده است.</Text>
+                ) : null}
+              </>
+            }
+            onReset={(next) => {
+              setRetained([next]);
+              setReset((n) => n + 1);
+            }}
+          />
+        ) : null
+      }
     </EditGate>
   );
 }
 
 function OccasionForm({
-  doctorId,
-  occasion,
+  seed,
   readNotice,
+  onReset,
 }: {
-  doctorId: string;
-  occasion: Occasion | null;
+  seed: OccasionFormRow;
   readNotice: ReactNode;
+  onReset: (row: OccasionFormRow) => void;
 }) {
-  const router = useRouter();
   const { spacing } = useTheme();
-  const now = useNow();
-
-  const { data: profileRows } = useLive(doctorProfileQuery(doctorId ?? ''), [doctorId]);
-  const knownBirthDate = profileRows?.[0]?.birthDate ?? null;
-
-  const [kind, setKind] = useState<Occasion['kind']>(occasion?.kind ?? 'birthday');
-  const [title, setTitle] = useState(occasion?.title ?? '');
-  const [isRecurring, setIsRecurring] = useState(occasion?.isRecurring ?? true);
-  const [isEnabled, setIsEnabled] = useState(occasion?.isEnabled ?? true);
-  const [remindDaysBefore, setRemindDaysBefore] = useState(String(occasion?.remindDaysBefore ?? 1));
-  const [messageTemplate, setMessageTemplate] = useState(occasion?.messageTemplate ?? '');
-  const [saving, setSaving] = useState(false);
-  const busy = useRef(false);
+  const now = new Date(useNow());
+  const editing = useOccasionForm(seed, onReset);
+  const f = editing.form;
   const dateValidation = useDateValidation();
-
-  /*
-   * Both shapes of date are edited as one Jalali field. For a recurring
-   * occasion only the month and day are kept, so the year the user types is
-   * irrelevant — the birthday's own year is the natural thing to type, and
-   * a profile date can pre-fill it or be explicitly selected after loading.
-   */
-  const [dateIso, setDateIso] = useState<string | null>(() =>
-    occasion ? occasionEditorDate(occasion, new Date(now)) : knownBirthDate,
-  );
-
-  const jalali = dateIso ? toJalali(new Date(`${dateIso}T00:00:00`)) : null;
-  const preview = jalali
-    ? {
-        jalaliMonth: jalali.jm,
-        jalaliDay: jalali.jd,
-        onDate: dateIso,
-        isRecurring,
-        remindDaysBefore: Number(remindDaysBefore),
-        isEnabled,
-      }
-    : null;
-  const nextAt = preview ? occasionNextDate(preview, new Date(now)) : null;
-  const remindAt = preview ? occasionReminderAt(preview, new Date(now)) : null;
-
-  async function save() {
-    if (busy.current) return;
-    if (!dateValidation.check()) return;
-    if (!dateIso || !jalali) {
-      notify('تاریخ لازم است', 'تاریخ مناسبت را بنویسید.');
-      return;
-    }
-    busy.current = true;
-    setSaving(true);
-    const payload = {
-      doctorId,
-      kind,
-      title: title.trim() || OCCASION_KIND_LABELS[kind],
-      jalaliMonth: isRecurring ? jalali.jm : null,
-      jalaliDay: isRecurring ? jalali.jd : null,
-      onDate: isRecurring ? null : dateIso,
-      isRecurring,
-      remindDaysBefore: Number(remindDaysBefore),
-      messageTemplate: messageTemplate.trim() || null,
-      isEnabled,
-    };
-    let committed = false;
+  let values: ReturnType<typeof occasionFormValues> | null = null;
+  try {
+    values = occasionFormValues(editing.document, now);
+  } catch {
+    /* Incomplete input remains a draft. */
+  }
+  const next = values ? occasionNextDate(values, now) : null;
+  const reminder = values ? occasionReminderAt(values, now) : null;
+  const parsed = fromIsoDate(values?.onDate);
+  const dateIso = f.isRecurring ? null : parsed ? (values?.onDate ?? null) : null;
+  const disabled = editing.busy || editing.completed;
+  let stored: OccasionFormFields | null = null;
+  let unreadable = false;
+  if (editing.comparison) {
     try {
-      if (occasion) await updateOccasion(occasion.id, payload);
-      const id = occasion?.id ?? (await createOccasion(payload));
-      committed = true;
-      const saved = occasionQuery(id).get();
-      router.back();
-      if (
-        saved &&
-        (saved.reminderRevision !== saved.reminderAppliedRevision ||
-          (occasionReminderAt(saved) && !saved.notificationId))
-      ) {
-        notify('مناسبت ذخیره شد', 'تنظیم یادآور کامل نشد؛ از بخش مناسبت‌ها دوباره تلاش کنید.');
-      }
-    } catch (e) {
-      // A post-save status read is not proof that the committed save failed.
-      if (committed) router.back();
-      alertError(committed ? 'ذخیره شد؛ وضعیت یادآور خوانده نشد' : 'ذخیره نشد', e);
-    } finally {
-      busy.current = false;
-      setSaving(false);
+      stored = editing.comparison.row.draft
+        ? decodeOccasionForm(editing.comparison.row.draft.body).fields
+        : initialOccasionForm(editing.comparison.row.occasion, editing.comparison.row.profile?.birthDate ?? null, now)
+            .fields;
+    } catch {
+      unreadable = true;
     }
   }
-
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: occasion ? 'ویرایش مناسبت' : 'مناسبت جدید' }} />
+      <ScreenOptions options={{ title: seed.occasion ? 'ویرایش مناسبت' : 'مناسبت جدید' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
-        <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
+        <Text variant="tiny" color={editing.state.status === 'failed' ? 'danger' : 'textMuted'}>
+          {editing.completed
+            ? 'مناسبت ثبت شد.'
+            : editing.state.status === 'failed'
+              ? 'پیش‌نویس ذخیره نشد؛ نوشته روی صفحه باقی مانده است.'
+              : editing.state.status === 'pending' || editing.state.status === 'writing'
+                ? 'در حال ذخیرهٔ پیش‌نویس…'
+                : editing.state.status === 'saved'
+                  ? 'پیش‌نویس ذخیره شد.'
+                  : seed.draft
+                    ? 'پیش‌نویس بازیابی شد.'
+                    : 'نوشته‌ها خودکار در پیش‌نویس ذخیره می‌شوند.'}
+        </Text>
+        {editing.state.status === 'failed' && !editing.stale ? (
+          <Button label="ذخیره نشد؛ تلاش دوباره" variant="ghost" onPress={() => void editing.retry()} />
+        ) : null}
+        <ChipSelect
+          label="نوع"
+          options={KIND_OPTIONS}
+          value={f.kind}
+          onChange={(v) => {
+            if (v && !disabled) editing.change({ kind: v, ...(v === 'religious' ? { isRecurring: false } : {}) });
+          }}
+        />
         <Input
           label="عنوان"
-          value={title}
-          onChangeText={setTitle}
-          placeholder={OCCASION_KIND_LABELS[kind]}
-          hint="خالی بگذارید تا همان نوع نوشته شود"
+          value={f.title}
+          editable={!disabled}
+          onChangeText={(title) => editing.change({ title })}
+          placeholder={OCCASION_KIND_LABELS[f.kind]}
         />
-
         <JalaliDateField
-          onValidityChange={dateValidation.setValid}
           label="تاریخ"
           value={dateIso}
-          onChange={setDateIso}
+          rawText={f.dateText}
+          onRawTextChange={(dateText) => editing.change({ dateText })}
+          onChange={() => {}}
+          onValidityChange={dateValidation.setValid}
+          required
           allowFuture
-          hint={isRecurring ? 'فقط ماه و روزش نگه داشته می‌شود؛ سال مهم نیست.' : undefined}
+          editable={!disabled}
+          hint={f.isRecurring ? 'برای تکرار سالانه فقط ماه و روز نگه داشته می‌شود.' : undefined}
         />
-        {!occasion && kind === 'birthday' && knownBirthDate && dateIso !== knownBirthDate ? (
+        {!seed.occasion && seed.profile?.birthDate ? (
           <Button
-            label="استفاده از تاریخ تولد پروفایل"
-            variant="ghost"
+            label="تاریخ تولد پروفایل"
             size="sm"
-            onPress={() => setDateIso(knownBirthDate)}
+            variant="ghost"
+            disabled={disabled}
+            onPress={() =>
+              editing.change({ dateText: initialOccasionForm(null, seed.profile!.birthDate, now).fields.dateText })
+            }
           />
         ) : null}
         <Toggle
-          label="هر سال تکرار شود"
-          description="تولد و سالگرد بله؛ یک مناسبت یک‌باره خیر"
-          value={isRecurring}
-          onChange={setIsRecurring}
+          label="هر سال در همین روز شمسی"
+          value={f.isRecurring}
+          onChange={(isRecurring) => {
+            if (!disabled) editing.change({ isRecurring });
+          }}
         />
-
         <ChipSelect
           label="یادآوری"
           options={LEAD_OPTIONS}
-          value={remindDaysBefore}
-          onChange={(v) => v && setRemindDaysBefore(v)}
+          value={f.leadText}
+          onChange={(leadText) => {
+            if (leadText && !disabled) editing.change({ leadText });
+          }}
         />
-        <Toggle label="یادآور روشن" value={isEnabled} onChange={setIsEnabled} />
-
-        {nextAt ? (
+        <Toggle
+          label="یادآور روشن"
+          value={f.isEnabled}
+          onChange={(isEnabled) => {
+            if (!disabled) editing.change({ isEnabled });
+          }}
+        />
+        {next ? (
           <Text variant="caption" color="textMuted">
-            نوبت بعدی: {formatJalaliLong(nextAt)}
-            {remindAt ? ` — یادآوری ${formatJalaliLong(remindAt)} ساعت ۹ صبح` : ' — بدون یادآور'}
+            نوبت بعدی: {formatJalaliLong(next)}
+            {reminder ? ` — یادآوری ${formatJalaliLong(reminder)} ساعت ۹ صبح` : ' — بدون یادآور'}
           </Text>
         ) : null}
-
         <Input
-          label="متن آماده‌ی تبریک"
-          value={messageTemplate}
-          onChangeText={setMessageTemplate}
+          label="متن آمادهٔ تبریک"
+          value={f.messageTemplate}
+          editable={!disabled}
           multiline
-          placeholder={DEFAULT_GREETING[kind]}
-          hint="می‌توانید {نام} و {مناسبت} بنویسید تا خودکار پر شوند. خالی بگذارید تا متن پیش‌فرض استفاده شود."
+          onChangeText={(messageTemplate) => editing.change({ messageTemplate })}
+          placeholder={DEFAULT_GREETING[f.kind]}
+          hint="{نام} و {مناسبت} با اطلاعات مخاطب پر می‌شوند."
         />
-        <Text variant="tiny" color="textFaint">
-          {RLM}MedOS خودش پیامی نمی‌فرستد. سر موعد نوتیفیکیشن می‌دهد و متن را آماده می‌کند؛ فرستادن با خودتان است.
-        </Text>
-
         <Button
-          label={occasion ? 'ذخیره' : 'افزودن مناسبت'}
+          label={editing.completed ? 'بستن' : seed.occasion ? 'ثبت تغییرات' : 'افزودن مناسبت'}
           icon="checkmark"
-          onPress={() => void save()}
-          loading={saving}
+          loading={editing.busy}
+          disabled={editing.stale}
           full
+          onPress={() => {
+            if (editing.completed || dateValidation.check()) void editing.save();
+          }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        {editing.state.status === 'failed' || editing.failedWrite || editing.comparison ? (
+          <Button
+            label="بررسی نسخهٔ ذخیره‌شده"
+            variant="ghost"
+            disabled={editing.stale || disabled}
+            onPress={() => void editing.compare()}
+          />
+        ) : null}
+        {editing.comparison ? (
+          <Card>
+            <Column gap="xs">
+              <Text variant="bodyStrong">نسخهٔ ذخیره‌شده</Text>
+              {unreadable ? <Text color="danger">پیش‌نویس خوانا نیست؛ جایگزین نمی‌شود.</Text> : null}
+              {stored
+                ? (Object.keys(FIELD_LABELS) as (keyof OccasionFormFields)[])
+                    .filter((key) => stored![key] !== f[key])
+                    .map((key) => (
+                      <Column key={key} gap="xxs">
+                        <Text variant="captionStrong">{FIELD_LABELS[key]}</Text>
+                        <Text selectable>نوشتهٔ من: {displayField(f, key)}</Text>
+                        <Text selectable>ذخیره‌شده: {displayField(stored!, key)}</Text>
+                      </Column>
+                    ))
+                : null}
+              <Button
+                label="نگه‌داشتن نوشتهٔ من"
+                disabled={unreadable || editing.stale || disabled || !!editing.comparison.original?.deletedAt}
+                onPress={() => void editing.keepMine()}
+              />
+              <Button
+                label="بارگذاری نسخهٔ ذخیره‌شده"
+                variant="secondary"
+                disabled={unreadable || editing.stale || disabled}
+                onPress={editing.loadStored}
+              />
+            </Column>
+          </Card>
+        ) : null}
+        <Button label="بستن" variant="ghost" onPress={editing.close} disabled={editing.busy} full />
+        {editing.hasDraft && !editing.completed ? (
+          <Button label="حذف پیش‌نویس" variant="ghost" disabled={editing.stale || disabled} onPress={editing.discard} />
+        ) : null}
       </Column>
     </Screen>
   );
+}
+
+const FIELD_LABELS: Record<keyof OccasionFormFields, string> = {
+  kind: 'نوع',
+  title: 'عنوان',
+  dateText: 'تاریخ',
+  isRecurring: 'تکرار سالانه',
+  isEnabled: 'یادآور',
+  leadText: 'روزهای قبل',
+  messageTemplate: 'متن پیام',
+};
+function displayField(fields: OccasionFormFields, key: keyof OccasionFormFields): string {
+  const value = fields[key];
+  return key === 'kind'
+    ? OCCASION_KIND_LABELS[fields.kind]
+    : typeof value === 'boolean'
+      ? value
+        ? 'بله'
+        : 'خیر'
+      : value || '—';
 }

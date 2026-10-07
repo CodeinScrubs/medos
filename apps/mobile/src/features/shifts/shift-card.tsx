@@ -1,85 +1,125 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Pressable } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { Badge, Button, Card, Column, Row, Text } from '@/components/ui';
+import { Badge, Button, Card, Column, Input, Row, Text } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
-import { activeShiftQuery, shiftPatientsQuery, shiftProgress } from './queries';
+import { matchesShiftDeck, type ShiftDeckRow } from './deck';
+import { ShiftPatientBrief } from './patient-brief';
+import { activeShiftWorkspaceQuery, shiftProgress } from './queries';
 
-/**
- * The shift, at the top of Today.
- *
- * One line when there is nothing to say — no shift open — and the round's
- * progress when there is. It does not list the patients: that is the shift
- * screen's job, and Today already has the admitted list below it.
- */
-export function ShiftCard() {
+/** The active patient deck is visible immediately; search reaches every member. */
+export function ShiftCard({ onShiftPresence }: { onShiftPresence?: (active: boolean | undefined) => void }) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
-  const { data: shifts, error, retry } = useLive(activeShiftQuery());
-  const shift = shifts?.[0] ?? null;
-
+  const now = new Date(useNow());
+  const { data, error, retry } = useLive(activeShiftWorkspaceQuery());
+  const shift = data?.[0]?.shift ?? null;
+  const rows = useMemo(
+    () =>
+      (data ?? []).flatMap(({ member, patient, encounter, nextTask }) =>
+        member && patient ? [{ member, patient, encounter, nextTask }] : [],
+      ),
+    [data],
+  );
+  const reliable = data !== undefined && !error;
+  const active = shift !== null;
+  useEffect(() => onShiftPresence?.(reliable ? active : undefined), [onShiftPresence, reliable, active]);
   return (
     <Card style={{ marginTop: spacing.lg, borderColor: shift ? colors.primary : colors.border, borderWidth: 1 }}>
-      <Pressable accessibilityRole="button" onPress={() => router.push('/shift')}>
-        <Row justify="space-between" align="center">
+      <Column gap="sm">
+        <Row justify="space-between" gap="xs">
           <Column gap="xxs" style={{ flex: 1 }}>
-            <Text variant="subheading">
-              {shift ? 'شیفت باز' : shifts === undefined || error ? 'شیفت' : 'شیفتی باز نیست'}
-            </Text>
+            <Text variant="subheading">{shift ? 'بیماران این شیفت' : reliable ? 'شیفتی باز نیست' : 'شیفت'}</Text>
             <Text variant="caption" color="textMuted">
               {shift
                 ? joinLabels([shift.ward, `از ${formatJalaliDateTime(shift.startAt)}`])
                 : error
-                  ? 'برای مشاهده بزنید'
-                  : shifts === undefined
-                    ? 'در حال خواندن…'
-                    : 'برای شروع بزنید'}
+                  ? 'خواندن کامل نشد'
+                  : reliable
+                    ? 'برای جمع‌کردن بیماران، شیفت را شروع کنید.'
+                    : 'در حال خواندن…'}
             </Text>
           </Column>
-          <Ionicons name="chevron-back" size={18} color={colors.textFaint} />
+          <Button
+            label={shift ? 'مدیریت شیفت' : 'شیفت'}
+            variant="ghost"
+            size="sm"
+            onPress={() => router.push('/shift')}
+          />
         </Row>
-      </Pressable>
-      <ErrorNotice error={error} what="شیفت" onRetry={retry} />
-      {shift && !error ? <ShiftRoundProgress key={shift.id} shiftId={shift.id} /> : null}
+        <ErrorNotice error={error} what="بیماران شیفت" onRetry={retry} />
+        {shift ? <ActiveDeck key={shift.id} rows={rows} now={now} reliable={reliable} /> : null}
+      </Column>
     </Card>
   );
 }
 
-/** A fresh mount per shift prevents the previous membership count from leaking across shifts. */
-function ShiftRoundProgress({ shiftId }: { shiftId: string }) {
+function ActiveDeck({ rows, now, reliable }: { rows: ShiftDeckRow[]; now: Date; reliable: boolean }) {
   const router = useRouter();
-  const { data: members, error, retry } = useLive(shiftPatientsQuery(shiftId), [shiftId]);
-  if (error) return <ErrorNotice error={error} what="بیماران شیفت" onRetry={retry} />;
-  if (members === undefined)
-    return (
-      <Text variant="tiny" color="textFaint">
-        در حال خواندن بیماران شیفت…
-      </Text>
-    );
-  const progress = shiftProgress(members);
-  if (!progress.total) return null;
-  const remaining = progress.total - progress.seen;
+  const [search, setSearch] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const progress = reliable ? shiftProgress(rows) : null;
+  const filtered = rows.filter((row) => matchesShiftDeck(row, search));
+  const visible = expanded || search.trim() ? filtered : filtered.slice(0, 4);
   return (
-    <Row justify="space-between" align="center" gap="sm">
-      <Badge
-        label={`${toPersianDigits(progress.seen)} از ${toPersianDigits(progress.total)}`}
-        tone={remaining === 0 ? 'success' : 'neutral'}
-      />
-      {remaining > 0 ? (
+    <Column gap="sm">
+      <Row justify="space-between" gap="sm">
+        <Badge
+          label={
+            progress
+              ? `${toPersianDigits(progress.seen)} از ${toPersianDigits(progress.total)} دیده‌شده`
+              : 'وضعیت نامشخص'
+          }
+          tone={progress && progress.total > 0 && progress.seen === progress.total ? 'success' : 'neutral'}
+        />
         <Button
-          label={`راند — ${toPersianDigits(remaining)} نفر مانده`}
+          label="راند"
           icon="walk-outline"
-          variant="secondary"
           size="sm"
+          variant="secondary"
+          disabled={!progress || progress.total === 0}
           onPress={() => router.push('/round')}
         />
+      </Row>
+      {rows.length > 4 ? (
+        <Input
+          label="جستجو در شیفت"
+          value={search}
+          onChangeText={setSearch}
+          icon="search-outline"
+          placeholder="نام، تخت یا کار بعدی…"
+        />
       ) : null}
-    </Row>
+      {visible.map((row) => (
+        <Card key={row.member.id} tone="alt">
+          <ShiftPatientBrief
+            row={row}
+            now={now}
+            disabled={!reliable}
+            onOpen={() => router.push({ pathname: '/patient/[id]', params: { id: row.patient.id } })}
+            onTask={() => router.push({ pathname: '/task', params: { taskId: row.nextTask!.id } })}
+          />
+        </Card>
+      ))}
+      {filtered.length === 0 && reliable ? (
+        <Text variant="caption" color="textMuted">
+          {search.trim() ? 'در این شیفت پیدا نشد.' : 'بیماران را از مدیریت شیفت اضافه کنید.'}
+        </Text>
+      ) : null}
+      {!search.trim() && rows.length > 4 ? (
+        <Button
+          label={expanded ? 'نمایش کوتاه' : `همهٔ ${toPersianDigits(rows.length)} بیمار همین‌جا`}
+          variant="ghost"
+          size="sm"
+          onPress={() => setExpanded((value) => !value)}
+        />
+      ) : null}
+    </Column>
   );
 }
