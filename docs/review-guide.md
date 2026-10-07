@@ -116,6 +116,13 @@ acknowledgment/focus and final-submission failure/retry. The older JSON voice
 codec is still supported; the unused staging helper is removed. This does not
 add general cross-editor text CAS. Source/native limits: validation-0.11.32.md.
 
+For 0.11.33, check the completed branch of `note-editor-screen.tsx` and the
+actual-screen/header witnesses in `media-editors.test.tsx`. The 0.11.32 native
+close crashed despite successful publication and green tests: switching the
+scroll host remounted ScreenOptions during Back. Identical title/right options
+are insufficient if the component remounts. The patch retains the same host;
+rebuilt native and software acceptance are separated in validation-0.11.33.md.
+
 The following integration test accelerates a 24-hour shift in real SQLite. It is
 not a 24-hour Android soak test or a physical-device performance measurement.
 

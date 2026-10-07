@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Keep the completed note's native header mounted
+
+**Agent:** GPT-6 via Codex
+**Commits:** correction in this commit; prior application `f1a7e03`.
+
+**Changed**
+- 0.11.33/code49 retains the completed note's scroll host. Changing it remounted
+  ScreenOptions and rewrote the native header during Back. No writer/schema/
+  dependency/route change. Real screen/header regression tests replace the old
+  string-host blind spot. AGENTS and architecture explain mounted ancestry.
+- Recorded exact 0.11.32 CI/APK/upgrade and its failed native close separately.
+
+**Verified**
+- 0.11.32 native Save-close crash reproduced twice. Independent exports preserve
+  original text/JSON/voice hash/time and intended publication with unrelated rows
+  unchanged. Native acceptance is still failed, not rescued by correct SQL.
+- Pre-fix real-header publication/discard witnesses fail; corrected two suites /
+  15 checks pass. Full check: 127 suites / 1,670 app tests and three workflows.
+
+**Not verified**
+- Exact 0.11.33 CI, signed/inspected APKs and native correction/recovery pending
+  here. No physical A52s, audible playback, performance/power/low-space or full
+  product/P0 sign-off. 0.11.32 is not an accepted install candidate.
+
+**Open threads**
+- Freeze source, build/inspect both ABIs, verify installed bytes, native upgrade,
+  old JSON voice publication, new draft stopped/cold voice, ready recovery and
+  discard. Then raw manual lab/contact recovery and remaining async forms.
+- Safe orphan-media accounting/cleanup: old-archive restore retains unrelated
+  files and full backup includes them. Never delete bytes to make QA pass.
+
+**Gotchas**
+- Keep the header under the same React ancestors on close. Screen.scroll is
+  structural, even if title/right-slot presence stay identical.
+- UI dump can see loading or time out before restore ACK. Observe success fresh
+  before dependent work. Dismiss the observed IME before automation swipes.
+
 ## 2026-10-08 — Journal new-note draft voices without overwriting recovered media
 
 **Agent:** GPT-6 via Codex

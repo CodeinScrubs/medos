@@ -400,8 +400,8 @@ function NoteEditor({
 
   if (completed) {
     return (
-      <Screen>
-        {/* Keep the native header's title and right-slot presence stable while closing. */}
+      <Screen scroll>
+        {/* Preserve the scroll host too: changing it remounts ScreenOptions during native close. */}
         <ScreenOptions options={{ title: isEdit ? 'ویرایش نوت' : 'نوت جدید', headerRight: () => null }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <Text>این پیش‌نویس بسته شد.</Text>

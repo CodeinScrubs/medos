@@ -130,7 +130,10 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
 - Header options inside a screen are `<ScreenOptions options={...} />`, never
   `<Stack.Screen options>` (ESLint enforces it). A native header that changes while its
   screen is being closed stops the app on Android; `ScreenOptions` only writes the header
-  when the title changes.
+  when the title or header-right presence changes.
+  Keep it mounted under the same React parents while closing, and retain the
+  title and header-right presence. Switching `Screen` from scrolling to plain
+  remounts its children and rewrites the native header even with identical options.
 - Editors guard leaving with `useSaveBeforeLeave(flush)`, which is on for the screen's
   whole life. Do not make the guard conditional: switching it off as a save finishes
   changes the header in the same moment `router.back()` removes the screen (the same

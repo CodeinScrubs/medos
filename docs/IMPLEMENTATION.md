@@ -35,6 +35,16 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.33: native 0.11.32 acceptance found/repeated a note-close crash after correct
+SQL publication. The completed branch now keeps the same scroll host so its
+ScreenOptions cannot remount/rewrite the native header during Back. Real
+screen/header publication and discard witnesses fail before, pass after;
+the former string-host editor tests missed this. See validation-0.11.33.md for
+source and rebuilt native checkpoints. 0.11.32 is not an accepted candidate.
+Finish this bounded native acceptance before raw manual lab/contact recovery.
+Restoring older archives also retains unrelated media bytes: safe orphan
+accounting/cleanup is open; do not delete them to make archive comparisons pass.
+
 0.11.32: new-note stopped voices reuse the recording journal. Canonical draft
 attachments survive later text autosave; pending jobs protect publication,
 retirement and parent identity. Note/history/media movement is one transaction,

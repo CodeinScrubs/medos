@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { notify } from '@/components/feedback';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Input } from '@/components/ui';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { attachments, captureInbox, noteDrafts, notes, recordingJobs } from '@/db/schema';
@@ -19,6 +20,7 @@ import { NoteEditorScreen } from './notes/note-editor-screen';
 let mockParams: Record<string, string>;
 let mockFocused = true;
 const mockBack = jest.fn();
+const mockNavigation = { isFocused: () => mockFocused, setOptions: jest.fn() };
 const mockFiles = new Set<string>();
 const mockCopies = jest.fn<(uri: string) => Promise<{ relativePath: string; sizeBytes: number }>>();
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -29,10 +31,13 @@ jest.mock('@/db/use-live', () => ({
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: mockBack, push: jest.fn() }),
+  useNavigation: () => mockNavigation,
 }));
-jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => mockNavigation }));
 jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
-jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
+jest.mock('react-native-keyboard-controller', () => ({
+  KeyboardAwareScrollView: jest.requireActual<typeof import('react-native')>('react-native').ScrollView,
+}));
 jest.mock('@/components/quick-date-field', () => ({ QuickDateField: 'QuickDateField' }));
 jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
 jest.mock('@/components/voice-recorder', () => ({ VoiceRecorder: 'VoiceRecorder' }));
@@ -45,7 +50,7 @@ jest.mock('@/components/ui', () => ({
   Column: 'Column',
   Input: 'Input',
   Row: 'Row',
-  Screen: 'Screen',
+  Screen: jest.requireActual<typeof import('@/components/ui/layout')>('@/components/ui/layout').Screen,
   SectionHeader: 'SectionHeader',
   SelectField: 'SelectField',
   Text: 'Text',
@@ -102,6 +107,7 @@ beforeEach(async () => {
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Patient' });
   mockParams = { id: patientId };
   mockBack.mockClear();
+  mockNavigation.setOptions.mockClear();
   jest.mocked(notify).mockClear();
   mockFocused = true;
   mockFiles.clear();
@@ -127,6 +133,37 @@ afterEach(async () => {
 });
 
 describe('voice metadata in real editor drafts', () => {
+  it.each(['publication', 'discard'] as const)(
+    'keeps the real screen header mounted through %s and close',
+    async (action) => {
+      await act(async () => {
+        tree = create(<NoteEditorScreen />);
+      });
+      const header = tree!.root.findByType(ScreenOptions);
+      expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        tree!.root
+          .findAllByType(Input)
+          .find((node) => node.props.label === 'عنوان')!
+          .props.onChangeText('Synthetic header witness');
+      });
+      const dialog = jest.spyOn(Alert, 'alert');
+      await act(async () => {
+        tree!.root
+          .findAllByType(Button)
+          .find((node) => node.props.label === (action === 'publication' ? 'ثبت در پرونده' : 'انصراف'))!
+          .props.onPress();
+        if (action === 'discard') {
+          dialog.mock.calls.at(-1)![2]!.find((button) => button.text === 'دور بریز')!.onPress!();
+        }
+        await settle();
+      });
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+      expect(tree!.root.findByType(ScreenOptions)).toBe(header);
+    },
+  );
+
   it('keeps the draft editable after publication fails and publishes the later correction on retry', async () => {
     await act(async () => {
       tree = create(<NoteEditorScreen />);

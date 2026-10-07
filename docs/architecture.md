@@ -1592,3 +1592,13 @@ republish the retired draft, nor navigate over another route. Completed renderin
 keeps the native header title and right-slot presence stable. Generic cross-editor
 text conflicts, active/pre-journal recording loss and physical/power/low-space
 acceptance remain separate work. Evidence and tradeoffs: validation-0.11.32.md.
+
+## Native header ancestry on completion (0.11.33)
+
+Header stability includes mounted ancestry, not just identical title/right-slot
+options. The native 0.11.32 close crashed because changing `Screen` from scrolling
+to plain remounted its nested `ScreenOptions` and rewrote the header during Back.
+The completed note retains its scroll host. Real screen/header regression checks
+cover publication and discard; no global navigation abstraction or editor rewrite
+was added. Keep this ancestry stable in other completion flows too. Native and
+source evidence have separate checkpoints in validation-0.11.33.md.
