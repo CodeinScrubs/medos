@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { orders, type Order } from '@/db/schema';
+import { encounters, orders, type Order } from '@/db/schema';
 import { startsWith } from '@/db/search';
-import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { currentEncounterQuery, resolveActiveEncounterId } from '@/features/encounters/queries';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -26,6 +26,28 @@ export function patientOrdersQuery(patientId: string, encounterId: string | null
         alive,
         eq(orders.patientId, patientId),
         encounterId ? or(eq(orders.encounterId, encounterId), isNull(orders.encounterId)) : isNull(orders.encounterId),
+      ),
+    )
+    .orderBy(asc(orders.sortOrder), desc(orders.startAt));
+}
+
+/**
+ * Resolve the current episode and its orders in one SQLite read. A separate
+ * awaited encounter read can fail or leave the previous episode's orders cached.
+ * The real encounter join also lets useLive watch changes to episode ownership.
+ */
+export function patientCurrentOrdersQuery(patientId: string) {
+  const current = currentEncounterQuery(patientId).as('snapshot_encounter');
+  const currentId = db.select({ id: current.id }).from(current);
+  return db
+    .select(getTableColumns(orders))
+    .from(orders)
+    .leftJoin(encounters, inArray(encounters.id, currentId))
+    .where(
+      and(
+        alive,
+        eq(orders.patientId, patientId),
+        or(eq(orders.encounterId, encounters.id), isNull(orders.encounterId)),
       ),
     )
     .orderBy(asc(orders.sortOrder), desc(orders.startAt));

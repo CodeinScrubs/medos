@@ -33,6 +33,46 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Keep patient overview failure distinct from missing records
+
+**Agent:** GPT-6 via Codex
+**Commits:** application and evidence in this commit; baseline `a3136e7`.
+
+**Changed**
+- Freshly fetch/review all five unchanged open PR heads; dispositions unchanged.
+- Overview/diagnosis/consult loading and failed reads no longer claim empty/zero.
+  Retain rows/input and offer failure-only retry; use the shared admission clock.
+- Resolve snapshot episode and orders in one joined/watched SQL statement;
+  retain explicit historical scope and suppress unreliable cached success/totals.
+- Correct architecture's blanket unchanged-portability claim; record witnesses
+  and limits in validation-0.11.28. Version 0.11.28 / code 44, work performed solo.
+  No dependencies/schema/clinical rules/routes/normal-path dialogs added.
+
+**Verified**
+- Clean baseline: 118 suites / 1515 app tests + three workflows; main CI
+  `37583735329` success; same five GitHub heads, all still open/unmerged.
+- Corrected witnesses typechecked then failed 16 / passed 27 on unchanged source.
+- First post-fix two targeted suites passed 53 tests plus typecheck; two more
+  cache/retry checks added afterward. Final full check passed typecheck, lint
+  (zero warnings), formatting, 118 suites / 1536 app tests + three workflows.
+
+**Not verified**
+- Exact-source CI and signed/native packages pending.
+- Physical phone, complete shift timings, native failure/lifecycle matrix,
+  stopped-draft voice/process interruption, clinical validation or completeness.
+
+**Open threads**
+- Finish this exact source's package/native/CI gates, then compatible
+  dependency patches, durable new-note/capture stopped voices, remaining raw
+  recovery and measured offline shift. Revised PRs must pass their witnesses.
+
+**Gotchas**
+- Joined-read fault injection affects both timeline panel/value queries; retry
+  expectations now reflect both. Invalid `phone` fixture, nullable narrowing and
+  loose clock substring were corrected before the valid pre-fix evidence.
+- The order projection must keep a real encounter join: subquery tables alone
+  are not observed by useLive. No existing migration/backup scheme was changed.
+
 ## 2026-10-07 — Review all five PRs and keep clinical completion truthful
 
 **Agent:** GPT-6 via Codex

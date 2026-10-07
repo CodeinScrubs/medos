@@ -52,6 +52,15 @@ own verification; trace the remaining parent/tool/runtime paths. Do not apply
 npm's suggested framework downgrades or `audit fix --force`. Exact versions,
 primary advisory links and limits are in the audit's dependency section.
 
+2026-10-07, 0.11.28: live GitHub refresh found the same five open PR heads;
+their audit dispositions remain unchanged. The main overview now separates
+failed/loading reads from empty follow-ups, contacts, diagnoses, consults and
+admissions; retains loaded rows/typed input, offers retry and updates admission
+duration from the shared clock. The compact kardex resolves episode ownership
+and orders in one watched SQLite statement. No new route, normal-path dialog,
+dependency, schema or clinical rule. See validation-0.11.28.md for separate gates;
+this does not close raw recovery, physical-phone or full-shift acceptance.
+
 2026-10-07, 0.11.26: original intent is captured before initial reads for patient,
 admission/edit/discharge, follow-up and consult-answer forms. Their Autosave and
 manual publication/comparison/load/adopt/discard use that token through final

@@ -43,8 +43,12 @@ and colour literals are an error outside `theme/`.
 
 The rules live in `apps/mobile/eslint.config.js` as `no-restricted-imports` patterns, so a
 wrong-way import fails `npm run check` instead of relying on review. The payoff is concrete:
-`lib/` and `db/schema/` depend on nothing app-specific, so a web dashboard — or a desktop
-tool that opens backups — can reuse them unchanged.
+pure text/number/date rules and schema definitions can be reused by a later client.
+This does not make the entire `lib/` directory platform-independent: `lib/ids.ts`
+uses Expo Crypto, and the backup crypto implementation has native bindings. A web
+dashboard or independent backup tool needs the corresponding runtime adapters,
+preserving ids, archive semantics and cryptographic vectors. Layer boundaries do
+not prove portability or justify copying the Android database client unchanged.
 
 **Rejected: extracting `packages/core` now.** It would add a build step and a second
 TypeScript project for a consumer that does not exist yet. The lint rules keep the
@@ -106,6 +110,25 @@ requiring a database mutation or navigation. Overlapping requests are coalesced,
 late results from a disposed subscription are ignored, and synchronous thenable
 failures become read errors too. Rows intentionally survive dependency changes;
 identity-sensitive children such as the shift progress card must be keyed by id.
+
+The patient overview applies this contract to admission, follow-ups, contacts,
+important notes, diagnoses and consults (0.11.28). Loading/failed reads do not
+claim zero, absence or completion; retry leaves loaded rows and typed input in
+place. The admission-duration display uses the shared live clock.
+
+`patientCurrentOrdersQuery` selects the current encounter and its standing/episode
+orders in one SQLite statement, reusing `currentEncounterQuery`'s ordering and
+deleted-episode rule. A real encounter join makes episode changes observable by
+`useLive`; an unobserved scalar subquery alone would miss that event. Explicit
+historical-episode queries keep `patientOrdersQuery`. No write/schema or episode
+selection semantics change, and no general repository layer is introduced.
+
+**Rejected: resolving an encounter in one awaited read and treating null/failure
+as a valid order scope in the next.** The initial failure can omit admission
+orders, and a dependency change can retain a previous scope's cached orders.
+One coherent projection removes that dependency without remounting the patient
+workspace. Failure feedback is still required; software fault injection is not
+proof of native power-loss recovery.
 
 Today and timeline expose failed sources and retry, withhold unreliable totals
 and empty/success claims, and retain available rows. `ErrorNotice` keeps technical

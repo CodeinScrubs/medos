@@ -43,7 +43,7 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
   const scope = useAutosaveScope()!;
   const { generation } = useDatasetIntent();
   const { spacing } = useTheme();
-  const { data, error } = useLive(patientConsultsQuery(patientId), [patientId]);
+  const { data, error, retry } = useLive(patientConsultsQuery(patientId), [patientId]);
   const rows = data ?? [];
   const [composing, setComposing] = useState(false);
 
@@ -68,10 +68,10 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
 
   return (
     <>
-      <ErrorNotice error={error} what="کانسالت‌ها" />
+      <ErrorNotice error={error} what="کانسالت‌ها" onRetry={retry} />
       <SectionHeader
         title="کانسالت‌ها"
-        count={rows.length}
+        count={data !== undefined && !error ? rows.length : undefined}
         action={
           composing ? null : (
             <Pressable hitSlop={8} onPress={() => setComposing(true)}>
@@ -84,7 +84,7 @@ export function ConsultsSection({ patientId }: { patientId: string }) {
       />
       <Column gap="sm">
         <ConsultRequestEditor patientId={patientId} open={composing} onDone={() => setComposing(false)} />
-        {rows.length === 0 && data !== undefined && !composing ? (
+        {rows.length === 0 && data !== undefined && !error && !composing ? (
           <Card tone="alt">
             <Text variant="caption" color="textFaint">
               کانسالتی ثبت نشده.

@@ -8,10 +8,9 @@ import { Card, Column, Divider, Row, SectionHeader, Text } from '@/components/ui
 import { useNow } from '@/components/use-now';
 import type { Note } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { currentEncounterQuery } from '@/features/encounters/queries';
 import { ORDER_STATUS_LABELS } from '@/features/kardex/labels';
 import { isRunning } from '@/features/kardex/logic';
-import { patientOrdersQuery } from '@/features/kardex/queries';
+import { patientCurrentOrdersQuery } from '@/features/kardex/queries';
 import { FLAG_LABEL, flagTone, type LabFlag } from '@/features/labs/flags';
 import { labsToReview } from '@/features/labs/logic';
 import { patientLabValuesQuery } from '@/features/labs/queries';
@@ -44,9 +43,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
 
   const vitals = useLive(patientVitalsQuery(patientId, 1), [patientId]);
   const labs = useLive(patientLabValuesQuery(patientId), [patientId]);
-  const encounters = useLive(currentEncounterQuery(patientId), [patientId]);
-  const encounterId = encounters.data?.[0]?.id ?? null;
-  const orders = useLive(patientOrdersQuery(patientId, encounterId), [patientId, encounterId]);
+  const orders = useLive(patientCurrentOrdersQuery(patientId), [patientId]);
   const notes = useLive(latestPatientNoteQuery(patientId), [patientId]);
 
   const open = (tab: RecordTab) => router.setParams({ tab });
@@ -113,7 +110,9 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
           </Row>
         ) : (
           <Text variant="caption" color="textMuted">
-            آخرین نتیجه‌ی {toPersianDigits(review.analytes)} آزمایش: بدون H یا L
+            {labs.error
+              ? 'نتایج قبلی؛ نیاز به بازخوانی'
+              : `آخرین نتیجه‌ی ${toPersianDigits(review.analytes)} آزمایش: بدون H یا L`}
           </Text>
         )}
       </SnapshotRow>,
@@ -126,7 +125,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
         key="kardex"
         icon="medical-outline"
         title="کاردکس"
-        when={`${toPersianDigits(running.length)} دستور جاری`}
+        when={orders.error ? 'نیاز به بازخوانی' : `${toPersianDigits(running.length)} دستور جاری`}
         onPress={() => open('kardex')}
       >
         <Row gap="sm" wrap>
@@ -157,13 +156,18 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
     );
   }
 
-  const error = vitals.error ?? labs.error ?? orders.error ?? notes.error;
+  const sources = [vitals, labs, orders, notes];
+  const error = sources.find((source) => source.error)?.error;
   if (rows.length === 0 && !error) return null;
 
   return (
     <>
       <SectionHeader title="در یک نگاه" />
-      <ErrorNotice error={error} what="خلاصه‌ی بیمار" />
+      <ErrorNotice
+        error={error}
+        what="خلاصه‌ی بیمار"
+        onRetry={() => sources.filter((source) => source.error).forEach((source) => source.retry())}
+      />
       {rows.length > 0 ? (
         <Card padded={false}>
           {rows.map((row, i) => (

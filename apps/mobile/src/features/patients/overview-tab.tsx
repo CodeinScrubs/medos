@@ -3,8 +3,10 @@ import { useRouter } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, DataRow, Divider, Row, SectionHeader, Text } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import type { Patient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { ConsultsSection } from '@/features/consults/consults-section';
@@ -33,9 +35,17 @@ export function OverviewTab({ patient }: { patient: Patient }) {
   const { colors } = useTheme();
   const patientId = patient.id;
 
-  const { data: contacts } = useLive(patientContactsQuery(patientId), [patientId]);
-  const { data: followUps } = useLive(patientFollowUpsQuery(patientId), [patientId]);
-  const { data: notes } = useLive(patientNotesQuery(patientId), [patientId]);
+  const {
+    data: contacts,
+    error: contactsError,
+    retry: retryContacts,
+  } = useLive(patientContactsQuery(patientId), [patientId]);
+  const {
+    data: followUps,
+    error: followUpsError,
+    retry: retryFollowUps,
+  } = useLive(patientFollowUpsQuery(patientId), [patientId]);
+  const { data: notes, error: notesError, retry: retryNotes } = useLive(patientNotesQuery(patientId), [patientId]);
 
   const pendingFollowUps = (followUps ?? []).filter((f) => f.status === 'pending');
   const events = (notes ?? []).filter(isHighlighted).slice(0, 8);
@@ -61,7 +71,7 @@ export function OverviewTab({ patient }: { patient: Patient }) {
 
       <SectionHeader
         title="پیگیری‌ها"
-        count={pendingFollowUps.length}
+        count={followUps !== undefined && !followUpsError ? pendingFollowUps.length : undefined}
         action={
           <Pressable
             hitSlop={8}
@@ -73,55 +83,59 @@ export function OverviewTab({ patient }: { patient: Patient }) {
           </Pressable>
         }
       />
+      <ErrorNotice error={followUpsError} what="پیگیری‌ها" onRetry={retryFollowUps} />
       {pendingFollowUps.length > 0 ? (
         <Column gap="sm">
           {pendingFollowUps.map((f) => (
             <FollowUpCard key={f.id} followUp={f} patient={patient} />
           ))}
         </Column>
-      ) : (
+      ) : followUps !== undefined && !followUpsError ? (
         <Card tone="alt">
           <Text variant="caption" color="textFaint">
             پیگیری بازی نیست.
           </Text>
         </Card>
-      )}
+      ) : null}
 
-      {events.length > 0 && (
+      {(events.length > 0 || notesError) && (
         <>
-          <SectionHeader title="رویدادهای مهم" count={events.length} />
-          <Card>
-            {events.map((n, i) => (
-              <View key={n.id}>
-                {i > 0 && <Divider />}
-                <Row gap="sm" align="flex-start" style={{ paddingVertical: 8 }}>
-                  <Ionicons
-                    name={n.type === 'event' ? 'flash' : 'pin'}
-                    size={14}
-                    color={n.type === 'event' ? colors.warning : colors.primary}
-                    style={{ marginTop: 5 }}
-                  />
-                  <Column gap="xxs" style={styles.grow}>
-                    <Text variant="bodyStrong">{n.title || n.body || n.assessment || '—'}</Text>
-                    {n.title && n.body ? (
-                      <Text variant="caption" color="textMuted" numberOfLines={2}>
-                        {n.body}
+          <SectionHeader title="رویدادهای مهم" count={!notesError ? events.length : undefined} />
+          <ErrorNotice error={notesError} what="رویدادهای مهم" onRetry={retryNotes} />
+          {events.length > 0 ? (
+            <Card>
+              {events.map((n, i) => (
+                <View key={n.id}>
+                  {i > 0 && <Divider />}
+                  <Row gap="sm" align="flex-start" style={{ paddingVertical: 8 }}>
+                    <Ionicons
+                      name={n.type === 'event' ? 'flash' : 'pin'}
+                      size={14}
+                      color={n.type === 'event' ? colors.warning : colors.primary}
+                      style={{ marginTop: 5 }}
+                    />
+                    <Column gap="xxs" style={styles.grow}>
+                      <Text variant="bodyStrong">{n.title || n.body || n.assessment || '—'}</Text>
+                      {n.title && n.body ? (
+                        <Text variant="caption" color="textMuted" numberOfLines={2}>
+                          {n.body}
+                        </Text>
+                      ) : null}
+                      <Text variant="tiny" color="textFaint">
+                        {formatJalaliDateTime(n.noteDate)}
                       </Text>
-                    ) : null}
-                    <Text variant="tiny" color="textFaint">
-                      {formatJalaliDateTime(n.noteDate)}
-                    </Text>
-                  </Column>
-                </Row>
-              </View>
-            ))}
-          </Card>
+                    </Column>
+                  </Row>
+                </View>
+              ))}
+            </Card>
+          ) : null}
         </>
       )}
 
       <SectionHeader
         title="همراهان"
-        count={contacts?.length ?? 0}
+        count={contacts !== undefined && !contactsError ? contacts.length : undefined}
         action={
           <Pressable
             hitSlop={8}
@@ -133,6 +147,7 @@ export function OverviewTab({ patient }: { patient: Patient }) {
           </Pressable>
         }
       />
+      <ErrorNotice error={contactsError} what="همراهان" onRetry={retryContacts} />
       {contacts && contacts.length > 0 ? (
         <Column gap="sm">
           {contacts.map((c) => (
@@ -161,13 +176,13 @@ export function OverviewTab({ patient }: { patient: Patient }) {
             </Pressable>
           ))}
         </Column>
-      ) : (
+      ) : contacts !== undefined && !contactsError ? (
         <Card tone="alt">
           <Text variant="caption" color="textFaint">
             شماره‌ی همراه ثبت نشده است.
           </Text>
         </Card>
-      )}
+      ) : null}
 
       {historyFields.length > 0 && (
         <>
@@ -203,27 +218,36 @@ export function OverviewTab({ patient }: { patient: Patient }) {
 function AdmissionCard({ patientId }: { patientId: string }) {
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
-  const { data } = useLive(activeEncounterDetailQuery(patientId), [patientId]);
+  const now = new Date(useNow());
+  const { data, error, loading, retry } = useLive(activeEncounterDetailQuery(patientId), [patientId]);
   const current = data?.[0];
 
   if (!current) {
     return (
-      <Row gap="sm" style={{ marginTop: spacing.lg }}>
-        <View style={styles.grow}>
-          <Button
-            label="ثبت بستری / ویزیت"
-            icon="bed-outline"
-            variant="ghost"
-            full
-            onPress={() => router.push({ pathname: '/patient/[id]/encounter', params: { id: patientId } })}
-          />
-        </View>
-      </Row>
+      <Column gap="sm" style={{ marginTop: spacing.lg }}>
+        <ErrorNotice error={error} what="بستری / ویزیت" onRetry={retry} />
+        {loading ? (
+          <Text variant="caption" color="textMuted">
+            در حال خواندن بستری…
+          </Text>
+        ) : null}
+        {data !== undefined && !error ? (
+          <View style={styles.grow}>
+            <Button
+              label="ثبت بستری / ویزیت"
+              icon="bed-outline"
+              variant="ghost"
+              full
+              onPress={() => router.push({ pathname: '/patient/[id]/encounter', params: { id: patientId } })}
+            />
+          </View>
+        ) : null}
+      </Column>
     );
   }
 
   const { encounter, place, attending } = current;
-  const elapsed = formatAdmissionElapsed(admissionElapsed(encounter.admittedAt, encounter.admittedAtHasTime));
+  const elapsed = formatAdmissionElapsed(admissionElapsed(encounter.admittedAt, encounter.admittedAtHasTime, now));
   const location = joinLabels([
     place?.name,
     encounter.ward,
@@ -232,90 +256,93 @@ function AdmissionCard({ patientId }: { patientId: string }) {
   const isAdmission = isInpatient(encounter.kind);
 
   return (
-    <Card style={{ marginTop: spacing.lg, borderColor: colors.primary, borderWidth: 1 }}>
-      <Column gap="sm">
-        <Row justify="space-between" align="flex-start">
-          <Column gap="xxs" style={styles.grow}>
-            <Row gap="xs">
-              <Badge label={ENCOUNTER_KIND_LABELS[encounter.kind]} tone="primary" />
-              {encounter.service ? <Badge label={encounter.service} tone="neutral" /> : null}
-            </Row>
-            {location ? <Text variant="subheading">{location}</Text> : null}
-            {attending ? (
-              <Text variant="caption" color="textMuted">
-                اتند: {doctorDisplayName(attending)}
-              </Text>
+    <>
+      <ErrorNotice error={error} what="بستری / ویزیت" onRetry={retry} />
+      <Card style={{ marginTop: spacing.lg, borderColor: colors.primary, borderWidth: 1 }}>
+        <Column gap="sm">
+          <Row justify="space-between" align="flex-start">
+            <Column gap="xxs" style={styles.grow}>
+              <Row gap="xs">
+                <Badge label={ENCOUNTER_KIND_LABELS[encounter.kind]} tone="primary" />
+                {encounter.service ? <Badge label={encounter.service} tone="neutral" /> : null}
+              </Row>
+              {location ? <Text variant="subheading">{location}</Text> : null}
+              {attending ? (
+                <Text variant="caption" color="textMuted">
+                  اتند: {doctorDisplayName(attending)}
+                </Text>
+              ) : null}
+            </Column>
+
+            {isAdmission && elapsed ? (
+              <View
+                style={{
+                  backgroundColor: colors.primarySoft,
+                  borderRadius: radii.md,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
+                  alignItems: 'center',
+                }}
+              >
+                <Text variant="subheading" color="primary">
+                  {elapsed}
+                </Text>
+                <Text variant="tiny" color="primary">
+                  از بستری
+                </Text>
+              </View>
             ) : null}
-          </Column>
+          </Row>
 
-          {isAdmission && elapsed ? (
-            <View
-              style={{
-                backgroundColor: colors.primarySoft,
-                borderRadius: radii.md,
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.xs,
-                alignItems: 'center',
-              }}
-            >
-              <Text variant="subheading" color="primary">
-                {elapsed}
-              </Text>
-              <Text variant="tiny" color="primary">
-                از بستری
-              </Text>
-            </View>
+          {encounter.chiefComplaint ? (
+            <Text variant="body" color="textMuted">
+              CC: {encounter.chiefComplaint}
+            </Text>
           ) : null}
-        </Row>
 
-        {encounter.chiefComplaint ? (
-          <Text variant="body" color="textMuted">
-            CC: {encounter.chiefComplaint}
-          </Text>
-        ) : null}
+          {encounter.admittedAt ? (
+            <Text variant="tiny" color="textFaint">
+              از {formatJalali(encounter.admittedAt)} ({formatRelative(encounter.admittedAt, now)})
+            </Text>
+          ) : null}
 
-        {encounter.admittedAt ? (
-          <Text variant="tiny" color="textFaint">
-            از {formatJalali(encounter.admittedAt)} ({formatRelative(encounter.admittedAt)})
-          </Text>
-        ) : null}
-
-        <Row gap="sm">
-          <View style={styles.grow}>
-            <Button
-              label="ویرایش"
-              icon="create-outline"
-              variant="ghost"
-              size="sm"
-              full
-              onPress={() =>
-                router.push({
-                  pathname: '/patient/[id]/encounter',
-                  params: { id: patientId, encounterId: encounter.id },
-                })
-              }
-            />
-          </View>
-          {isAdmission && (
+          <Row gap="sm">
             <View style={styles.grow}>
               <Button
-                label="ترخیص"
-                icon="exit-outline"
-                variant="secondary"
+                label="ویرایش"
+                icon="create-outline"
+                variant="ghost"
                 size="sm"
                 full
                 onPress={() =>
                   router.push({
-                    pathname: '/patient/[id]/discharge',
+                    pathname: '/patient/[id]/encounter',
                     params: { id: patientId, encounterId: encounter.id },
                   })
                 }
               />
             </View>
-          )}
-        </Row>
-      </Column>
-    </Card>
+            {isAdmission && (
+              <View style={styles.grow}>
+                <Button
+                  label="ترخیص"
+                  icon="exit-outline"
+                  variant="secondary"
+                  size="sm"
+                  full
+                  onPress={() =>
+                    router.push({
+                      pathname: '/patient/[id]/discharge',
+                      params: { id: patientId, encounterId: encounter.id },
+                    })
+                  }
+                />
+              </View>
+            )}
+          </Row>
+        </Column>
+      </Card>
+    </>
   );
 }
 

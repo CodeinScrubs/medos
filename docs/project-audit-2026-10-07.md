@@ -20,6 +20,13 @@ green CI, a successful APK build, and software tests are different kinds of
 evidence. The next acceptance target should be an offline 40-patient shift on
 the owner's phone, with interruption/recovery and measured common actions.
 
+The subsequent same-day refresh on clean main `a3136e7` fetched GitHub again:
+all five reviewed heads remain unchanged/open, and exact main CI `37583735329`
+is successful. Their dispositions therefore remain unchanged. The follow-up
+0.11.28 slice fixes additional main-branch overview read failures; it does not
+integrate any rejected PR. Its separate evidence is in
+[validation-0.11.28.md](validation-0.11.28.md).
+
 ## 1. Evidence and exact scope
 
 The audited main source is `466a1a886bba55b05defed59a1b741c7f7e21b5d`, version
@@ -256,9 +263,16 @@ establishes the proposed two-second entry claim.
   owner's manual current problem, episode impressions or both. Do not silently
   overwrite it or derive a confirmed diagnosis from free text. This is a
   source-reviewed consistency risk, not a reproduced wrong-diagnosis incident.
-- **Read failure honesty:** `PatientSnapshot` does not include encounter-read
-  errors in its combined notice and supplies no summary retry. This remains a
-  source-reviewed gap. A failed context query must not look like “no orders.”
+- **Read failure honesty:** the 0.11.27 snapshot omitted encounter-read errors
+  and supplied no retry. Further probes also reproduced false empty/zero claims
+  for overview follow-ups/contacts and patient diagnoses/consults, missing
+  admission/important-note failure feedback, and a non-live admission clock.
+  Sixteen finalized checks failed on unchanged source; these are not sixteen
+  independent bugs. The 0.11.28 slice preserves rows/input, adds failure-only
+  retry, withholds unreliable totals/absence claims and uses one coherent current
+  order read. Broader auxiliary read paths and device failure acceptance remain
+  open; see the new validation record rather than treating the whole product as
+  accepted.
 - **Durable recovery:** note/capture drafts and several raw forms persist, but
   mounted text preservation is not universal crash recovery. Durable stopped
   voice publication is implemented for existing records, not yet fully wired

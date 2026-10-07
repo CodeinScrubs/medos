@@ -38,7 +38,7 @@ const STATUS_TONE: Record<Diagnosis['status'], 'success' | 'neutral' | 'info'> =
 export function DiagnosesSection({ patientId }: { patientId: string }) {
   const { generation } = useDatasetIntent();
   const { colors, spacing } = useTheme();
-  const { data, error } = useLive(patientDiagnosesQuery(patientId), [patientId]);
+  const { data, error, retry } = useLive(patientDiagnosesQuery(patientId), [patientId]);
   const rows = data ?? [];
 
   const [title, setTitle] = useState('');
@@ -130,8 +130,8 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
 
   return (
     <>
-      <ErrorNotice error={error} what="تشخیص‌ها" />
-      <SectionHeader title="تشخیص‌ها" count={active.length} />
+      <ErrorNotice error={error} what="تشخیص‌ها" onRetry={retry} />
+      <SectionHeader title="تشخیص‌ها" count={data !== undefined && !error ? active.length : undefined} />
       <Column gap="sm">
         <Row gap="sm">
           <View style={styles.grow}>
@@ -166,7 +166,7 @@ export function DiagnosesSection({ patientId }: { patientId: string }) {
           }}
         />
 
-        {rows.length === 0 && data !== undefined ? (
+        {rows.length === 0 && data !== undefined && !error ? (
           <Text variant="tiny" color="textFaint" style={{ marginBottom: spacing.xs }}>
             هنوز تشخیصی ثبت نشده.
           </Text>

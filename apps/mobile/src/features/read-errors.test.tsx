@@ -14,18 +14,31 @@ import { createTestDatabase } from '@/test/sqljs';
 import { CaptureCard } from './capture/capture-card';
 import { InboxSection } from './capture/inbox-section';
 import * as captures from './capture/queries';
+import { ConsultsSection } from './consults/consults-section';
 import { OpenConsults } from './consults/open-consults';
 import { openConsultsQuery, createConsult, patientConsultsQuery } from './consults/queries';
+import { DiagnosesSection } from './diagnoses/diagnoses-section';
+import { patientDiagnosesQuery } from './diagnoses/queries';
 import { upcomingOccasionsQuery } from './doctors/occasions-queries';
 import { UpcomingOccasions } from './doctors/upcoming-occasions';
-import { openEncounter } from './encounters/queries';
-import { dueFollowUpsQuery } from './followups/queries';
-import { patientLabPanelsQuery } from './labs/queries';
+import { activeEncounterDetailQuery, currentEncounterQuery, openEncounter } from './encounters/queries';
+import { FollowUpCard } from './followups/follow-up-card';
+import { createFollowUp, dueFollowUpsQuery, patientFollowUpsQuery } from './followups/queries';
+import { createOrder, patientOrdersQuery } from './kardex/queries';
+import { createLabPanel, patientLabPanelsQuery, patientLabValuesQuery } from './labs/queries';
 import { openNoteDraftsQuery } from './notes/draft-queries';
 import { createNote, latestPatientNoteQuery } from './notes/queries';
 import { UnfinishedNotes } from './notes/unfinished-notes';
+import { OverviewTab } from './patients/overview-tab';
 import { PatientCard } from './patients/patient-card';
-import { createPatient, patientListQuery } from './patients/queries';
+import { PatientSnapshot } from './patients/patient-snapshot';
+import {
+  addPatientContact,
+  createPatient,
+  patientContactsQuery,
+  patientListQuery,
+  patientQuery,
+} from './patients/queries';
 import {
   activeShiftQuery,
   activeShiftWorkspaceQuery,
@@ -49,6 +62,7 @@ const mockCache = new Map<string, unknown[]>();
 const mockErrors = new Map<string, Error>();
 const mockLoading = new Set<string>();
 const mockRetried: string[] = [];
+let mockNow = new Date('2026-09-25T12:00:00Z').getTime();
 const mockScope = {
   perform: (action: () => void) => action(),
   group: new SaveGroup(),
@@ -57,10 +71,12 @@ const mockScope = {
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[]; toSQL(): unknown }) => {
     const { tablesOf: tables } = jest.requireActual<typeof import('@/db/query-tables')>('@/db/query-tables');
-    const table = tables(query)[0]!;
+    const watched = tables(query);
+    const table = watched[0]!;
     const key = JSON.stringify(query.toSQL());
-    const error = mockErrors.get(table);
-    if (!error && !mockLoading.has(table)) {
+    const failed = watched.find((name) => mockErrors.has(name));
+    const error = failed ? mockErrors.get(failed) : undefined;
+    if (!error && !watched.some((name) => mockLoading.has(name))) {
       const rows = query.all();
       if (JSON.stringify(rows) !== JSON.stringify(mockCache.get(key))) mockCache.set(key, rows);
     }
@@ -70,8 +86,8 @@ jest.mock('@/db/use-live', () => ({
       error,
       loading: data === undefined && !error,
       retry: () => {
-        mockRetried.push(table);
-        mockErrors.delete(table);
+        mockRetried.push(failed ?? table);
+        if (failed) mockErrors.delete(failed);
       },
     };
   },
@@ -84,10 +100,14 @@ jest.mock('@/components/ui', () => ({
   Badge: 'Badge',
   Button: 'Button',
   Card: 'Card',
+  ChipSelect: 'ChipSelect',
   Column: 'Column',
+  DataRow: 'DataRow',
+  Divider: 'Divider',
   EmptyState: 'EmptyState',
   Fab: 'Fab',
   Input: 'Input',
+  IconButton: 'IconButton',
   Row: 'Row',
   Screen: 'Screen',
   SectionHeader: 'SectionHeader',
@@ -102,7 +122,8 @@ jest.mock('@/components/feedback', () => ({
   alertError: jest.fn(),
   notify: jest.requireActual<typeof import('@/components/feedback')>('@/components/feedback').notify,
 }));
-jest.mock('@/components/use-now', () => ({ useNow: () => new Date('2026-09-25T12:00:00Z').getTime() }));
+jest.mock('@/components/use-now', () => ({ useNow: () => mockNow }));
+jest.mock('@/components/prompt-modal', () => ({ PromptModal: 'PromptModal' }));
 jest.mock('@/components/autosave-scope', () => ({
   AutosaveScope: ({ children }: { children: ReactNode }) => children,
   useAutosaveScope: () => mockScope,
@@ -114,6 +135,7 @@ jest.mock('./patients/patient-card', () => ({ PatientCard: 'PatientCard' }));
 jest.mock('./followups/follow-up-card', () => ({ FollowUpCard: 'FollowUpCard' }));
 jest.mock('./tasks/quick-add', () => ({ QuickAddTask: 'QuickAddTask' }));
 jest.mock('./tasks/task-row', () => ({ TaskRow: 'TaskRow' }));
+jest.mock('./consults/request-editor', () => ({ ConsultRequestEditor: 'ConsultRequestEditor' }));
 
 let tree: ReactTestRenderer;
 let patientId: string;
@@ -145,6 +167,7 @@ async function retryAll() {
 }
 
 beforeEach(async () => {
+  mockNow = new Date('2026-09-25T12:00:00Z').getTime();
   mockScope.generation = datasetGeneration();
   useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Example', lastName: 'Patient', status: 'outpatient' });
@@ -158,6 +181,203 @@ afterEach(async () => {
     tree?.unmount();
   });
   jest.restoreAllMocks();
+});
+
+describe('patient overview read recovery', () => {
+  const header = (title: string) => tree.root.findAllByType(SectionHeader).find((node) => node.props.title === title)!;
+  const overview = async () => <OverviewTab patient={(await patientQuery(patientId))[0]!} />;
+  const sources = () => [
+    { query: patientFollowUpsQuery(patientId), title: 'پیگیری‌ها', empty: 'پیگیری بازی نیست.', element: overview },
+    {
+      query: patientContactsQuery(patientId),
+      title: 'همراهان',
+      empty: 'شماره‌ی همراه ثبت نشده است.',
+      element: overview,
+    },
+    {
+      query: patientDiagnosesQuery(patientId),
+      title: 'تشخیص‌ها',
+      empty: 'هنوز تشخیصی ثبت نشده.',
+      element: async () => <DiagnosesSection patientId={patientId} />,
+    },
+    {
+      query: patientConsultsQuery(patientId),
+      title: 'کانسالت‌ها',
+      empty: 'کانسالتی ثبت نشده.',
+      element: async () => <ConsultsSection patientId={patientId} />,
+    },
+  ];
+
+  it.each([0, 1, 2, 3])(
+    'does not present cached-empty source %i as a successful empty read after failure',
+    async (index) => {
+      const { query, title, empty, element } = sources()[index]!;
+      const screen = await element();
+      await render(screen);
+      expect(text()).toContain(empty);
+      fail(query);
+      await refresh(screen);
+      expect(text()).not.toContain(empty);
+      expect(header(title).props.count).toBeUndefined();
+      const notice = notices().find((node) => node.props.what === title)!;
+      expect(notice).toBeDefined();
+      expect(typeof notice.props.onRetry).toBe('function');
+      await act(async () => notice.props.onRetry());
+      await refresh(screen);
+      expect(header(title).props.count).toBe(0);
+      expect(text()).toContain(empty);
+    },
+  );
+
+  it.each([0, 1, 2, 3])('does not report zero for source %i before it has loaded', async (index) => {
+    const { query, title, empty, element } = sources()[index]!;
+    mockLoading.add(tableOf(query));
+    await render(await element());
+    expect(header(title).props.count).toBeUndefined();
+    expect(text()).not.toContain(empty);
+  });
+
+  it('retains loaded follow-ups and contacts while exposing their independent read failures', async () => {
+    await createFollowUp({
+      patientId,
+      dueAt: new Date('2026-09-26T12:00:00Z'),
+      reason: 'Synthetic pending follow-up',
+      channel: 'call',
+      priority: 'normal',
+    });
+    await addPatientContact(patientId, { name: 'Synthetic companion', phone: '0000000027' });
+    const screen = await overview();
+    await render(screen);
+    fail(patientFollowUpsQuery(patientId));
+    fail(patientContactsQuery(patientId));
+    await refresh(screen);
+    expect(tree.root.findByType(FollowUpCard).props.followUp.reason).toBe('Synthetic pending follow-up');
+    expect(text()).toContain('Synthetic companion');
+    expect(header('پیگیری‌ها').props.count).toBeUndefined();
+    expect(header('همراهان').props.count).toBeUndefined();
+    expect(notices().filter((node) => ['پیگیری‌ها', 'همراهان'].includes(node.props.what))).toHaveLength(2);
+  });
+
+  it('does not suggest an absent admission while its first read is loading or has failed', async () => {
+    const query = activeEncounterDetailQuery(patientId);
+    mockLoading.add(tableOf(query));
+    const screen = await overview();
+    await render(screen);
+    expect(tree.root.findAllByType(Button).some((node) => node.props.label === 'ثبت بستری / ویزیت')).toBe(false);
+    mockLoading.clear();
+    fail(query);
+    await refresh(screen);
+    expect(notices().some((node) => node.props.what === 'بستری / ویزیت')).toBe(true);
+    expect(tree.root.findAllByType(Button).some((node) => node.props.label === 'ثبت بستری / ویزیت')).toBe(false);
+    await retryAll();
+    await refresh(screen);
+    expect(tree.root.findAllByType(Button).some((node) => node.props.label === 'ثبت بستری / ویزیت')).toBe(true);
+  });
+
+  it('keeps a loaded admission visible after a failed refresh and offers retry', async () => {
+    await openEncounter({ patientId, kind: 'admission', ward: 'Synthetic ward' });
+    const screen = await overview();
+    await render(screen);
+    fail(activeEncounterDetailQuery(patientId));
+    await refresh(screen);
+    expect(text()).toContain('Synthetic ward');
+    const notice = notices().find((node) => node.props.what === 'بستری / ویزیت')!;
+    expect(notice).toBeDefined();
+    expect(typeof notice.props.onRetry).toBe('function');
+  });
+
+  it('updates elapsed admission time from the shared clock without changing the recorded admission', async () => {
+    const id = await openEncounter({ patientId, kind: 'admission', admittedAt: new Date('2026-09-25T11:00:00Z') });
+    const screen = await overview();
+    await render(screen);
+    expect(tree.root.findAllByType(Text).some((node) => node.props.children === '۱ ساعت')).toBe(true);
+    mockNow += 3_600_000;
+    await refresh(screen);
+    expect(tree.root.findAllByType(Text).some((node) => node.props.children === '۲ ساعت')).toBe(true);
+    expect((await currentEncounterQuery(patientId))[0]!.id).toBe(id);
+    expect((await currentEncounterQuery(patientId))[0]!.admittedAt!.toISOString()).toBe('2026-09-25T11:00:00.000Z');
+  });
+
+  it('keeps important notes visible with their own failure and retry feedback', async () => {
+    await createNote({ patientId, type: 'event', title: 'Synthetic important event', body: 'Synthetic event body' });
+    const screen = await overview();
+    await render(screen);
+    fail(latestPatientNoteQuery(patientId));
+    await refresh(screen);
+    expect(text()).toContain('Synthetic important event');
+    const notice = notices().find((node) => node.props.what === 'رویدادهای مهم')!;
+    expect(notice).toBeDefined();
+    expect(typeof notice.props.onRetry).toBe('function');
+  });
+
+  it('retains partially typed clinical input through failed refresh and retry', async () => {
+    const screen = <DiagnosesSection patientId={patientId} />;
+    await render(screen);
+    await act(async () => tree.root.findByType(Input).props.onChangeText('Synthetic partial impression'));
+    fail(patientDiagnosesQuery(patientId));
+    await refresh(screen);
+    expect(tree.root.findByType(Input).props.value).toBe('Synthetic partial impression');
+    const notice = notices().find((node) => node.props.what === 'تشخیص‌ها')!;
+    expect(typeof notice.props.onRetry).toBe('function');
+    await act(async () => notice.props.onRetry());
+    await refresh(screen);
+    expect(tree.root.findByType(Input).props.value).toBe('Synthetic partial impression');
+  });
+
+  it('does not silently hide a failed encounter read in the clinical snapshot', async () => {
+    fail(currentEncounterQuery(patientId));
+    await render(<PatientSnapshot patientId={patientId} />);
+    expect(notices()).toHaveLength(1);
+    expect(typeof notices()[0]!.props.onRetry).toBe('function');
+    await retryAll();
+    await refresh(<PatientSnapshot patientId={patientId} />);
+    expect(notices()).toHaveLength(0);
+  });
+
+  it('offers explicit recovery for a failed snapshot order read', async () => {
+    fail(patientOrdersQuery(patientId, null));
+    await render(<PatientSnapshot patientId={patientId} />);
+    expect(notices()).toHaveLength(1);
+    expect(typeof notices()[0]!.props.onRetry).toBe('function');
+    await retryAll();
+    await refresh(<PatientSnapshot patientId={patientId} />);
+    expect(notices()).toHaveLength(0);
+  });
+
+  it('does not present cached unflagged labs as a current successful summary after a failed refresh', async () => {
+    await createLabPanel({
+      patientId,
+      collectedAt: new Date('2026-09-25T11:00:00Z'),
+      source: 'manual',
+      values: [{ analyte: 'Synthetic lab', value: '1', unit: 'mg/dL', refLow: 0, refHigh: 2 }],
+    });
+    const screen = <PatientSnapshot patientId={patientId} />;
+    await render(screen);
+    expect(text()).toContain('بدون H یا L');
+    fail(patientLabValuesQuery(patientId));
+    await refresh(screen);
+    expect(text()).not.toContain('بدون H یا L');
+    expect(text()).toContain('نتایج قبلی');
+    await retryAll();
+    await refresh(screen);
+    expect(text()).toContain('بدون H یا L');
+    expect(mockRetried).toEqual(['lab_values']);
+  });
+
+  it('keeps cached orders without claiming a current total and retries only the failed source', async () => {
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic cached order' });
+    const screen = <PatientSnapshot patientId={patientId} />;
+    await render(screen);
+    expect(text()).toContain('دستور جاری');
+    fail(patientOrdersQuery(patientId, null));
+    await refresh(screen);
+    expect(text()).toContain('Synthetic cached order');
+    expect(text()).not.toContain('دستور جاری');
+    await retryAll();
+    await refresh(screen);
+    expect(text()).toContain('دستور جاری');
+    expect(mockRetried).toEqual(['orders']);
+  });
 });
 
 describe('Today read failures', () => {
@@ -398,7 +618,12 @@ describe('timeline partial reads', () => {
     expect(text()).not.toContain('در حال خواندن');
     await retryAll();
     await refresh(<TimelineTab patientId={patientId} />);
-    expect(mockRetried).toEqual([tableOf(patientLabPanelsQuery(patientId)), tableOf(patientConsultsQuery(patientId))]);
+    // A panel failure also affects the joined value query; both reads recover.
+    expect(mockRetried).toEqual([
+      tableOf(patientLabPanelsQuery(patientId)),
+      tableOf(patientLabPanelsQuery(patientId)),
+      tableOf(patientConsultsQuery(patientId)),
+    ]);
     expect(tree.root.findByType(EmptyState).props.title).toBe('هنوز چیزی ثبت نشده');
   });
 

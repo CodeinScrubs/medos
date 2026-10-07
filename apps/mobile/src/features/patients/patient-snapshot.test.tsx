@@ -1,21 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 
 import { Text } from '@/components/ui';
-import { createOrder, setOrderStatus } from '@/features/kardex/queries';
+import { tablesOf } from '@/db/query-tables';
+import { encounters } from '@/db/schema';
+import { openEncounter } from '@/features/encounters/queries';
+import { createOrder, patientCurrentOrdersQuery, setOrderStatus } from '@/features/kardex/queries';
 import { createLabPanel } from '@/features/labs/queries';
 import { createNote } from '@/features/notes/queries';
 import { recordVital } from '@/features/vitals/queries';
 import { useTestDatabase } from '@/test/db-client';
-import { createTestDatabase } from '@/test/sqljs';
+import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { PatientSnapshot } from './patient-snapshot';
 import { createPatient } from './queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
-// Rows are read once on mount here; live updates are use-live.test's subject.
-jest.mock('expo-sqlite', () => ({ addDatabaseChangeListener: () => ({ remove: () => {} }) }));
+// Native events are injected explicitly; the real useLive hook and SQL run here.
+const mockListeners = new Set<(event: { tableName: string }) => void>();
+jest.mock('expo-sqlite', () => ({
+  addDatabaseChangeListener: (listener: (event: { tableName: string }) => void) => {
+    mockListeners.add(listener);
+    return { remove: () => mockListeners.delete(listener) };
+  },
+}));
 const mockRouter = { push: jest.fn(), setParams: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
 jest.mock('@/components/ui', () => ({
@@ -31,6 +41,7 @@ jest.mock('@/components/use-now', () => ({ useNow: () => Date.now() }));
 
 let tree: ReactTestRenderer | undefined;
 let patientId: string;
+let database: TestDatabase;
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
 
 async function render() {
@@ -61,7 +72,8 @@ function rowTexts(): string[] {
 }
 
 beforeEach(async () => {
-  useTestDatabase(await createTestDatabase());
+  database = useTestDatabase(await createTestDatabase());
+  mockListeners.clear();
   mockRouter.push.mockClear();
   mockRouter.setParams.mockClear();
   patientId = await createPatient({ firstName: 'Test', lastName: 'Patient', status: 'outpatient' });
@@ -73,6 +85,53 @@ afterEach(async () => {
 });
 
 describe('patient at a glance', () => {
+  it('reads current-episode and standing orders together without including an older or foreign episode', async () => {
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic standing order' });
+    await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(48) });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic prior episode' });
+    await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(2) });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic current episode' });
+    const other = await createPatient({ firstName: 'Other', lastName: 'Synthetic' });
+    await openEncounter({ patientId: other, kind: 'admission' });
+    await createOrder({ patientId: other, kind: 'drug', name: 'Synthetic foreign episode' });
+    await render();
+    const kardex = rowTexts().find((row) => row.includes('کاردکس'))!;
+    expect(kardex).toContain('Synthetic standing order');
+    expect(kardex).toContain('Synthetic current episode');
+    expect(kardex).not.toContain('Synthetic prior episode');
+    expect(kardex).not.toContain('Synthetic foreign episode');
+  });
+
+  it('preserves latest-closed-episode fallback while excluding deleted encounters', async () => {
+    const prior = await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(48) });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic prior episode' });
+    const recent = await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(2) });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic latest closed episode' });
+    // Explicit fixtures for an imported closed episode and a mistaken deletion.
+    database.db.update(encounters).set({ isActive: false }).where(eq(encounters.id, recent)).run();
+    expect((await patientCurrentOrdersQuery(patientId)).map((order) => order.name)).toEqual([
+      'Synthetic latest closed episode',
+    ]);
+    database.db.update(encounters).set({ deletedAt: new Date() }).where(eq(encounters.id, recent)).run();
+    expect((await patientCurrentOrdersQuery(patientId)).map((order) => order.encounterId)).toEqual([prior]);
+  });
+
+  it('refreshes current order ownership on an encounter event without relying on an order event', async () => {
+    await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(48) });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic prior episode' });
+    await render();
+    expect(rowTexts()[0]).toContain('Synthetic prior episode');
+    await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(2) });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic current episode' });
+    await act(async () => {
+      mockListeners.forEach((listener) => listener({ tableName: 'encounters' }));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(rowTexts()[0]).toContain('Synthetic current episode');
+    expect(rowTexts()[0]).not.toContain('Synthetic prior episode');
+    expect(tablesOf(patientCurrentOrdersQuery(patientId))).toEqual(['orders', 'encounters']);
+  });
+
   it('shows the recorded unit beside a flagged laboratory value', async () => {
     await createLabPanel({
       patientId,
