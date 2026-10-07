@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
@@ -12,6 +13,7 @@ import type { Consultation } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { patientQuery } from '@/features/patients/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { assertDatasetWrite, withDatasetWrite } from '@/lib/dataset-write';
 import { fullName } from '@/lib/persian';
 
 import { ConsultDraftConflict, type AnswerDraft } from './answer-drafts';
@@ -23,20 +25,31 @@ export function ConsultAnswerScreen() {
 }
 
 function AnswerGate({ id }: { id: string }) {
+  const { generation, stale } = useDatasetIntent();
   const { data, error, retry } = useLive(consultQuery(id, true), [id]);
   const [loaded, setLoaded] = useState<{ row: Consultation; generation: number } | null>(null);
   // Keep the editor mounted through later read failures/deletion. Only an explicit
   // reload replaces its text; live query results must never fight the keyboard.
-  if (!loaded && data?.[0]) setLoaded({ row: data[0], generation: 0 });
+  if (!stale && !loaded && data?.[0]) setLoaded({ row: data[0], generation: 0 });
   if (loaded)
     return (
       <AnswerEditor
         key={loaded.generation}
         initial={loaded.row}
+        generation={generation}
         readError={error}
         retryRead={retry}
-        onReload={(row) => setLoaded({ row, generation: loaded.generation + 1 })}
+        onReload={(row) => {
+          assertDatasetWrite(generation);
+          setLoaded({ row, generation: loaded.generation + 1 });
+        }}
       />
+    );
+  if (stale)
+    return (
+      <Screen>
+        <Text color="danger">اطلاعات از بکاپ جایگزین شد؛ صفحه را دوباره باز کنید.</Text>
+      </Screen>
     );
   return (
     <EditGate editing rows={data} error={error} onRetry={retry} what="کانسالت">
@@ -48,15 +61,18 @@ function AnswerGate({ id }: { id: string }) {
 /** One scheduler for both fields, one persisted revision, and an explicit publish. */
 export function AnswerEditor({
   initial,
+  generation: expectedGeneration,
   onReload,
   readError,
   retryRead,
 }: {
   initial: Consultation;
+  generation?: number;
   onReload: (row: Consultation) => void;
   readError?: Error;
   retryRead?: () => void;
 }) {
+  const { generation, stale } = useDatasetIntent(expectedGeneration);
   const router = useRouter();
   const {
     data: patientRows,
@@ -83,6 +99,7 @@ export function AnswerEditor({
         revision = next;
       },
       saver: new Autosave<AnswerDraft>({
+        generation,
         write: async (value) => {
           revision = await saveConsultAnswerDraft(initial.id, value, revision);
         },
@@ -92,7 +109,10 @@ export function AnswerEditor({
     };
   });
   const saver = persistence.saver;
-  useSaveBeforeLeave(() => saver.flush());
+  useSaveBeforeLeave(async () => {
+    if (acting.current || !(await saver.flush())) return false;
+    return !acting.current && !saver.unsaved;
+  });
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') void saver.flush();
@@ -116,7 +136,7 @@ export function AnswerEditor({
     acting.current = true;
     setBusy(true);
     try {
-      await action();
+      await withDatasetWrite(generation, action);
       setOperationFailed(false);
     } catch (error) {
       setOperationFailed(true);
@@ -135,6 +155,7 @@ export function AnswerEditor({
     if (!(await saver.flush()) || saver.unsaved) return;
     await commitConsultAnswerDraft(initial.id, persistence.getRevision());
     saver.cancel();
+    acting.current = false; // The always-on removal guard may dispatch acknowledged publication.
     router.back();
   }
 
@@ -150,6 +171,7 @@ export function AnswerEditor({
     <Screen scroll>
       <ScreenOptions options={{ title: 'پاسخ کانسالت' }} />
       <Column gap="md">
+        {stale ? <Text color="danger">اطلاعات از بکاپ جایگزین شد؛ نوشته‌های قبلی را مرور یا کپی کنید.</Text> : null}
         <ErrorNotice error={readError} what="کانسالت" onRetry={retryRead} />
         <ErrorNotice error={patientError} what="بیمار" onRetry={retryPatient} />
         {patientRows?.[0] ? (

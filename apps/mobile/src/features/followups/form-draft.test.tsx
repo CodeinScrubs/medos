@@ -8,6 +8,8 @@ import { alertError } from '@/components/feedback';
 import { Button, ChipSelect, Input } from '@/components/ui';
 import { followUpFormDrafts, followUps } from '@/db/schema';
 import { createPatient } from '@/features/patients/queries';
+import { DatasetBusyError, DatasetChangedError } from '@/lib/dataset-write';
+import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications, scheduled } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -15,6 +17,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 import { FollowUpFormScreen } from './follow-up-form-screen';
 import { decodeFollowUpForm } from './form-draft';
 import { followUpFormQuery, saveFollowUpFormDraft } from './form-draft-queries';
+import * as draftQueries from './form-draft-queries';
 
 let mockPatientId: string;
 let mockFlush: (() => Promise<boolean>) | null;
@@ -316,5 +319,103 @@ describe('follow-up form recovery', () => {
     expect((await followUpFormQuery(first))[0]!.draft?.body).toContain('Old patient raw text');
     await typeReason('New patient');
     expect(decodeFollowUpForm(stored().body).fields.reason).toBe('New patient');
+  });
+});
+
+describe('follow-up form original intent', () => {
+  it('refuses a clean publication after same-id restore without changing reminders or raw input', async () => {
+    await mount();
+    await typeReason('Raw report follow-up');
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await click('ثبت پیگیری');
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('برای چه؟').props.value).toBe('Raw report follow-up');
+    expect(scheduled.size).toBe(0);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(alertError).toHaveBeenLastCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+  it('refuses delayed discard before retiring the restored draft', async () => {
+    await mount();
+    await typeReason('Keep draft');
+    await click('حذف پیش‌نویس');
+    const held = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((option) => option.text === 'حذف پیش‌نویس')!.onPress!;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      held();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('برای چه؟').props.value).toBe('Keep draft');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it.each(['load', 'keep'])(
+    'refuses held %s before canceling local text or adopting a restored draft',
+    async (action) => {
+      await mount();
+      await typeReason('First');
+      const row = stored();
+      const doc = decodeFollowUpForm(row.body);
+      await saveFollowUpFormDraft(
+        row.id,
+        mockPatientId,
+        null,
+        { ...doc, fields: { ...doc.fields, reason: 'Other editor' } },
+        row.revision,
+      );
+      await typeReason('My pending input');
+      await click('بررسی نسخهٔ ذخیره‌شده');
+      let held: () => void;
+      if (action === 'load') {
+        await click('بارگذاری نسخهٔ ذخیره‌شده');
+        held = jest
+          .mocked(Alert.alert)
+          .mock.calls.at(-1)![2]!
+          .find((option) => option.text === 'بارگذاری')!.onPress!;
+      } else held = button('نگه‌داشتن نوشتهٔ من').props.onPress;
+      await act(async () => {
+        snapshotDataset(t)();
+        await settle();
+      });
+      const before = databaseRows(t);
+      await act(async () => {
+        held();
+        await settle();
+      });
+      expect(databaseRows(t)).toEqual(before);
+      expect(input('برای چه؟').props.value).toBe('My pending input');
+      expect(alertError).toHaveBeenCalledWith(expect.any(String), expect.any(DatasetChangedError));
+    },
+  );
+  it('keeps publication admitted through the real reminder/query acknowledgment', async () => {
+    const original = draftQueries.commitFollowUpFormDraft;
+    let release = () => {};
+    jest.spyOn(draftQueries, 'commitFollowUpFormDraft').mockImplementationOnce(async (...args) => {
+      const id = await original(...args);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return id;
+    });
+    await mount();
+    await typeReason('One follow-up');
+    await click('ثبت پیگیری');
+    const failure = replacementFailure();
+    await act(async () => {
+      release();
+      await settle();
+    });
+    expect(failure).toBeInstanceOf(DatasetBusyError);
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

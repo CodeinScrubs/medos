@@ -3,9 +3,12 @@ import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
+import { PickerModal } from '@/components/picker-modal';
 import { Button, ChipSelect, Input } from '@/components/ui';
 import { encounterFormDrafts, encounters } from '@/db/schema';
 import { createPatient } from '@/features/patients/queries';
+import { DatasetBusyError, DatasetChangedError } from '@/lib/dataset-write';
+import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -13,6 +16,7 @@ import { DischargeScreen } from './discharge-screen';
 import { EncounterFormScreen } from './encounter-form-screen';
 import { decodeEncounterForm } from './form-draft';
 import { saveEncounterFormDraft } from './form-draft-queries';
+import * as draftQueries from './form-draft-queries';
 import { openEncounter, updateEncounter } from './queries';
 
 let mockPatientId: string;
@@ -290,5 +294,138 @@ describe('episode draft editor handlers', () => {
     await click('ثبت بستری');
     expect(t.db.select().from(encounters).all()).toHaveLength(1);
     expect(t.db.select().from(encounterFormDrafts).get()?.committedEncounterId).not.toBeNull();
+  });
+});
+
+describe('episode form original intent', () => {
+  const cases = [
+    { mode: 'new', field: 'بخش', save: 'ثبت بستری' },
+    { mode: 'edit', field: 'بخش', save: 'ذخیره تغییرات' },
+    { mode: 'discharge', field: 'خلاصه‌ی نتیجه', save: 'ثبت ترخیص' },
+  ];
+  async function prepare(mode: string) {
+    discharge = mode === 'discharge';
+    if (mode !== 'new') mockEncounterId = await openEncounter({ patientId: mockPatientId, kind: 'admission' });
+    await mount();
+  }
+  it.each(cases)(
+    'refuses a clean $mode publication and retains raw input after same-id restore',
+    async ({ mode, field, save }) => {
+      await prepare(mode);
+      await type(field, 'Kept raw input');
+      await act(async () => {
+        snapshotDataset(t)();
+        await settle();
+      });
+      const before = databaseRows(t);
+      await click(save);
+      expect(databaseRows(t)).toEqual(before);
+      expect(input(field).props.value).toBe('Kept raw input');
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(alertError).toHaveBeenLastCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+    },
+  );
+  it.each(cases)('refuses a delayed $mode draft deletion', async ({ mode, field }) => {
+    await prepare(mode);
+    await type(field, 'Retained draft');
+    await click('حذف پیش‌نویس');
+    const held = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((option) => option.text === 'حذف پیش‌نویس')!.onPress!;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      held();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input(field).props.value).toBe('Retained draft');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it.each(['load', 'keep'])('refuses a held %s comparison action before reset or adoption', async (action) => {
+    await prepare('edit');
+    await type('بخش', 'My ward');
+    await updateEncounter(mockEncounterId!, { ward: 'External ward' });
+    await click('ذخیره تغییرات');
+    await click('بررسی نسخهٔ ذخیره‌شده');
+    let held: () => void;
+    if (action === 'load') {
+      await click('بارگذاری نسخهٔ ذخیره‌شده');
+      held = jest
+        .mocked(Alert.alert)
+        .mock.calls.at(-1)![2]!
+        .find((option) => option.text === 'بارگذاری')!.onPress!;
+    } else held = button('نگه‌داشتن نوشتهٔ من').props.onPress;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      held();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('بخش').props.value).toBe('My ward');
+    expect(alertError).toHaveBeenCalledWith(expect.any(String), expect.any(DatasetChangedError));
+  });
+  it('refuses a delayed mistaken-encounter deletion', async () => {
+    await prepare('edit');
+    await type('بخش', 'Keep episode');
+    await click('حذف (ثبت اشتباه)');
+    const held = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((option) => option.text === 'حذف')!.onPress!;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      held();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('بخش').props.value).toBe('Keep episode');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it.each(['بیمارستان / مرکز', 'اتند'])('refuses old inline %s creation before related writes', async (title) => {
+    await prepare('edit');
+    const picker = tree!.root.findAllByType(PickerModal).find((node) => node.props.title === title)!;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      await expect(picker.props.onCreate('Synthetic related record')).rejects.toBeInstanceOf(DatasetChangedError);
+    });
+    expect(databaseRows(t)).toEqual(before);
+  });
+  it('retains admission through final publication acknowledgment', async () => {
+    const original = draftQueries.commitEncounterFormDraft;
+    let release = () => {};
+    jest.spyOn(draftQueries, 'commitEncounterFormDraft').mockImplementationOnce(async (...args) => {
+      const id = await original(...args);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return id;
+    });
+    await prepare('new');
+    await type('بخش', 'One episode');
+    await click('ثبت بستری');
+    const failure = replacementFailure();
+    await act(async () => {
+      release();
+      await settle();
+    });
+    expect(failure).toBeInstanceOf(DatasetBusyError);
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

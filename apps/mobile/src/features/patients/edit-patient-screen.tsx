@@ -9,9 +9,11 @@ export function EditPatientScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, error, retry } = useLive(patientQuery(id), [id]);
   return (
-    <EditGate editing rows={data} error={error} onRetry={retry} what="پرونده">
-      {(patient, readNotice) =>
-        patient ? <PatientForm key={patient.id} patient={patient} readNotice={readNotice} /> : null
+    <EditGate editing rows={data} error={error} onRetry={retry} what="پرونده" fenceDataset>
+      {(patient, readNotice, generation) =>
+        patient ? (
+          <PatientForm key={patient.id} patient={patient} readNotice={readNotice} generation={generation} />
+        ) : null
       }
     </EditGate>
   );

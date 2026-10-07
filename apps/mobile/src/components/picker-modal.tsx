@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { alertError } from '@/components/feedback';
 import { Column, Divider, IconButton, Row, Text } from '@/components/ui';
 import { normalizePersian, searchTerms } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
@@ -53,6 +54,7 @@ export function PickerModal({
   const { colors, radii, spacing, typography } = useTheme();
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
 
   const filtered = useMemo(() => {
     const terms = searchTerms(query);
@@ -68,18 +70,21 @@ export function PickerModal({
   const canCreate = Boolean(onCreate && trimmed && !exactExists);
 
   function close() {
+    if (creatingRef.current) return;
     setQuery('');
     onClose();
   }
 
   async function create() {
-    if (!onCreate || !trimmed) return;
+    if (creatingRef.current || !onCreate || !trimmed) return;
+    creatingRef.current = true;
     setCreating(true);
     try {
       const item = await onCreate(trimmed);
       setQuery('');
       onSelect(item);
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   }
@@ -91,7 +96,7 @@ export function PickerModal({
           <Text variant="heading" style={{ paddingHorizontal: spacing.sm }}>
             {title}
           </Text>
-          <IconButton icon="close" label="بستن" onPress={close} />
+          <IconButton icon="close" label="بستن" onPress={close} disabled={creating} />
         </Row>
 
         <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
@@ -109,7 +114,10 @@ export function PickerModal({
             <Ionicons name="search" size={18} color={colors.textFaint} />
             <TextInput
               value={query}
-              onChangeText={setQuery}
+              onChangeText={(value) => {
+                if (!creatingRef.current) setQuery(value);
+              }}
+              editable={!creating}
               placeholder={placeholder}
               placeholderTextColor={colors.textFaint}
               selectionColor={colors.primary}
@@ -125,7 +133,7 @@ export function PickerModal({
           <Pressable
             accessibilityRole="button"
             disabled={creating}
-            onPress={() => void create()}
+            onPress={() => void create().catch((error) => alertError('افزوده نشد', error))}
             style={({ pressed }) => [
               {
                 marginHorizontal: spacing.lg,
@@ -162,7 +170,9 @@ export function PickerModal({
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
+                disabled={creating}
                 onPress={() => {
+                  if (creatingRef.current) return;
                   setQuery('');
                   onSelect(item);
                 }}

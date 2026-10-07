@@ -44,22 +44,26 @@ export function DischargeScreen() {
       patientId={patientId}
       encounterId={encounterId}
     >
-      {(seed, notice, reset) => <DischargeForm seed={seed} readNotice={notice} onReset={reset} />}
+      {(seed, notice, reset, generation) => (
+        <DischargeForm seed={seed} readNotice={notice} onReset={reset} generation={generation} />
+      )}
     </EncounterFormDraftGate>
   );
 }
 function DischargeForm({
   seed,
+  generation,
   readNotice,
   onReset,
 }: {
   seed: EncounterFormSeed;
+  generation: number;
   readNotice: ReactNode;
   onReset: (seed: EncounterFormSeed) => void;
 }) {
   const { spacing } = useTheme();
   const now = useNow();
-  const editing = useEncounterFormDraft(seed, onReset);
+  const editing = useEncounterFormDraft(seed, onReset, generation);
   const { dischargeType, nextStatus, outcomeNotes } = editing.form as DischargeFormFields;
   const change = editing.changeDischarge;
   const saving = editing.busy;

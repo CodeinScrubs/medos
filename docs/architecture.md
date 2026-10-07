@@ -1409,3 +1409,37 @@ or backup/key scheme. This uses existing boundaries, not a new framework. Manual
 raw forms and process-local captions/outcomes are not crash recovery. Unscoped
 patient/admission/follow-up/consult-answer forms and durable draft/capture stopped
 voices remain separately tracked; this does not fence every clinical workflow.
+
+## Form ownership before loading and manual acknowledgment (0.11.26)
+
+Patient, admission/edit/discharge, follow-up and consult-answer gates capture
+their immutable dataset intent before the first read. The original token is
+passed into each keyed editor and its Autosave constructor. A replacement while
+loading cannot grant a late editor fresh authority. Loaded raw input stays mounted,
+including patient edits when the restored archive omits the patient. Explicit
+load/reset keeps the gate's token; it cannot renew an old route implicitly.
+
+Manual publication, comparison, adoption, confirmed load/discard and mistaken
+episode deletion hold `withDatasetWrite` through final acknowledgment. Patient
+duplicate confirmation reacquires the same original token when answered later.
+An untouched or already-saved draft still needs admission: a clean flush does
+not establish ownership. Consult publication keeps the existing always-on leave
+guard busy until its query acknowledges, then permits navigation.
+
+Companion entry uses the same intent, a synchronous submission ref and latest raw
+fields. Typing and Save in one event turn does not miss the last value; repeated
+Save cannot insert twice. Inputs/cancel remain locked through acknowledgment and
+SQL failure retains text for retry. Contact insertion checks patient liveness
+inside its synchronous transaction, including direct query callers.
+
+Inline doctor/place creation carries the admission form's token. The existing
+generic picker catches a rejected creation, retains its query and exposes the
+usual error feedback. A synchronous ref suppresses duplicate creation and locks
+selection, close and typing until acknowledgment. No new normal-path dialog,
+navigation guard, schema, dependency, permission, clinical rule or archive scheme.
+
+These contracts preserve mounted intent; they are not crash recovery for manual
+contact/lab raw input or durable stopped-voice publication in capture/note drafts.
+Physical-device timing, interruptions, large records and broader product acceptance
+remain separate gates. Replacing the framework would not supply this ownership
+protocol automatically.

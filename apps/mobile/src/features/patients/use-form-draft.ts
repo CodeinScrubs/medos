@@ -2,11 +2,13 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError, notify } from '@/components/feedback';
 import { useNow } from '@/components/use-now';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import type { Patient, PatientFormDraft } from '@/db/schema';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 
 import {
@@ -50,7 +52,12 @@ export function patientFormSeed(patient: Patient | undefined, draft: PatientForm
 }
 
 /** One document, one serialized autosave; neither field rendering nor navigation owns its only copy. */
-export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: PatientFormSeed) => void) {
+export function usePatientFormDraft(
+  seed: PatientFormSeed,
+  onReset: (seed: PatientFormSeed) => void,
+  expectedGeneration?: number,
+) {
+  const { generation } = useDatasetIntent(expectedGeneration);
   const router = useRouter();
   const now = useNow();
   const patientId = seed.patient?.id ?? null;
@@ -74,6 +81,7 @@ export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: Patie
         revision = nextRevision;
       },
       saver: new Autosave<PatientFormDocument>({
+        generation,
         write: async (value) => {
           revision = await savePatientFormDraft(id, patientId, value, revision);
         },
@@ -117,7 +125,7 @@ export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: Patie
   async function perform(action: () => Promise<void>) {
     if (!begin()) return;
     try {
-      await action();
+      await withDatasetWrite(generation, action);
       setFailed(false);
     } catch (error) {
       setFailed(true);
@@ -138,18 +146,20 @@ export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: Patie
   async function publish(allowDuplicate = false) {
     let savedId: string | null = null;
     try {
-      const id = await commitPatientFormDraft(
-        persistence.id(),
-        patientId,
-        persistence.revision(),
-        new Date(now),
-        allowDuplicate,
-      );
-      savedId = id;
-      setCompletedId(id);
-      saver.cancel();
-      end(); // The always-on removal guard may now flush and dispatch navigation.
-      navigate(id);
+      await withDatasetWrite(generation, async () => {
+        const id = await commitPatientFormDraft(
+          persistence.id(),
+          patientId,
+          persistence.revision(),
+          new Date(now),
+          allowDuplicate,
+        );
+        savedId = id;
+        setCompletedId(id);
+        saver.cancel();
+        end(); // The always-on removal guard may now flush and dispatch navigation.
+        navigate(id);
+      });
     } catch (error) {
       if (error instanceof PatientDuplicateWarning) {
         let answered = false;
@@ -188,9 +198,12 @@ export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: Patie
     if (!begin()) return;
     if (completedId) {
       try {
-        end();
-        navigate(completedId);
+        await withDatasetWrite(generation, async () => {
+          end();
+          navigate(completedId);
+        });
       } catch (error) {
+        end();
         alertError('پرونده ثبت شد؛ باز نشد', error);
       }
       return;
@@ -202,14 +215,16 @@ export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: Patie
       return;
     }
     try {
-      await flushOrFail();
-      if (patientId && persistence.revision() === 0) {
-        await inspectPatientForm(patientId);
-        end();
-        router.back();
-        return;
-      }
-      await publish();
+      await withDatasetWrite(generation, async () => {
+        await flushOrFail();
+        if (patientId && persistence.revision() === 0) {
+          await inspectPatientForm(patientId);
+          end();
+          router.back();
+          return;
+        }
+        await publish();
+      });
     } catch (error) {
       setFailed(true);
       alertError('ثبت نشد', error);
@@ -262,12 +277,14 @@ export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: Patie
             answered = true;
             void (async () => {
               try {
-                await saver.flush();
-                const current = await inspectPatientForm(patientId);
-                const next = patientFormSeed(current.patient ?? undefined, current.draft);
-                saver.cancel();
-                end();
-                onReset(next);
+                await withDatasetWrite(generation, async () => {
+                  await saver.flush();
+                  const current = await inspectPatientForm(patientId);
+                  const next = patientFormSeed(current.patient ?? undefined, current.draft);
+                  saver.cancel();
+                  end();
+                  onReset(next);
+                });
               } catch (error) {
                 alertError('بارگذاری نشد', error);
                 end();
@@ -304,11 +321,13 @@ export function usePatientFormDraft(seed: PatientFormSeed, onReset: (seed: Patie
             answered = true;
             void (async () => {
               try {
-                await flushOrFail();
-                await discardPatientFormDraft(persistence.id(), patientId, persistence.revision());
-                saver.cancel();
-                end();
-                router.back();
+                await withDatasetWrite(generation, async () => {
+                  await flushOrFail();
+                  await discardPatientFormDraft(persistence.id(), patientId, persistence.revision());
+                  saver.cancel();
+                  end();
+                  router.back();
+                });
               } catch (error) {
                 alertError('حذف نشد', error);
                 end();

@@ -1,17 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { alertError } from '@/components/feedback';
 import { Button, Input } from '@/components/ui';
 import type { Consultation } from '@/db/schema';
 import { createPatient } from '@/features/patients/queries';
+import { DatasetBusyError, DatasetChangedError, datasetGeneration } from '@/lib/dataset-write';
+import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { AnswerEditor } from './answer-screen';
 import { consultQuery, createConsult, saveConsultAnswerDraft } from './queries';
+import * as queries from './queries';
 
 const mockBack = jest.fn();
 let mockExit: () => Promise<boolean>;
+let mockParentGeneration: number | null;
+jest.mock('@/components/autosave-scope', () => ({
+  useAutosaveScope: () => (mockParentGeneration === null ? null : { generation: mockParentGeneration }),
+}));
 jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ back: mockBack }) }));
 jest.mock('@/components/ui', () => ({
@@ -57,6 +66,9 @@ beforeEach(async () => {
   const id = await createConsult({ patientId, reason: 'Question' });
   initial = (await consultQuery(id))[0]!;
   mockBack.mockClear();
+  mockParentGeneration = null;
+  jest.mocked(alertError).mockClear();
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.useFakeTimers();
 });
 afterEach(async () => {
@@ -67,6 +79,99 @@ afterEach(async () => {
     });
   jest.clearAllTimers();
   jest.useRealTimers();
+  jest.restoreAllMocks();
+});
+
+describe('consult answer original intent', () => {
+  it('refuses publication of a clean saved draft after same-id restore', async () => {
+    await saveConsultAnswerDraft(initial.id, { response: 'Saved draft', instruction: 'Keep instruction' }, 0);
+    initial = (await consultQuery(initial.id))[0]!;
+    await mount(initial);
+    await act(async () => snapshotDataset(t)());
+    const before = databaseRows(t);
+    await act(async () => {
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('پاسخ').props.value).toBe('Saved draft');
+    expect(input('دستور پیگیری').props.value).toBe('Keep instruction');
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(alertError).toHaveBeenLastCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+  it.each(['load', 'keep'])('refuses held %s before replacing input or adopting restored revision', async (action) => {
+    const onReload = jest.fn();
+    await act(async () => {
+      tree = create(<AnswerEditor initial={initial} onReload={onReload} />);
+    });
+    await saveConsultAnswerDraft(initial.id, { response: 'Other editor', instruction: '' }, 0);
+    await act(async () => {
+      input('پاسخ').props.onChangeText('My pending reply');
+      expect(await mockExit()).toBe(false);
+    });
+    await act(async () => {
+      button('مقایسه با نسخهٔ ذخیره‌شده').props.onPress();
+      await settle();
+    });
+    let held: () => void;
+    if (action === 'load') {
+      await act(async () => {
+        button('بارگذاری این نسخه به‌جای نوشتهٔ من').props.onPress();
+      });
+      held = jest
+        .mocked(Alert.alert)
+        .mock.calls.at(-1)![2]!
+        .find((option) => option.text === 'بارگذاری')!.onPress!;
+    } else held = button('ذخیرهٔ نوشتهٔ من به‌جای این نسخه').props.onPress;
+    await act(async () => snapshotDataset(t)());
+    const before = databaseRows(t);
+    await act(async () => {
+      held();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('پاسخ').props.value).toBe('My pending reply');
+    expect(onReload).not.toHaveBeenCalled();
+    expect(alertError).toHaveBeenLastCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+  it('keeps a late editor autosave on its enclosing original intent', async () => {
+    mockParentGeneration = datasetGeneration();
+    snapshotDataset(t)();
+    const before = databaseRows(t);
+    await mount(initial);
+    await act(async () => {
+      input('پاسخ').props.onChangeText('Late local input');
+      expect(await mockExit()).toBe(false);
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('پاسخ').props.value).toBe('Late local input');
+  });
+  it('holds publication admission and prevents leaving until final query acknowledgment', async () => {
+    const original = queries.commitConsultAnswerDraft;
+    let release = () => {};
+    jest.spyOn(queries, 'commitConsultAnswerDraft').mockImplementationOnce(async (...args) => {
+      await original(...args);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    });
+    await mount(initial);
+    await act(async () => {
+      input('پاسخ').props.onChangeText('One answer');
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    const failure = replacementFailure();
+    let mayLeave = false;
+    await act(async () => {
+      mayLeave = await mockExit();
+      release();
+      await settle();
+    });
+    expect(failure).toBeInstanceOf(DatasetBusyError);
+    expect(mayLeave).toBe(false);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('consult answer editor with SQLite', () => {

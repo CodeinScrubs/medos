@@ -5,6 +5,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, Input } from '@/components/ui';
+import { DatasetBusyError, DatasetChangedError } from '@/lib/dataset-write';
+import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -380,5 +382,135 @@ describe('patient form persistence and publication', () => {
     expect(input('نام').props.value).toBe('Stored');
     await unmount();
     expect((await stored()).firstName).toBe('Stored');
+  });
+});
+
+describe('patient form original intent', () => {
+  it.each([false, true])('refuses clean publication after same-id restore (new=%s)', async (creating) => {
+    await mount(!creating);
+    if (creating) {
+      await type('نام', 'Fresh');
+      await type('نام خانوادگی', 'Synthetic');
+    } else await type('خلاصه‌ی یک‌خطی', 'Saved raw input');
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await click(creating ? 'ثبت بیمار' : 'ذخیره تغییرات');
+    expect(databaseRows(t)).toEqual(before);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(input(creating ? 'نام' : 'خلاصه‌ی یک‌خطی').props.value).toBe(creating ? 'Fresh' : 'Saved raw input');
+    expect(alertError).toHaveBeenLastCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+  it('checks ownership even for an untouched edit with no draft to flush', async () => {
+    await mount(true);
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await click('ذخیره تغییرات');
+    expect(databaseRows(t)).toEqual(before);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(alertError).toHaveBeenLastCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+  it('refuses a delayed duplicate confirmation without creating another patient', async () => {
+    await mount();
+    await type('نام', 'Synthetic');
+    await type('نام خانوادگی', 'Patient');
+    await click('ثبت بیمار');
+    const confirm = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((item) => item.text === 'ثبت کن')!.onPress!;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      confirm();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('نام').props.value).toBe('Synthetic');
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(alertError).toHaveBeenLastCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+  it('refuses delayed discard and keeps both the restored draft and visible text', async () => {
+    await mount(true);
+    await type('خلاصه‌ی یک‌خطی', 'Keep both');
+    await click('حذف پیش‌نویس');
+    const confirm = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((item) => item.style === 'destructive')!.onPress!;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      confirm();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('خلاصه‌ی یک‌خطی').props.value).toBe('Keep both');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it.each(['load', 'keep'])(
+    'refuses a held %s action before replacing local input or stored revision',
+    async (action) => {
+      await mount(true);
+      await type('خلاصه‌ی یک‌خطی', 'My input');
+      await updatePatient(patientId, { summary: 'Stored clinical correction' });
+      await click('ذخیره تغییرات');
+      await click('بررسی نسخه‌های ذخیره‌شده');
+      let held: () => void;
+      if (action === 'load') {
+        await click('بارگذاری نسخهٔ ذخیره‌شده');
+        held = jest
+          .mocked(Alert.alert)
+          .mock.calls.at(-1)![2]!
+          .find((item) => item.text === 'بارگذاری')!.onPress!;
+      } else held = button('نگه‌داشتن تغییرات من').props.onPress;
+      await act(async () => {
+        snapshotDataset(t)();
+        await settle();
+      });
+      const before = databaseRows(t);
+      await act(async () => {
+        held();
+        await settle();
+      });
+      expect(databaseRows(t)).toEqual(before);
+      expect(input('خلاصه‌ی یک‌خطی').props.value).toBe('My input');
+      expect(alertError).toHaveBeenCalledWith(expect.any(String), expect.any(DatasetChangedError));
+      await type('خلاصه‌ی یک‌خطی', 'Later retained input');
+      expect(databaseRows(t)).toEqual(before);
+    },
+  );
+  it('holds publication admission through the final real query acknowledgment', async () => {
+    const original = draftQueries.commitPatientFormDraft;
+    let release = () => {};
+    jest.spyOn(draftQueries, 'commitPatientFormDraft').mockImplementationOnce(async (...args) => {
+      const id = await original(...args);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return id;
+    });
+    await mount(true);
+    await type('خلاصه‌ی یک‌خطی', 'Acknowledged once');
+    await click('ذخیره تغییرات');
+    const failure = replacementFailure();
+    await act(async () => {
+      release();
+      await settle();
+    });
+    expect(failure).toBeInstanceOf(DatasetBusyError);
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

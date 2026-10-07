@@ -2,10 +2,12 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError, notify } from '@/components/feedback';
 import { useNow } from '@/components/use-now';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 
 import {
@@ -32,7 +34,12 @@ import { deleteEncounter, encounterRecordCount } from './queries';
 export type { EncounterFormSeed } from './form-draft-queries';
 
 /** Shared by admission/edit and discharge; autosave changes no clinical state. */
-export function useEncounterFormDraft(seed: EncounterFormSeed, onReset: (seed: EncounterFormSeed) => void) {
+export function useEncounterFormDraft(
+  seed: EncounterFormSeed,
+  onReset: (seed: EncounterFormSeed) => void,
+  expectedGeneration?: number,
+) {
+  const { generation } = useDatasetIntent(expectedGeneration);
   const router = useRouter();
   const now = useNow();
   const patientId = seed.row.patient.id;
@@ -57,6 +64,7 @@ export function useEncounterFormDraft(seed: EncounterFormSeed, onReset: (seed: E
         revision = nextRevision;
       },
       saver: new Autosave<EncounterFormDocument>({
+        generation,
         write: async (value) => {
           revision = await saveEncounterFormDraft(id, seed.mode, patientId, seed.encounterId, value, revision);
         },
@@ -111,7 +119,7 @@ export function useEncounterFormDraft(seed: EncounterFormSeed, onReset: (seed: E
   async function perform(action: () => Promise<void>) {
     if (!begin()) return;
     try {
-      await action();
+      await withDatasetWrite(generation, action);
       setFailed(false);
     } catch (error) {
       setFailed(true);
@@ -123,10 +131,13 @@ export function useEncounterFormDraft(seed: EncounterFormSeed, onReset: (seed: E
   async function save() {
     if (!begin()) return;
     if (completedId) {
-      end();
       try {
-        router.back();
+        await withDatasetWrite(generation, async () => {
+          end();
+          router.back();
+        });
       } catch (error) {
+        end();
         alertError('ثبت شد؛ صفحه بسته نشد', error);
       }
       return;
@@ -139,22 +150,24 @@ export function useEncounterFormDraft(seed: EncounterFormSeed, onReset: (seed: E
       return;
     }
     try {
-      await flushOrFail();
-      const id = await commitEncounterFormDraft(
-        persistence.id(),
-        seed.mode,
-        patientId,
-        seed.encounterId,
-        persistence.revision(),
-        latest.current,
-        new Date(now),
-      );
-      published.current = true;
-      setCompletedId(id);
-      setFinishedMessage('ثبت شد.');
-      saver.cancel();
-      end();
-      router.back();
+      await withDatasetWrite(generation, async () => {
+        await flushOrFail();
+        const id = await commitEncounterFormDraft(
+          persistence.id(),
+          seed.mode,
+          patientId,
+          seed.encounterId,
+          persistence.revision(),
+          latest.current,
+          new Date(now),
+        );
+        published.current = true;
+        setCompletedId(id);
+        setFinishedMessage('ثبت شد.');
+        saver.cancel();
+        end();
+        router.back();
+      });
     } catch (error) {
       setFailed(true);
       alertError(published.current ? 'ثبت شد؛ صفحه بسته نشد' : 'ثبت نشد', error);
@@ -214,7 +227,7 @@ export function useEncounterFormDraft(seed: EncounterFormSeed, onReset: (seed: E
             answered = true;
             void (async () => {
               try {
-                await action();
+                await withDatasetWrite(generation, action);
               } catch (error) {
                 setFailed(true);
                 alertError('انجام نشد', error);

@@ -204,15 +204,27 @@ export async function addPatientContact(
   contact: { name?: string; relation?: string; phone: string; isPrimary?: boolean; notes?: string },
 ): Promise<string> {
   const id = newId();
-  await db.insert(patientContacts).values({
-    id,
-    ...stamps(),
-    patientId,
-    name: contact.name ?? null,
-    relation: contact.relation ?? null,
-    phone: normalizePhone(contact.phone),
-    isPrimary: contact.isPrimary ?? false,
-    notes: contact.notes ?? null,
+  db.transaction((tx) => {
+    if (
+      !tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(alive, eq(patients.id, patientId)))
+        .get()
+    )
+      throw new Error('پروندهٔ بیمار پیدا نشد.');
+    tx.insert(patientContacts)
+      .values({
+        id,
+        ...stamps(),
+        patientId,
+        name: contact.name ?? null,
+        relation: contact.relation ?? null,
+        phone: normalizePhone(contact.phone),
+        isPrimary: contact.isPrimary ?? false,
+        notes: contact.notes ?? null,
+      })
+      .run();
   });
   return id;
 }

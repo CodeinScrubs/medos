@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Screen, Segmented, Text } from '@/components/ui';
@@ -8,6 +9,7 @@ import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
 import type { FollowUp } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { assertDatasetWrite } from '@/lib/dataset-write';
 import { useTheme } from '@/theme';
 
 import { followUpDisplayDate } from './form-draft';
@@ -42,11 +44,12 @@ export function FollowUpFormScreen() {
 }
 
 function DraftGate({ patientId }: { patientId: string }) {
+  const { generation, stale } = useDatasetIntent();
   const { data, error, retry } = useLive(followUpFormQuery(patientId), [patientId]);
   const now = useNow();
   const [seed, setSeed] = useState<{ value: FollowUpFormSeed; generation: number } | null>(null);
   let decodeError: Error | undefined;
-  if (!seed && data?.[0]) {
+  if (!stale && !seed && data?.[0]) {
     try {
       setSeed({ value: followUpFormSeed(data[0], new Date(now)), generation: 0 });
     } catch (e) {
@@ -55,13 +58,17 @@ function DraftGate({ patientId }: { patientId: string }) {
   }
   const missing =
     data && !data.length ? new Error('پروندهٔ بیمار در دسترس نیست؛ نوشتهٔ فعلی نگه داشته شد.') : undefined;
-  const notice = <ErrorNotice error={error ?? decodeError ?? missing} what="پیش‌نویس پیگیری" onRetry={retry} />;
+  const notice = stale ? (
+    <Text color="danger">اطلاعات از بکاپ جایگزین شد؛ نوشته‌های قبلی را مرور یا کپی کنید.</Text>
+  ) : (
+    <ErrorNotice error={error ?? decodeError ?? missing} what="پیش‌نویس پیگیری" onRetry={retry} />
+  );
   if (!seed)
     return (
       <Screen>
         <Column>
           {notice}
-          {!error && !decodeError && !missing ? <Text>بارگذاری پیش‌نویس…</Text> : null}
+          {!stale && !error && !decodeError && !missing ? <Text>بارگذاری پیش‌نویس…</Text> : null}
         </Column>
       </Screen>
     );
@@ -69,24 +76,30 @@ function DraftGate({ patientId }: { patientId: string }) {
     <FollowUpFormEditor
       key={seed.generation}
       seed={seed.value}
+      generation={generation}
       readNotice={notice}
-      onReset={(value) => setSeed({ value, generation: seed.generation + 1 })}
+      onReset={(value) => {
+        assertDatasetWrite(generation);
+        setSeed({ value, generation: seed.generation + 1 });
+      }}
     />
   );
 }
 
 function FollowUpFormEditor({
   seed,
+  generation,
   readNotice,
   onReset,
 }: {
   seed: FollowUpFormSeed;
+  generation: number;
   readNotice: ReactNode;
   onReset: (seed: FollowUpFormSeed) => void;
 }) {
   const { spacing } = useTheme();
   const now = useNow();
-  const editing = useFollowUpFormDraft(seed, onReset);
+  const editing = useFollowUpFormDraft(seed, onReset, generation);
   const { form, change, busy: saving } = editing;
   const dateValidation = useDateValidation();
   const locked = saving || !!editing.completedId;

@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Keep patient form intent through initial loading and acknowledgment
+
+**Agent:** GPT-6 via Codex
+**Commits:** application change in this commit.
+
+**Changed**
+- Capture original generation before loading patient/admission/discharge/follow-up/
+  consult-answer forms; pass it to Autosave and fence manual publication, comparison,
+  delayed load/adopt/discard, duplicate confirmation and mistaken-episode deletion.
+- Keep loaded input after restore, including a missing patient. Companion Save
+  uses latest fields and a submission ref; query atomically requires a live parent.
+- Fence inline doctor/place creation; picker catches failures, retains query and
+  suppresses duplicate creation. No new normal-path dialog/guard/dependency/schema.
+- Version 0.11.26 / Android code 42. Work in this continuation was performed solo.
+
+**Verified**
+- Previous acceptance CI `37221081552` completed successfully on exact `b0a8ce6`.
+- Clean-source baseline repeat: 114 suites / 1462 app tests + three workflows.
+- 41 valid new witnesses failed on unchanged production source; six targeted
+  suites / 80 tests passed after fixes. Separate picker repro found duplicate calls.
+- Final full check: typecheck, lint (zero warnings), formatting, 117 suites /
+  1507 app tests + three workflows. See validation-0.11.26 for separate gates.
+
+**Not verified**
+- Exact-source CI, signed packages and native acceptance pending below.
+- Physical phone/API 26, stopped-voice interruption, power loss/low space,
+  large records, clinical tool acceptance or whole-product completeness.
+
+**Open threads**
+- Owner now requests review of all five open PRs; preserve this source slice
+  separately. Finish exact-source signed/offline native acceptance and independent archive
+  preservation. Then durable stopped voices for capture/note drafts, manual
+  lab/contact raw recovery and the remaining IMPLEMENTATION gates.
+
+**Gotchas**
+- Initial baseline hit one 5-second timeout; isolated case passed in 1.3 seconds
+  and full unchanged-source repeat passed. No timeout was increased.
+- An initial witness used the wrong episode-delete label; corrected before valid
+  red rerun. Picker harness needed specific native default-export stand-ins; failed
+  harness attempts do not count as defect evidence. QA stays ignored/private.
+
 ## 2026-10-04 — Accept signed 0.11.25 manual intent and preservation
 
 **Agent:** GPT-6 via Codex

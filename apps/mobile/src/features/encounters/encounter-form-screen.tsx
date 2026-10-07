@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
@@ -14,6 +15,7 @@ import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
 import { isInpatient } from '@/features/encounters/logic';
 import { createPlace, placesQuery } from '@/features/places/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { useTheme } from '@/theme';
 
 import { encounterFormDisplayDate, type EncounterFormFields } from './form-draft';
@@ -45,23 +47,28 @@ export function EncounterFormScreen() {
       patientId={patientId}
       encounterId={encounterId ?? null}
     >
-      {(seed, notice, reset) => <EncounterForm seed={seed} readNotice={notice} onReset={reset} />}
+      {(seed, notice, reset, generation) => (
+        <EncounterForm seed={seed} readNotice={notice} onReset={reset} generation={generation} />
+      )}
     </EncounterFormDraftGate>
   );
 }
 
 function EncounterForm({
   seed,
+  generation: expectedGeneration,
   readNotice,
   onReset,
 }: {
   seed: EncounterFormSeed;
+  generation: number;
   readNotice: ReactNode;
   onReset: (seed: EncounterFormSeed) => void;
 }) {
+  const { generation } = useDatasetIntent(expectedGeneration);
   const { spacing } = useTheme();
   const now = useNow();
-  const editing = useEncounterFormDraft(seed, onReset);
+  const editing = useEncounterFormDraft(seed, onReset, generation);
   // The keyed gate validates the stored mode before this editor mounts.
   const { kind, placeId, ward, bed, service, attendingId, chiefComplaint, hourKnown } =
     editing.form as EncounterFormFields;
@@ -222,8 +229,10 @@ function EncounterForm({
           setPicker(null);
         }}
         onCreate={async (name) => {
-          const id = await createPlace({ name, kind: 'hospital' });
-          return { id, label: name };
+          return withDatasetWrite(generation, async () => {
+            const id = await createPlace({ name, kind: 'hospital' });
+            return { id, label: name };
+          });
         }}
         createLabel="افزودن مرکز"
         emptyText="هنوز مرکزی ثبت نشده — نامش را بنویسید و اضافه کنید."
@@ -239,7 +248,7 @@ function EncounterForm({
           change({ attendingId: item.id });
           setPicker(null);
         }}
-        onCreate={quickCreateDoctor}
+        onCreate={(name) => withDatasetWrite(generation, () => quickCreateDoctor(name))}
         createLabel="افزودن پزشک"
         emptyText="هنوز پزشکی ثبت نشده — نامش را بنویسید و اضافه کنید."
       />

@@ -35,6 +35,19 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-07, 0.11.26: original intent is captured before initial reads for patient,
+admission/edit/discharge, follow-up and consult-answer forms. Their Autosave and
+manual publication/comparison/load/adopt/discard use that token through final
+acknowledgment. Loaded raw input survives replacement; delayed duplicate/delete
+confirmations cannot mutate the replacement dataset. Companion entry now uses
+latest-input and submission refs; its query atomically rejects retired patients.
+Inline doctor/place creation is fenced, and the picker reports failures and
+suppresses duplicate creation without adding normal-path UI.
+See [validation-0.11.26.md](validation-0.11.26.md) for executed evidence and pending
+acceptance. Next: durable stopped voices for capture/note drafts, then independent
+manual lab/contact raw recovery and remaining integrity/feature/native gates below.
+Do not equate scoped intent fencing with all-form or whole-product completion.
+
 2026-10-04, 0.11.25: fence NoteCard pin/nested delete, FollowUpCard.perform,
 media viewer caption/delete/share and lab entry creation/update/paste. Keep original
 Scope/Gate ownership, actual prompt/raw input on failure and admission through SQL/

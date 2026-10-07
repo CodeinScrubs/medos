@@ -2,10 +2,12 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError, notify } from '@/components/feedback';
 import { useNow } from '@/components/use-now';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 
 import {
@@ -43,7 +45,12 @@ export function followUpFormSeed(row: FollowUpFormRow, now: Date) {
 export type FollowUpFormSeed = ReturnType<typeof followUpFormSeed>;
 
 /** Raw input is autosaved; explicit valid publication alone creates a clinical follow-up. */
-export function useFollowUpFormDraft(seed: FollowUpFormSeed, onReset: (seed: FollowUpFormSeed) => void) {
+export function useFollowUpFormDraft(
+  seed: FollowUpFormSeed,
+  onReset: (seed: FollowUpFormSeed) => void,
+  expectedGeneration?: number,
+) {
+  const { generation } = useDatasetIntent(expectedGeneration);
   const router = useRouter();
   const now = useNow();
   const patientId = seed.row.patient.id;
@@ -67,6 +74,7 @@ export function useFollowUpFormDraft(seed: FollowUpFormSeed, onReset: (seed: Fol
         revision = nextRevision;
       },
       saver: new Autosave<FollowUpFormDocument>({
+        generation,
         write: async (value) => {
           revision = await saveFollowUpFormDraft(id, patientId, seed.encounterId, value, revision);
         },
@@ -113,7 +121,7 @@ export function useFollowUpFormDraft(seed: FollowUpFormSeed, onReset: (seed: Fol
   async function perform(action: () => Promise<void>) {
     if (!begin()) return;
     try {
-      await action();
+      await withDatasetWrite(generation, action);
       setFailed(false);
     } catch (error) {
       setFailed(true);
@@ -125,10 +133,13 @@ export function useFollowUpFormDraft(seed: FollowUpFormSeed, onReset: (seed: Fol
   async function save() {
     if (!begin()) return;
     if (completedId) {
-      end();
       try {
-        router.back();
+        await withDatasetWrite(generation, async () => {
+          end();
+          router.back();
+        });
       } catch (error) {
+        end();
         alertError('پیگیری ثبت شد؛ صفحه بسته نشد', error);
       }
       return;
@@ -141,13 +152,15 @@ export function useFollowUpFormDraft(seed: FollowUpFormSeed, onReset: (seed: Fol
       return;
     }
     try {
-      await flushOrFail();
-      const id = await commitFollowUpFormDraft(persistence.id(), patientId, persistence.revision(), new Date(now));
-      published.current = true;
-      setCompletedId(id);
-      saver.cancel();
-      end();
-      router.back();
+      await withDatasetWrite(generation, async () => {
+        await flushOrFail();
+        const id = await commitFollowUpFormDraft(persistence.id(), patientId, persistence.revision(), new Date(now));
+        published.current = true;
+        setCompletedId(id);
+        saver.cancel();
+        end();
+        router.back();
+      });
     } catch (error) {
       setFailed(true);
       alertError(published.current ? 'پیگیری ثبت شد؛ صفحه بسته نشد' : 'ثبت نشد', error);
@@ -204,7 +217,7 @@ export function useFollowUpFormDraft(seed: FollowUpFormSeed, onReset: (seed: Fol
             answered = true;
             void (async () => {
               try {
-                await action();
+                await withDatasetWrite(generation, action);
               } catch (error) {
                 setFailed(true);
                 alertError('انجام نشد', error);

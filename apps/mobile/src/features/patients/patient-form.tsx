@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { Button, Column, Input, Row, Screen, Segmented, Text } from '@/components/ui';
@@ -10,6 +11,7 @@ import { useNow } from '@/components/use-now';
 import type { Patient } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { CHOOSABLE_STATUSES, isChoosableStatus } from '@/features/encounters/status';
+import { assertDatasetWrite } from '@/lib/dataset-write';
 import { parseJalaliInput, toIsoDate } from '@/lib/jalali';
 import { isValidNationalId, toLatinDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -20,11 +22,20 @@ import { BLOOD_TYPES, PATIENT_STATUS, SEX_LABELS } from './labels';
 import { patientFormSeed, usePatientFormDraft, type PatientFormSeed } from './use-form-draft';
 
 /** Read the draft before mounting an editor; read failures must never look like an empty form. */
-export function PatientForm({ patient, readNotice }: { patient?: Patient; readNotice?: ReactNode }) {
+export function PatientForm({
+  patient,
+  readNotice,
+  generation: expectedGeneration,
+}: {
+  patient?: Patient;
+  readNotice?: ReactNode;
+  generation?: number;
+}) {
+  const { generation, stale } = useDatasetIntent(expectedGeneration);
   const { data, error, retry } = useLive(patientFormDraftQuery(patient?.id ?? null), [patient?.id]);
   const [seed, setSeed] = useState<{ value: PatientFormSeed; generation: number } | null>(null);
   let decodeError: Error | undefined;
-  if (!seed && data) {
+  if (!stale && !seed && data) {
     try {
       setSeed({ value: patientFormSeed(patient, data[0] ?? null), generation: 0 });
     } catch (e) {
@@ -33,8 +44,14 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
   }
   const notice = (
     <>
-      {readNotice}
-      <ErrorNotice error={error ?? decodeError} what="پیش‌نویس بیمار" onRetry={retry} />
+      {stale ? (
+        (readNotice ?? <Text color="danger">اطلاعات از بکاپ جایگزین شد؛ نوشته‌های قبلی را مرور یا کپی کنید.</Text>)
+      ) : (
+        <>
+          {readNotice}
+          <ErrorNotice error={error ?? decodeError} what="پیش‌نویس بیمار" onRetry={retry} />
+        </>
+      )}
     </>
   );
   if (!seed)
@@ -42,7 +59,7 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
       <Screen>
         <Column>
           {notice}
-          {!error && !decodeError ? <Text>بارگذاری پیش‌نویس…</Text> : null}
+          {!stale && !error && !decodeError ? <Text>بارگذاری پیش‌نویس…</Text> : null}
         </Column>
       </Screen>
     );
@@ -50,24 +67,30 @@ export function PatientForm({ patient, readNotice }: { patient?: Patient; readNo
     <PatientFormEditor
       key={seed.generation}
       seed={seed.value}
+      generation={generation}
       readNotice={notice}
-      onReset={(value) => setSeed({ value, generation: seed.generation + 1 })}
+      onReset={(value) => {
+        assertDatasetWrite(generation);
+        setSeed({ value, generation: seed.generation + 1 });
+      }}
     />
   );
 }
 
 function PatientFormEditor({
   seed,
+  generation,
   readNotice,
   onReset,
 }: {
   seed: PatientFormSeed;
+  generation: number;
   readNotice: ReactNode;
   onReset: (seed: PatientFormSeed) => void;
 }) {
   const { spacing } = useTheme();
   const isEdit = Boolean(seed.patient);
-  const editing = usePatientFormDraft(seed, onReset);
+  const editing = usePatientFormDraft(seed, onReset, generation);
   const { form, set, errors, busy: saving } = editing;
   const dateValidation = useDateValidation();
   const now = useNow();
