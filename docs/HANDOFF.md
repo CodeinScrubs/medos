@@ -36,7 +36,8 @@ wrong, never rewrite them to look better.
 ## 2026-10-07 — Review all five PRs and keep clinical completion truthful
 
 **Agent:** GPT-6 via Codex
-**Commits:** application/audit change in this commit; baseline source `466a1a8`.
+**Commits:** application/audit `f6c9277`; acceptance/fixture correction in this
+commit. Baseline source `466a1a8`.
 
 **Changed**
 - Audited all five exact PR heads in an isolated integration; no remote merge,
@@ -48,6 +49,8 @@ wrong, never rewrite them to look better.
   messenger preparation no longer claims an unperformed clipboard copy.
 - Preserve synthetic PR witnesses/installer under docs/reviews/2026-10-07.
   Version 0.11.27 / code 43; no dependencies/schema/formula/permission change.
+- Record independent archive/native and signed-artifact acceptance; preserve
+  open dependency findings separately instead of applying framework downgrades.
 
 **Verified**
 - Exact 0.11.26 source CI `37573104289` success; its push-hook check passed.
@@ -57,16 +60,27 @@ wrong, never rewrite them to look better.
 - Main finalized unchanged-source probes: seven failed / thirteen passed;
   after fixes all 20 targeted tests passed.
 - Full final check: typecheck, lint (zero warnings), formatting, 118 suites /
-  1515 app tests + three workflows. Fresh GitHub inventory confirmed the same
-  five open heads and unmerged status; main still matched the baseline.
+  1515 app tests + three workflows, including the final checkout repeat. Fresh
+  GitHub inventory confirmed the same five open heads and unmerged status.
+- Exact application CI `37577506830` completed/success; normal source push-hook
+  check passed. Signed x86_64/arm64 packages passed metadata, certificate and
+  essential-library inspection; artifacts/hashes in validation-0.11.27.
+- Offline native upgrade retained all 39 app tables/18 files exactly. Mounted
+  answer after restore retained text and refused publication without changing
+  those tables/files. Fresh answer/back/cold reopen left one answered row/event,
+  empty drafts, exact 38 other tables and all files; integrity/FKs clean.
+- Final corrected review fixtures typechecked before reproducing 24 failed /
+  one passed / 22 skipped checks. Owned review worktree archived recoverably;
+  owned emulator stopped. No physical-phone acceptance is inferred.
 
 **Not verified**
-- Exact-source CI and signed native acceptance recorded when executed.
 - Physical phone, 40-patient timings, message/alarm delivery, stopped-draft voice
   interruption, power loss/low space, clinical validation or product completeness.
+- Full exploit reachability for seven dependency advisories; none fixed here.
 
 **Open threads**
-- Finish current source/native gates. Next durable stopped voices for new-note/
+- Take compatible shell-quote/source-map-js locked fixes with their own gates;
+  trace five remaining advisory paths. Next durable stopped voices for new-note/
   capture drafts, remaining manual raw recovery, then the measured offline shift.
 - Revised PRs must retain current original intent through acknowledgment; rerun
   review witnesses and meaningful native acceptance, not just old PR CI.
@@ -77,6 +91,10 @@ wrong, never rewrite them to look better.
   ref. Witnesses are intentionally failing review fixtures, not ordinary CI tests.
 - Older-result test wording was corrected to the existing calendar helper before
   the finalized unchanged-source probe. Do not add a parallel relative-date rule.
+- Five initial fixture kinds were corrected from `inpatient` to `admission`;
+  harness/type errors are not PR defects. Three UI-idle retries expired during
+  restore before a fresh dump showed successful acknowledgment. A startup system
+  Digital Wellbeing ANR was dismissed; neither issue is an app-crash finding.
 
 ## 2026-10-07 — Keep patient form intent through initial loading and acknowledgment
 

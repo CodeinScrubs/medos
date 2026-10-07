@@ -45,6 +45,12 @@ feedback no longer invents a clipboard copy. See project-audit-2026-10-07.md and
 validation-0.11.27.md for exact evidence and proposed paper-replacement acceptance.
 No PR was remotely merged or approved. Existing execution priorities below stay
 in force; a new AI banner or feature count does not close the capture/phone gates.
+The same audit's bounded production-dependency scan found seven underlying
+advisories propagated to 81 affected package entries. This patch changes none
+of them. First take scoped compatible shell-quote/source-map-js fixes with their
+own verification; trace the remaining parent/tool/runtime paths. Do not apply
+npm's suggested framework downgrades or `audit fix --force`. Exact versions,
+primary advisory links and limits are in the audit's dependency section.
 
 2026-10-07, 0.11.26: original intent is captured before initial reads for patient,
 admission/edit/discharge, follow-up and consult-answer forms. Their Autosave and

@@ -32,6 +32,11 @@ Before adding these probes, the integrated experiment passed the ordinary check:
 probe run failed 24 checks and passed one SQL-rollback check. This is 24 failed
 checks, not 24 independent bugs; four referral checks exercise the same mistaken
 state transition. Existing unrelated tests were skipped by the name filter.
+The final installed fixtures also passed the mobile TypeScript check before
+reproducing 24 failed / one passed / 22 skipped tests on unchanged PR production.
+Five initial fixture inputs used `inpatient` instead of the actual `admission`
+encounter kind. Those were corrected and the whole selected run repeated; invalid
+fixture types were not counted as project defects.
 
 ## Installing and running
 
@@ -44,6 +49,7 @@ From that checkout's root:
 
 ```powershell
 node docs/reviews/2026-10-07/install-witnesses.cjs
+npm run typecheck --workspace=@medos/mobile
 npm run test --workspace=@medos/mobile -- --runInBand --runTestsByPath src/features/ai/review-witness.test.tsx src/features/consults/share-review-witness.test.tsx src/features/shifts/round-screen.test.tsx src/features/diagnoses/diagnoses-section.test.tsx --testNamePattern 'PR.?[1345] review'
 ```
 

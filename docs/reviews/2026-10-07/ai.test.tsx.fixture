@@ -113,9 +113,9 @@ describe('PR 1 review witnesses, unchanged PR production on 0.11.26', () => {
     expect(plan.warnings.length).toBeGreaterThan(0);
   });
   it('includes only current-encounter and standing orders in the current dossier', async () => {
-    await openEncounter({ patientId, kind: 'inpatient' });
+    await openEncounter({ patientId, kind: 'admission' });
     await createOrder({ patientId, kind: 'drug', name: 'PreviousEpisodeOnly' });
-    const current = await openEncounter({ patientId, kind: 'inpatient' });
+    const current = await openEncounter({ patientId, kind: 'admission' });
     expect(await patientOrdersQuery(patientId, current)).toHaveLength(0);
     const data = await queries.fetchDossierData(patientId);
     expect(data!.orders).toHaveLength(0);
@@ -127,7 +127,7 @@ describe('PR 1 review witnesses, unchanged PR production on 0.11.26', () => {
   });
   it('rejects a medication plan explicitly linked to another patient encounter', async () => {
     const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
-    const otherEncounter = await openEncounter({ patientId: other, kind: 'inpatient' });
+    const otherEncounter = await openEncounter({ patientId: other, kind: 'admission' });
     const before = databaseRows(t);
     const attempt = queries.commitAiPlan({
       patientId,
@@ -271,7 +271,7 @@ describe('PR 1 review witnesses, unchanged PR production on 0.11.26', () => {
     expect(Clipboard.setStringAsync).not.toHaveBeenCalled();
   });
   it('keeps the encounter reviewed in the dossier instead of silently targeting a new admission', async () => {
-    await openEncounter({ patientId, kind: 'inpatient', chiefComplaint: 'Synthetic original episode' });
+    await openEncounter({ patientId, kind: 'admission', chiefComplaint: 'Synthetic original episode' });
     await act(async () => {
       tree = create(<AiConsultModal visible patientId={patientId} onClose={() => {}} />);
       await settle();
@@ -288,7 +288,7 @@ describe('PR 1 review witnesses, unchanged PR production on 0.11.26', () => {
       button('بررسی و خطایابی برنامه (Review & Stage)').props.onPress();
       await settle();
     });
-    await openEncounter({ patientId, kind: 'inpatient', chiefComplaint: 'Synthetic replacement episode' });
+    await openEncounter({ patientId, kind: 'admission', chiefComplaint: 'Synthetic replacement episode' });
     const before = databaseRows(t);
     await act(async () => {
       await commitButton().props.onPress();

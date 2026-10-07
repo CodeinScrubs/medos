@@ -63,6 +63,17 @@ Statements such as “100% coverage” or “under two seconds” in a PR descri
 need a coverage report or a timed workload; the inspected checks do not establish
 those claims.
 
+The later 0.11.27 source `f6c9277` passed 118 suites / 1515 app tests plus three
+workflow tests and exact-source CI `37577506830`. Its signed x86_64 package
+upgraded the existing QA installation offline without clearing data. Independent
+full-archive comparison preserved all 39 application tables and 18 media files
+exactly. An old answer form retained input after restore and refused publication
+without changing those rows/files; a fresh answer survived cold reopen, with only
+its expected consultation changes and one answered audit event. See the separate
+validation record for artifacts, exclusions, QA tool issues and remaining limits.
+No proposed PR UI, AI output, external delivery or 40-patient speed is certified
+by that bounded native run.
+
 ## 2. Blocking PR findings
 
 ### PR 1: preserve clinical meaning before adding an AI workflow
@@ -263,6 +274,41 @@ establishes the proposed two-second entry claim.
 - **Documentation drift:** the roadmap is a feature inventory with historical
   phone claims and old counts. Treat the newest HANDOFF/IMPLEMENTATION/validation
   as current evidence; do not copy its check marks into a release-complete claim.
+- **Portability is selective:** `lib/ids.ts` uses Expo Crypto, and native crypto
+  bindings are part of the backup implementation. Do not assume the whole lib
+  folder is device-independent merely from its name or the layer diagram. Keep
+  pure clinical/text contracts portable; isolate a native binding when a real
+  second runtime needs it, preserving existing cryptographic test vectors.
+
+### Dependency advisories require triage, not automatic framework changes
+
+After the application source freeze, a bounded `npm audit --omit=dev --json`
+completed on the unchanged lockfile. It reported 81 affected packages (one
+critical, 65 high, 15 moderate), but only **seven underlying advisory records**.
+Severity propagates through Expo/React Native dependency chains. “Production” in
+npm's graph includes build/development utilities installed by Expo; it is not
+evidence that all 81 packages or vulnerable paths execute in the signed APK.
+No dependency was changed in this patch; these are a separate, open maintenance
+finding, not introduced by the five PRs. Full independent exploit reachability
+was not established.
+
+| Locked underlying package | Source-verified advisory / patch status | Next action |
+|---|---|---|
+| `shell-quote@1.10.0` | [Critical command quoting advisory](https://github.com/advisories/GHSA-pqg4-j6r4-53mv), patched in 1.11.0 | Prioritize a compatible locked update. Its recorded parent is react-devtools-core with `^1.6.1`; reproduce safe quoting without executing injected commands, then run checks/bundle/native inspection. |
+| `source-map-js@1.2.1` | [Source-map offset DoS](https://github.com/advisories/GHSA-68fv-2mgg-jv7q), patched in 1.2.2 | Compatible locked update under postcss `^1.2.1`; check source-map/bundle behavior. |
+| `decode-uri-component@0.2.2` | [Malformed decoding DoS](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr), patched in 0.5.0 | Parent query-string asks for `^0.2.2`; a forced override crosses its compatibility range. Trace actual link parsing, test bounded malformed input and choose a supported parent upgrade/compatible mitigation. |
+| `node-forge@1.4.0` | [RSA verification advisory](https://github.com/advisories/GHSA-86w9-cpqp-85rv), no patched version listed | Trace Expo CLI/code-signing use and applicable inputs; track upstream. Do not change MedOS AES backup schemes or APK signing based on an unrelated package name. |
+| `braces@3.0.3` | [Nested-pattern stack exhaustion](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), no patched version listed | Parent micromatch; inspect externally supplied patterns versus controlled build globs and apply supported depth/input handling if exposed. |
+| `sprintf-js@1.0.3` | [Unbounded precision advisory](https://github.com/advisories/GHSA-hp3w-g68c-fv3c), no patched version listed | Recorded parent is argparse in coverage tooling. Determine whether any untrusted format reaches it; upgrade/remove through the owning tool when supported. |
+| `uuid@7.0.3` | [v3/v5/v6 buffer-bound advisory](https://github.com/advisories/GHSA-w5hq-g745-h8pq), patched families include 11.1.1 | Recorded parent xcode requires `^7.0.3`; a major override needs compatibility review. MedOS ids use `Crypto.randomUUID()`, not these buffer APIs. Do not rewrite patient ids or historical records. |
+
+Patch availability and affected ranges were independently checked against the
+linked GitHub advisory pages on 2026-10-07. An initial unbounded registry attempt
+was cancelled; the bounded retry produced the actual report. npm suggested
+framework downgrades such as Expo 44.0.6 and old native libraries through
+`fixAvailable`; these are resolver suggestions, not a compatible MedOS upgrade
+plan. Do not run `npm audit fix --force` or add broad overrides to make a counter
+zero. Preserve Expo/RN compatibility and validate each selected change separately.
 
 ## 5. Product fit: a shift should feel like one workspace
 
@@ -372,6 +418,10 @@ remains the execution ledger; do not create a competing task system.
 - Re-run the preserved witnesses on each changed head, then the ordinary check.
   For relevant screens inspect the actual signed native build and Android Back,
   keyboard and safe-area behavior. No merge based solely on old CI green.
+- Triage the seven underlying dependency advisories above. Start the two
+  compatible patched transitive updates as a separate scoped change; review
+  unsupported/major parent changes for runtime reachability and compatibility.
+  A green test count does not mean a dependency advisory has been resolved.
 
 **Exit:** recorded verdicts, no known false-status/wrong-scope path admitted to
 main, current exact-source checks, and clear native limitations.
