@@ -88,6 +88,9 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
 }));
+jest.mock('expo-router/react-navigation', () => ({
+  useNavigation: () => ({ isFocused: () => true }),
+}));
 jest.mock('@/components/ui', () => ({
   Badge: 'Badge',
   Button: 'Button',

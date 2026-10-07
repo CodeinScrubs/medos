@@ -1518,3 +1518,20 @@ retain its raw drafts. Two compatible transitive patches update shell-quote and
 source-map-js; remaining advisory exposure is recorded separately. Native
 upgrade, heavy-record navigation, process interruption and physical-phone gates
 must be evaluated independently from SQLite/React handler tests.
+
+## Native navigation ownership and shift density (0.11.30)
+
+An Android permission/scheduling promise can resolve after a newer route has
+opened. Dataset admission does not make a global router.back belong to the
+original form. The occasion editor checks its originating navigation's isFocused
+before closing after publication/discard; an unfocused completed editor remains
+read-only and closes explicitly when revisited, without publishing again.
+The navigation guard remains always on. Native acceptance exposed this race;
+a deferred-reminder component witness fails before and passes after the change.
+
+The shift and round routes already have an inset native Stack header. Their
+Screen omits the redundant top safe edge while keeping the automatic bottom
+edge. Round/add-patient stay direct; bulk-add/end-shift move into one inline
+options group. Presentation changes never remount handoff editors or their Scope.
+This is local to the header-hosted routes: tab roots and headerless modals still
+need their top inset. No global safe-area heuristic or navigation layer was added.

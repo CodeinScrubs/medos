@@ -124,10 +124,77 @@ does not certify a clean supply chain or remove every advisory.
 
 ## Release and native acceptance
 
-Signed arm64 APK, isolated x86_64 upgrade/40-patient navigation, independent
-archive comparison, cold recovery and bounded crash/ANR evidence are pending
-execution at this source checkpoint. Record exact source, signatures/hashes and
-executed results here after testing; do not mark them passed in advance.
+Exact source is `1fb86ffffbeeb49f3abb4502d8844676ee160c58`. Its
+[GitHub CI run](https://github.com/CodeinScrubs/medos/actions/runs/37647712032)
+completed successfully, including clean-install checks, migration regeneration
+and the Android bundle. The arm64 `npm run apk` completed in 13m29s; a separate
+x86_64 build completed in 5m29s. Native libraries, package/version/ABI and release
+signature were inspected rather than inferred from Gradle success.
+
+| Artifact at this checkpoint | Bytes | SHA-256 |
+|---|---:|---|
+| Signed arm64 0.11.29 / code45 | 52,924,119 | `167ba5a8c59354d297d4126be6f4f982c21fe563ae05ed2bbc777034ee1bd42b` |
+| Private signed x86_64, same source | 54,532,446 | `e46b429bd9e55a563fa4892ae8bfe40fdf3e81ee6a65ed131dc92c527f8013f1` |
+
+The signer certificate SHA-256 is
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`,
+matching the previous release. The x86 build never went to dist. Pulling the
+installed base APK established exact agreement with the inspected x86 artifact.
+
+Native acceptance used the separately owned API36.1 x86_64 AVD on
+emulator-5556, Tehran timezone, airplane mode with mobile data/Wi-Fi off. No
+physical phone was attached and no app data was cleared/uninstalled. A full
+native SAF archive was taken on 0.11.28 before an in-place `adb install -r`
+upgrade. Independent Node AES-GCM/scrypt authentication/decryption and SQLite
+comparison of fresh before/after archives preserved all **135 original rows in
+39 application tables and all 18 media files byte-for-byte**. The new draft
+table was empty; 22 migrations, integrity `ok`, no foreign-key violations.
+Operational settings/audit/backup/migration bookkeeping was excluded explicitly.
+
+An encrypted private fixture retained that database/media and added the software
+heavy-shift rows: 40 synthetic patients, 3,884 additional rows, 4,019 total
+application rows in 40 tables. Native SAF restore acknowledged 41 total patients
+(40 new plus the original) and 18 files. A fresh native full archive independently
+matched all 4,019 rows and all 18 media hashes, with integrity and foreign keys
+clean. No native reminder-column differences occurred. The fixture's clinical
+times remain March 2025; opening it now does not simulate a real-time 24h shift.
+
+All 40 intended patient routes opened with the correct identity and the same
+process id throughout read stress. The crash buffer was empty afterward. Maximum
+action-to-fresh-hierarchy time was 6,666ms, including ADB/UIAutomator, so it is not
+an app-render timing measurement. Recorded PSS was 467,496KB; software-rendered
+emulator gfxinfo reported 1,633 janky frames out of 1,925 (84.83%). Forty stacked
+deep links and software rendering are not a normal phone benchmark. These
+numbers do **not** prove smoothness; physical-device timing/profiling stays open.
+
+Native occasion checks verified acknowledged title and exact invalid date
+`1404/12/30` after force-stop/cold reopening, refusal to publish that invalid
+date, corrected `1403/12/30` publication and the visible next annual occurrence
+on Esfand 29 of non-leap 1405. The native message sheet/copy/close worked; no
+external message was sent. Scheduling permission was exercised, not actual
+future notification delivery. The final native checkpoint retains an additional
+unsubmitted raw occasion for the next in-place upgrade test.
+
+Two findings from native work are addressed by **0.11.30**, not by these APKs:
+the shift header wastes space (duplicate top inset/large administrative controls),
+and an old form's delayed native acknowledgment can globally pop a newer deep
+linked screen. The navigation witness fails on 0.11.29 and is tested again after
+the fix. See [validation-0.11.30.md](validation-0.11.30.md).
+
+Harness limitations are retained: early AVD boot produced a System UI ANR on the
+old app version, not a MedOS crash, and that attempt was not accepted as stable
+startup. Early restore polling expired before its later successful acknowledgment.
+The fixture initially had no doctor; one was created through the real UI. One
+label-based input helper selected the wrong flattened native field; the date
+test was repeated with the exact observed field/hint and acknowledgment. No
+failed harness attempt is counted as a passing application check.
+
+For decode-uri-component, installed Expo Router's linking uses its forked
+getStateFromPath and URL.searchParams for parsing. The old React Navigation
+parser still imports query-string.parse; current output formatting uses
+query-string.stringify. This is a bounded source trace, not proof that every
+bundle/deep-link entry point avoids the advisory. No incompatible ESM override
+was applied.
 
 ## Remaining release gates
 

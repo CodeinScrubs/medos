@@ -35,6 +35,17 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-07, 0.11.30: native 40-patient review of 0.11.29 found excessive shift
+header space and a late navigation race when scheduling/permission completed
+after a newer deep link. Shift/round now omit only their duplicate top inset;
+round/add-patient stay direct and shift administration is one inline group.
+The occasion form checks original navigation focus before delayed Back and
+retains one completed/read-only close path. The pre-fix deferred-reminder witness
+failed; targeted four suites / 40 checks pass after correction. Other async forms
+still need navigation-ownership audit. Native and full-check evidence for this
+source is tracked in validation-0.11.30.md; previous exact source/archive/heavy
+navigation evidence is in validation-0.11.29.md. No broader P0/phone sign-off is implied.
+
 2026-10-07, 0.11.29: the active shift/Today deck now exposes compact patient
 identity, admission, pinned-episode context and the next correctly scoped task.
 Search reaches all members; hidden handoff editors stay mounted. Accessible

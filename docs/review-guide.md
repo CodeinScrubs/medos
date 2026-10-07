@@ -89,6 +89,13 @@ For the 0.11.29 change, review these bounded areas:
 | Message handover | `greeting-composer.tsx`, `messages-queries.ts`, `occasions-section.tsx` | Every channel accessible; failed opening creates no log; SQL retry does not reopen; sent time is idempotent; full history remains accessible |
 | Calendar | `lib/jalali.ts`, `lib/date-input.ts`, their tests | Strict syntax, month/leap boundaries, unsupported stored-date recovery and independent ICU comparison in the documented practical range |
 
+The 0.11.30 follow-up addresses actual native findings: read
+`use-occasion-form.ts` with its deferred-reminder/focus test. A late global Back
+must not pop a newer route. Shift/round use explicit safe edges only on routes
+with a native header; bottom navigation protection remains. Inline options must
+not remount the clinical editing scope. Native/software source checkpoints and
+artifact hashes stay separate in the two validation reports.
+
 The following integration test accelerates a 24-hour shift in real SQLite. It is
 not a 24-hour Android soak test or a physical-device performance measurement.
 

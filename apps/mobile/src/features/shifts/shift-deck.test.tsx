@@ -183,6 +183,22 @@ describe('40-patient deck with real reads, autosave and write admission', () => 
     await press('تحویل شیفت');
     const exact = '  End of shift\n\nLast line\n';
     await type('یادداشت تحویل شیفت', exact);
+    // Administrative controls must not remount the clinical editing scope.
+    await act(async () => {
+      tree!.root
+        .findAllByType(IconButton)
+        .find((n) => n.props.label === 'گزینه‌های شیفت')!
+        .props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      tree!.root
+        .findAllByType(IconButton)
+        .find((n) => n.props.label === 'بستن گزینه‌های شیفت')!
+        .props.onPress();
+      await settle();
+    });
+    expect(input('یادداشت تحویل شیفت').props.value).toBe(exact);
     await type('جستجو در شیفت', 'BED-40');
     expect(input('یادداشت تحویل شیفت').props.value).toBe(exact);
     expect(

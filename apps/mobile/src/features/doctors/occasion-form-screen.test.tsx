@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, ChipSelect, Input, Toggle } from '@/components/ui';
 import { occasionFormDrafts, occasions } from '@/db/schema';
+import * as notifications from '@/platform/notifications';
 import { databaseRows, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -17,11 +18,15 @@ import { createDoctor } from './queries';
 
 let mockParams: { doctorId: string; occasionId?: string };
 let mockFlush: (() => Promise<boolean>) | null;
+let mockFocused = true;
 const mockBack = jest.fn();
 const mockListeners = new Set<(event: { tableName: string }) => void>();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: mockBack }),
+}));
+jest.mock('expo-router/react-navigation', () => ({
+  useNavigation: () => ({ isFocused: () => mockFocused }),
 }));
 jest.mock('expo-sqlite', () => ({
   addDatabaseChangeListener: (listener: (event: { tableName: string }) => void) => {
@@ -100,6 +105,7 @@ beforeEach(async () => {
   const doctorId = await createDoctor({ firstName: 'Synthetic', lastName: 'Colleague', relationship: 'colleague' });
   mockParams = { doctorId };
   mockBack.mockReset();
+  mockFocused = true;
   mockFlush = null;
   mockListeners.clear();
   jest.mocked(alertError).mockClear();
@@ -114,6 +120,35 @@ afterEach(async () => {
 });
 
 describe('occasion editor with real autosave scope, live reads and SQLite', () => {
+  it('does not pop a newer screen when native reminder acknowledgment finishes after the editor loses focus', async () => {
+    let release: () => void = () => {
+      throw new Error('Reminder was not requested');
+    };
+    jest.spyOn(notifications, 'scheduleReminder').mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          release = () => resolve('synthetic-notification');
+        }),
+    );
+    await mount();
+    await type('تاریخ', '1403/12/30');
+    await press('افزودن مناسبت');
+    expect(published()).toHaveLength(1);
+    expect(mockBack).not.toHaveBeenCalled();
+    mockFocused = false;
+    await act(async () => {
+      release();
+      await settle();
+    });
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(input('عنوان').props.editable).toBe(false);
+    expect(tree!.root.findAllByType(Button).filter((n) => n.props.label === 'بستن')).toHaveLength(1);
+    const saved = databaseRows(t);
+    mockFocused = true;
+    await press('بستن');
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(databaseRows(t)).toEqual(saved);
+  });
   it('defaults a religious occasion to a one-off date rather than inventing an annual Solar recurrence', async () => {
     await mount();
     await act(async () => {
@@ -135,6 +170,28 @@ describe('occasion editor with real autosave scope, live reads and SQLite', () =
       jalaliMonth: null,
       jalaliDay: null,
     });
+  });
+  it('keeps one explicit stale close after a completed editor survives dataset replacement', async () => {
+    await mount();
+    await type('تاریخ', '1403/12/30');
+    mockFocused = false;
+    await press('افزودن مناسبت');
+    expect(published()).toHaveLength(1);
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const restored = databaseRows(t);
+    mockFocused = true;
+    expect(button('بستن').props.disabled).toBe(false);
+    await press('بستن');
+    await act(async () => {
+      dialog()[1]!.onPress!();
+      await settle();
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(databaseRows(t)).toEqual(restored);
+    await act(async () => expect(await mockFlush!()).toBe(true));
   });
   it('recovers exact incomplete date and message text without publishing an occasion', async () => {
     await mount();

@@ -255,10 +255,11 @@ function OccasionForm({
           label={editing.completed ? 'بستن' : seed.occasion ? 'ثبت تغییرات' : 'افزودن مناسبت'}
           icon="checkmark"
           loading={editing.busy}
-          disabled={editing.stale}
+          disabled={editing.stale && !editing.completed}
           full
           onPress={() => {
-            if (editing.completed || dateValidation.check()) void editing.save();
+            if (editing.completed) editing.close();
+            else if (dateValidation.check()) void editing.save();
           }}
         />
         {editing.state.status === 'failed' || editing.failedWrite || editing.comparison ? (
@@ -299,7 +300,9 @@ function OccasionForm({
             </Column>
           </Card>
         ) : null}
-        <Button label="بستن" variant="ghost" onPress={editing.close} disabled={editing.busy} full />
+        {!editing.completed ? (
+          <Button label="بستن" variant="ghost" onPress={editing.close} disabled={editing.busy} full />
+        ) : null}
         {editing.hasDraft && !editing.completed ? (
           <Button label="حذف پیش‌نویس" variant="ghost" disabled={editing.stale || disabled} onPress={editing.discard} />
         ) : null}

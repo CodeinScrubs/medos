@@ -135,6 +135,11 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
   whole life. Do not make the guard conditional: switching it off as a save finishes
   changes the header in the same moment `router.back()` removes the screen (the same
   crash).
+- Native permission or database acknowledgment can finish after a different
+  screen opens. Check the originating navigation's `isFocused()` before a delayed
+  `router.back()`; do not pop the newer screen. Keep the completed form readable
+  and offer one explicit close when the owner returns. Dataset ownership and
+  navigation ownership are separate checks.
 - Voice callbacks return an awaited `Promise<void>` and reject failed metadata/draft
   acknowledgement. Each recorder belongs to its screen's one `AutosaveScope`, alongside
   text fields; never add a competing removal guard to that route or flush the whole group

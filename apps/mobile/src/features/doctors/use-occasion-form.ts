@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router/react-navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 
@@ -32,6 +33,7 @@ export function useOccasionForm(seed: OccasionFormRow, onReset: (row: OccasionFo
   const scope = useAutosaveScope()!;
   const { generation, stale } = useDatasetIntent();
   const router = useRouter();
+  const navigation = useNavigation();
   const now = useNow();
   const doctorId = seed.doctor.id;
   const occasionId = seed.occasion?.id ?? null;
@@ -120,6 +122,11 @@ export function useOccasionForm(seed: OccasionFormRow, onReset: (row: OccasionFo
       setBusy(false);
     }
   }
+  function closeFocusedEditor() {
+    // Permission/scheduling can outlive a deep link to another screen. A late
+    // global back would pop that newer screen, not this completed editor.
+    if (navigation.isFocused()) router.back();
+  }
   function save() {
     return perform(async () => {
       if (!published.current) {
@@ -146,7 +153,7 @@ export function useOccasionForm(seed: OccasionFormRow, onReset: (row: OccasionFo
           notify('مناسبت ذخیره شد', 'یادآور هماهنگ نشد؛ از صفحهٔ پزشک «هماهنگی اعلان؛ تلاش مجدد» را بزنید.');
       }
       acting.current = false;
-      router.back();
+      closeFocusedEditor();
     });
   }
   function keepMine() {
@@ -228,7 +235,7 @@ export function useOccasionForm(seed: OccasionFormRow, onReset: (row: OccasionFo
         published.current = true;
         saver.cancel();
         acting.current = false;
-        router.back();
+        closeFocusedEditor();
       },
       { destructive: true },
     );
@@ -236,7 +243,7 @@ export function useOccasionForm(seed: OccasionFormRow, onReset: (row: OccasionFo
   function close() {
     if (acting.current || pendingDialog.current) return;
     if (!stale) {
-      router.back();
+      closeFocusedEditor();
       return;
     }
     confirm(
@@ -244,7 +251,7 @@ export function useOccasionForm(seed: OccasionFormRow, onReset: (row: OccasionFo
       'پیش از بستن نوشته‌های روی صفحه را مرور یا کپی کنید.',
       async () => {
         scope.abandonStale();
-        router.back();
+        closeFocusedEditor();
       },
       { label: 'بستن فرم', allowStale: true },
     );

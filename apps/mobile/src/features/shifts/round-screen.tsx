@@ -109,7 +109,7 @@ function RoundScreenContent() {
 
   if (error && !shift) {
     return (
-      <Screen>
+      <Screen edges={[]}>
         <ScreenOptions options={{ title: 'راند' }} />
         <ErrorNotice error={error} what="راند" onRetry={retry} />
         <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
@@ -119,7 +119,7 @@ function RoundScreenContent() {
 
   if (loading) {
     return (
-      <Screen>
+      <Screen edges={[]}>
         <ScreenOptions options={{ title: 'راند' }} />
         <ErrorNotice error={error} what="راند" onRetry={retry} />
         <Text variant="caption" color="textMuted">
@@ -131,7 +131,7 @@ function RoundScreenContent() {
 
   if (!blocked && rows.length === 0) {
     return (
-      <Screen scroll>
+      <Screen scroll edges={[]}>
         <ScreenOptions options={{ title: 'راند' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="راند" onRetry={retry} />
@@ -152,7 +152,7 @@ function RoundScreenContent() {
 
   if (progress?.done) {
     return (
-      <Screen scroll>
+      <Screen scroll edges={[]}>
         <ScreenOptions options={{ title: 'راند' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <EmptyState
@@ -168,7 +168,7 @@ function RoundScreenContent() {
 
   if (!current || index == null) {
     return (
-      <Screen>
+      <Screen edges={[]}>
         <ScreenOptions options={{ title: 'راند' }} />
         <ErrorNotice error={error} what="وضعیت راند" onRetry={retry} />
         <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
@@ -177,7 +177,7 @@ function RoundScreenContent() {
   }
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} edges={[]}>
       <ScreenOptions options={{ title: 'راند' }} />
       <KeyboardAwareScrollView
         style={styles.grow}

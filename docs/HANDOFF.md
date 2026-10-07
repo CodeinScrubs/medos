@@ -33,10 +33,59 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Native heavy-shift findings and senior-review checkpoint
+
+**Agent:** GPT-6 via Codex
+**Commits:** application in this commit; baseline `1fb86ff`; native acceptance pending.
+
+**Changed**
+- Shift/round omit duplicate top safe area below their native header; bottom
+  protection remains. Round/add-patient are direct; administrative shift actions
+  are one inline options group without remounting pending handoff editors.
+- Deferred occasion Save/discard checks original navigation focus before Back;
+  a late permission/scheduling result cannot pop a newer route. The completed
+  form stays readable, idempotent and has one explicit Close. Rule added to AGENTS.
+- 0.11.30/code46; no schema/dependency/route/permission/native/backup/clinical change.
+  Previous checkpoint evidence is in validation-0.11.29, current in 0.11.30.
+
+**Verified**
+- 0.11.29 source `1fb86ff`: CI 37647712032 success; signed arm64/x86 native
+  library/ABI/version/certificate and installed-x86 hash inspected.
+- Native 0.11.28-to-29 in-place upgrade: independent archives preserve 135 rows
+  in 39 application tables and all 18 media hashes. Heavy fixture native restore
+  and fresh full export preserve 4,019 rows/40 tables/18 files, integrity/FK clean.
+- All 40 intended patient routes opened with correct identities and unchanged
+  process id; no MedOS crash observed in this bounded run. Native invalid-date
+  force-stop recovery/refusal, leap correction/next occurrence and sheet/copy pass.
+- Deferred-reminder witness failed before correction; four targeted suites /
+  40 checks pass after it, plus 11 occasion checks including stale completed close.
+- Final `npm run check`: 124 suites / 1611 app tests + three workflows,
+  typecheck/formatting and zero-warning lint. No source change after this gate.
+
+**Not verified**
+- Current 0.11.30 signed APK/native acceptance pending at this checkpoint.
+- Physical A52s speed/scrolling, native 24h/OEM reminders, power/low-space
+  interruption, clinical or whole-product/paper-replacement sign-off.
+  Emulator jank was high; do not describe the app as proven smooth.
+
+**Open threads**
+- Build/inspect current APKs and finish isolated upgrade, compact layout,
+  pending raw-occasion retention and round/save/close evidence before delivery.
+- Durable pre-ack stopped draft/capture voices and manual raw forms remain P0.
+  Other async forms need navigation-ownership review; wider product ledger stays open.
+
+**Gotchas**
+- Do not route elsewhere before native Save has acknowledged unless intentionally
+  testing the late-navigation race. In native field tests, identify the exact
+  observed input/hint, not a flattened ancestor containing a different field.
+- Early boot System UI ANR and too-short restore polling were harness limitations,
+  not accepted stable-startup/restore failures. No app data was wiped; no external
+  message was sent. All fixtures/decoded media/signing logs are private/ignored.
+
 ## 2026-10-07 — Compact shift deck and recoverable Jalali occasions
 
 **Agent:** GPT-6 via Codex
-**Commits:** application in this commit; baseline `80dc57f`; acceptance pending.
+**Commits:** application `1fb86ff`; baseline `80dc57f`; later native evidence in validation-0.11.29.
 
 **Changed**
 - One watched shift/encounter/next-task snapshot, direct patient/task links,

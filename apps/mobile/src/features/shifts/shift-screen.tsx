@@ -7,7 +7,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
-import { Badge, Button, Card, Column, EmptyState, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
+import { Badge, Button, Card, Column, EmptyState, IconButton, Input, Row, Screen, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { patientPickerSublabel } from '@/features/patients/logic';
@@ -48,6 +48,7 @@ function ShiftScreenContent() {
   const now = new Date(useNow());
   const [search, setSearch] = useState('');
   const [ordering, setOrdering] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const shownCount = rows.filter((row) => matchesShiftDeck(row, search)).length;
 
   const [picking, setPicking] = useState(false);
@@ -141,7 +142,7 @@ function ShiftScreenContent() {
 
   if (error && !shift) {
     return (
-      <Screen scroll>
+      <Screen scroll edges={[]}>
         <ScreenOptions options={{ title: 'شیفت' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="شیفت" onRetry={retryReads} />
@@ -154,7 +155,7 @@ function ShiftScreenContent() {
 
   if (!loading && !shift && !error && !changing) {
     return (
-      <Screen scroll>
+      <Screen scroll edges={[]}>
         <ScreenOptions options={{ title: 'شیفت' }} />
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           <ErrorNotice error={error} what="شیفت" />
@@ -171,7 +172,7 @@ function ShiftScreenContent() {
   }
 
   return (
-    <Screen scroll>
+    <Screen scroll edges={[]}>
       <ScreenOptions options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
         <ErrorNotice error={error ?? patientsError} what="شیفت" onRetry={retryReads} />
@@ -183,7 +184,7 @@ function ShiftScreenContent() {
         ) : null}
 
         {shift ? (
-          <Card style={{ borderColor: colors.primary, borderWidth: 1 }}>
+          <Card style={{ borderColor: colors.primary, borderWidth: 1, padding: spacing.md }}>
             <Column gap="sm">
               <Row justify="space-between" align="flex-start">
                 <Column gap="xxs" style={styles.grow}>
@@ -209,6 +210,7 @@ function ShiftScreenContent() {
                     icon="walk-outline"
                     onPress={() => void scope.perform(() => router.push('/round'))}
                     disabled={rows.length === 0 || progress === null}
+                    size="sm"
                     full
                   />
                 </View>
@@ -216,26 +218,62 @@ function ShiftScreenContent() {
                   label="افزودن بیمار"
                   icon="person-add-outline"
                   variant="secondary"
+                  size="sm"
                   disabled={busy || blocked}
                   onPress={() => setPicking(true)}
                 />
+                <IconButton
+                  label={optionsOpen ? 'بستن گزینه‌های شیفت' : 'گزینه‌های شیفت'}
+                  icon={optionsOpen ? 'chevron-up-outline' : 'ellipsis-horizontal'}
+                  onPress={() => setOptionsOpen((value) => !value)}
+                />
               </Row>
 
-              {progress && admittedNotInShift.length > 0 ? (
-                <Button
-                  label={`افزودن همه‌ی بستری‌ها (${toPersianDigits(admittedNotInShift.length)})`}
-                  icon="people-outline"
-                  variant="secondary"
-                  loading={busy}
-                  onPress={() => void addAllAdmitted()}
-                />
+              {optionsOpen ? (
+                <Column gap="xs">
+                  {progress && admittedNotInShift.length > 0 ? (
+                    <Button
+                      label={`افزودن همه‌ی بستری‌ها (${toPersianDigits(admittedNotInShift.length)})`}
+                      icon="people-outline"
+                      variant="secondary"
+                      size="sm"
+                      loading={busy}
+                      onPress={() => void addAllAdmitted()}
+                    />
+                  ) : null}
+                  <Button
+                    label="پایان شیفت"
+                    variant="ghost"
+                    size="sm"
+                    onPress={finish}
+                    disabled={blocked}
+                    haptic={false}
+                  />
+                </Column>
               ) : null}
-              <Button label="پایان شیفت" variant="ghost" onPress={finish} disabled={blocked} haptic={false} />
             </Column>
           </Card>
         ) : null}
 
-        <SectionHeader title="بیماران این شیفت" count={progress?.total} />
+        <Row gap="sm" justify="space-between">
+          <Column gap="xxs" style={styles.grow}>
+            <Text variant="subheading">بیماران این شیفت</Text>
+            {rows.length > 0 ? (
+              <Text variant="caption" color="textMuted">
+                {toPersianDigits(shownCount)} از {toPersianDigits(rows.length)}
+              </Text>
+            ) : null}
+          </Column>
+          {rows.length > 0 ? (
+            <Button
+              label={ordering ? 'پایان مرتب‌کردن' : 'ترتیب راند'}
+              variant="ghost"
+              size="sm"
+              disabled={blocked || busy}
+              onPress={() => setOrdering((value) => !value)}
+            />
+          ) : null}
+        </Row>
         {rows.length > 0 ? (
           <>
             <Input
@@ -245,18 +283,6 @@ function ShiftScreenContent() {
               icon="search-outline"
               placeholder="نام، تخت، تشخیص یا کار بعدی…"
             />
-            <Row gap="sm" justify="space-between">
-              <Text variant="caption" color="textMuted">
-                {toPersianDigits(shownCount)} از {toPersianDigits(rows.length)}
-              </Text>
-              <Button
-                label={ordering ? 'پایان مرتب‌کردن' : 'ترتیب راند'}
-                variant="ghost"
-                size="sm"
-                disabled={blocked || busy}
-                onPress={() => setOrdering((value) => !value)}
-              />
-            </Row>
             {shownCount === 0 ? (
               <Text variant="caption" color="textMuted">
                 در این شیفت پیدا نشد.
