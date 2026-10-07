@@ -36,8 +36,8 @@ wrong, never rewrite them to look better.
 ## 2026-10-07 — Review all five PRs and keep clinical completion truthful
 
 **Agent:** GPT-6 via Codex
-**Commits:** application/audit `f6c9277`; acceptance/fixture correction in this
-commit. Baseline source `466a1a8`.
+**Commits:** application/audit `f6c9277`; acceptance/fixture correction `efd1ce1`;
+goal-map completion in this commit. Baseline source `466a1a8`.
 
 **Changed**
 - Audited all five exact PR heads in an isolated integration; no remote merge,
@@ -51,6 +51,8 @@ commit. Baseline source `466a1a8`.
   Version 0.11.27 / code 43; no dependencies/schema/formula/permission change.
 - Record independent archive/native and signed-artifact acceptance; preserve
   open dependency findings separately instead of applying framework downgrades.
+- Keep explicit reorder/move goals visible in the audit, grounded in W02/W07
+  and stored membership sort keys. No new reorder/transfer feature is claimed.
 
 **Verified**
 - Exact 0.11.26 source CI `37573104289` success; its push-hook check passed.

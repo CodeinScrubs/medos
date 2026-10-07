@@ -399,6 +399,7 @@ paths, not between the physician and an ordinary note.
 | Automatic backup and full restore | Encrypted local full backup, SAF/manual/background paths and historical compatibility tests exist | Last successful verified destination is honest; off-device independent copy chosen by owner; restore interruption/low-space/phone acceptance |
 | Exact and semantic search | Normalized conventional search exists; semantic retrieval is not implemented | Search relevant fields and incomplete drafts with filters/failure feedback; future semantic results cite original records without overwriting them |
 | Full reversible clinical history | Meaningful note history and soft deletes are substantial; all-entity history/trash is not complete | Explicit per-entity revision/recovery policy, no automatic pruning of promised note versions, reviewable mistaken-delete recovery |
+| Manual reordering and moving records between sections/patients | Shift membership sort keys and query support exist; persistent explicit reorder and broader move acceptance remain open in IMPLEMENTATION W02/W07 | Persist intentional display order with an accessible alternative to dragging; never change clinical occurrence times. Cross-patient moves require explicit destination identity, retained provenance/links, audit and undo; simple reordering needs no extra confirmation |
 | Sourced scores/algorithms and AI drafts | Validation contracts exist; chat-derived formulas or generic AI staging do not satisfy them | Per-tool evidence and physician review; explicit units/inputs/freshness/population; outputs remain drafts and never auto-order |
 | Future web/private server/desktop | Deferred by owner | Stable ids/formats/domain semantics now; device identity and conflicts designed before sync; no current network dependency |
 
@@ -510,6 +511,12 @@ benchmark against the owner's existing paper workflow, not marketing claims.
   valid; do not claim it is an `.xlsx` importer.
 - Complete photo comparison/original-preserving crop and expected voice target
   coverage. Provide recovery for all promised soft-deleted clinical entities.
+- Finish intentional persistent ordering with a discoverable drag/reorder action
+  and accessible controls, preserving the membership-id round cursor. Define
+  section moves per entity; crossing patients requires a confirmed destination,
+  correct encounter/attachment links, provenance, audit and undo under the original
+  intent. Keep clinical dates separate from display order. Existing capture
+  assignment/publication is not evidence of a general safe clinical-record mover.
 - Exercise doctor/referral/private ratings, knowledge/teacher links, specialty
   profiles, owner templates, ideas, places/extensions and simple credentials
   end to end. Keep these reachable through organized secondary navigation.
