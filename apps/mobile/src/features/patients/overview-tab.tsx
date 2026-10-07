@@ -20,7 +20,7 @@ import { patientNotesQuery } from '@/features/notes/queries';
 import { TasksSection } from '@/features/tasks/tasks-section';
 import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali, formatJalaliDateTime, formatJalaliLong, formatRelative } from '@/lib/jalali';
-import { joinLabels, toPersianDigits } from '@/lib/persian';
+import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { CallRow } from './patient-header';
@@ -36,6 +36,16 @@ export function OverviewTab({ patient }: { patient: Patient }) {
   const { data: contacts } = useLive(patientContactsQuery(patientId), [patientId]);
   const { data: followUps } = useLive(patientFollowUpsQuery(patientId), [patientId]);
   const { data: notes } = useLive(patientNotesQuery(patientId), [patientId]);
+  const { data: encounters } = useLive(activeEncounterDetailQuery(patientId), [patientId]);
+
+  const activeDetail = encounters?.[0];
+  const patientLocation = activeDetail
+    ? joinLabels([
+        activeDetail.place?.name,
+        activeDetail.encounter.ward,
+        activeDetail.encounter.bed ? `تخت ${toPersianDigits(activeDetail.encounter.bed)}` : null,
+      ])
+    : undefined;
 
   const pendingFollowUps = (followUps ?? []).filter((f) => f.status === 'pending');
   const events = (notes ?? []).filter(isHighlighted).slice(0, 8);
@@ -57,7 +67,11 @@ export function OverviewTab({ patient }: { patient: Patient }) {
 
       <TasksSection patientId={patientId} title="کارهای این بیمار" limit={8} />
 
-      <ConsultsSection patientId={patientId} />
+      <ConsultsSection
+        patientId={patientId}
+        patientName={fullName(patient.firstName, patient.lastName)}
+        location={patientLocation}
+      />
 
       <SectionHeader
         title="پیگیری‌ها"
