@@ -33,6 +33,41 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Exact 0.11.30 native round and archive checkpoint
+
+**Agent:** GPT-6 via Codex
+**Commits:** application `eb1979a`; this commit records acceptance evidence only.
+
+**Changed**
+- Updated validation-0.11.30 with exact-source CI/artifact hashes, in-place
+  upgrade preservation and native 40-patient round evidence. No application change.
+
+**Verified**
+- Source CI 37656747034 success; signed arm64/x86 package/ABI/native libraries/
+  version/signer inspected, installed x86 hash matched, owner APK unchanged.
+- Upgrade preserves 4,023 rows/40 app tables/18 media files. Continuous native
+  round reviews all 40 correct identities without process restart or observed
+  MedOS crash; compact layout/font scales, handoff recovery, reorder and normal
+  occasion Save pass. Cold shift shows all 40 reviewed.
+- Independent final archive: 4,024 rows, only expected reviewed/text/occasion
+  changes; 37 tables and every media hash unchanged, integrity/FK clean.
+
+**Not verified**
+- Physical A52s, smooth performance (emulator jank 89.61%), 24h native soak,
+  power/low-space/OEM reminders, external message delivery or clinical sign-off.
+- Deferred focus race has a software witness, not a new native race test.
+
+**Open threads**
+- Connect stopped quick-capture voices to existing recording_jobs first;
+  protect empty cleanup and publication/filing atomically. Then note-draft
+  voices/manual raw forms and the remaining ledger/physical-phone gates.
+
+**Gotchas**
+- Top-target helper needs an explicit label; calling it without one returns
+  any visible node. ADB Ctrl+A/delete did not reliably clear a search field.
+  Neither harness attempt is acceptance evidence. Early System UI boot ANR
+  recovered via Wait. No app data was wiped and no real data/message was used.
+
 ## 2026-10-07 — Native heavy-shift findings and senior-review checkpoint
 
 **Agent:** GPT-6 via Codex

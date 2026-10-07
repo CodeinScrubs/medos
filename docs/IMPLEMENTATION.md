@@ -35,6 +35,15 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.30 acceptance checkpoint: application `eb1979a`, exact-source CI
+37656747034 success, both signed/inspected ABIs and native in-place upgrade
+preserve 4,023 rows/40 app tables/18 media files. The continuous native round
+reviewed all 40 identities with one process/no observed MedOS crash; final export
+contains only intended review/text/occasion changes. See validation-0.11.30.md.
+This closes that bounded round/upgrade gate, not physical-phone or performance
+acceptance: emulator jank was 89.61%. Next implementation remains durable
+stopped capture voices, then note-draft voices and other raw-form gaps.
+
 2026-10-07, 0.11.30: native 40-patient review of 0.11.29 found excessive shift
 header space and a late navigation race when scheduling/permission completed
 after a newer deep link. Shift/round now omit only their duplicate top inset;
