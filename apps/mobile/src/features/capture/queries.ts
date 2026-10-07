@@ -156,6 +156,10 @@ export async function updateCapture(
       .get();
     if (!current) throw new Error('ثبت سریع در دسترس نیست؛ تغییر ذخیره نشد.');
     const patientId = patch.patientId === undefined ? current.patientId : patch.patientId;
+    // Recovery compares the stopped recording's original owner. Moving its
+    // parent before acknowledgment would strand that verified copy.
+    if (patientId !== current.patientId && hasPendingRecording(tx, id))
+      throw new Error('وویس این ثبت هنوز ذخیره نشده است؛ ابتدا ذخیره یا لغو وویس را کامل کنید.');
     if (current.filedAt && (patientId !== current.patientId || patch.kind !== undefined))
       throw new Error('این ثبت سریع قبلاً مرتب شده است؛ مقصد آن تغییر نکرد.');
     if (

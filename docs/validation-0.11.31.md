@@ -49,6 +49,16 @@ the row atomically. Copying/ready/discarding jobs protect their parent. Filing
 refuses pending recordings; after recovery the existing note/task flow works.
 No new recording may start on an already filed capture.
 
+Follow-up ownership witnesses on application `008d098` exposed three more
+failures: reassignment during copying/ready/discarding changed the capture's
+patient and stranded recovery's original-owner comparison. The corrected
+real-SQLite fixtures fail before the guard. Reassignment now refuses atomically
+while that journal is pending, including a combined patient/text patch; newer
+text alone can still save. After successful recording save or explicit discard,
+normal assignment remains available. The original capture UI already waits for
+its single SaveGroup before patient selection; the query guard also covers inbox
+choices and direct callers. No new normal-path dialog is added.
+
 Today/full inbox capture cards, patient choices and recovery actions retain the
 parent's generation from before reads. Old deletion/filing/assignment callbacks
 cannot acquire fresh authority after restore. Picker failures retain selection;
@@ -68,13 +78,29 @@ stand-ins initially omitted the newly used contracts: the first full checks had
 one failure with 1,623 other checks passing. The stand-ins now supply focused
 navigation and verified journal-copy semantics without dropping their metadata,
 same-file retry or failed-close assertions; both media/screen suites pass.
-Final-source `npm run check` passes: typecheck, architecture lint, formatting,
+Initial source `008d098` full check passed: typecheck, architecture lint, formatting,
 126 suites / 1,635 app tests and three workflow tests. This includes the additional
 capture-kind rollback and deferred inbox-navigation checks.
+
+The first ownership follow-up full gate passed 1,636 checks and failed two older
+corruption fixtures: their attempted normal reassignment is now correctly blocked.
+Those fixtures now mutate SQLite directly to keep testing the journal's independent
+owner defense. Their rejection/no-copy/no-publication/idempotent-retry assertions
+remain intact; the new query tests cover the normal admission guard separately.
+
+Final ownership-follow-up `npm run check` passes typecheck, architecture lint,
+formatting, 126 suites / 1,638 app tests and three workflow tests. A serialized
+open-handles investigation is pending at this checkpoint.
 
 Exact-source CI, signed artifacts and native upgrade/recording/recovery acceptance
 are pending at this source checkpoint. Record them
 separately after they actually run; do not use the 0.11.30 APK as current evidence.
+
+Initial source `008d098` CI 37677225740 passed. Its first owner APK also passed
+version/ABI/signer/native-library inspection, but is superseded by the ownership
+follow-up and must not be used as final-source acceptance. The pre-push parallel
+test run passed all assertions with a Jest worker-exit warning under concurrent
+native compilation; investigate handles on the final source rather than hide it.
 
 ## Limits and next work
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { attachments, captureInbox, notes, noteVersions, tasks } from '@/db/schema';
+import { attachments, captureInbox, notes, noteVersions, recordingJobs, tasks } from '@/db/schema';
 import { beginRecordingJob, discardRecording } from '@/features/attachments/recording-queries';
 import { DatasetChangedError } from '@/lib/dataset-write';
 import { databaseRows, snapshotDataset } from '@/test/dataset-snapshot';
@@ -53,6 +53,31 @@ async function attachVoice(captureId: string): Promise<string> {
 }
 
 describe('a capture', () => {
+  it.each(['copying', 'ready', 'discarding'] as const)(
+    'keeps a %s recording destination fixed while allowing newer text',
+    async (state) => {
+      const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other', status: 'outpatient' });
+      const id = await createCapture({ text: 'Synthetic original', patientId });
+      const job = beginRecordingJob(
+        { uri: 'file:///synthetic-stopped.m4a', durationMs: 2000 },
+        { entityType: 'capture', entityId: id },
+        new Date(),
+      );
+      t.db
+        .update(recordingJobs)
+        .set({ state, checksum: 'a'.repeat(64), sizeBytes: 42 })
+        .run();
+      const before = databaseRows(t);
+      await expect(updateCapture(id, { patientId: other, text: 'Must not publish' })).rejects.toThrow();
+      expect(databaseRows(t)).toEqual(before);
+      await updateCapture(id, { text: 'Synthetic newer words' });
+      expect(captureQuery(id).get()).toMatchObject({ text: 'Synthetic newer words', patientId });
+      expect(t.db.select().from(recordingJobs).get()?.patientId).toBe(patientId);
+      await discardRecording(job.id, new Date());
+      await updateCapture(id, { patientId: other });
+      expect(captureQuery(id).get()?.patientId).toBe(other);
+    },
+  );
   it('refuses a new capture for a retired patient without leaving a hidden row', async () => {
     await deletePatient(patientId);
     await expect(createCapture({ patientId, text: 'Synthetic old intent' })).rejects.toThrow();

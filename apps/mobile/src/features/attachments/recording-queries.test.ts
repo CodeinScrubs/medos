@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { attachments, auditLog, captureInbox, noteDrafts, recordingJobs } from '@/db/schema';
-import { captureQuery, createCapture, fileCaptureAsTask, updateCapture } from '@/features/capture/queries';
+import { captureQuery, createCapture, fileCaptureAsTask } from '@/features/capture/queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import { reserveFileMaintenance } from '@/lib/file-work';
 import { stamps } from '@/lib/ids';
@@ -135,7 +135,9 @@ describe('durable stopped voice jobs', () => {
   it('rechecks a null capture owner after reading the source and before copying', async () => {
     const captureId = await createCapture({ kind: 'voice', shiftId: null });
     mockFingerprint.mockImplementationOnce(async () => {
-      await updateCapture(captureId, { patientId });
+      // Bypass the normal reassignment guard to keep testing the journal's
+      // independent defense against an externally changed/corrupt owner.
+      t.db.update(captureInbox).set({ patientId }).where(eq(captureInbox.id, captureId)).run();
       return { ...fingerprint };
     });
     await expect(persistRecording(recording(), { entityType: 'capture', entityId: captureId }, now)).rejects.toThrow();
@@ -151,7 +153,7 @@ describe('durable stopped voice jobs', () => {
     );
     await expect(persistRecording(recording(), { entityType: 'capture', entityId: captureId }, now)).rejects.toThrow();
     t.sqlite.exec('DROP TRIGGER fail_voice');
-    await updateCapture(captureId, { patientId });
+    t.db.update(captureInbox).set({ patientId }).where(eq(captureInbox.id, captureId)).run();
     await expect(resumeRecording(recording().operationId, now)).rejects.toThrow();
     expect(recordingJobQuery(recording().operationId).get()).toMatchObject({ state: 'ready', patientId: null });
     expect(t.db.select().from(attachments).all()).toEqual([]);
@@ -160,7 +162,9 @@ describe('durable stopped voice jobs', () => {
 
   it('refuses a null capture owner reassigned during copy and retains the original journal', async () => {
     const captureId = await createCapture({ kind: 'voice', shiftId: null });
-    mockAfterCopy = () => updateCapture(captureId, { patientId });
+    mockAfterCopy = async () => {
+      t.db.update(captureInbox).set({ patientId }).where(eq(captureInbox.id, captureId)).run();
+    };
     await expect(persistRecording(recording(), { entityType: 'capture', entityId: captureId }, now)).rejects.toThrow();
     expect(recordingJobQuery(recording().operationId).get()).toMatchObject({ state: 'copying', patientId: null });
     expect(t.db.select().from(attachments).all()).toEqual([]);

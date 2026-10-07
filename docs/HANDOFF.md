@@ -33,6 +33,40 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Keep pending capture recovery's patient destination fixed
+
+**Agent:** GPT-6 via Codex
+**Commits:** follow-up in this commit; base application `008d098`.
+
+**Changed**
+- Three real-SQLite witnesses expose reassignment during copying/ready/discarding,
+  which strands recovery's original patient. Refuse that patch atomically while
+  allowing newer text and normal assignment after save/discard. Same 0.11.31/code47,
+  no schema/dependency/route change; the first APK is superseded.
+
+**Verified**
+- Corrected witness fixtures fail on all three states before the query fix.
+- Base source CI 37677225740 passed; initial owner arm64 package/signature/libraries
+  inspected. Five open PR heads remain unchanged; no remote PR action taken.
+- Final full `npm run check` passes typecheck/lint/format, 126 suites / 1,638 app
+  tests and three workflows. Corruption fixtures still exercise independent
+  journal owner refusal using direct SQLite changes; no assertion was removed.
+
+**Not verified**
+- Final-source CI/rebuilt APK/native upgrade and recovery pending here.
+- No physical phone/performance, power/low-space, note-draft voice or complete
+  product/clinical sign-off. Prior parallel pre-push worker-exit warning needs
+  a handles check; initial fixture missing a required name was not a defect witness.
+
+**Open threads**
+- Finish final-source checks/build and native recovery including pending assignment.
+- Then draft-note recording/publication and remaining P0/physical-phone ledger.
+
+**Gotchas**
+- Do not use an earlier APK/CI run as final source. Emulator boot showed System UI
+  and other OS startup failures under compilation load; Wait recovered the UI.
+  Those boot/harness failures are not MedOS acceptance or a performance benchmark.
+
 ## 2026-10-07 — Durable quick-capture voice and original inbox actions
 
 **Agent:** GPT-6 via Codex
