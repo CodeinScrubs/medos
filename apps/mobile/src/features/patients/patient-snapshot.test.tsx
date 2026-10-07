@@ -73,6 +73,44 @@ afterEach(async () => {
 });
 
 describe('patient at a glance', () => {
+  it('shows the recorded unit beside a flagged laboratory value', async () => {
+    await createLabPanel({
+      patientId,
+      collectedAt: hoursAgo(1),
+      source: 'manual',
+      values: [{ analyte: 'SyntheticUnits', value: '3.0', unit: 'mg/dL', refLow: 0, refHigh: 1 }],
+    });
+    await render();
+    expect(rowTexts()[0]).toContain('SyntheticUnits');
+    expect(rowTexts()[0]).toContain('mg/dL');
+  });
+  it('makes a missing laboratory unit explicit without guessing one', async () => {
+    await createLabPanel({
+      patientId,
+      collectedAt: hoursAgo(1),
+      source: 'manual',
+      values: [{ analyte: 'SyntheticNoUnit', value: '3', refLow: 0, refHigh: 1 }],
+    });
+    await render();
+    expect(rowTexts()[0]).toContain('واحد؟');
+    expect(rowTexts()[0]).not.toContain('mg/dL');
+  });
+  it('shows the age of an older flagged result when a different analyte has a newer sample', async () => {
+    await createLabPanel({
+      patientId,
+      collectedAt: hoursAgo(48),
+      source: 'manual',
+      values: [{ analyte: 'SyntheticOlder', value: '3', unit: 'mg/dL', refLow: 0, refHigh: 1 }],
+    });
+    await createLabPanel({
+      patientId,
+      collectedAt: hoursAgo(1),
+      source: 'manual',
+      values: [{ analyte: 'SyntheticRecent', value: '5', unit: 'mmol/L', refLow: 0, refHigh: 1 }],
+    });
+    await render();
+    expect(rowTexts()[0]).toContain('پریروز');
+  });
   it('shows nothing for a patient with nothing recorded', async () => {
     await render();
     expect(tree!.toJSON()).toBeNull();

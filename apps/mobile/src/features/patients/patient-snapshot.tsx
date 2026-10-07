@@ -54,6 +54,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
   const lastVital = vitals.data?.[0];
   const chips = lastVital ? vitalChips(lastVital) : [];
   const review = labsToReview(labs.data ?? []);
+  const latestLabAge = review.latestAt ? formatRelativeTime(review.latestAt, now) : undefined;
   const running = (orders.data ?? []).filter(isRunning);
   const lastNote = notes.data?.[0];
 
@@ -90,14 +91,24 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
         key="labs"
         icon="flask-outline"
         title="آزمایش"
-        when={formatRelativeTime(review.latestAt, now)}
+        when={`آخرین نمونه: ${latestLabAge}`}
         onPress={() => open('labs')}
       >
         {review.rows.length > 0 ? (
           <Row gap="md" wrap>
-            {review.rows.slice(0, SHOWN).map((r) => (
-              <LabResult key={r.value.id} analyte={r.value.analyte} value={r.value.value} flag={r.value.flag} />
-            ))}
+            {review.rows.slice(0, SHOWN).map((r) => {
+              const age = formatRelativeTime(r.collectedAt, now);
+              return (
+                <LabResult
+                  key={r.value.id}
+                  analyte={r.value.analyte}
+                  value={r.value.value}
+                  flag={r.value.flag}
+                  unit={r.value.unit}
+                  when={age === latestLabAge ? undefined : age}
+                />
+              );
+            })}
             <More count={review.rows.length - SHOWN} />
           </Row>
         ) : (
@@ -216,21 +227,44 @@ function SnapshotRow({
   );
 }
 
-function LabResult({ analyte, value, flag }: { analyte: string; value: string | null; flag: LabFlag | null }) {
+function LabResult({
+  analyte,
+  value,
+  flag,
+  unit,
+  when,
+}: {
+  analyte: string;
+  value: string | null;
+  flag: LabFlag | null;
+  unit: string | null;
+  when?: string;
+}) {
   const { colors } = useTheme();
   const tone = flagTone(flag);
   // A flagged value carries its letter; one that could not be read as a number carries "?".
   const mark = tone && flag ? FLAG_LABEL[flag] : '?';
   const color = tone === 'info' ? colors.info : tone === 'warning' ? colors.warning : colors.danger;
   return (
-    <Text numeric variant="bodyStrong">
-      <Text numeric variant="caption" color="textMuted">
-        {analyte}{' '}
+    <Column gap="xxs">
+      <Text numeric variant="bodyStrong">
+        <Text numeric variant="caption" color="textMuted">
+          {analyte}{' '}
+        </Text>
+        <Text numeric variant="bodyStrong" style={{ color }}>
+          {value ?? '—'} {mark}
+        </Text>
+        <Text variant="caption" color="textMuted" ltr={Boolean(unit?.trim())}>
+          {' '}
+          {unit?.trim() || 'واحد؟'}
+        </Text>
       </Text>
-      <Text numeric variant="bodyStrong" style={{ color }}>
-        {value ?? '—'} {mark}
-      </Text>
-    </Text>
+      {when ? (
+        <Text variant="tiny" color="textFaint">
+          {when}
+        </Text>
+      ) : null}
+    </Column>
   );
 }
 

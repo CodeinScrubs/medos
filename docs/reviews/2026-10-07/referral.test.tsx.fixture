@@ -1,0 +1,110 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+
+import { AutosaveScope } from '@/components/autosave-scope';
+import { Button } from '@/components/ui';
+import { createDoctor, doctorQuery } from '@/features/doctors/queries';
+import * as actions from '@/features/doctors/actions';
+import { createPatient } from '@/features/patients/queries';
+import { databaseRows, snapshotDataset } from '@/test/dataset-snapshot';
+import { useTestDatabase } from '@/test/db-client';
+import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
+
+import { ConsultShareModal, type ConsultShareTarget } from './consult-share-modal';
+import { createConsult, consultQuery } from './queries';
+
+jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
+jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
+jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
+jest.mock('@/components/feedback', () => ({ notify: jest.fn(), alertError: jest.fn() }));
+jest.mock('@/features/doctors/actions', () => ({
+  callNumber: jest.fn(async () => true),
+  copyText: jest.fn(async () => {}),
+  sendSms: jest.fn(async () => true),
+  sendWhatsApp: jest.fn(async () => true),
+}));
+jest.mock('@/components/ui', () => ({
+  Badge: 'Badge',
+  Button: 'Button',
+  Card: 'Card',
+  Column: 'Column',
+  IconButton: 'IconButton',
+  Row: 'Row',
+  Text: 'Text',
+}));
+
+let tree: ReactTestRenderer | undefined;
+let t: TestDatabase;
+let target: ConsultShareTarget;
+const button = (label: string) => tree!.root.findAllByType(Button).find((node) => node.props.label === label)!;
+async function settle() {
+  for (let i = 0; i < 40; i++) await Promise.resolve();
+}
+async function render() {
+  await act(async () => {
+    tree = create(
+      <AutosaveScope>
+        <ConsultShareModal visible target={target} onClose={() => {}} />
+      </AutosaveScope>,
+    );
+    await settle();
+  });
+}
+beforeEach(async () => {
+  jest.clearAllMocks();
+  t = useTestDatabase(await createTestDatabase());
+  const patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Referral' });
+  const doctorId = await createDoctor({ firstName: 'Synthetic', lastName: 'Recipient', phone: '+15550100000' });
+  const consultId = await createConsult({ patientId, doctorId, reason: 'Synthetic referral question' });
+  target = {
+    consult: (await consultQuery(consultId))[0]!,
+    doctor: (await doctorQuery(doctorId))[0]!,
+    patientName: 'Synthetic Referral',
+  };
+});
+afterEach(async () => {
+  await act(async () => {
+    tree?.unmount();
+    await settle();
+  });
+  tree = undefined;
+  jest.restoreAllMocks();
+});
+
+describe('PR4 review witnesses with real consultation SQL', () => {
+  it.each(['کپی متن', 'ارسال پیامک', 'تماس تلفنی', 'واتس‌اپ'])(
+    'does not claim actual requesting from preparation/opening only (%s)',
+    async (label) => {
+      await render();
+      await act(async () => {
+        button(label).props.onPress();
+        await settle();
+      });
+      expect((await consultQuery(target.consult.id))[0]!.status).toBe('pending');
+    },
+  );
+  it('does not change a replacement dataset through a retained Copy callback', async () => {
+    const restore = snapshotDataset(t);
+    await render();
+    await act(async () => {
+      restore();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      button('کپی متن').props.onPress();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+  });
+  it('opens the SMS composer only once when the same callback is pressed twice', async () => {
+    await render();
+    const press = button('ارسال پیامک').props.onPress;
+    await act(async () => {
+      press();
+      press();
+      await settle();
+    });
+    expect(actions.sendSms).toHaveBeenCalledTimes(1);
+  });
+});

@@ -175,6 +175,69 @@ describe('consult answer original intent', () => {
 });
 
 describe('consult answer editor with SQLite', () => {
+  it('ignores later taps and field changes after acknowledged publication without repeating navigation', async () => {
+    await mount(initial);
+    await act(async () => {
+      input('پاسخ').props.onChangeText('Final acknowledged reply');
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      button('ثبت پاسخ').props.onPress();
+      input('پاسخ').props.onChangeText('Late change after publication');
+      await settle();
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('پاسخ').props.value).toBe('Final acknowledged reply');
+    expect(input('پاسخ').props.editable).toBe(false);
+    expect(button('ثبت پاسخ').props.disabled).toBe(true);
+  });
+  it('reports a navigation failure separately from the already committed reply', async () => {
+    const failure = new Error('Synthetic navigation failure');
+    mockBack.mockImplementationOnce(() => {
+      throw failure;
+    });
+    await mount(initial);
+    await act(async () => {
+      input('پاسخ').props.onChangeText('Persisted before navigation');
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    expect((await consultQuery(initial.id))[0]?.status).toBe('answered');
+    expect(alertError).toHaveBeenLastCalledWith('پاسخ ثبت شد؛ بازگشت انجام نشد', failure);
+    const before = databaseRows(t);
+    await act(async () => {
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(await mockExit()).toBe(true);
+  });
+  it('retains a retryable reply when the clinical publish SQL fails', async () => {
+    t.sqlite.exec(
+      "CREATE TRIGGER refuse_final_reply BEFORE UPDATE OF status ON consultations BEGIN SELECT RAISE(ABORT, 'Synthetic failure'); END;",
+    );
+    await mount(initial);
+    await act(async () => {
+      input('پاسخ').props.onChangeText('Keep this reply for retry');
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    expect((await consultQuery(initial.id))[0]?.status).toBe('pending');
+    expect(input('پاسخ').props.value).toBe('Keep this reply for retry');
+    expect(input('پاسخ').props.editable).toBe(true);
+    expect(button('ثبت پاسخ').props.disabled).not.toBe(true);
+    t.sqlite.exec('DROP TRIGGER refuse_final_reply');
+    await act(async () => {
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    expect((await consultQuery(initial.id))[0]?.response).toBe('Keep this reply for retry');
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
   it('flushes both fields on exit without publishing, then reopens the exact draft', async () => {
     await mount(initial);
     await act(async () => {

@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Review all five PRs and keep clinical completion truthful
+
+**Agent:** GPT-6 via Codex
+**Commits:** application/audit change in this commit; baseline source `466a1a8`.
+
+**Changed**
+- Audited all five exact PR heads in an isolated integration; no remote merge,
+  approval, closure or review comment. Block AI/referral as submitted; revise
+  round/autocomplete. Findings/goal coverage/priorities in project-audit-2026-10-07.
+- Port the useful answer lock only after SQL acknowledgment; retain retry,
+  original lease/exit guard and separate saved-reply/navigation-failure feedback.
+- Keep units and older-result age in the existing patient summary. Failed
+  messenger preparation no longer claims an unperformed clipboard copy.
+- Preserve synthetic PR witnesses/installer under docs/reviews/2026-10-07.
+  Version 0.11.27 / code 43; no dependencies/schema/formula/permission change.
+
+**Verified**
+- Exact 0.11.26 source CI `37573104289` success; its push-hook check passed.
+- Experimental integration: 123 suites / 1530 app tests + three workflows green.
+- New PR probes: 24 failed checks / one passing rollback check; not 24 distinct
+  bugs. Published installer reproduced the result and refused duplicate setup.
+- Main finalized unchanged-source probes: seven failed / thirteen passed;
+  after fixes all 20 targeted tests passed.
+- Full final check: typecheck, lint (zero warnings), formatting, 118 suites /
+  1515 app tests + three workflows. Fresh GitHub inventory confirmed the same
+  five open heads and unmerged status; main still matched the baseline.
+
+**Not verified**
+- Exact-source CI and signed native acceptance recorded when executed.
+- Physical phone, 40-patient timings, message/alarm delivery, stopped-draft voice
+  interruption, power loss/low space, clinical validation or product completeness.
+
+**Open threads**
+- Finish current source/native gates. Next durable stopped voices for new-note/
+  capture drafts, remaining manual raw recovery, then the measured offline shift.
+- Revised PRs must retain current original intent through acknowledgment; rerun
+  review witnesses and meaningful native acceptance, not just old PR CI.
+
+**Gotchas**
+- Existing green tests did not detect invented NKDA, false requested status,
+  wrong-episode/restore staging, hidden medication fields or autocomplete's stale
+  ref. Witnesses are intentionally failing review fixtures, not ordinary CI tests.
+- Older-result test wording was corrected to the existing calendar helper before
+  the finalized unchanged-source probe. Do not add a parallel relative-date rule.
+
 ## 2026-10-07 — Keep patient form intent through initial loading and acknowledgment
 
 **Agent:** GPT-6 via Codex

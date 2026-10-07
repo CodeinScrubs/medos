@@ -51,13 +51,16 @@ function internationalNumber(phone: string): string {
 export async function sendSms(phone: string | null | undefined, body: string): Promise<boolean> {
   const number = normalizePhone(phone ?? '');
   if (!number) return false;
-  return open(`sms:${number}?body=${encodeURIComponent(body)}`, 'پیام‌رسان باز نشد. متن کپی شده است.');
+  return open(`sms:${number}?body=${encodeURIComponent(body)}`, 'پیام‌رسان باز نشد. متن را کپی کنید و دستی بفرستید.');
 }
 
 export async function sendWhatsApp(phone: string | null | undefined, body: string): Promise<boolean> {
   const number = phone ? internationalNumber(phone) : '';
   if (!number) return false;
-  return open(`https://wa.me/${number}?text=${encodeURIComponent(body)}`, 'واتس‌اپ باز نشد. متن کپی شده است.');
+  return open(
+    `https://wa.me/${number}?text=${encodeURIComponent(body)}`,
+    'واتس‌اپ باز نشد. متن را کپی کنید و دستی بفرستید.',
+  );
 }
 
 export async function sendTelegram(handle: string | null | undefined, body: string): Promise<boolean> {
@@ -66,6 +69,6 @@ export async function sendTelegram(handle: string | null | undefined, body: stri
   // Telegram's share link opens a chat with the text prefilled.
   return open(
     `https://t.me/${encodeURIComponent(user)}?text=${encodeURIComponent(body)}`,
-    'تلگرام باز نشد. متن کپی شده است.',
+    'تلگرام باز نشد. متن را کپی کنید و دستی بفرستید.',
   );
 }

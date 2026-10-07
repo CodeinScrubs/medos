@@ -1,0 +1,40 @@
+function reviewText(node: import('react-test-renderer').ReactTestInstance): string {
+  return node.children.map((child) => (typeof child === 'string' ? child : reviewText(child))).join('');
+}
+function reviewVisibleText() {
+  return tree!.root.findAllByType(Text).map(reviewText).join('\n');
+}
+
+describe('PR3 review witnesses for clinical round display', () => {
+  it('keeps the recorded lab unit next to the displayed value', async () => {
+    await createLabPanel({
+      patientId: firstPatientId,
+      collectedAt: new Date(),
+      source: 'manual',
+      values: [{ analyte: 'SyntheticUnits', value: '3.0', unit: 'mg/dL', refLow: 0, refHigh: 1 }],
+    });
+    await render();
+    expect(reviewVisibleText()).toContain('SyntheticUnits');
+    expect(reviewVisibleText()).toContain('mg/dL');
+  });
+  it('labels held orders so they are not presented like active administration', async () => {
+    const id = await createOrder({ patientId: firstPatientId, kind: 'drug', name: 'SyntheticHeld' });
+    await setOrderStatus(id, 'held');
+    await render();
+    expect(reviewVisibleText()).toContain('SyntheticHeld');
+    expect(reviewVisibleText()).toContain(ORDER_STATUS_LABELS.held);
+  });
+  it('discloses the seventh flagged result instead of silently hiding it at the six-result cap', async () => {
+    for (let i = 0; i < 7; i++) {
+      await createLabPanel({
+        patientId: firstPatientId,
+        collectedAt: new Date(Date.now() - i * 3_600_000),
+        source: 'manual',
+        values: [{ analyte: `SyntheticOverflow${i}`, value: '3', unit: 'mg/dL', refLow: 0, refHigh: 1 }],
+      });
+    }
+    await render();
+    const labCard = tree!.root.findAllByType(Card).find((node) => reviewText(node).includes('آزمایش‌های هشدار'))!;
+    expect(reviewText(labCard)).toMatch(/(?:۱|1).*دیگر/);
+  });
+});

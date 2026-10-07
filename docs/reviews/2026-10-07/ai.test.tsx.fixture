@@ -1,0 +1,299 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as Clipboard from 'expo-clipboard';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+
+import { AutosaveScope } from '@/components/autosave-scope';
+import { Button, Input, Segmented } from '@/components/ui';
+import { db } from '@/db/client';
+import { notes, orders } from '@/db/schema';
+import { addDiagnosis } from '@/features/diagnoses/queries';
+import { openEncounter } from '@/features/encounters/queries';
+import { createOrder, patientOrdersQuery } from '@/features/kardex/queries';
+import { createPatient } from '@/features/patients/queries';
+import { databaseRows, snapshotDataset } from '@/test/dataset-snapshot';
+import { useTestDatabase } from '@/test/db-client';
+import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
+
+import { AiConsultModal } from './ai-consult-modal';
+import { buildPatientDossier } from './dossier';
+import { parseAiPlan, type ParsedAiPlan } from './parser';
+import { PlanStagingModal } from './plan-staging-modal';
+import * as queries from './queries';
+
+jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
+jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
+jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
+jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicon');
+jest.mock('expo-clipboard', () => ({ getStringAsync: jest.fn(), setStringAsync: jest.fn() }));
+jest.mock('@/components/feedback', () => ({ alertError: jest.fn(), notify: jest.fn() }));
+jest.mock('@/components/ui', () => ({
+  Button: 'Button',
+  Card: 'Card',
+  Column: 'Column',
+  Divider: 'Divider',
+  IconButton: 'IconButton',
+  Input: 'Input',
+  Row: 'Row',
+  Segmented: 'Segmented',
+  Text: 'Text',
+  Toggle: 'Toggle',
+}));
+
+let tree: ReactTestRenderer | undefined;
+let t: TestDatabase;
+let patientId: string;
+const examplePlan = () =>
+  parseAiPlan(
+    JSON.stringify({
+      note: 'Synthetic reviewed plan',
+      medications: [{ drug: 'ExampleDrug', dose: '5 mg', route: 'PO', frequency: 'DAILY' }],
+    }),
+  );
+const button = (label: string) => tree!.root.findAllByType(Button).find((node) => node.props.label === label)!;
+const commitButton = () =>
+  tree!.root.findAllByType(Button).find((node) => String(node.props.label).startsWith('تأیید و ثبت'))!;
+async function settle() {
+  for (let i = 0; i < 30; i++) await Promise.resolve();
+}
+async function mountPlan(plan: ParsedAiPlan, onCommitted = jest.fn()) {
+  await act(async () => {
+    tree = create(
+      <AutosaveScope>
+        <PlanStagingModal visible patientId={patientId} plan={plan} onClose={() => {}} onCommitted={onCommitted} />
+      </AutosaveScope>,
+    );
+    await settle();
+  });
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  t = useTestDatabase(await createTestDatabase());
+  patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Patient' });
+});
+afterEach(async () => {
+  await act(async () => {
+    tree?.unmount();
+    await settle();
+  });
+  tree = undefined;
+  jest.restoreAllMocks();
+});
+
+describe('PR 1 review witnesses, unchanged PR production on 0.11.26', () => {
+  it('keeps absent allergy history unknown rather than asserting NKDA', () => {
+    const text = buildPatientDossier({
+      patient: { id: 'synthetic', firstName: 'Synthetic', lastName: 'Patient', allergies: '' },
+    });
+    expect(text).not.toContain('NKDA');
+  });
+  it('does not advertise de-identification while retaining an identifier in free text', () => {
+    const text = buildPatientDossier(
+      {
+        patient: { id: 'synthetic', firstName: 'Synthetic', lastName: 'Patient' },
+        notes: [
+          {
+            type: 'general',
+            body: 'Synthetic Patient contact: +15550100000',
+            noteDate: new Date('2026-10-07T10:00:00Z'),
+          },
+        ],
+      },
+      { deidentify: true },
+    );
+    expect(text).not.toContain('+15550100000');
+    expect(text).not.toContain('Synthetic Patient');
+  });
+  it('returns a recoverable parser result for a valid JSON scalar instead of throwing', () => {
+    expect(() => parseAiPlan('"unstructured reply"')).not.toThrow();
+  });
+  it('refuses an object-shaped drug instead of selecting the string [object Object]', () => {
+    const plan = parseAiPlan('{"medications":[{"drug":{"unexpected":true},"dose":"5 mg"}]}');
+    expect(plan.medications).toEqual([]);
+    expect(plan.warnings.length).toBeGreaterThan(0);
+  });
+  it('includes only current-encounter and standing orders in the current dossier', async () => {
+    await openEncounter({ patientId, kind: 'inpatient' });
+    await createOrder({ patientId, kind: 'drug', name: 'PreviousEpisodeOnly' });
+    const current = await openEncounter({ patientId, kind: 'inpatient' });
+    expect(await patientOrdersQuery(patientId, current)).toHaveLength(0);
+    const data = await queries.fetchDossierData(patientId);
+    expect(data!.orders).toHaveLength(0);
+  });
+  it('preserves the distinction between a rule-out problem and a confirmed diagnosis', async () => {
+    await addDiagnosis({ patientId, title: 'SyntheticProblem', kind: 'rule_out' });
+    const data = await queries.fetchDossierData(patientId);
+    expect(data!.diagnoses![0]).toMatchObject({ kind: 'rule_out' });
+  });
+  it('rejects a medication plan explicitly linked to another patient encounter', async () => {
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
+    const otherEncounter = await openEncounter({ patientId: other, kind: 'inpatient' });
+    const before = databaseRows(t);
+    const attempt = queries.commitAiPlan({
+      patientId,
+      encounterId: otherEncounter,
+      saveNote: false,
+      medications: examplePlan().medications,
+      labs: [],
+      consults: [],
+      tasks: [],
+    });
+    await expect(attempt).rejects.toThrow();
+    expect(databaseRows(t)).toEqual(before);
+  });
+  it('refuses a selected medication whose name was cleared during review', async () => {
+    const before = databaseRows(t);
+    const attempt = queries.commitAiPlan({
+      patientId,
+      saveNote: false,
+      medications: [{ ...examplePlan().medications[0]!, drug: '   ' }],
+      labs: [],
+      consults: [],
+      tasks: [],
+    });
+    await expect(attempt).rejects.toThrow();
+    expect(databaseRows(t)).toEqual(before);
+  });
+  it('rolls back note/history and medication if a later lab SQL insert fails', async () => {
+    t.sqlite.exec(
+      "CREATE TRIGGER refuse_ai_lab BEFORE INSERT ON orders WHEN NEW.kind='lab' BEGIN SELECT RAISE(ABORT, 'Synthetic failure'); END;",
+    );
+    const before = databaseRows(t);
+    await expect(
+      queries.commitAiPlan({
+        patientId,
+        saveNote: true,
+        noteText: 'Synthetic note',
+        medications: examplePlan().medications,
+        labs: [{ id: 'lab', analyte: 'SyntheticLab', selected: true }],
+        consults: [],
+        tasks: [],
+      }),
+    ).rejects.toThrow();
+    expect(databaseRows(t)).toEqual(before);
+  });
+  it('does not submit a retained staged plan into a replacement dataset', async () => {
+    const restore = snapshotDataset(t);
+    await mountPlan(examplePlan());
+    await act(async () => {
+      restore();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      await commitButton().props.onPress();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+  });
+  it('allows a second distinct plan after the first acknowledged plan closes', async () => {
+    const onCommitted = jest.fn();
+    const first = examplePlan();
+    await mountPlan(first, onCommitted);
+    await act(async () => {
+      await commitButton().props.onPress();
+      await settle();
+    });
+    expect(db.select().from(notes).all()).toHaveLength(1);
+    await act(async () => {
+      tree!.update(
+        <AutosaveScope>
+          <PlanStagingModal
+            visible={false}
+            patientId={patientId}
+            plan={first}
+            onClose={() => {}}
+            onCommitted={onCommitted}
+          />
+        </AutosaveScope>,
+      );
+      await settle();
+    });
+    await act(async () => {
+      tree!.update(
+        <AutosaveScope>
+          <PlanStagingModal
+            visible
+            patientId={patientId}
+            plan={examplePlan()}
+            onClose={() => {}}
+            onCommitted={onCommitted}
+          />
+        </AutosaveScope>,
+      );
+      await settle();
+    });
+    await act(async () => {
+      await commitButton().props.onPress();
+      await settle();
+    });
+    expect(onCommitted).toHaveBeenCalledTimes(2);
+    expect(db.select().from(orders).all()).toHaveLength(2);
+  });
+  it('shows the medication duration that it is about to commit for physician review', async () => {
+    const plan = examplePlan();
+    plan.medications[0]!.duration = '99 days';
+    await mountPlan(plan);
+    const visible = tree!.root
+      .findAllByType(Input)
+      .map((node) => node.props.value)
+      .join('\n');
+    expect(visible).toContain('99 days');
+  });
+  it('does not export an old cached dossier while the next refresh is pending', async () => {
+    await act(async () => {
+      tree = create(<AiConsultModal visible patientId={patientId} onClose={() => {}} />);
+      await settle();
+    });
+    await act(async () => {
+      tree!.update(<AiConsultModal visible={false} patientId={patientId} onClose={() => {}} />);
+      await settle();
+    });
+    let finish!: (value: Awaited<ReturnType<typeof queries.fetchDossierData>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof queries.fetchDossierData>>>((resolve) => {
+      finish = resolve;
+    });
+    jest.spyOn(queries, 'fetchDossierData').mockImplementationOnce(() => pending);
+    await act(async () => {
+      tree!.update(<AiConsultModal visible patientId={patientId} onClose={() => {}} />);
+      await settle();
+    });
+    const copy = tree!.root.findAllByType(Button).find((node) => node.props.label === 'کپی در کلیپ‌بورد');
+    if (copy && !copy.props.disabled)
+      await act(async () => {
+        await copy.props.onPress();
+        await settle();
+      });
+    finish(null);
+    await act(async () => {
+      await settle();
+    });
+    expect(Clipboard.setStringAsync).not.toHaveBeenCalled();
+  });
+  it('keeps the encounter reviewed in the dossier instead of silently targeting a new admission', async () => {
+    await openEncounter({ patientId, kind: 'inpatient', chiefComplaint: 'Synthetic original episode' });
+    await act(async () => {
+      tree = create(<AiConsultModal visible patientId={patientId} onClose={() => {}} />);
+      await settle();
+    });
+    await act(async () => {
+      tree!.root.findByType(Segmented).props.onChange('import');
+      await settle();
+    });
+    await act(async () => {
+      tree!.root.findByType(Input).props.onChangeText('{"note":"Plan reviewed on the original admission"}');
+      await settle();
+    });
+    await act(async () => {
+      button('بررسی و خطایابی برنامه (Review & Stage)').props.onPress();
+      await settle();
+    });
+    await openEncounter({ patientId, kind: 'inpatient', chiefComplaint: 'Synthetic replacement episode' });
+    const before = databaseRows(t);
+    await act(async () => {
+      await commitButton().props.onPress();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+  });
+});

@@ -86,6 +86,8 @@ export function AnswerEditor({
   });
   const latest = useRef(fields);
   const acting = useRef(false);
+  const committed = useRef(false);
+  const [isCommitted, setIsCommitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [operationFailed, setOperationFailed] = useState(false);
   const [comparison, setComparison] = useState<Consultation | null>(null);
@@ -124,7 +126,7 @@ export function AnswerEditor({
   }, [saver]);
 
   function update(patch: Partial<AnswerDraft>) {
-    if (acting.current || !editable) return;
+    if (acting.current || committed.current || !editable) return;
     const next = { ...latest.current, ...patch };
     latest.current = next;
     setFields(next);
@@ -132,7 +134,7 @@ export function AnswerEditor({
   }
 
   async function act(action: () => Promise<void>) {
-    if (acting.current) return;
+    if (acting.current || committed.current) return;
     acting.current = true;
     setBusy(true);
     try {
@@ -155,8 +157,14 @@ export function AnswerEditor({
     if (!(await saver.flush()) || saver.unsaved) return;
     await commitConsultAnswerDraft(initial.id, persistence.getRevision());
     saver.cancel();
+    committed.current = true;
+    setIsCommitted(true);
     acting.current = false; // The always-on removal guard may dispatch acknowledged publication.
-    router.back();
+    try {
+      router.back();
+    } catch (error) {
+      alertError('پاسخ ثبت شد؛ بازگشت انجام نشد', error);
+    }
   }
 
   async function compare() {
@@ -186,28 +194,30 @@ export function AnswerEditor({
               multiline
               value={fields.response}
               onChangeText={(response) => update({ response })}
-              editable={!busy}
+              editable={!busy && !isCommitted}
             />
             <Input
               label="دستور پیگیری"
               multiline
               value={fields.instruction}
               onChangeText={(instruction) => update({ instruction })}
-              editable={!busy}
+              editable={!busy && !isCommitted}
             />
             <Text variant="tiny" color="textMuted">
-              {state.status === 'failed'
-                ? 'پیش‌نویس ذخیره نشد.'
-                : state.status === 'pending' || state.status === 'writing'
-                  ? 'در حال ذخیره…'
-                  : 'پیش‌نویس؛ هنوز پاسخ نهایی ثبت نشده است.'}
+              {isCommitted
+                ? 'پاسخ ثبت شد.'
+                : state.status === 'failed'
+                  ? 'پیش‌نویس ذخیره نشد.'
+                  : state.status === 'pending' || state.status === 'writing'
+                    ? 'در حال ذخیره…'
+                    : 'پیش‌نویس؛ هنوز پاسخ نهایی ثبت نشده است.'}
             </Text>
             {state.status === 'failed' || operationFailed ? (
               <>
                 <Button
                   label="تلاش دوباره"
                   variant="ghost"
-                  disabled={busy}
+                  disabled={busy || isCommitted}
                   onPress={() =>
                     void act(async () => {
                       await saver.flush();
@@ -217,12 +227,18 @@ export function AnswerEditor({
                 <Button
                   label="مقایسه با نسخهٔ ذخیره‌شده"
                   variant="secondary"
-                  disabled={busy}
+                  disabled={busy || isCommitted}
                   onPress={() => void act(compare)}
                 />
               </>
             ) : null}
-            <Button label="ثبت پاسخ" icon="checkmark" loading={busy} onPress={() => void act(publish)} />
+            <Button
+              label="ثبت پاسخ"
+              icon="checkmark"
+              loading={busy}
+              disabled={isCommitted}
+              onPress={() => void act(publish)}
+            />
           </>
         ) : (
           <>

@@ -35,6 +35,17 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+2026-10-07 PR audit: all five heads and their older-base CI were checked. A local
+integration passed all 1530 existing app tests, but 24 targeted checks failed
+(one rollback check passed). PRs 1/4 are blocked as submitted; PRs 3/5 need
+changes. PR 2's useful acknowledged-answer lock is ported independently in
+0.11.27, retaining the original lease/exit guard and failure retry. The existing
+patient summary now includes lab units and older-result age; messenger failure
+feedback no longer invents a clipboard copy. See project-audit-2026-10-07.md and
+validation-0.11.27.md for exact evidence and proposed paper-replacement acceptance.
+No PR was remotely merged or approved. Existing execution priorities below stay
+in force; a new AI banner or feature count does not close the capture/phone gates.
+
 2026-10-07, 0.11.26: original intent is captured before initial reads for patient,
 admission/edit/discharge, follow-up and consult-answer forms. Their Autosave and
 manual publication/comparison/load/adopt/discard use that token through final

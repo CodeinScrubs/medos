@@ -64,9 +64,12 @@ run is retained in ignored `check-final-source.log`. No application source
 changed after that run. The owner then requested review of all five open PRs;
 this source slice is being preserved separately from that review.
 
-Commit/CI, signed owner/emulator packages, native acceptance and independent
-archive comparison will be recorded after they execute. They remain pending;
-source tests are not device evidence.
+Application commit `466a1a886bba55b05defed59a1b741c7f7e21b5d` was pushed with
+the ordinary pre-push check green. Exact-source CI `37573104289` was directly
+verified completed/success. No standalone 0.11.26 native package/acceptance was
+executed before the owner redirected priority to PR review. Later native gates
+for the source continuation are recorded in validation-0.11.27; source tests
+are not device evidence.
 
 ## Remaining limits
 

@@ -1,0 +1,19 @@
+describe('PR5 review witnesses for suggestions integrated with current handlers', () => {
+  it('saves the expanded diagnosis actually selected on screen', async () => {
+    await render();
+    await act(async () => addInput().props.onChangeText('AF'));
+    const suggestion = tree!.root
+      .findAllByType(Pressable)
+      .find((node) => node.findAllByType(Text).some((text) => text.props.children === 'AF'))!;
+    await act(async () => suggestion.props.onPress());
+    expect(addInput().props.value).toBe('Atrial Fibrillation (AF)');
+    await act(async () => {
+      button('افزودن').props.onPress();
+      await settle();
+    });
+    expect((await queries.patientDiagnosesQuery(patientId))[0]?.title).toBe('Atrial Fibrillation (AF)');
+  });
+  it('matches Arabic-keyboard Yeh exactly like Persian-keyboard Yeh', () => {
+    expect(matchImpressions('د\u064Aابت').some((row) => row.abbr === 'DM')).toBe(true);
+  });
+});
