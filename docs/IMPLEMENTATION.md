@@ -46,6 +46,17 @@ pre-journal interruption, draft-note voices, manual raw forms or phone acceptanc
 Next P0 is the draft-note journal/publication contract, then manual lab/contact
 raw recovery and remaining form intent/navigation audits.
 
+0.11.31 acceptance (2026-10-08): exact application `d61b11d`, CI 37679736687,
+signed/inspected owner arm64 and QA x86_64 APKs. Offline in-place upgrade preserves
+4,024 rows/40 app tables/18 files. Actual Back/manual stopped voices survive cold
+reopen. Native retained-inbox replacement, rejected pending publication/assignment,
+seeded ready recovery without cache and note filing pass independent row/media
+comparisons; final cold reopen preserves 4,035 rows/21 files exactly. No observed
+MedOS crash/ANR; this is bounded native acceptance. Seeded readiness does not prove
+power-loss behavior; no physical/performance, audible playback or full P0 sign-off.
+See validation-0.11.31.md. The next implementation is draft-note voices, not a
+duplicate capture mechanism or a new normal-path recovery screen.
+
 0.11.30 acceptance checkpoint: application `eb1979a`, exact-source CI
 37656747034 success, both signed/inspected ABIs and native in-place upgrade
 preserve 4,023 rows/40 app tables/18 media files. The continuous native round

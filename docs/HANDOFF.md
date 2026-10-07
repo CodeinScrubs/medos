@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Exact-source stopped capture and recovery acceptance
+
+**Agent:** GPT-6 via Codex
+**Commits:** docs in this commit; application `d61b11d` and `008d098`.
+
+**Changed**
+- Recorded actual 0.11.31/code47 CI, signed ABI packages, in-place upgrade,
+  native stop/recovery/filing and independent complete row/media comparisons.
+  No application code/feature/dependency change in this checkpoint.
+
+**Verified**
+- Final source full check: 126 suites / 1,638 app tests and three workflows;
+  serialized detectOpenHandles passes without warning. Exact-source CI
+  37679736687 succeeds including schema/migrations and Android bundle.
+- Both ABIs/signatures/essential libraries inspected; installed x86_64 bytes
+  match. Owner APK `dist/MedOS-0.11.31.apk` SHA-256 starts `8861f873f27d3d50`.
+- Offline emulator in-place upgrade preserves 4,024 rows/40 app tables and all
+  18 files. Actual Back-stop and manual-stop voices persist after cold reopen.
+- Retained inbox current-route replacement works. Seeded ready recovery survives
+  cold reopen without its cache; pending filing/reassignment refuse and preserve
+  the picker. Retry and note filing preserve original owner, bytes and time.
+- Final 4,035 rows/21 files contain only expected QA additions; cold reopen changes
+  nothing. Integrity/FKs pass, crash buffer empty, no observed MedOS fatal/ANR.
+  Full source/artifact/archive hashes and boundaries: validation-0.11.31.md.
+
+**Not verified**
+- Physical A52s, audible playback/live player progress, power/native SQL faults,
+  low space/OEM reminders, performance or 24-hour native soak. The ready fixture
+  is deliberately seeded. Prior 89.61% emulator jank remains an open gate.
+- Draft-note stopped voice still lacks the journal/publication contract; manual
+  lab/contact raw recovery, other async forms and product/clinical gates remain.
+
+**Open threads**
+- Next P0: draft-note voices, preserving raw text, ownership, pending publication,
+  recovery/discard and legacy draft/backup compatibility; avoid just adding an enum.
+- Finish remaining IMPLEMENTATION.md gates and physical shift/performance evidence.
+
+**Gotchas**
+- Default UIAutomator idle dumps can fail during live timers/restore animation.
+  A fresh compressed dump actually drove the manual stop. The older API26 runner
+  fails on API36 before capture despite an OK marker; do not count it as a pass.
+- Private native evidence stays under validation-0.11.29; no synthetic archive,
+  decoded patient rows or signing material is committed. Documentation-only
+  commits do not require replacing the inspected application artifacts.
+
 ## 2026-10-07 — Keep pending capture recovery's patient destination fixed
 
 **Agent:** GPT-6 via Codex
