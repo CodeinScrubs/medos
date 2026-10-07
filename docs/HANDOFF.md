@@ -33,6 +33,42 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Keep the note form's native parent stable during submission
+
+**Agent:** GPT-6 via Codex; two read-only GPT-6.1 Sol/xhigh reviewers.
+**Commits:** correction in this commit; previous application `94752a7`.
+
+**Changed**
+- 0.11.34/code50 pins the corresponding editable/completed note Columns as
+  concrete native stacking parents. Saving's pointerEvents toggle must not
+  reparent children during Android close. No SQL/schema/dependency/global UI change.
+- Actual Column/View tests cover deferred publication/discard and failure/retry.
+  Corrected earlier header-only causal language; recorded the failed .33 retest.
+- Owner's updated delegation limit/model/reasoning is recorded in AGENTS/ledger.
+
+**Verified**
+- Exact .33 CI, signed APK identity, installed QA hash and in-place upgrade;
+  4,039 rows/40 tables/23 files unchanged. Legacy Save still killed the process.
+- Independent post-crash data comparison preserves every unrelated row/file and
+  intended single publication. Correct data is not crash-free native acceptance.
+- Two new native-parent witnesses fail before the fix; two suites/15 tests pass
+  after. Full check passes: 127 suites/1,670 app tests and three workflow checks.
+  Native acceptance checkpoints follow in validation-0.11.34.md.
+
+**Not verified**
+- .34 native close/voice recovery, physical A52s, audible playback, low storage,
+  power loss, performance/24-hour native soak or complete product/P0 acceptance.
+
+**Open threads**
+- Build exact .34, inspect installed bytes, repeat legacy Save, new draft voice
+  cold recovery/publication, seeded cacheless ready recovery and discard.
+- Then manual lab/contact raw recovery and other ledger gates. No orphan deletion.
+
+**Gotchas**
+- Preserve both React ancestry and native flattening eligibility. Same header
+  mount does not prevent layout-only Column children moving when pointerEvents
+  changes. Native mock tests cannot execute Fabric's actual mount transaction.
+
 ## 2026-10-08 — Keep the completed note's native header mounted
 
 **Agent:** GPT-6 via Codex

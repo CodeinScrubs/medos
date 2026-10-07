@@ -55,3 +55,27 @@ recording interruption, low storage, power loss, native fault injection, OEM
 reminders, performance and a 24-hour native soak remain separate gates. Safe
 orphan-media accounting, raw manual lab/contact recovery and the remaining
 async forms are still open. This patch is not complete product/P0 acceptance.
+
+## Actual native checkpoint — still failed (2026-10-08)
+
+Exact source `94752a79b5f4a88693b105426686f27993cc6d37`, hosted CI
+37700375596 passed. Both signed code49 APKs were built and inspected. Owner
+arm64 SHA-256 `0f98d560541ead0f483e111058f6ed02c99b2a8a30a486eb0d0485200aa74e7c`;
+QA x86_64 `987ae4ca56602500ad6f02a4baca2412d121cbac26fe7831b20573c240731649`.
+The installed QA bytes match. In-place 0.11.32 to 0.11.33 upgrade preserved
+4,039 rows across 40 app tables and 23 media files exactly.
+
+After restoring the clean legacy draft baseline and cold reopening, actual
+header Save still killed PID11370. Fabric again reported `addViewAt`: Text2432
+still had parent2700 when inserted into2698 under the scroll host. Private
+`legacy33-full-logcat.log` retains the full hierarchy. Thus the source header
+regression was corrected, but the native crash was **not** resolved. 0.11.33
+is not an accepted installation candidate.
+
+The post-crash archive SHA-256 is
+`64dc0136d2ac6290dab0aedef1f1887f376bb59104c5b860fe9c14b81db1e404`.
+Independent decryption/SQLite/hash comparison proves exactly one new note,
+version and attachment, soft-retired linked draft, unchanged legacy text/JSON/
+file/time and unrelated rows, integrity/FKs clean. This is data evidence only.
+Next correction targets the saving-dependent flattening of the main Column;
+see validation-0.11.34.md. Do not repeat the earlier header-only causal claim.

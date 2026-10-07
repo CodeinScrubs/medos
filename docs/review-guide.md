@@ -122,6 +122,10 @@ close crashed despite successful publication and green tests: switching the
 scroll host remounted ScreenOptions during Back. Identical title/right options
 are insufficient if the component remounts. The patch retains the same host;
 rebuilt native and software acceptance are separated in validation-0.11.33.md.
+That retest still crashed. 0.11.34 additionally pins both note form Columns as
+native stacking parents across pointerEvents changes; real Column/View checks
+cover pending acknowledgment and failure/retry. See validation-0.11.34.md for
+the independent native result. A passing React contract is not a Fabric run.
 
 The following integration test accelerates a 24-hour shift in real SQLite. It is
 not a 24-hour Android soak test or a physical-device performance measurement.

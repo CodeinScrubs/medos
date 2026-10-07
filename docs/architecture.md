@@ -1596,9 +1596,19 @@ acceptance remain separate work. Evidence and tradeoffs: validation-0.11.32.md.
 ## Native header ancestry on completion (0.11.33)
 
 Header stability includes mounted ancestry, not just identical title/right-slot
-options. The native 0.11.32 close crashed because changing `Screen` from scrolling
-to plain remounted its nested `ScreenOptions` and rewrote the header during Back.
+options. Review of the native 0.11.32 crash found that changing `Screen` from
+scrolling to plain remounted `ScreenOptions` and rewrote the header during Back.
 The completed note retains its scroll host. Real screen/header regression checks
 cover publication and discard; no global navigation abstraction or editor rewrite
 was added. Keep this ancestry stable in other completion flows too. Native and
 source evidence have separate checkpoints in validation-0.11.33.md.
+
+The 0.11.33 native retest still crashed: the header correction did not resolve
+the native parent problem. The editor's layout-only Column also changed from
+flattenable to a concrete stacking parent when `pointerEvents` became `none`
+during saving. Android retains outgoing child parents during transitions.
+In 0.11.34 both editable and completed branches explicitly keep that same
+Column `collapsable={false}`. This retains one native parent throughout idle,
+pending, failed/retry and completed states without weakening input freeze.
+Real Column/View regression checks protect the contract; native acceptance is
+separate evidence in validation-0.11.34.md. Do not disable flattening globally.

@@ -2,8 +2,9 @@
 
 This is the current delivery backlog, not a claim of completeness. Read it with
 `AGENTS.md` and the latest `HANDOFF.md` entry. The owner authorized implementation,
-commits and GitHub pushes on 2026-09-23. The current delegation limit (2026-10-03)
-is **at most two subagents**, with the primary agent owning integration and checks. Continue in priority
+commits and GitHub pushes on 2026-09-23. The current delegation limit (2026-10-08)
+is **at most two subagents**, each GPT-6.1 Sol with extra-high reasoning, with
+the primary agent owning integration and checks. Continue in priority
 order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Product and decision record
@@ -35,12 +36,20 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.34: 0.11.33 retained the header but still failed the exact native Save
+reproduction. Both corresponding note form Columns now retain one native
+stacking parent when saving toggles pointerEvents. Real Column/View tests cover
+idle, pending publication/discard, failure/retry and completion. No schema,
+dependency, global layout change or new workflow. Native correction and remaining
+draft voice acceptance are tracked in validation-0.11.34.md; never infer native
+success from the software witness. The 0.11.32 and 0.11.33 artifacts both failed.
+
 0.11.33: native 0.11.32 acceptance found/repeated a note-close crash after correct
 SQL publication. The completed branch now keeps the same scroll host so its
 ScreenOptions cannot remount/rewrite the native header during Back. Real
 screen/header publication and discard witnesses fail before, pass after;
 the former string-host editor tests missed this. See validation-0.11.33.md for
-source and rebuilt native checkpoints. 0.11.32 is not an accepted candidate.
+source and rebuilt native checkpoints; its native retest also failed.
 Finish this bounded native acceptance before raw manual lab/contact recovery.
 Restoring older archives also retains unrelated media bytes: safe orphan
 accounting/cleanup is open; do not delete them to make archive comparisons pass.

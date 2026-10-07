@@ -403,7 +403,7 @@ function NoteEditor({
       <Screen scroll>
         {/* Preserve the scroll host too: changing it remounts ScreenOptions during native close. */}
         <ScreenOptions options={{ title: isEdit ? 'ویرایش نوت' : 'نوت جدید', headerRight: () => null }} />
-        <Column gap="md" style={{ paddingTop: spacing.md }}>
+        <Column collapsable={false} gap="md" style={{ paddingTop: spacing.md }}>
           <Text>این پیش‌نویس بسته شد.</Text>
           <Button
             label="بستن"
@@ -454,7 +454,8 @@ function NoteEditor({
           ),
         }}
       />
-      <Column gap="md" pointerEvents={saving ? 'none' : 'auto'} style={{ paddingTop: spacing.md }}>
+      {/* Keep a native parent throughout saving/close; pointerEvents alone changes Fabric flattening. */}
+      <Column collapsable={false} gap="md" pointerEvents={saving ? 'none' : 'auto'} style={{ paddingTop: spacing.md }}>
         {readNotice}
         <ErrorNotice error={readError} what="نوت و پیش‌نویس" onRetry={retryRead} />
         {recovered ? (

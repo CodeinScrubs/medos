@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Alert } from 'react-native';
+import { Alert, View } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
-import { Button, Input } from '@/components/ui';
+import { Button, Column, Input } from '@/components/ui';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { attachments, captureInbox, noteDrafts, notes, recordingJobs } from '@/db/schema';
 import { createPatient } from '@/features/patients/queries';
@@ -14,6 +14,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { CaptureScreen } from './capture/capture-screen';
 import * as noteCommit from './notes/commit-queries';
+import * as noteDraftQueries from './notes/draft-queries';
 import { discardNoteDraft, noteDraftQuery } from './notes/draft-queries';
 import { NoteEditorScreen } from './notes/note-editor-screen';
 
@@ -47,7 +48,7 @@ jest.mock('@/components/feedback', () => ({ alertError: jest.fn(), notify: jest.
 jest.mock('@/components/ui', () => ({
   Button: 'Button',
   ChipSelect: 'ChipSelect',
-  Column: 'Column',
+  Column: jest.requireActual<typeof import('@/components/ui/layout')>('@/components/ui/layout').Column,
   Input: 'Input',
   Row: 'Row',
   Screen: jest.requireActual<typeof import('@/components/ui/layout')>('@/components/ui/layout').Screen,
@@ -134,12 +135,18 @@ afterEach(async () => {
 
 describe('voice metadata in real editor drafts', () => {
   it.each(['publication', 'discard'] as const)(
-    'keeps the real screen header mounted through %s and close',
+    'keeps the native form parent and screen header mounted through pending %s and close',
     async (action) => {
       await act(async () => {
         tree = create(<NoteEditorScreen />);
       });
       const header = tree!.root.findByType(ScreenOptions);
+      const formHost = () => tree!.root.findAllByType(Column)[0]!.findByType(View);
+      const parent = formHost();
+      // Fabric must retain this View even when pointerEvents changes during
+      // native close; Android may still retain the outgoing children's parents.
+      expect(parent.props.collapsable).toBe(false);
+      expect(parent.props.pointerEvents).toBe('auto');
       expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
       await act(async () => {
         tree!.root
@@ -148,17 +155,48 @@ describe('voice metadata in real editor drafts', () => {
           .props.onChangeText('Synthetic header witness');
       });
       const dialog = jest.spyOn(Alert, 'alert');
-      await act(async () => {
-        tree!.root
-          .findAllByType(Button)
-          .find((node) => node.props.label === (action === 'publication' ? 'ثبت در پرونده' : 'انصراف'))!
-          .props.onPress();
-        if (action === 'discard') {
-          dialog.mock.calls.at(-1)![2]!.find((button) => button.text === 'دور بریز')!.onPress!();
-        }
-        await settle();
+      let release!: () => void;
+      const acknowledgment = new Promise<void>((resolve) => {
+        release = resolve;
       });
+      if (action === 'publication') {
+        const commit = noteCommit.commitNoteDraft;
+        jest.spyOn(noteCommit, 'commitNoteDraft').mockImplementation(async (...args) => {
+          const id = await commit(...args);
+          await acknowledgment;
+          return id;
+        });
+      } else {
+        const discard = noteDraftQueries.discardNoteDraft;
+        jest.spyOn(noteDraftQueries, 'discardNoteDraft').mockImplementation(async (...args) => {
+          await discard(...args);
+          await acknowledgment;
+        });
+      }
+      try {
+        await act(async () => {
+          tree!.root
+            .findAllByType(Button)
+            .find((node) => node.props.label === (action === 'publication' ? 'ثبت در پرونده' : 'انصراف'))!
+            .props.onPress();
+          if (action === 'discard') {
+            dialog.mock.calls.at(-1)![2]!.find((button) => button.text === 'دور بریز')!.onPress!();
+          }
+          await settle();
+        });
+        expect(mockBack).not.toHaveBeenCalled();
+        expect(formHost()).toBe(parent);
+        expect(parent.props.collapsable).toBe(false);
+        expect(parent.props.pointerEvents).toBe('none');
+      } finally {
+        await act(async () => {
+          release();
+          await settle();
+        });
+      }
       expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(formHost()).toBe(parent);
+      expect(parent.props.collapsable).toBe(false);
       expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
       expect(tree!.root.findByType(ScreenOptions)).toBe(header);
     },
@@ -168,6 +206,8 @@ describe('voice metadata in real editor drafts', () => {
     await act(async () => {
       tree = create(<NoteEditorScreen />);
     });
+    const formHost = () => tree!.root.findAllByType(Column)[0]!.findByType(View);
+    const parent = formHost();
     const title = () => tree!.root.findAllByType(Input).find((node) => node.props.label === 'عنوان')!;
     const save = () =>
       tree!.root
@@ -184,6 +224,9 @@ describe('voice metadata in real editor drafts', () => {
     });
     expect(t.db.select().from(notes).all()).toEqual([]);
     expect(title().props.editable).toBe(true);
+    expect(formHost()).toBe(parent);
+    expect(parent.props.collapsable).toBe(false);
+    expect(parent.props.pointerEvents).toBe('auto');
     expect((await noteDraftQuery(patientId, null))[0]?.title).toBe('First title');
     t.sqlite.exec('DROP TRIGGER fail_note');
     await act(async () => title().props.onChangeText('Corrected title'));
@@ -192,6 +235,8 @@ describe('voice metadata in real editor drafts', () => {
       await settle();
     });
     expect(t.db.select().from(notes).get()?.title).toBe('Corrected title');
+    expect(formHost()).toBe(parent);
+    expect(parent.props.collapsable).toBe(false);
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 

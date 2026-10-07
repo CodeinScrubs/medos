@@ -271,5 +271,6 @@ Whatever comes back still has to pass `npm run check` in the repository before i
 See `docs/HANDOFF.md` for the live picture, `docs/roadmap.md` for what is built and what is
 next, `docs/IMPLEMENTATION.md` for the current prioritized execution and acceptance gates,
 and `README.md` for how the owner installs and uses it. The owner authorized implementation
-and pushes on 2026-09-23. On 2026-10-03 the owner allowed at most two subagents;
-the primary agent must stay involved and own integration and verification.
+and pushes on 2026-09-23. On 2026-10-08 the owner authorized at most two subagents,
+each using GPT-6.1 Sol with extra-high reasoning. The primary agent must stay
+involved and own integration and verification.
