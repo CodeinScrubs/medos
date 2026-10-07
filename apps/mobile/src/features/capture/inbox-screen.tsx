@@ -1,15 +1,19 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useMemo, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
-import { Button, Column, EmptyState, Input, Screen, SectionHeader } from '@/components/ui';
+import { Button, Column, EmptyState, Input, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { RecordingRecovery } from '@/features/attachments/recording-recovery';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { fullName } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
@@ -35,6 +39,9 @@ import {
  */
 export function InboxScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { generation, stale } = useDatasetIntent();
+  const saving = useRef(false);
   const { spacing } = useTheme();
   const [search, setSearch] = useState('');
   const [openLimit, setOpenLimit] = useState(50);
@@ -50,7 +57,12 @@ export function InboxScreen() {
   const openRows = open ?? [];
   const filedRows = filed ?? [];
 
-  const { data: patientRows } = useLive(patientListQuery());
+  const {
+    data: patientRows,
+    error: patientError,
+    retry: retryPatients,
+    loading: patientsLoading,
+  } = useLive(patientListQuery());
   const patientItems: PickerItem[] = useMemo(
     () =>
       (patientRows ?? []).map((p) => ({
@@ -64,18 +76,38 @@ export function InboxScreen() {
 
   async function answerAsk(patientId: string) {
     const pending = ask;
-    setAsk(null);
-    if (!pending) return;
+    if (!pending || patientError || patientsLoading || saving.current) return;
+    saving.current = true;
     try {
-      if (pending.purpose === 'note') {
-        const noteId = await fileCaptureAsNote(pending.captureId, { patientId });
-        router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
-      } else {
-        await updateCapture(pending.captureId, { patientId });
-      }
+      await withDatasetWrite(generation, async () => {
+        if (pending.purpose === 'note') {
+          const noteId = await fileCaptureAsNote(pending.captureId, { patientId });
+          if (navigation.isFocused())
+            router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
+        } else await updateCapture(pending.captureId, { patientId });
+      });
+      setAsk((current) => (current === pending ? null : current));
     } catch (e) {
       alertError('انجام نشد', e);
+    } finally {
+      saving.current = false;
     }
+  }
+
+  function openCurrentInbox() {
+    const open = () => {
+      if (!navigation.isFocused()) return;
+      setAsk(null);
+      router.replace('/inbox');
+    };
+    if (!ask) {
+      open();
+      return;
+    }
+    Alert.alert('انتخاب قبلی بسته شود؟', 'انتخاب بیمارِ قبلی ذخیره نمی‌شود؛ ورودی‌های بازگردانی‌شده باز می‌شوند.', [
+      { text: 'ادامهٔ مرور', style: 'cancel' },
+      { text: 'بستن انتخاب قبلی', onPress: open },
+    ]);
   }
 
   return (
@@ -86,6 +118,14 @@ export function InboxScreen() {
           error={error ?? filedError ?? openCountError ?? filedCountError ?? mediaError}
           what="ثبت‌های سریع"
         />
+        {stale && (
+          <Column gap="xs">
+            <Text variant="caption" color="textMuted">
+              اطلاعات از بکاپ جایگزین شده؛ انتخاب قبلی ذخیره نمی‌شود.
+            </Text>
+            <Button label="باز کردن ورودی‌های جدید" variant="secondary" onPress={openCurrentInbox} />
+          </Column>
+        )}
         <Input
           placeholder="جستجو در متن ثبت‌ها"
           value={search}
@@ -97,7 +137,7 @@ export function InboxScreen() {
         />
 
         <Button label="ثبت سریع تازه" icon="add" onPress={() => router.push('/capture')} full />
-        <RecordingRecovery />
+        <RecordingRecovery generation={generation} />
 
         {!error && openRows.length === 0 && open !== undefined ? (
           <EmptyState
@@ -118,6 +158,7 @@ export function InboxScreen() {
                   patient={patient}
                   media={byCapture.get(capture.id) ?? NO_MEDIA}
                   onAskPatient={setAsk}
+                  generation={generation}
                 />
               ))}
             </Column>
@@ -139,6 +180,7 @@ export function InboxScreen() {
                   patient={patient}
                   media={byCapture.get(capture.id) ?? NO_MEDIA}
                   onAskPatient={setAsk}
+                  generation={generation}
                 />
               ))}
             </Column>
@@ -150,13 +192,15 @@ export function InboxScreen() {
       </Column>
 
       <PickerModal
-        visible={ask != null}
+        visible={ask != null && !patientError}
         title={ask?.purpose === 'note' ? 'نوت برای کدام بیمار؟' : 'این برای کیست؟'}
-        items={patientItems}
+        items={patientError ? [] : patientItems}
+        emptyText={patientsLoading ? 'در حال خواندن…' : 'موردی پیدا نشد'}
         selectedId={ask?.selectedId ?? null}
         onClose={() => setAsk(null)}
         onSelect={(item) => void answerAsk(item.id)}
       />
+      <ErrorNotice error={ask ? patientError : undefined} what="فهرست بیماران" onRetry={retryPatients} />
     </Screen>
   );
 }

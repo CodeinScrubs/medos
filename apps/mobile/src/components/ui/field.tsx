@@ -155,6 +155,7 @@ export function SelectField({
   icon,
   error,
   required,
+  disabled = false,
 }: {
   label?: string;
   value?: string | null;
@@ -164,12 +165,15 @@ export function SelectField({
   icon?: keyof typeof Ionicons.glyphMap;
   error?: string;
   required?: boolean;
+  disabled?: boolean;
 }) {
   const { colors, radii, spacing } = useTheme();
   return (
     <Field label={label} error={error} required={required}>
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         accessibilityLabel={`${label ?? ''} ${value ?? placeholder}`.trim()}
         onPress={onPress}
         style={({ pressed }) => [
@@ -182,7 +186,7 @@ export function SelectField({
             minHeight: MIN_TOUCH,
             justifyContent: 'center',
           },
-          pressed && { opacity: 0.7 },
+          (pressed || disabled) && { opacity: 0.7 },
         ]}
       >
         <Row gap="sm" justify="space-between">
@@ -193,7 +197,13 @@ export function SelectField({
             </Text>
           </Row>
           {value && onClear ? (
-            <Pressable onPress={onClear} hitSlop={12} accessibilityLabel="پاک کردن">
+            <Pressable
+              onPress={onClear}
+              disabled={disabled}
+              accessibilityState={{ disabled }}
+              hitSlop={12}
+              accessibilityLabel="پاک کردن"
+            >
               <Ionicons name="close-circle" size={18} color={colors.textFaint} />
             </Pressable>
           ) : (

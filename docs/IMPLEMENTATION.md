@@ -35,6 +35,17 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.31: stopped quick-capture voices use the existing recording journal;
+capture kind/media/job acknowledgment and empty cleanup/filing are atomic.
+Original writer/screen/card/picker/recovery intents survive restore without
+writing replacement rows. Latest typing is flushed before close; delayed native
+or filing acknowledgment cannot navigate over another route. No new schema,
+dependency or normal-path UI. See validation-0.11.31.md for witnessed software
+failures and separate source/artifact/native gates. This does not close active/
+pre-journal interruption, draft-note voices, manual raw forms or phone acceptance.
+Next P0 is the draft-note journal/publication contract, then manual lab/contact
+raw recovery and remaining form intent/navigation audits.
+
 0.11.30 acceptance checkpoint: application `eb1979a`, exact-source CI
 37656747034 success, both signed/inspected ABIs and native in-place upgrade
 preserve 4,023 rows/40 app tables/18 media files. The continuous native round

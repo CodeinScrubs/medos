@@ -96,6 +96,16 @@ with a native header; bottom navigation protection remains. Inline options must
 not remount the clinical editing scope. Native/software source checkpoints and
 artifact hashes stay separate in the two validation reports.
 
+For 0.11.31, read capture `writer.ts`, `queries.ts`, `capture-screen.tsx`,
+both inbox containers and `capture-card.tsx` alongside attachment
+`recording-queries.ts`. Reservation must precede native IO; capture kind/media/job
+acknowledgment is atomic; pending voices protect cleanup/filing. Cards, choices,
+recorders and delayed dialogs keep the parent's original dataset intent. Verify
+the actual-handler tests `capture-screen.test.tsx`, `inbox-intents.test.tsx` and
+`capture-card.test.tsx`, plus both real-SQLite query suites. This reuses the
+existing journal; draft-note voice and pre-journal interruption remain open.
+See `docs/validation-0.11.31.md` for the separate source and native evidence.
+
 The following integration test accelerates a 24-hour shift in real SQLite. It is
 not a 24-hour Android soak test or a physical-device performance measurement.
 

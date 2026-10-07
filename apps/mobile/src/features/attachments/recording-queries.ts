@@ -3,7 +3,7 @@ import { and, asc, eq, isNull, ne, or } from 'drizzle-orm';
 import type { Recording } from '@/components/voice-recorder';
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { attachments, noteDrafts, patients, recordingJobs, type RecordingJob } from '@/db/schema';
+import { attachments, captureInbox, noteDrafts, patients, recordingJobs, type RecordingJob } from '@/db/schema';
 import { assertFileWorkAvailable, withFileJob } from '@/lib/file-work';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import {
@@ -95,7 +95,18 @@ function current(tx: DbTransaction, expected: RecordingJob): RecordingJob {
 
 /** Null is a captured owner too; it must not become an implicit new patient. */
 function requireOwner(tx: DbTransaction, row: RecordingJob): void {
+  requireUnfiledCapture(tx, row);
   if (attachmentPatientInTransaction(tx, row) !== row.patientId) conflict();
+}
+
+function requireUnfiledCapture(tx: DbTransaction, target: AttachmentTarget): void {
+  if (target.entityType !== 'capture') return;
+  const row = tx
+    .select({ filedAt: captureInbox.filedAt })
+    .from(captureInbox)
+    .where(and(eq(captureInbox.id, target.entityId), isNull(captureInbox.deletedAt)))
+    .get();
+  if (!row || row.filedAt) conflict();
 }
 
 function requireFingerprint(file: FileFingerprint): void {
@@ -139,6 +150,7 @@ export function beginRecordingJob(recording: Recording, target: AttachmentTarget
   const id = recordingOperationId(recording);
   const path = jobPath(id);
   return db.transaction((tx) => {
+    requireUnfiledCapture(tx, target);
     const patientId = attachmentPatientInTransaction(tx, target);
     const previous = tx.select().from(recordingJobs).where(eq(recordingJobs.id, id)).get();
     const capturedAt = recording.capturedAt ?? previous?.capturedAt ?? now;
@@ -258,6 +270,12 @@ function commit(expected: RecordingJob, file: FileFingerprint, now: Date): strin
       mimeType: 'audio/mp4',
     });
     tx.update(attachments).set({ checksum: row.checksum }).where(eq(attachments.id, id)).run();
+    if (row.entityType === 'capture') {
+      tx.update(captureInbox)
+        .set({ kind: 'voice', ...touch(now) })
+        .where(eq(captureInbox.id, row.entityId))
+        .run();
+    }
     tx.update(recordingJobs)
       .set({ state: 'saved', attachmentId: id, revision: row.revision + 1, ...touch(now) })
       .where(eq(recordingJobs.id, row.id))

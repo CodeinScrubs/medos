@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { attachments, captureInbox, notes, noteVersions, tasks } from '@/db/schema';
+import { beginRecordingJob, discardRecording } from '@/features/attachments/recording-queries';
+import { DatasetChangedError } from '@/lib/dataset-write';
+import { databaseRows, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -28,6 +31,7 @@ import { tasksQuery } from '../tasks/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
+jest.mock('@/platform/media', () => ({ mediaFile: () => ({ exists: false }) }));
 
 let t: TestDatabase;
 let patientId: string;
@@ -49,6 +53,11 @@ async function attachVoice(captureId: string): Promise<string> {
 }
 
 describe('a capture', () => {
+  it('refuses a new capture for a retired patient without leaving a hidden row', async () => {
+    await deletePatient(patientId);
+    await expect(createCapture({ patientId, text: 'Synthetic old intent' })).rejects.toThrow();
+    expect(t.db.select().from(captureInbox).all()).toEqual([]);
+  });
   /*
    * The whole point: it demands nothing. No patient, no type, no title — the
    * questions are what stop a thing from being written down at all.
@@ -235,8 +244,8 @@ describe('filing a capture', () => {
     await fileCaptureAsNote(id);
     const otherId = await createPatient({ firstName: 'Test', lastName: 'Other', status: 'outpatient' });
     await expect(fileCaptureAsNote(id, { patientId: otherId })).rejects.toThrow();
-    await deletePatient(patientId);
     const unfiled = await createCapture({ text: 'Another', patientId });
+    await deletePatient(patientId);
     await expect(fileCaptureAsNote(unfiled)).rejects.toThrow();
     expect((await captureQuery(unfiled))[0]?.filedAt).toBeNull();
   });
@@ -256,6 +265,34 @@ function failFiling() {
 }
 
 describe('throwing a capture away', () => {
+  it('keeps an empty capture that owns a stopped voice until that operation is explicitly discarded', async () => {
+    const id = await createCapture();
+    const now = new Date('2026-10-07T12:00:00Z');
+    const job = beginRecordingJob(
+      { uri: 'file:///synthetic-cache.m4a', durationMs: 1500 },
+      { entityType: 'capture', entityId: id },
+      now,
+    );
+    expect(await discardCaptureIfEmpty(id)).toBe(false);
+    expect(captureQuery(id).get()?.deletedAt).toBeNull();
+    await discardRecording(job.id, now);
+    expect(await discardCaptureIfEmpty(id)).toBe(true);
+    expect(await discardCaptureIfEmpty(id)).toBe(false);
+  });
+
+  it('refuses filing while a stopped voice is still waiting for acknowledgment', async () => {
+    const id = await createCapture({ patientId, text: 'Synthetic pending voice' });
+    beginRecordingJob(
+      { uri: 'file:///synthetic-cache.m4a', durationMs: 1500 },
+      { entityType: 'capture', entityId: id },
+      new Date('2026-10-07T12:00:00Z'),
+    );
+    await expect(fileCaptureAsNote(id)).rejects.toThrow();
+    await expect(fileCaptureAsTask(id)).rejects.toThrow();
+    expect(captureQuery(id).get()?.filedAt).toBeNull();
+    expect(t.db.select().from(notes).all()).toEqual([]);
+    expect(t.db.select().from(tasks).all()).toEqual([]);
+  });
   it('is a soft delete, like everything else in the record', async () => {
     const id = await createCapture({ text: 'بی‌اهمیت' });
     await discardCapture(id);
@@ -336,6 +373,27 @@ describe('the inbox', () => {
 });
 
 describe('the capture writer', () => {
+  it('keeps the original dataset intent for a delayed creation after replacement', async () => {
+    const writer = new CaptureWriter({ text: 'Synthetic retained input', patientId });
+    const restore = snapshotDataset(t);
+    restore();
+    const before = databaseRows(t);
+    await expect(writer.ensure()).rejects.toThrow(DatasetChangedError);
+    expect(writer.current.text).toBe('Synthetic retained input');
+    expect(databaseRows(t)).toEqual(before);
+  });
+
+  it('refuses old writes and empty cleanup even when replacement retains identical row IDs', async () => {
+    const writer = new CaptureWriter();
+    const id = await writer.ensure();
+    const restore = snapshotDataset(t);
+    restore();
+    const before = databaseRows(t);
+    await expect(writer.write({ text: 'Synthetic stale edit', patientId: null })).rejects.toThrow(DatasetChangedError);
+    await expect(writer.discardIfEmpty()).rejects.toThrow(DatasetChangedError);
+    expect(captureQuery(id).get()?.deletedAt).toBeNull();
+    expect(databaseRows(t)).toEqual(before);
+  });
   it('retries failed creation with the newest text after a transient database error', async () => {
     const writer = new CaptureWriter();
     t.sqlite.exec(

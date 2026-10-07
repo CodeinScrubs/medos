@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { attachments, auditLog, captureInbox, noteDrafts, recordingJobs } from '@/db/schema';
-import { createCapture, updateCapture } from '@/features/capture/queries';
+import { captureQuery, createCapture, fileCaptureAsTask, updateCapture } from '@/features/capture/queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import { reserveFileMaintenance } from '@/lib/file-work';
 import { stamps } from '@/lib/ids';
@@ -92,6 +92,46 @@ async function failPublication() {
 }
 
 describe('durable stopped voice jobs', () => {
+  it('rolls back capture kind with attachment metadata if the journal acknowledgment fails', async () => {
+    const id = await createCapture({ patientId, text: 'Synthetic unchanged text' });
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_capture_ack BEFORE UPDATE ON recording_jobs WHEN NEW.state='saved' BEGIN SELECT RAISE(ABORT, 'Synthetic capture ack'); END;",
+    );
+    await expect(persistRecording(recording(), { entityType: 'capture', entityId: id }, now)).rejects.toThrow();
+    expect(captureQuery(id).get()).toMatchObject({ kind: 'text', text: 'Synthetic unchanged text' });
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+    expect(recordingJobQuery(recording().operationId).get()).toMatchObject({ state: 'ready', attachmentId: null });
+    t.sqlite.exec('DROP TRIGGER fail_capture_ack');
+    await resumeRecording(recording().operationId, now);
+    expect(captureQuery(id).get()?.kind).toBe('voice');
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
+  });
+  it('acknowledges capture kind, media and recording state together and recovers ready bytes without cache', async () => {
+    const id = await createCapture({ text: 'Synthetic capture', patientId });
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_kind BEFORE UPDATE OF kind ON capture_inbox WHEN NEW.kind='voice' BEGIN SELECT RAISE(ABORT, 'Synthetic kind'); END;",
+    );
+    await expect(persistRecording(recording(), { entityType: 'capture', entityId: id }, now)).rejects.toThrow();
+    expect(captureQuery(id).get()?.kind).toBe('text');
+    expect(t.db.select().from(attachments).all()).toEqual([]);
+    expect(recordingJobQuery(recording().operationId).get()).toMatchObject({ state: 'ready', attachmentId: null });
+    t.sqlite.exec('DROP TRIGGER fail_kind');
+    mockFiles.delete(recording().uri);
+    const attachmentId = await resumeRecording(recording().operationId, now);
+    expect(await resumeRecording(recording().operationId, now)).toBe(attachmentId);
+    expect(captureQuery(id).get()?.kind).toBe('voice');
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reserve or publish a new voice on an already filed capture', async () => {
+    const id = await createCapture({ text: 'Synthetic filed capture' });
+    await fileCaptureAsTask(id);
+    await expect(persistRecording(recording(), { entityType: 'capture', entityId: id }, now)).rejects.toThrow();
+    expect(t.db.select().from(recordingJobs).all()).toEqual([]);
+    expect(mockFingerprint).not.toHaveBeenCalled();
+    expect(mockCopy).not.toHaveBeenCalled();
+  });
   it('rechecks a null capture owner after reading the source and before copying', async () => {
     const captureId = await createCapture({ kind: 'voice', shiftId: null });
     mockFingerprint.mockImplementationOnce(async () => {

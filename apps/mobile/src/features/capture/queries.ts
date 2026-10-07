@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { db, type DbTransaction } from '@/db/client';
 import {
@@ -6,6 +6,7 @@ import {
   captureInbox,
   notes,
   patients,
+  recordingJobs,
   shifts,
   tasks,
   type Capture,
@@ -95,16 +96,6 @@ export type CaptureInput = {
   capturedAt?: Date;
 };
 
-async function activeShiftId(): Promise<string | null> {
-  const [row] = await db
-    .select({ id: shifts.id })
-    .from(shifts)
-    .where(and(isNull(shifts.deletedAt), eq(shifts.isActive, true)))
-    .orderBy(desc(shifts.startAt))
-    .limit(1);
-  return row?.id ?? null;
-}
-
 /**
  * Write a capture.
  *
@@ -115,18 +106,40 @@ async function activeShiftId(): Promise<string | null> {
 export async function createCapture(input: CaptureInput = {}): Promise<string> {
   const id = newId();
   const text = input.text?.trim() || null;
-  await db.insert(captureInbox).values({
-    id,
-    ...stamps(),
-    kind: input.kind ?? 'text',
-    text,
-    patientId: input.patientId ?? null,
-    shiftId: input.shiftId !== undefined ? input.shiftId : await activeShiftId(),
-    capturedAt: input.capturedAt ?? new Date(),
-    filedAs: null,
-    filedId: null,
-    filedAt: null,
-    searchText: captureSearchText({ text }),
+  db.transaction((tx) => {
+    if (
+      input.patientId &&
+      !tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, input.patientId), isNull(patients.deletedAt)))
+        .get()
+    )
+      throw new Error('پروندهٔ بیمار در دسترس نیست؛ ثبت سریع ذخیره نشد.');
+    const shiftId =
+      input.shiftId !== undefined
+        ? input.shiftId
+        : (tx
+            .select({ id: shifts.id })
+            .from(shifts)
+            .where(and(isNull(shifts.deletedAt), eq(shifts.isActive, true)))
+            .orderBy(desc(shifts.startAt))
+            .get()?.id ?? null);
+    tx.insert(captureInbox)
+      .values({
+        id,
+        ...stamps(),
+        kind: input.kind ?? 'text',
+        text,
+        patientId: input.patientId ?? null,
+        shiftId,
+        capturedAt: input.capturedAt ?? new Date(),
+        filedAs: null,
+        filedId: null,
+        filedAt: null,
+        searchText: captureSearchText({ text }),
+      })
+      .run();
   });
   return id;
 }
@@ -231,6 +244,8 @@ function captureForFiling(tx: DbTransaction, id: string, patientId: string | nul
     .where(and(alive, eq(captureInbox.id, id)))
     .get();
   if (!capture) throw new Error('Capture not found');
+  if (hasPendingRecording(tx, id))
+    throw new Error('وویس این ثبت هنوز ذخیره نشده است؛ ابتدا از ورودی‌ها ذخیرهٔ وویس را کامل کنید.');
   const target = patientId !== undefined ? patientId : capture.patientId;
   if (
     target &&
@@ -361,22 +376,41 @@ export async function restoreCapture(id: string): Promise<void> {
  * or a filing survives this.
  */
 export async function discardCaptureIfEmpty(id: string): Promise<boolean> {
-  const capture = (await captureQuery(id))[0];
-  if (!capture || capture.filedAt) return false;
-  if ((capture.text ?? '').trim()) return false;
-  if ((await captureAttachments(id)).length > 0) return false;
-  await discardCapture(id);
-  return true;
+  return db.transaction((tx) => {
+    const capture = tx
+      .select()
+      .from(captureInbox)
+      .where(and(alive, eq(captureInbox.id, id)))
+      .get();
+    if (!capture || capture.filedAt || (capture.text ?? '').trim() || hasPendingRecording(tx, id)) return false;
+    if (
+      tx
+        .select({ id: attachments.id })
+        .from(attachments)
+        .where(and(isNull(attachments.deletedAt), eq(attachments.entityType, 'capture'), eq(attachments.entityId, id)))
+        .get()
+    )
+      return false;
+    tx.update(captureInbox)
+      .set(softDelete())
+      .where(and(alive, eq(captureInbox.id, id)))
+      .run();
+    return true;
+  });
 }
 
-function captureAttachments(captureId: string) {
-  return db
-    .select({ id: attachments.id })
-    .from(attachments)
+function hasPendingRecording(tx: DbTransaction, captureId: string): boolean {
+  return !!tx
+    .select({ id: recordingJobs.id })
+    .from(recordingJobs)
     .where(
-      and(isNull(attachments.deletedAt), eq(attachments.entityType, 'capture'), eq(attachments.entityId, captureId)),
+      and(
+        eq(recordingJobs.entityType, 'capture'),
+        eq(recordingJobs.entityId, captureId),
+        inArray(recordingJobs.state, ['copying', 'ready', 'discarding']),
+      ),
     )
-    .limit(1);
+    .get();
 }
 
 /**

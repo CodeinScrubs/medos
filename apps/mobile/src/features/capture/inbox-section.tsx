@@ -1,6 +1,9 @@
 import { useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router/react-navigation';
 import { useMemo, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
@@ -9,6 +12,7 @@ import { useLive } from '@/db/use-live';
 import { RecordingRecoveryNotice } from '@/features/attachments/recording-recovery';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { fullName, toPersianDigits } from '@/lib/persian';
 
 import { CaptureCard, groupMedia, NO_MEDIA, type PatientAsk } from './capture-card';
@@ -24,6 +28,8 @@ const SHOWN = 3;
  */
 export function InboxSection() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { generation, stale } = useDatasetIntent();
   const captures = useLive(inboxQuery(SHOWN));
   const count = useLive(captureCountQuery(false));
   const attachments = useLive(captureMediaQuery());
@@ -60,18 +66,35 @@ export function InboxSection() {
     if (!pending || patients.error || patients.loading || saving.current) return;
     saving.current = true;
     try {
-      if (pending.purpose === 'note') {
-        const noteId = await fileCaptureAsNote(pending.captureId, { patientId });
-        router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
-      } else {
-        await updateCapture(pending.captureId, { patientId });
-      }
+      await withDatasetWrite(generation, async () => {
+        if (pending.purpose === 'note') {
+          const noteId = await fileCaptureAsNote(pending.captureId, { patientId });
+          if (navigation.isFocused())
+            router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId } });
+        } else await updateCapture(pending.captureId, { patientId });
+      });
       setAsk((current) => (current === pending ? null : current));
     } catch (e) {
       alertError('انجام نشد', e);
     } finally {
       saving.current = false;
     }
+  }
+
+  function openCurrentInbox() {
+    const open = () => {
+      if (!navigation.isFocused()) return;
+      setAsk(null);
+      router.push('/inbox');
+    };
+    if (!ask) {
+      open();
+      return;
+    }
+    Alert.alert('انتخاب قبلی بسته شود؟', 'انتخاب بیمارِ قبلی ذخیره نمی‌شود؛ ورودی‌های بازگردانی‌شده باز می‌شوند.', [
+      { text: 'ادامهٔ مرور', style: 'cancel' },
+      { text: 'بستن انتخاب قبلی', onPress: open },
+    ]);
   }
 
   if (rows.length === 0 && failed.length === 0 && !ask)
@@ -86,6 +109,7 @@ export function InboxSection() {
         what={failed.map(({ label }) => label).join('، ')}
         onRetry={() => failed.forEach(({ query }) => query.retry())}
       />
+      {stale && <Button label="باز کردن ورودی‌های جدید" variant="secondary" onPress={openCurrentInbox} />}
       <Column gap="sm">
         {rows.slice(0, SHOWN).map(({ capture, patient }) => (
           <CaptureCard
@@ -94,6 +118,7 @@ export function InboxSection() {
             patient={patient}
             media={byCapture.get(capture.id) ?? NO_MEDIA}
             onAskPatient={setAsk}
+            generation={generation}
           />
         ))}
 

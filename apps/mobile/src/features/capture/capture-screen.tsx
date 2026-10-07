@@ -1,8 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { AppState, StyleSheet, View } from 'react-native';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, AppState, StyleSheet, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
@@ -10,15 +13,16 @@ import { Button, Column, Input, Row, Screen, SelectField, Text } from '@/compone
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, attachPhotos } from '@/features/attachments/capture';
-import { stageRecording } from '@/features/attachments/recordings';
+import { discardStoppedRecording, persistRecording } from '@/features/attachments/recording-queries';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
+import { assertDatasetWrite, withDatasetWrite } from '@/lib/dataset-write';
 import { withFileJob } from '@/lib/file-work';
 import { fullName } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
-import { addCaptureVoice, updateCapture } from './queries';
+import { updateCapture } from './queries';
 import { CaptureWriter, type CaptureFields } from './writer';
 
 /**
@@ -44,25 +48,29 @@ export function CaptureScreen() {
 
 function CaptureForm() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const scope = useAutosaveScope()!;
+  const { generation, stale } = useDatasetIntent();
   const { spacing } = useTheme();
   const params = useLocalSearchParams<{ patientId?: string }>();
 
   // The writer holds both the newest values and the row id. Timers, the
   // recorder and the camera all read it from callbacks, where React state
   // would be a stale closure.
-  const [writer] = useState(() => new CaptureWriter({ patientId: params.patientId ?? null }));
+  const [writer] = useState(() => new CaptureWriter({ patientId: params.patientId ?? null }, generation));
   const [text, setText] = useState('');
   const [patientId, setPatientId] = useState<string | null>(params.patientId ?? null);
   const [picking, setPicking] = useState(false);
   const [autosave, setAutosave] = useState<AutosaveState>({ status: 'idle' });
   const [busy, setBusy] = useState(false);
+  const acting = useRef(false);
+  const voiceTarget = useRef<string | undefined>(undefined);
 
   const saver = useMemo(
-    () => new Autosave<CaptureFields>({ write: (value) => writer.write(value), onState: setAutosave }),
-    [writer],
+    () => new Autosave<CaptureFields>({ write: (value) => writer.write(value), onState: setAutosave, generation }),
+    [writer, generation],
   );
 
-  const scope = useAutosaveScope()!;
   useEffect(() => scope.group.register(saver), [scope, saver]);
 
   function update(patch: Partial<CaptureFields>) {
@@ -84,12 +92,12 @@ function CaptureForm() {
       sub.remove();
       void saver
         .flush()
-        .then((saved) => (saved ? writer.discardIfEmpty() : undefined))
+        .then((saved) => (saved && !scope.isAbandoned() ? writer.discardIfEmpty() : undefined))
         .catch((e) => alertError('ثبت نشد', e));
     };
-  }, [saver, writer]);
+  }, [saver, writer, scope]);
 
-  const { data: patientRows } = useLive(patientListQuery());
+  const { data: patientRows, error: patientError, retry: retryPatients } = useLive(patientListQuery());
   const patientItems: PickerItem[] = useMemo(
     () =>
       (patientRows ?? []).map((p) => ({
@@ -101,41 +109,65 @@ function CaptureForm() {
     [patientRows],
   );
   const patientLabel = patientItems.find((p) => p.id === patientId)?.label ?? null;
+  // A replacement may reuse this patient ID for a different identity. Keep
+  // the old label with the retained form rather than relabeling its intent.
+  const [originalPatientLabel, setOriginalPatientLabel] = useState(patientLabel);
+  if (!stale && originalPatientLabel !== patientLabel) setOriginalPatientLabel(patientLabel);
 
   async function onRecorded(recording: Recording) {
-    await withFileJob(async () => {
-      const stored = await stageRecording(recording, new Date());
-      const id = await writer.ensure();
-      if (!(await saver.flush())) throw new Error('متن یا بیمار ثبت سریع هنوز ذخیره نشده است.');
-      await addCaptureVoice(id, {
-        relativePath: stored.relativePath,
-        sizeBytes: stored.sizeBytes,
-        durationMs: recording.durationMs,
-        capturedAt: stored.capturedAt,
-      });
+    await withDatasetWrite(generation, () =>
+      withFileJob(async () => {
+        const id = await writer.ensure();
+        voiceTarget.current = id;
+        if (!(await saver.flush())) throw new Error('متن یا بیمار ثبت سریع هنوز ذخیره نشده است.');
+        // persistRecording reserves the durable operation before native IO. The
+        // recorder keeps its stopped source until this entire callback acknowledges.
+        await persistRecording(recording, { entityType: 'capture', entityId: id }, new Date());
+        // Typing may continue while native copying is in flight. A close must
+        // acknowledge those newer words too, without recursively flushing the recorder.
+        if (!(await saver.flush())) throw new Error('وویس ذخیره شد، اما متن جدید هنوز ذخیره نشده است.');
+      }),
+    );
+  }
+
+  async function onDiscarded(recording: Recording) {
+    await withDatasetWrite(generation, async () => {
+      if (voiceTarget.current)
+        await discardStoppedRecording(recording, { entityType: 'capture', entityId: voiceTarget.current }, new Date());
     });
+  }
+
+  function closeAfterSave() {
+    assertDatasetWrite(generation);
+    if (navigation.isFocused()) router.back();
   }
 
   function addPhoto() {
     askPhotoSource((source) => {
       void (async () => {
+        if (acting.current) return;
+        acting.current = true;
         setBusy(true);
         try {
-          const id = await writer.ensure({ kind: 'photo' });
-          const added = await attachPhotos({
-            source,
-            entityType: 'capture',
-            entityId: id,
-            patientId: writer.current.patientId,
-            kind: 'photo',
+          await withDatasetWrite(generation, async () => {
+            const id = await writer.ensure({ kind: 'photo' });
+            if (!(await saver.flush())) throw new Error('متن یا بیمار ثبت سریع هنوز ذخیره نشده است.');
+            const added = await attachPhotos({
+              source,
+              entityType: 'capture',
+              entityId: id,
+              patientId: writer.current.patientId,
+              kind: 'photo',
+            });
+            if (added.length > 0) {
+              await updateCapture(id, { kind: 'photo' });
+              if (await saver.flush()) closeAfterSave();
+            }
           });
-          if (added.length > 0) {
-            await updateCapture(id, { kind: 'photo' });
-            router.back();
-          }
         } catch (e) {
           alertError('عکس ذخیره نشد', e);
         } finally {
+          acting.current = false;
           setBusy(false);
         }
       })();
@@ -143,15 +175,36 @@ function CaptureForm() {
   }
 
   async function done() {
+    if (acting.current) return;
+    acting.current = true;
     setBusy(true);
     try {
-      const stored = await scope.group.flush();
+      const stored = await scope.canLeave();
       // Only leave if the words reached storage; a failed write keeps its
       // value and retries, and going back now would hide that.
-      if (stored) router.back();
+      if (stored) closeAfterSave();
+    } catch (e) {
+      alertError('ثبت نشد', e);
     } finally {
+      acting.current = false;
       setBusy(false);
     }
+  }
+
+  function closeStale() {
+    Alert.alert('بستن فرم قبلی', 'نوشتهٔ روی این صفحه دور ریخته می‌شود؛ اطلاعات بازگردانی‌شده تغییر نمی‌کند.', [
+      { text: 'ادامهٔ مرور', style: 'cancel' },
+      {
+        text: 'بستن فرم',
+        style: 'destructive',
+        onPress: () => {
+          if (!navigation.isFocused()) return;
+          saver.cancel();
+          scope.abandonStale();
+          router.back();
+        },
+      },
+    ]);
   }
 
   return (
@@ -163,39 +216,60 @@ function CaptureForm() {
           onChangeText={(v) => update({ text: v })}
           placeholder="هرچه هست بنویسید؛ بعداً سر فرصت جایش را مشخص کنید."
           multiline
+          editable={!stale}
           autoFocus
         />
 
         <Row gap="sm">
           <View style={styles.grow}>
-            <VoiceRecorder label="ضبط وویس" onRecorded={onRecorded} onSaved={() => router.back()} />
+            {!stale && (
+              <VoiceRecorder
+                label="ضبط وویس"
+                onRecorded={onRecorded}
+                onDiscarded={onDiscarded}
+                onSaved={() => {
+                  if (!acting.current) closeAfterSave();
+                }}
+              />
+            )}
           </View>
-          <Button label="عکس" icon="camera-outline" variant="secondary" onPress={addPhoto} loading={busy} />
+          <Button
+            label="عکس"
+            icon="camera-outline"
+            variant="secondary"
+            onPress={addPhoto}
+            loading={busy}
+            disabled={stale}
+          />
         </Row>
 
+        <ErrorNotice error={patientError} what="بیماران" onRetry={retryPatients} />
         <SelectField
           label="بیمار (اختیاری)"
-          value={patientLabel}
+          value={stale ? originalPatientLabel : patientLabel}
           placeholder="اگر معلوم است برای چه کسی است"
-          onPress={() => setPicking(true)}
-          onClear={patientId ? () => update({ patientId: null }) : undefined}
+          disabled={stale}
+          onPress={() => void scope.perform(() => setPicking(true))}
+          onClear={patientId ? () => void scope.perform(() => update({ patientId: null })) : undefined}
         />
 
         <Button
-          label="ثبت"
+          label={stale ? 'بستن فرم قبلی' : 'ثبت'}
           icon="checkmark"
-          onPress={() => void done()}
+          onPress={() => (stale ? closeStale() : void done())}
           loading={busy}
-          disabled={text.trim().length === 0}
+          disabled={!stale && text.trim().length === 0}
           full
         />
 
         <Text variant="tiny" color="textFaint">
-          {autosave.status === 'failed'
-            ? 'هنوز ذخیره نشده — دوباره تلاش می‌شود.'
-            : autosave.status === 'pending' || autosave.status === 'writing'
-              ? 'در حال ذخیره…'
-              : 'نوشته‌ها خودکار نگه داشته می‌شوند.'}
+          {stale
+            ? 'اطلاعات از بکاپ جایگزین شده؛ نوشتهٔ این فرم باقی مانده و ذخیره نمی‌شود.'
+            : autosave.status === 'failed'
+              ? 'هنوز ذخیره نشده — دوباره تلاش می‌شود.'
+              : autosave.status === 'pending' || autosave.status === 'writing'
+                ? 'در حال ذخیره…'
+                : 'نوشته‌ها خودکار نگه داشته می‌شوند.'}
         </Text>
       </Column>
 
@@ -206,8 +280,10 @@ function CaptureForm() {
         selectedId={patientId}
         onClose={() => setPicking(false)}
         onSelect={(item) => {
-          setPicking(false);
-          update({ patientId: item.id });
+          void scope.perform(() => {
+            setPicking(false);
+            update({ patientId: item.id });
+          });
         }}
       />
     </Screen>

@@ -1535,3 +1535,32 @@ edge. Round/add-patient stay direct; bulk-add/end-shift move into one inline
 options group. Presentation changes never remount handoff editors or their Scope.
 This is local to the header-hosted routes: tab roots and headerless modals still
 need their top inset. No global safe-area heuristic or navigation layer was added.
+
+## Durable quick capture and original inbox intent (0.11.31)
+
+Quick capture reuses the existing recording journal rather than a second media
+pipeline. The original CaptureWriter owns one parent and keeps its dataset token.
+It acknowledges the current text/patient before reserving a recording job; that
+job commits before native fingerprint/copy. Capture kind, attachment/checksum and
+the saved journal state publish in one synchronous transaction. Pending
+copying/ready/discarding jobs prevent empty cleanup and filing. Recovery from a
+verified ready copy does not require the recorder cache; a filed capture cannot
+accept a new recording. This supersedes the earlier process-local capture voice
+path. Note-draft voice still needs its own revision/publication target contract.
+
+Capture's recorder and text remain in one always-on AutosaveScope. The recorder
+callback flushes text only, never its own whole SaveGroup, and flushes newer
+typing after native copying before acknowledging a close. Original dataset
+admission spans the native waits; originating navigation focus owns delayed
+closes. All inbox cards, patient choices and recovery actions inherit the
+generation captured before their parent reads, including late mounted children.
+Delayed trash confirmations keep that same token. Picker failures retain the
+choice and suppress duplicates; filing acknowledgment cannot open a route over
+a newer screen. Stale forms retain their text and original patient label. An
+explicit failure-only action opens a fresh inbox; it never silently renews the
+authority of an old editing intent.
+
+The durable boundary starts after initial capture/field SQL and journal
+reservation succeed. Active or unconfirmed recording, failed initial SQL and
+pre-journal interruption are separate gaps. No migration, dependency, route,
+permission, clinical rule or archive/key scheme changes here.

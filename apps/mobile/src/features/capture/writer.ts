@@ -1,3 +1,5 @@
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
+
 import { createCapture, discardCaptureIfEmpty, updateCapture, type CaptureInput } from './queries';
 
 export type CaptureFields = { text: string; patientId: string | null };
@@ -19,7 +21,10 @@ export class CaptureWriter {
   private id: Promise<string> | null = null;
   private fields: CaptureFields = { text: '', patientId: null };
 
-  constructor(initial?: Partial<CaptureFields>) {
+  constructor(
+    initial?: Partial<CaptureFields>,
+    private readonly generation = datasetGeneration(),
+  ) {
     this.fields = { text: initial?.text ?? '', patientId: initial?.patientId ?? null };
   }
 
@@ -39,23 +44,27 @@ export class CaptureWriter {
 
   /** The row id, creating it the first time somebody needs one. */
   ensure(seed: CaptureInput = {}): Promise<string> {
-    if (!this.id) {
-      const pending = createCapture({ text: this.fields.text, patientId: this.fields.patientId, ...seed });
-      this.id = pending;
-      // Share an in-flight creation, but do not cache a transient failure.
-      // The next attempt reads the newest fields, not the failed snapshot.
-      void pending.catch(() => {
-        if (this.id === pending) this.id = null;
-      });
-    }
-    return this.id;
+    return withDatasetWrite(this.generation, () => {
+      if (!this.id) {
+        const pending = createCapture({ text: this.fields.text, patientId: this.fields.patientId, ...seed });
+        this.id = pending;
+        // Share an in-flight creation, but do not cache a transient failure.
+        // The next attempt reads the newest fields, not the failed snapshot.
+        void pending.catch(() => {
+          if (this.id === pending) this.id = null;
+        });
+      }
+      return this.id;
+    });
   }
 
   /** Write the current values through. Used by autosave. */
   async write(fields: CaptureFields): Promise<void> {
     this.set(fields);
-    const id = await this.ensure();
-    await updateCapture(id, fields);
+    await withDatasetWrite(this.generation, async () => {
+      const id = await this.ensure();
+      await updateCapture(id, fields);
+    });
   }
 
   /**
@@ -66,6 +75,6 @@ export class CaptureWriter {
    */
   async discardIfEmpty(): Promise<boolean> {
     if (!this.id) return false;
-    return discardCaptureIfEmpty(await this.id);
+    return withDatasetWrite(this.generation, async () => discardCaptureIfEmpty(await this.id!));
   }
 }

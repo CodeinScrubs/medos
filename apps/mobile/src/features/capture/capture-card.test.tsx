@@ -3,8 +3,9 @@ import { Alert, type AlertButton } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { Badge, Button } from '@/components/ui';
+import { databaseRows, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
-import { createTestDatabase } from '@/test/sqljs';
+import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { CaptureCard, type PatientAsk } from './capture-card';
 import { captureQuery, createCapture, inboxQuery } from './queries';
@@ -15,6 +16,7 @@ jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/platform/media', () => ({ mediaUri: () => null }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 jest.mock('@/components/voice-note-player', () => ({ VoiceNotePlayer: 'VoiceNotePlayer' }));
@@ -33,10 +35,11 @@ jest.mock('@/components/ui', () => ({
 }));
 
 let tree: ReactTestRenderer;
+let t: TestDatabase;
 let patientId: string;
 
 beforeEach(async () => {
-  useTestDatabase(await createTestDatabase());
+  t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Example', lastName: 'Patient', status: 'outpatient' });
 });
 
@@ -113,6 +116,39 @@ describe('a capture whose patient was deleted', () => {
 });
 
 describe('a capture whose patient is still in the record', () => {
+  it.each(['کار', 'نوت'])('refuses the retained %s action after identical-row replacement', async (label) => {
+    await createCapture({ patientId, text: 'Synthetic old card' });
+    await renderInboxRow();
+    const retained = button(label).props.onPress;
+    await act(async () => {
+      snapshotDataset(t)();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      retained();
+      for (let i = 0; i < 50; i++) await Promise.resolve();
+    });
+    expect(databaseRows(t)).toEqual(before);
+  });
+
+  it('refuses a delayed trash confirmation after replacement', async () => {
+    await createCapture({ patientId, text: 'Synthetic retained capture' });
+    await renderInboxRow();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await act(async () => {
+      button('دور انداختن').props.onPress();
+    });
+    const confirm = alert.mock.calls.at(-1)![2]!.find((b) => b.text === 'دور انداختن')!.onPress!;
+    await act(async () => {
+      snapshotDataset(t)();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      confirm();
+      for (let i = 0; i < 50; i++) await Promise.resolve();
+    });
+    expect(databaseRows(t)).toEqual(before);
+  });
   it('files straight to a task with that patient, without a question', async () => {
     const id = await createCapture({ text: 'Repeat the potassium', patientId });
     await renderInboxRow();

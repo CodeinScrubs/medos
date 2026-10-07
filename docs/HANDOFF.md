@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-07 — Durable quick-capture voice and original inbox actions
+
+**Agent:** GPT-6 via Codex
+**Commits:** application in this commit; baseline `059696a`; native acceptance pending.
+
+**Changed**
+- Quick capture uses existing recording_jobs; capture kind/media/job commit
+  together. Empty cleanup and filing protect copying/ready/discarding voices.
+- Writer, recorder, photo/Done, card actions and Today/full-inbox patient choices
+  retain original dataset intent. Latest text survives native copying; late
+  acknowledgment cannot navigate over a newer route. Picker failure/retry retains
+  selection, duplicates are suppressed; stale recovery is explicit/local only.
+- 0.11.31/code47; no schema/dependency/permission/route/backup/clinical change.
+  Details and evidence boundaries are in validation-0.11.31.md.
+
+**Verified**
+- Seven query/writer, three screen, three card and five picker witnesses failed
+  before their fixes; existing tests retained. Extended voice/recorder/recovery
+  six suites / 122 checks and card/picker/read three suites / 58 checks passed.
+- Existing media-editor stand-ins updated to the native navigation/journal-copy
+  contracts; failed metadata/same-file retry/failed-close assertions still pass.
+- Final `npm run check`: typecheck/lint/format, 126 suites / 1,635 app tests and
+  three workflow tests pass.
+
+**Not verified**
+- Exact-source CI/APKs/native acceptance pending at this checkpoint.
+- Physical phone, power/low-space/pre-journal interruption, draft-note voice,
+  manual raw forms, whole-product/clinical/performance sign-off.
+
+**Open threads**
+- Finish exact-source software/build/upgrade/stopped-voice recovery evidence.
+- Then draft-note journal/publication semantics and the remaining P0 ledger.
+
+**Gotchas**
+- Do not flush the recorder's own SaveGroup from its callback. Do not replace
+  old input automatically after restore; original-token refusal and explicit
+  local close are distinct from recovery on a fresh mounted inbox.
+
 ## 2026-10-07 — Exact 0.11.30 native round and archive checkpoint
 
 **Agent:** GPT-6 via Codex

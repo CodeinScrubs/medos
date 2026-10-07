@@ -25,6 +25,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: mockBack, push: jest.fn() }),
 }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
 jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
 jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
 jest.mock('@/components/quick-date-field', () => ({ QuickDateField: 'QuickDateField' }));
@@ -50,6 +51,27 @@ jest.mock('@/platform/media', () => ({
   extensionOf: () => 'm4a',
   mediaUri: (path: string) => path,
   storeFile: (uri: string) => mockCopies(uri),
+  mediaFile: (path: string) => ({
+    get exists() {
+      return mockFiles.has(path);
+    },
+    delete: () => mockFiles.delete(path),
+  }),
+}));
+jest.mock('@/platform/import-file', () => ({
+  fingerprintRecordingSource: async (uri: string) => {
+    if (!mockFiles.has(uri)) throw new Error('Synthetic missing source');
+    return { checksum: 'a'.repeat(64), sizeBytes: 3 };
+  },
+  fingerprintImportFile: async (path: string) => {
+    if (!mockFiles.has(path)) throw new Error('Synthetic missing copy');
+    return { checksum: 'a'.repeat(64), sizeBytes: 3 };
+  },
+  copyImportFile: async (uri: string, path: string) => {
+    const copied = await mockCopies(uri);
+    mockFiles.add(path);
+    return { checksum: 'a'.repeat(64), sizeBytes: copied.sizeBytes };
+  },
 }));
 jest.mock('@/features/attachments/capture', () => ({ askPhotoSource: jest.fn(), attachPhotos: jest.fn() }));
 jest.mock('@/features/attachments/voice-notes', () => ({ VoiceNotesSection: 'VoiceNotesSection' }));

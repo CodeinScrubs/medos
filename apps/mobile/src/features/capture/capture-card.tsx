@@ -1,13 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, Row, Text } from '@/components/ui';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
 import type { Attachment, Capture, Patient } from '@/db/schema';
+import { assertDatasetWrite, withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
 import { mediaUri } from '@/platform/media';
@@ -40,15 +43,20 @@ export function CaptureCard({
   patient,
   media,
   onAskPatient,
+  generation: expectedGeneration,
 }: {
   capture: Capture;
   patient: Patient | null;
   media: Attachment[];
   onAskPatient: (ask: PatientAsk) => void;
+  generation?: number;
 }) {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { generation, stale } = useDatasetIntent(expectedGeneration);
   const { colors, radii, spacing } = useTheme();
   const [busy, setBusy] = useState(false);
+  const acting = useRef(false);
 
   const voices = media.filter((m) => m.kind === 'voice');
   const photos = media.filter((m) => m.kind !== 'voice');
@@ -59,12 +67,17 @@ export function CaptureCard({
   const patientGone = capture.patientId != null && patient == null;
 
   async function fileAsTask(patientId?: null) {
+    if (acting.current) return;
+    acting.current = true;
     setBusy(true);
     try {
-      await fileCaptureAsTask(capture.id, patientId === null ? { patientId: null } : {});
+      await withDatasetWrite(generation, () =>
+        fileCaptureAsTask(capture.id, patientId === null ? { patientId: null } : {}),
+      );
     } catch (e) {
       alertError('به کار تبدیل نشد', e);
     } finally {
+      acting.current = false;
       setBusy(false);
     }
   }
@@ -82,17 +95,32 @@ export function CaptureCard({
 
   async function toNote() {
     if (!capture.patientId || patientGone) {
-      onAskPatient({ captureId: capture.id, purpose: 'note', selectedId: null });
+      askPatient({ captureId: capture.id, purpose: 'note', selectedId: null });
       return;
     }
+    if (acting.current) return;
+    acting.current = true;
     setBusy(true);
     try {
-      const noteId = await fileCaptureAsNote(capture.id);
-      router.push({ pathname: '/patient/[id]/note', params: { id: capture.patientId, noteId } });
+      await withDatasetWrite(generation, async () => {
+        const noteId = await fileCaptureAsNote(capture.id);
+        if (navigation.isFocused())
+          router.push({ pathname: '/patient/[id]/note', params: { id: capture.patientId!, noteId } });
+      });
     } catch (e) {
       alertError('به نوت تبدیل نشد', e);
     } finally {
+      acting.current = false;
       setBusy(false);
+    }
+  }
+
+  function askPatient(ask: PatientAsk) {
+    try {
+      assertDatasetWrite(generation);
+      onAskPatient(ask);
+    } catch (e) {
+      alertError('انتخاب بیمار انجام نشد', e);
     }
   }
 
@@ -166,13 +194,13 @@ export function CaptureCard({
               icon="checkbox-outline"
               variant="secondary"
               size="sm"
-              disabled={busy || !capture.text}
+              disabled={stale || busy || !capture.text}
               onPress={toTask}
               loading={busy}
             />
             <Button
               label="نوت"
-              disabled={busy}
+              disabled={stale || busy}
               icon="document-text-outline"
               variant="secondary"
               size="sm"
@@ -180,16 +208,16 @@ export function CaptureCard({
             />
             <Button
               label={patient ? 'تغییر بیمار' : 'بیمار'}
-              disabled={busy}
+              disabled={stale || busy}
               icon="person-outline"
               variant="ghost"
               size="sm"
               haptic={false}
-              onPress={() => onAskPatient({ captureId: capture.id, purpose: 'assign', selectedId: capture.patientId })}
+              onPress={() => askPatient({ captureId: capture.id, purpose: 'assign', selectedId: capture.patientId })}
             />
             <Button
               label="دور انداختن"
-              disabled={busy}
+              disabled={stale || busy}
               variant="ghost"
               size="sm"
               haptic={false}
@@ -200,7 +228,9 @@ export function CaptureCard({
                     text: 'دور انداختن',
                     style: 'destructive',
                     onPress: () => {
-                      void discardCapture(capture.id).catch((e: unknown) => alertError('حذف نشد', e));
+                      void withDatasetWrite(generation, () => discardCapture(capture.id)).catch((e: unknown) =>
+                        alertError('حذف نشد', e),
+                      );
                     },
                   },
                 ])
