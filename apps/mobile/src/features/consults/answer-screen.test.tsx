@@ -153,4 +153,26 @@ describe('consult answer editor with SQLite', () => {
     expect((await consultQuery(initial.id))[0]).toMatchObject({ draftResponse: 'My reply', status: 'pending' });
     expect(mockBack).not.toHaveBeenCalled();
   });
+
+  it('locks repeated submission taps after publish succeeds and prevents secondary commit', async () => {
+    await mount(initial);
+    await act(async () => {
+      input('پاسخ').props.onChangeText('First and final reply');
+      button('ثبت پاسخ').props.onPress();
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    expect((await consultQuery(initial.id))[0]).toMatchObject({
+      response: 'First and final reply',
+      status: 'answered',
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+
+    // Another tap after completion must be ignored and not trigger another commit
+    await act(async () => {
+      button('ثبت پاسخ').props.onPress();
+      await settle();
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
 });
