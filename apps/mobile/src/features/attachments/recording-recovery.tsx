@@ -26,6 +26,7 @@ const TARGET_LABELS = {
   patient: 'بیمار',
   encounter: 'بستری',
   note: 'نوت',
+  note_draft: 'پیش‌نویس نوت',
   lab_panel: 'آزمایش',
   imaging_study: 'تصویربرداری',
   doctor: 'پزشک',

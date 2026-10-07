@@ -1,7 +1,17 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne, or } from 'drizzle-orm';
 
-import { db } from '@/db/client';
-import { noteDrafts, notes, patients, type DraftVoice, type NoteDraft, type NoteType } from '@/db/schema';
+import { audit } from '@/db/audit';
+import { db, type DbTransaction } from '@/db/client';
+import {
+  attachments,
+  noteDrafts,
+  notes,
+  patients,
+  recordingJobs,
+  type DraftVoice,
+  type NoteDraft,
+  type NoteType,
+} from '@/db/schema';
 import { assertDatasetWrite, datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
@@ -79,10 +89,77 @@ export function openNoteDraftsQuery(limit = 20) {
  * write the note a second time.
  */
 export async function retargetNoteDraft(id: string, noteId: string): Promise<void> {
-  await db
-    .update(noteDrafts)
-    .set({ noteId, ...touch() })
-    .where(eq(noteDrafts.id, id));
+  db.transaction((tx) => {
+    const draft = tx
+      .select()
+      .from(noteDrafts)
+      .where(and(eq(noteDrafts.id, id), alive))
+      .get();
+    if (!draft) throw new Error('پیش‌نویس در دسترس نیست؛ مقصد تغییر نکرد.');
+    if (draft.noteId !== noteId) {
+      requireNoPendingDraftRecording(tx, id);
+      if (draftVoiceRowsInTransaction(tx, id).length)
+        throw new Error('این پیش‌نویس وویس دارد؛ ابتدا آن را به‌طور کامل در پرونده ثبت کنید.');
+    }
+    if (
+      !tx
+        .select({ id: notes.id })
+        .from(notes)
+        .where(and(eq(notes.id, noteId), eq(notes.patientId, draft.patientId), isNull(notes.deletedAt)))
+        .get()
+    )
+      throw new Error('نوت مقصد در دسترس نیست؛ پیش‌نویس تغییر نکرد.');
+    tx.update(noteDrafts)
+      .set({ noteId, ...touch() })
+      .where(eq(noteDrafts.id, id))
+      .run();
+  });
+}
+
+/** Text autosave never owns this metadata: recovery cannot be overwritten by a voices: [] patch. */
+export function draftVoiceRowsInTransaction(tx: DbTransaction, id: string) {
+  return tx
+    .select()
+    .from(attachments)
+    .where(and(eq(attachments.entityType, 'note_draft'), eq(attachments.entityId, id), isNull(attachments.deletedAt)))
+    .all();
+}
+
+/** Imperative capture/publication checks include acknowledged media, not just legacy JSON voices. */
+export function draftHasSavedVoice(id: string): boolean {
+  return !!db
+    .select({ id: attachments.id })
+    .from(attachments)
+    .where(
+      and(
+        eq(attachments.entityType, 'note_draft'),
+        eq(attachments.entityId, id),
+        eq(attachments.kind, 'voice'),
+        isNull(attachments.deletedAt),
+      ),
+    )
+    .get();
+}
+
+/** Publication, retirement and retargeting share the same synchronous pending-state gate. */
+export function requireNoPendingDraftRecording(tx: DbTransaction, id: string): void {
+  if (
+    tx
+      .select({ id: recordingJobs.id })
+      .from(recordingJobs)
+      .where(
+        and(
+          eq(recordingJobs.entityType, 'note_draft'),
+          eq(recordingJobs.entityId, id),
+          or(
+            and(isNull(recordingJobs.deletedAt), ne(recordingJobs.state, 'saved')),
+            eq(recordingJobs.state, 'discarding'),
+          ),
+        ),
+      )
+      .get()
+  )
+    throw new Error('وویس این پیش‌نویس هنوز ذخیره نشده است؛ ابتدا ذخیره یا لغو وویس را کامل کنید.');
 }
 
 /**
@@ -115,6 +192,10 @@ export async function writeNoteDraft(
     )
       throw new Error('پروندهٔ بیمار در دسترس نیست؛ پیش‌نویس ذخیره نشد.');
     const noteId = current?.noteId ?? target.noteId;
+    if (current && current.noteId !== noteId) {
+      requireNoPendingDraftRecording(tx, id);
+      if (draftVoiceRowsInTransaction(tx, id).length) throw new Error('این پیش‌نویس وویس دارد؛ مقصد آن تغییر نکرد.');
+    }
     if (
       noteId &&
       !tx
@@ -135,7 +216,20 @@ export async function writeNoteDraft(
 /** The draft is no longer wanted: saved into a note, or thrown away. */
 export async function discardNoteDraft(id: string, generation = datasetGeneration()): Promise<void> {
   await withDatasetWrite(generation, async () => {
-    await db.update(noteDrafts).set(softDelete()).where(eq(noteDrafts.id, id));
+    const changed = db.transaction((tx) => {
+      if (
+        !tx
+          .select({ id: noteDrafts.id })
+          .from(noteDrafts)
+          .where(and(eq(noteDrafts.id, id), alive))
+          .get()
+      )
+        return false;
+      requireNoPendingDraftRecording(tx, id);
+      tx.update(noteDrafts).set(softDelete()).where(eq(noteDrafts.id, id)).run();
+      return true;
+    });
+    if (changed) await audit('note.draftDiscarded', { entityType: 'note_draft', entityId: id });
   });
 }
 

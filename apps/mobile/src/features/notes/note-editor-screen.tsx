@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router/react-navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 
@@ -25,16 +26,13 @@ import {
 } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
-import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
 import { NOTE_TYPES, type Note, type NoteDraft, type NoteType } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { stageRecording } from '@/features/attachments/recordings';
 import { VoiceNotesSection } from '@/features/attachments/voice-notes';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
-import { assertDatasetWrite, DatasetChangedError, withDatasetWrite } from '@/lib/dataset-write';
-import { withFileJob } from '@/lib/file-work';
+import { DatasetChangedError, withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
@@ -43,6 +41,7 @@ import { commitNoteDraft } from './commit-queries';
 import {
   discardNoteDraft,
   draftHasContent,
+  draftHasSavedVoice,
   noteDraftQuery,
   writeNoteDraft,
   type NoteDraftFields,
@@ -189,12 +188,13 @@ function NoteEditor({
   readNotice: ReactNode;
 }) {
   const router = useRouter();
+  const navigation = useNavigation();
   const { stale } = useDatasetIntent(generation);
   const { colors, spacing } = useTheme();
   const isEdit = note != null;
   // Both read the draft as it was on mount: the row changes underneath as this
   // screen writes to it, and neither answer should change with it.
-  const [recovered] = useState(() => draft != null && draftHasContent(draft));
+  const [recovered] = useState(() => draft != null && (draftHasContent(draft) || draftHasSavedVoice(draft.id)));
   const [draftId] = useState(() => draft?.id ?? newId());
   const [fields, setFields] = useState<NoteDraftFields>(() => fieldsOf(note, draft, initialType));
   // The scheduler reads this, not React state: it runs from timers, where a
@@ -204,6 +204,9 @@ function NoteEditor({
 
   const [pickingDoctor, setPickingDoctor] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const completedRef = useRef(false);
+  const committing = useRef(false);
   const dateValidation = useDateValidation();
 
   const saver = useMemo(
@@ -220,6 +223,7 @@ function NoteEditor({
   useEffect(() => scope.group.register(saver), [scope, saver]);
 
   function update(patch: Partial<NoteDraftFields>) {
+    if (completedRef.current || committing.current) return;
     const next = { ...latest.current, ...patch };
     latest.current = next;
     setFields(next);
@@ -257,54 +261,45 @@ function NoteEditor({
   const previous = previousRows?.[0] ?? null;
   const isConsult = CONSULT_NOTE_TYPES.includes(fields.type);
 
-  const committing = useRef(false);
+  async function persistCurrentDraftFields() {
+    // The recorder's original dataset admission encloses both calls. Never
+    // recursively flush the group here: it contains this recorder's handoff.
+    if (completedRef.current) throw new Error('این پیش‌نویس بسته شده است؛ وویس جدید ثبت نشد.');
+    saver.change(latest.current);
+    if (!(await saver.flush())) throw new Error('متن پیش‌نویس هنوز ذخیره نشده است.');
+  }
 
-  async function onRecorded(recording: Recording) {
-    assertDatasetWrite(generation);
-    await withFileJob(async () => {
-      const stored = await stageRecording(recording, new Date());
-      if (!latest.current.voices.some((voice) => voice.relativePath === stored.relativePath)) {
-        update({
-          voices: [
-            ...latest.current.voices,
-            {
-              relativePath: stored.relativePath,
-              durationMs: recording.durationMs,
-              sizeBytes: stored.sizeBytes,
-              capturedAt: stored.capturedAt.toISOString(),
-            },
-          ],
-        });
-      } else saver.change(latest.current);
-      // Do not flush the whole group here: it contains this recorder's handoff.
-      if (!(await saver.flush())) throw new Error('وویس هنوز در پیش‌نویس ذخیره نشده است.');
-    });
+  function hasContent() {
+    return draftHasContent(latest.current) || draftHasSavedVoice(draftId);
   }
 
   async function save() {
-    if (committing.current) return;
+    if (committing.current || completedRef.current) return;
     committing.current = true;
     setSaving(true);
     try {
-      assertDatasetWrite(generation);
-      if (!(await scope.group.flush())) {
-        notify('ذخیره نشد', 'متن یا وویس روی صفحه باقی مانده؛ دوباره تلاش کنید.');
-        return;
-      }
-      if (!dateValidation.check()) return;
-      if (!draftHasContent(latest.current)) {
-        notify('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
-        return;
-      }
-      // Even an unchanged existing note may not have a draft yet.
-      saver.change(latest.current);
-      if (!(await saver.flush())) {
-        notify('ذخیره نشد', 'نوشته روی صفحه باقی مانده؛ دوباره تلاش کنید.');
-        return;
-      }
-      await commitNoteDraft(draftId, generation);
-      saver.cancel();
-      router.back();
+      await withDatasetWrite(generation, async () => {
+        if (!(await scope.group.flush())) {
+          notify('ذخیره نشد', 'متن یا وویس روی صفحه باقی مانده؛ دوباره تلاش کنید.');
+          return;
+        }
+        if (!dateValidation.check()) return;
+        if (!hasContent()) {
+          notify('نوت خالی است', 'حداقل یک بخش را بنویسید یا وویس ضبط کنید.');
+          return;
+        }
+        // Even an unchanged existing note may not have a draft yet.
+        saver.change(latest.current);
+        if (!(await saver.flush())) {
+          notify('ذخیره نشد', 'نوشته روی صفحه باقی مانده؛ دوباره تلاش کنید.');
+          return;
+        }
+        await commitNoteDraft(draftId, generation);
+        completedRef.current = true;
+        saver.cancel();
+        setCompleted(true);
+        if (navigation.isFocused()) router.back();
+      });
     } catch (e) {
       alertError('ذخیره نشد', e);
     } finally {
@@ -314,19 +309,22 @@ function NoteEditor({
   }
 
   async function discardAndLeave() {
-    if (committing.current) return;
+    if (committing.current || completedRef.current) return;
     committing.current = true;
     setSaving(true);
     try {
-      assertDatasetWrite(generation);
-      // Wait for in-flight writes before retiring the draft; failed deletion stays visible.
-      if (!(await scope.group.flush())) {
-        notify('پیش‌نویس حذف نشد', 'متن یا وویس هنوز ذخیره نشده است؛ دوباره تلاش کنید.');
-        return;
-      }
-      await discardNoteDraft(draftId, generation);
-      saver.cancel();
-      router.back();
+      await withDatasetWrite(generation, async () => {
+        // Wait for in-flight writes before retiring the draft; failed deletion stays visible.
+        if (!(await scope.group.flush())) {
+          notify('پیش‌نویس حذف نشد', 'متن یا وویس هنوز ذخیره نشده است؛ دوباره تلاش کنید.');
+          return;
+        }
+        await discardNoteDraft(draftId, generation);
+        completedRef.current = true;
+        saver.cancel();
+        setCompleted(true);
+        if (navigation.isFocused()) router.back();
+      });
     } catch (e) {
       alertError('پیش‌نویس حذف نشد', e);
     } finally {
@@ -344,6 +342,7 @@ function NoteEditor({
           text: 'بستن فرم',
           style: 'destructive',
           onPress: () => {
+            if (!navigation.isFocused()) return;
             // Local abandonment only: never retire a restored same-ID draft.
             saver.cancel();
             scope.abandonStale();
@@ -353,7 +352,7 @@ function NoteEditor({
       ]);
       return;
     }
-    if (!draftHasContent(latest.current) && !scope.group.unsaved) {
+    if (!hasContent() && !scope.group.unsaved) {
       void discardAndLeave();
       return;
     }
@@ -368,8 +367,9 @@ function NoteEditor({
           void scope
             .canLeave()
             .then((stored) => {
-              if (stored) router.back();
-              else {
+              if (stored) {
+                if (navigation.isFocused()) router.back();
+              } else {
                 notify(
                   'هنوز ذخیره نشد',
                   'نوشته‌ی شما روی صفحه هست و دوباره تلاش می‌شود. اگر حافظه‌ی گوشی پر است، کمی جا باز کنید.',
@@ -398,6 +398,26 @@ function NoteEditor({
           ? 'پیش‌نویس خودکار ذخیره شد'
           : null;
 
+  if (completed) {
+    return (
+      <Screen>
+        {/* Keep the native header's title and right-slot presence stable while closing. */}
+        <ScreenOptions options={{ title: isEdit ? 'ویرایش نوت' : 'نوت جدید', headerRight: () => null }} />
+        <Column gap="md" style={{ paddingTop: spacing.md }}>
+          <Text>این پیش‌نویس بسته شد.</Text>
+          <Button
+            label="بستن"
+            onPress={() => {
+              if (!navigation.isFocused()) return;
+              if (stale) scope.abandonStale();
+              router.back();
+            }}
+          />
+        </Column>
+      </Screen>
+    );
+  }
+
   return (
     <Screen scroll>
       <ScreenOptions
@@ -411,6 +431,7 @@ function NoteEditor({
                 <IconButton
                   icon="time-outline"
                   label="تاریخچه"
+                  disabled={saving}
                   onPress={() =>
                     void scope.perform(() =>
                       router.push({
@@ -433,7 +454,7 @@ function NoteEditor({
           ),
         }}
       />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <Column gap="md" pointerEvents={saving ? 'none' : 'auto'} style={{ paddingTop: spacing.md }}>
         {readNotice}
         <ErrorNotice error={readError} what="نوت و پیش‌نویس" onRetry={retryRead} />
         {recovered ? (
@@ -444,6 +465,7 @@ function NoteEditor({
 
         <ChipSelect
           label="نوع نوت"
+          disabled={saving}
           options={TYPE_OPTIONS}
           value={fields.type}
           onChange={(v) => v && update({ type: v })}
@@ -451,6 +473,7 @@ function NoteEditor({
 
         <Input
           label={fields.type === 'event' ? 'چه اتفاقی افتاد؟' : 'عنوان'}
+          editable={!saving}
           value={fields.title ?? ''}
           onChangeText={(v) => update({ title: v })}
           placeholder={fields.type === 'event' ? 'مثلاً Intubated / انتقال به ICU' : 'اختیاری'}
@@ -460,6 +483,7 @@ function NoteEditor({
           <>
             <SelectField
               label={fields.type === 'consult_request' ? 'کانسالت از' : 'پاسخ‌دهنده'}
+              disabled={saving}
               icon="person-outline"
               value={doctorLabel}
               placeholder="انتخاب یا افزودن پزشک"
@@ -468,6 +492,7 @@ function NoteEditor({
             />
             <Input
               label="سرویس"
+              editable={!saving}
               value={fields.specialty ?? ''}
               onChangeText={(v) => update({ specialty: v })}
               placeholder="مثلاً قلب / عفونی"
@@ -482,6 +507,7 @@ function NoteEditor({
               // Copied only on request, into empty fields, and fully editable.
               <Button
                 label="ادامه از نوت قبلی (Assessment و Plan)"
+                disabled={saving}
                 icon="copy-outline"
                 variant="ghost"
                 size="sm"
@@ -490,30 +516,46 @@ function NoteEditor({
             ) : null}
             <Input
               label="Subjective"
+              editable={!saving}
               value={fields.subjective ?? ''}
               onChangeText={(v) => update({ subjective: v })}
               multiline
             />
             <Input
               label="Objective"
+              editable={!saving}
               value={fields.objective ?? ''}
               onChangeText={(v) => update({ objective: v })}
               multiline
             />
             <Input
               label="Assessment"
+              editable={!saving}
               value={fields.assessment ?? ''}
               onChangeText={(v) => update({ assessment: v })}
               multiline
             />
-            <Input label="Plan" value={fields.plan ?? ''} onChangeText={(v) => update({ plan: v })} multiline />
+            <Input
+              label="Plan"
+              editable={!saving}
+              value={fields.plan ?? ''}
+              onChangeText={(v) => update({ plan: v })}
+              multiline
+            />
             {fields.body ? (
-              <Input label="متن آزاد" value={fields.body} onChangeText={(v) => update({ body: v })} multiline />
+              <Input
+                label="متن آزاد"
+                editable={!saving}
+                value={fields.body}
+                onChangeText={(v) => update({ body: v })}
+                multiline
+              />
             ) : null}
           </>
         ) : (
           <Input
             label={fields.type === 'event' ? 'جزئیات' : 'متن نوت'}
+            editable={!saving}
             value={fields.body ?? ''}
             onChangeText={(v) => update({ body: v })}
             multiline
@@ -524,6 +566,7 @@ function NoteEditor({
         <QuickDateField
           onValidityChange={dateValidation.setValid}
           label="زمان"
+          disabled={saving}
           value={fields.noteDate ?? new Date()}
           onChange={(v) => update({ noteDate: v })}
           direction="past"
@@ -544,20 +587,27 @@ function NoteEditor({
                 onLongPress={() => update({ voices: fields.voices.filter((_, j) => j !== i) })}
               />
             ))}
-            {!stale && (
-              <VoiceRecorder label={fields.voices.length ? 'وویس دیگر' : 'ضبط وویس'} onRecorded={onRecorded} />
-            )}
+            <VoiceNotesSection
+              entityType="note_draft"
+              entityId={draftId}
+              patientId={patientId}
+              generation={generation}
+              beforePersist={persistCurrentDraftFields}
+              afterPersist={persistCurrentDraftFields}
+            />
           </Column>
         )}
 
         <Toggle
           label="سنجاق در خلاصه‌ی پرونده"
+          disabled={saving}
           description="نوت‌های سنجاق‌شده و رویدادهای مهم در صفحه‌ی اول پرونده دیده می‌شوند"
           value={fields.isPinned}
           onChange={(v) => update({ isPinned: v })}
         />
         <Toggle
           label="پیش‌نویس"
+          disabled={saving}
           description="برای وقتی که بعداً کاملش می‌کنید"
           value={fields.isDraft}
           onChange={(v) => update({ isDraft: v })}

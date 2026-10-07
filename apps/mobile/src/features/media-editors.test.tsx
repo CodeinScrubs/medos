@@ -1,18 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { notify } from '@/components/feedback';
 import { Button, Input } from '@/components/ui';
 import { VoiceRecorder, type Recording } from '@/components/voice-recorder';
-import { attachments, captureInbox, notes } from '@/db/schema';
+import { attachments, captureInbox, noteDrafts, notes, recordingJobs } from '@/db/schema';
 import { createPatient } from '@/features/patients/queries';
+import { reserveDatasetReplacement } from '@/lib/dataset-write';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { CaptureScreen } from './capture/capture-screen';
+import * as noteCommit from './notes/commit-queries';
 import { discardNoteDraft, noteDraftQuery } from './notes/draft-queries';
 import { NoteEditorScreen } from './notes/note-editor-screen';
 
 let mockParams: Record<string, string>;
+let mockFocused = true;
 const mockBack = jest.fn();
 const mockFiles = new Set<string>();
 const mockCopies = jest.fn<(uri: string) => Promise<{ relativePath: string; sizeBytes: number }>>();
@@ -25,7 +30,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: mockBack, push: jest.fn() }),
 }));
-jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
 jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: () => {} }));
 jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
 jest.mock('@/components/quick-date-field', () => ({ QuickDateField: 'QuickDateField' }));
@@ -74,7 +79,7 @@ jest.mock('@/platform/import-file', () => ({
   },
 }));
 jest.mock('@/features/attachments/capture', () => ({ askPhotoSource: jest.fn(), attachPhotos: jest.fn() }));
-jest.mock('@/features/attachments/voice-notes', () => ({ VoiceNotesSection: 'VoiceNotesSection' }));
+// Keep the real generic handoff and query list; only native recorder/player are stand-ins.
 
 let t: TestDatabase;
 let patientId: string;
@@ -97,6 +102,8 @@ beforeEach(async () => {
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Patient' });
   mockParams = { id: patientId };
   mockBack.mockClear();
+  jest.mocked(notify).mockClear();
+  mockFocused = true;
   mockFiles.clear();
   mockFiles.add(rec().uri);
   mockCopies.mockReset().mockImplementation(async (uri) => {
@@ -116,9 +123,189 @@ afterEach(async () => {
   tree = undefined;
   jest.clearAllTimers();
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 describe('voice metadata in real editor drafts', () => {
+  it('keeps the draft editable after publication fails and publishes the later correction on retry', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+    });
+    const title = () => tree!.root.findAllByType(Input).find((node) => node.props.label === 'عنوان')!;
+    const save = () =>
+      tree!.root
+        .findAllByType(Button)
+        .find((node) => node.props.label === 'ثبت در پرونده')!
+        .props.onPress();
+    await act(async () => title().props.onChangeText('First title'));
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_note BEFORE INSERT ON notes BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
+    );
+    await act(async () => {
+      save();
+      await settle();
+    });
+    expect(t.db.select().from(notes).all()).toEqual([]);
+    expect(title().props.editable).toBe(true);
+    expect((await noteDraftQuery(patientId, null))[0]?.title).toBe('First title');
+    t.sqlite.exec('DROP TRIGGER fail_note');
+    await act(async () => title().props.onChangeText('Corrected title'));
+    await act(async () => {
+      save();
+      await settle();
+    });
+    expect(t.db.select().from(notes).get()?.title).toBe('Corrected title');
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the submitted fields read-only while final publication acknowledgment is pending', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+    });
+    const title = () => tree!.root.findAllByType(Input).find((node) => node.props.label === 'عنوان')!;
+    await act(async () => title().props.onChangeText('Submitted title'));
+    const originalCommit = noteCommit.commitNoteDraft;
+    let release!: () => void;
+    const acknowledgment = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.spyOn(noteCommit, 'commitNoteDraft').mockImplementation(async (...args) => {
+      const id = await originalCommit(...args);
+      await acknowledgment;
+      return id;
+    });
+    try {
+      await act(async () => {
+        tree!.root
+          .findAllByType(Button)
+          .find((node) => node.props.label === 'ثبت در پرونده')!
+          .props.onPress();
+        await settle();
+      });
+      expect(t.db.select().from(notes).get()?.title).toBe('Submitted title');
+      expect(title().props.editable).toBe(false);
+      // A retained callback cannot accept an edit into the already-retired draft.
+      await act(async () => title().props.onChangeText('Too late'));
+      expect(title().props.value).toBe('Submitted title');
+      expect(t.db.select().from(notes).get()?.title).toBe('Submitted title');
+    } finally {
+      await act(async () => {
+        release();
+        await settle();
+      });
+    }
+  });
+
+  it('does not report a successful keep-draft operation as failed after another route gains focus', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+    });
+    await act(async () => {
+      tree!.root
+        .findAllByType(Input)
+        .find((node) => node.props.label === 'عنوان')!
+        .props.onChangeText('Kept title');
+    });
+    const dialog = jest.spyOn(Alert, 'alert');
+    await act(async () => {
+      tree!.root
+        .findAllByType(Button)
+        .find((node) => node.props.label === 'انصراف')!
+        .props.onPress();
+    });
+    const keep = dialog.mock.calls.at(-1)![2]!.find((button) => button.text === 'نگه دار')!.onPress!;
+    mockFocused = false;
+    await act(async () => {
+      keep();
+      await settle();
+    });
+    expect((await noteDraftQuery(patientId, null))[0]?.title).toBe('Kept title');
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('does not close a newer route after note publication acknowledges and cannot republish the retired draft', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+    });
+    await act(async () => {
+      tree!.root
+        .findAllByType(Input)
+        .find((node) => node.props.label === 'عنوان')!
+        .props.onChangeText('Late note');
+    });
+    const originalCommit = noteCommit.commitNoteDraft;
+    jest.spyOn(noteCommit, 'commitNoteDraft').mockImplementation(async (...args) => {
+      const id = await originalCommit(...args);
+      mockFocused = false;
+      return id;
+    });
+    const savedAction = tree!.root.findAllByType(Button).find((node) => node.props.label === 'ثبت در پرونده')!.props
+      .onPress;
+    await act(async () => {
+      savedAction();
+      await settle();
+    });
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+    expect(mockBack).not.toHaveBeenCalled();
+    await act(async () => {
+      savedAction();
+      await settle();
+    });
+    expect(t.db.select().from(notes).all()).toHaveLength(1);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it('persists the original text and recording journal before the first draft voice IO', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    await act(async () => {
+      tree!.root
+        .findAllByType(Input)
+        .find((node) => node.props.label === 'عنوان')!
+        .props.onChangeText('Original capture');
+    });
+    mockCopies.mockImplementationOnce(async () => {
+      const draft = t.db.select().from(noteDrafts).get();
+      expect(draft?.title).toBe('Original capture');
+      expect(t.db.select().from(recordingJobs).all()).toHaveLength(1);
+      expect(t.db.select().from(recordingJobs).get()).toMatchObject({
+        entityType: 'note_draft',
+        entityId: draft?.id,
+        patientId,
+      });
+      const relativePath = 'media/test/native-stand-in.m4a';
+      mockFiles.add(relativePath);
+      return { relativePath, sizeBytes: 3 };
+    });
+    await expect((await record(rec())).result).resolves.toBeUndefined();
+  });
+  it('holds original dataset admission through draft voice copying and keeps newer typing', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+    });
+    mockCopies.mockImplementationOnce(async () => {
+      let granted: ReturnType<typeof reserveDatasetReplacement> | undefined;
+      try {
+        granted = reserveDatasetReplacement();
+      } catch {
+        /* Original write must retain admission. */
+      }
+      granted?.release();
+      expect(granted).toBeUndefined();
+      tree!.root
+        .findAllByType(Input)
+        .find((node) => node.props.label === 'عنوان')!
+        .props.onChangeText('Typed during copy');
+      const relativePath = 'media/test/native-stand-in.m4a';
+      mockFiles.add(relativePath);
+      return { relativePath, sizeBytes: 3 };
+    });
+    await expect((await record(rec())).result).resolves.toBeUndefined();
+    expect((await noteDraftQuery(patientId, null))[0]?.title).toBe('Typed during copy');
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
+  });
   it('rejects a failed note draft handoff, retries one file, then publishes one voice', async () => {
     await act(async () => {
       tree = create(<NoteEditorScreen />);
@@ -132,7 +319,13 @@ describe('voice metadata in real editor drafts', () => {
     expect(await noteDraftQuery(patientId, null)).toHaveLength(0);
     t.sqlite.exec('DROP TRIGGER fail_note_draft');
     await expect((await record(recording)).result).resolves.toBeUndefined();
-    expect((await noteDraftQuery(patientId, null))[0]?.voices).toHaveLength(1);
+    const draft = (await noteDraftQuery(patientId, null))[0]!;
+    expect(draft.voices).toEqual([]);
+    expect(t.db.select().from(attachments).get()).toMatchObject({
+      entityType: 'note_draft',
+      entityId: draft.id,
+      patientId,
+    });
     expect(mockCopies).toHaveBeenCalledTimes(1);
     await act(async () => {
       tree!.root

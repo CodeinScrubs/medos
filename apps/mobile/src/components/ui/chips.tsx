@@ -26,6 +26,7 @@ export function ChipSelect<T extends string>({
   layout = 'scroll',
   ltr = false,
   hint,
+  disabled = false,
 }: {
   label?: string;
   options: readonly ChipOption<T>[] | readonly T[];
@@ -36,6 +37,7 @@ export function ChipSelect<T extends string>({
   /** For Latin option labels such as routes (IV, PO) and frequencies (BD, TDS). */
   ltr?: boolean;
   hint?: string;
+  disabled?: boolean;
 }) {
   const { colors, radii, spacing } = useTheme();
   const scroller = useRef<ScrollView>(null);
@@ -87,8 +89,9 @@ export function ChipSelect<T extends string>({
       <Pressable
         key={o.value}
         accessibilityRole="radio"
-        accessibilityState={{ selected: active }}
+        accessibilityState={{ selected: active, disabled }}
         accessibilityLabel={o.label}
+        disabled={disabled}
         onLayout={active && layout === 'scroll' ? onSelectedLayout : undefined}
         onPress={() => {
           void Haptics.selectionAsync();
@@ -104,7 +107,7 @@ export function ChipSelect<T extends string>({
             backgroundColor: active ? colors.primary : colors.surface,
             borderColor: active ? colors.primary : colors.border,
           },
-          pressed && styles.pressed,
+          (pressed || disabled) && styles.pressed,
         ]}
       >
         <Text variant="captionStrong" ltr={ltr} style={{ color: active ? colors.primaryText : colors.textMuted }}>

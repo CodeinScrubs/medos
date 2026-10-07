@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
@@ -13,6 +13,7 @@ import {
   imagingStudies,
   labPanels,
   notes,
+  noteDrafts,
   patients,
   places,
   prescriptionTemplates,
@@ -47,7 +48,12 @@ export function patientMediaQuery(patientId: string, kinds?: AttachmentKind[]) {
     .select()
     .from(attachments)
     .where(
-      and(alive, eq(attachments.patientId, patientId), kinds?.length ? inArray(attachments.kind, kinds) : undefined),
+      and(
+        alive,
+        eq(attachments.patientId, patientId),
+        ne(attachments.entityType, 'note_draft'),
+        kinds?.length ? inArray(attachments.kind, kinds) : undefined,
+      ),
     )
     .orderBy(desc(attachments.capturedAt));
 }
@@ -94,6 +100,15 @@ export function attachmentPatientInTransaction(tx: DbTransaction, target: Attach
   let patientId: string | null;
   if (target.entityType === 'patient') {
     patientId = target.entityId;
+  } else if (target.entityType === 'note_draft') {
+    // A new note's draft is its own target, never an alias for a published note.
+    const draft = tx
+      .select({ patientId: noteDrafts.patientId })
+      .from(noteDrafts)
+      .where(and(eq(noteDrafts.id, target.entityId), isNull(noteDrafts.deletedAt), isNull(noteDrafts.noteId)))
+      .get();
+    if (!draft) throw new Error('پیش‌نویس مقصد در دسترس نیست؛ وویس ثبت نشد.');
+    patientId = draft.patientId;
   } else if (target.entityType in clinical) {
     const table = clinical[target.entityType as keyof typeof clinical];
     const row = tx
@@ -145,6 +160,8 @@ export function addAttachmentInTransaction(
   input: AttachmentInput,
   { reuseVoice = false }: { reuseVoice?: boolean } = {},
 ): string {
+  if (input.entityType === 'note_draft' && input.kind !== 'voice')
+    throw new Error('این مقصد فقط برای وویس پیش‌نویس است؛ فایل ثبت نشد.');
   const patientId = attachmentPatientInTransaction(tx, input);
   // One staged recording can be retried after an acknowledged commit/navigation
   // failure. A retired or differently bound file is never silently revived/moved.

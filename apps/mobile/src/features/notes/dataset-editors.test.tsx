@@ -25,6 +25,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: mockBack, push: jest.fn() }),
 }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[] }) => ({ data: query.all(), retry: jest.fn() }),
@@ -39,7 +40,6 @@ jest.mock('@/components/picker-modal', () => ({ PickerModal: 'PickerModal' }));
 jest.mock('@/components/voice-note-player', () => ({ VoiceNotePlayer: 'VoiceNotePlayer' }));
 jest.mock('@/components/voice-recorder', () => ({ VoiceRecorder: 'VoiceRecorder' }));
 jest.mock('@/features/attachments/voice-notes', () => ({ VoiceNotesSection: 'VoiceNotesSection' }));
-jest.mock('@/features/attachments/recordings', () => ({ stageRecording: jest.fn() }));
 jest.mock('@/features/patients/patient-header', () => ({ AllergyBanner: 'AllergyBanner' }));
 jest.mock('@/components/ui', () => ({
   Button: 'Button',

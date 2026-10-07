@@ -7,7 +7,6 @@ import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { deleteAttachment } from './queries';
-import { stageRecording } from './recordings';
 import { saveRecording } from './voice-notes';
 
 // Preserve the copy/move contract: a move consumes the only retry source.
@@ -174,10 +173,11 @@ describe('stopped recording acknowledgement', () => {
 
   it('rejects mutation of the retained recording identity instead of reusing the wrong bytes', async () => {
     const rec = recording();
-    await stageRecording(rec, new Date());
+    await saveRecording(rec, target());
     rec.uri = 'file:///different.m4a';
-    await expect(stageRecording(rec, new Date())).rejects.toThrow();
+    await expect(saveRecording(rec, target())).rejects.toThrow();
     expect(mockCopies).toHaveBeenCalledTimes(1);
+    expect(t.db.select().from(attachments).all()).toHaveLength(1);
   });
 
   it('holds the maintenance exclusion through copy and metadata acknowledgement', async () => {

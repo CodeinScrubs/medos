@@ -35,6 +35,17 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.32: new-note stopped voices reuse the recording journal. Canonical draft
+attachments survive later text autosave; pending jobs protect publication,
+retirement and parent identity. Note/history/media movement is one transaction,
+preserving original file/hash/time and old JSON voice compatibility. Original
+dataset admission and navigation focus govern final acknowledgment; brief final
+submission freezes editing and failed publication remains editable/retryable.
+The unused process-local staging path is removed. No migration/dependency/route.
+See validation-0.11.32.md for executed source and separate native checkpoints.
+Next P0: manual lab/contact raw recovery and remaining async forms, then the
+other integrity/native/product gates below. This is not complete P0 acceptance.
+
 0.11.31: stopped quick-capture voices use the existing recording journal;
 capture kind/media/job acknowledgment and empty cleanup/filing are atomic.
 Original writer/screen/card/picker/recovery intents survive restore without

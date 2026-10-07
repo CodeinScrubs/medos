@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Journal new-note draft voices without overwriting recovered media
+
+**Agent:** GPT-6 via Codex
+**Commits:** implementation in this commit; native baseline application `d61b11d`.
+
+**Changed**
+- 0.11.32/code48 reuses the recording journal for new-note drafts. Canonical
+  voice metadata survives text autosave, stays outside the clinical gallery and
+  moves atomically with note/history/draft retirement. Pending jobs protect their
+  parent; old JSON voices remain compatible. Original dataset admission spans
+  IO; final submission freezes editing and late acknowledgment checks focus.
+- Removed the unreferenced WeakMap staging helper; retained its identity check
+  on the actual journal entry point. No migration/dependency/route/permission.
+  Architecture and validation-0.11.32.md explain contracts and evidence boundaries.
+
+**Verified**
+- Pre-fix contract/actual-handler witnesses fail; final focused two suites / 29
+  pass. Full check: 127 suites / 1,668 app tests and three workflows. Import-order
+  warnings on touched files corrected before final lint/pre-push verification.
+- `npm run db:generate`: no schema change; migration SQL/snapshots unchanged.
+  Five open PR heads refreshed and unchanged; no remote PR action.
+
+**Not verified**
+- This exact source's hosted CI/APKs/native upgrade and note-draft recovery
+  pending here. Prior 0.11.31 native evidence does not accept the new version.
+- No physical A52s/audible playback, performance, power/low-space/OEM reminders,
+  24-hour native soak or complete P0/product/clinical sign-off.
+
+**Open threads**
+- Build both signed/inspected ABIs from the final source; independently compare
+  0.11.31-to-32 rows/files, cold draft voice and seeded ready recovery/publication.
+- Then manual lab/contact raw recovery, other async forms and ledger gates.
+
+**Gotchas**
+- Recorder callbacks flush their text saver only, never their own SaveGroup.
+  Canonical media cannot go in the full-shape text writer's stale voices array.
+- Freeze only explicit final submission; newer typing during ordinary copying
+  must still persist. Keep title and header-right presence stable during close.
+
 ## 2026-10-08 — Exact-source stopped capture and recovery acceptance
 
 **Agent:** GPT-6 via Codex

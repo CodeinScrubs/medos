@@ -24,6 +24,7 @@ export type AuditAction =
   | 'encounter.draftDiscarded'
   | 'note.deleted'
   | 'note.restored'
+  | 'note.draftDiscarded'
   | 'task.deleted'
   | 'task.restored'
   | 'task.statusChanged'

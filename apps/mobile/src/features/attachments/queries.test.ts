@@ -13,6 +13,7 @@ import {
   imagingStudies,
   labPanels,
   notes,
+  noteDrafts,
   places,
   prescriptionTemplates,
   topics,
@@ -32,7 +33,16 @@ let t: TestDatabase;
 let patientId: string;
 let otherPatientId: string;
 let ids: Record<AttachmentEntity, string>;
-const clinical = ['patient', 'encounter', 'note', 'lab_panel', 'imaging_study', 'follow_up', 'capture'] as const;
+const clinical = [
+  'patient',
+  'encounter',
+  'note',
+  'note_draft',
+  'lab_panel',
+  'imaging_study',
+  'follow_up',
+  'capture',
+] as const;
 
 beforeEach(async () => {
   t = useTestDatabase(await createTestDatabase());
@@ -48,6 +58,10 @@ beforeEach(async () => {
   t.db
     .insert(notes)
     .values({ ...base('note'), patientId, noteDate: new Date() })
+    .run();
+  t.db
+    .insert(noteDrafts)
+    .values({ ...base('note_draft'), patientId, type: 'general', voices: [] })
     .run();
   t.db
     .insert(labPanels)

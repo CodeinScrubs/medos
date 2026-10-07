@@ -1,12 +1,12 @@
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { noteDrafts, notes, patients } from '@/db/schema';
+import { attachments, noteDrafts, notes, patients } from '@/db/schema';
 import { addAttachmentInTransaction } from '@/features/attachments/queries';
 import { assertDatasetWrite, datasetGeneration } from '@/lib/dataset-write';
-import { softDelete } from '@/lib/ids';
+import { softDelete, touch } from '@/lib/ids';
 
-import { draftHasContent } from './draft-queries';
+import { draftHasContent, draftVoiceRowsInTransaction, requireNoPendingDraftRecording } from './draft-queries';
 import { createNoteInTransaction, updateNoteInTransaction } from './queries';
 
 /** Publish the persisted draft, its history and voice metadata as one operation. */
@@ -18,7 +18,27 @@ export async function commitNoteDraft(draftId: string, generation = datasetGener
       .from(noteDrafts)
       .where(and(eq(noteDrafts.id, draftId), isNull(noteDrafts.deletedAt)))
       .get();
-    if (!draft || !draftHasContent(draft)) throw new Error('No saved draft to commit');
+    if (!draft) throw new Error('No saved draft to commit');
+    requireNoPendingDraftRecording(tx, draftId);
+    const voices = draftVoiceRowsInTransaction(tx, draftId);
+    if (!draftHasContent(draft) && !voices.length) throw new Error('No saved draft to commit');
+    for (const voice of voices) {
+      if (
+        draft.noteId ||
+        voice.kind !== 'voice' ||
+        voice.patientId !== draft.patientId ||
+        !voice.checksum ||
+        !/^[0-9a-f]{64}$/.test(voice.checksum) ||
+        !Number.isSafeInteger(voice.sizeBytes) ||
+        (voice.sizeBytes ?? 0) <= 0 ||
+        !Number.isSafeInteger(voice.durationMs) ||
+        (voice.durationMs ?? 0) < 500 ||
+        !voice.capturedAt ||
+        !Number.isFinite(voice.capturedAt.getTime()) ||
+        (draft.voices ?? []).some((legacy) => legacy.relativePath === voice.relativePath)
+      )
+        throw new Error('وضعیت وویس پیش‌نویس با مقصد یکسان نیست؛ نوت ثبت نشد.');
+    }
     if (
       !tx
         .select({ id: patients.id })
@@ -70,6 +90,13 @@ export async function commitNoteDraft(draftId: string, generation = datasetGener
         durationMs: voice.durationMs,
         capturedAt,
       });
+    }
+    // Only the parent changes. Path, checksum, original time and journal receipt stay immutable.
+    for (const voice of voices) {
+      tx.update(attachments)
+        .set({ entityType: 'note', entityId: noteId, ...touch() })
+        .where(eq(attachments.id, voice.id))
+        .run();
     }
     tx.update(noteDrafts)
       .set({ noteId, ...softDelete() })

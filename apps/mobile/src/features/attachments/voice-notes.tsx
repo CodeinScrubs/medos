@@ -34,6 +34,7 @@ export function useRecordingHandoff(
     patientId?: string | null;
   },
   expectedGeneration?: number,
+  lifecycle: { beforePersist?: () => Promise<void>; afterPersist?: () => Promise<void> } = {},
 ) {
   const { generation } = useDatasetIntent(expectedGeneration);
   const [ownedId, setOwnedId] = useState<string | undefined>();
@@ -42,7 +43,11 @@ export function useRecordingHandoff(
     onRecorded: async (recording: Recording) => {
       assertDatasetWrite(generation);
       setOwnedId(recordingOperationId(recording));
-      await withDatasetWrite(generation, () => saveRecording(recording, target));
+      await withDatasetWrite(generation, async () => {
+        await lifecycle.beforePersist?.();
+        await saveRecording(recording, target);
+        await lifecycle.afterPersist?.();
+      });
       setOwnedId(undefined);
     },
     onDiscarded: async (recording: Recording) => {
@@ -61,16 +66,20 @@ export function VoiceNotesSection({
   entityId,
   patientId,
   generation: expectedGeneration,
+  beforePersist,
+  afterPersist,
 }: {
   entityType: AttachmentEntity;
   entityId: string;
   patientId?: string | null;
   generation?: number;
+  beforePersist?: () => Promise<void>;
+  afterPersist?: () => Promise<void>;
 }) {
   const { generation, stale } = useDatasetIntent(expectedGeneration);
   const { data, error, retry } = useLive(entityAttachmentsQuery(entityType, entityId), [entityType, entityId]);
   const voices = (data ?? []).filter((a) => a.kind === 'voice');
-  const handoff = useRecordingHandoff({ entityType, entityId, patientId }, generation);
+  const handoff = useRecordingHandoff({ entityType, entityId, patientId }, generation, { beforePersist, afterPersist });
 
   return (
     <Column gap="sm">

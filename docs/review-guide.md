@@ -106,6 +106,16 @@ the actual-handler tests `capture-screen.test.tsx`, `inbox-intents.test.tsx` and
 existing journal; draft-note voice and pre-journal interruption remain open.
 See `docs/validation-0.11.31.md` for the separate source and native evidence.
 
+For 0.11.32, read note `draft-queries.ts`, `commit-queries.ts` and
+`note-editor-screen.tsx` with attachment target resolution and journal queries.
+Canonical draft voices must survive `voices: []` autosave, stay outside the
+clinical gallery and move atomically with note/history/draft retirement.
+Pending jobs cannot lose their original parent. Check `draft-recording.test.ts`
+and the actual-handler `media-editors.test.tsx` for rollback, newer typing,
+acknowledgment/focus and final-submission failure/retry. The older JSON voice
+codec is still supported; the unused staging helper is removed. This does not
+add general cross-editor text CAS. Source/native limits: validation-0.11.32.md.
+
 The following integration test accelerates a 24-hour shift in real SQLite. It is
 not a 24-hour Android soak test or a physical-device performance measurement.
 

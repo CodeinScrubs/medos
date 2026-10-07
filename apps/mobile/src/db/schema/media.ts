@@ -20,6 +20,7 @@ export const ATTACHMENT_ENTITIES = [
   'patient',
   'encounter',
   'note',
+  'note_draft',
   'lab_panel',
   'imaging_study',
   'doctor',

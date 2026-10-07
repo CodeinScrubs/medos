@@ -1564,3 +1564,31 @@ The durable boundary starts after initial capture/field SQL and journal
 reservation succeed. Active or unconfirmed recording, failed initial SQL and
 pre-journal interruption are separate gaps. No migration, dependency, route,
 permission, clinical rule or archive/key scheme changes here.
+
+## Durable new-note draft voices (0.11.32)
+
+The new note's draft now uses the same recording journal as published records
+and quick capture. `note_draft` is an internal voice-only parent, resolved to a
+live new draft and its live patient. Drizzle's existing text column needs no
+migration. The prior `stageRecording` WeakMap path has no remaining consumer and
+is removed; it was process-local staging, not crash recovery.
+
+Canonical metadata belongs to `attachments`, not the autosaved draft's full-shape
+legacy voices JSON. Otherwise recovery would append a voice and the mounted text
+writer would silently overwrite it with its older array. Existing JSON voices
+remain readable and publishable. The recorder callback persists latest text both
+before reservation and after verified copying while holding original dataset
+admission; it flushes only that text saver, never the group containing itself.
+
+Pending copying/ready/discarding jobs protect their original draft from
+publication, retirement and retargeting. Saved draft voices stay out of the
+clinical gallery. Explicit publication validates them and moves the same rows,
+unchanged file/hash/time, with note/version creation and soft draft retirement
+in one synchronous transaction. Failed movement rolls back the whole operation.
+
+Final submission briefly disables editing without unmounting the recorder/Scope;
+ordinary recording still permits typing. Late acknowledgment cannot edit or
+republish the retired draft, nor navigate over another route. Completed rendering
+keeps the native header title and right-slot presence stable. Generic cross-editor
+text conflicts, active/pre-journal recording loss and physical/power/low-space
+acceptance remain separate work. Evidence and tradeoffs: validation-0.11.32.md.
