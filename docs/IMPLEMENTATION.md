@@ -60,6 +60,12 @@ duration from the shared clock. The compact kardex resolves episode ownership
 and orders in one watched SQLite statement. No new route, normal-path dialog,
 dependency, schema or clinical rule. See validation-0.11.28.md for separate gates;
 this does not close raw recovery, physical-phone or full-shift acceptance.
+Signed arm64 inspection and bounded offline x86_64 upgrade/scope/cold-reopen
+acceptance also passed; independent archive comparison preserved all 39
+application tables and 18 original media files before native fixture additions.
+Source-reviewed read follow-up: wire root `PatientRecord`'s existing query retry
+into both root ErrorNotice branches, retaining the same AutosaveScope/input.
+Do not equate the native projection check with native SQL failure injection.
 
 2026-10-07, 0.11.26: original intent is captured before initial reads for patient,
 admission/edit/discharge, follow-up and consult-answer forms. Their Autosave and

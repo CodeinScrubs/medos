@@ -273,6 +273,12 @@ establishes the proposed two-second entry claim.
   order read. Broader auxiliary read paths and device failure acceptance remain
   open; see the new validation record rather than treating the whole product as
   accepted.
+  **Source-reviewed remaining case:** `PatientRecord` itself still omits the
+  `patientQuery` retry callback when rendering its root `ErrorNotice`. The
+  component shows a retry button only when `onRetry` is provided. Wire the
+  existing callback and verify failed initial/cached reads preserve the mounted
+  AutosaveScope/input. This is not a native failure-injection result or a claim
+  that the 0.11.28 section fixes covered the root read.
 - **Durable recovery:** note/capture drafts and several raw forms persist, but
   mounted text preservation is not universal crash recovery. Durable stopped
   voice publication is implemented for existing records, not yet fully wired

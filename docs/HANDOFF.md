@@ -36,7 +36,7 @@ wrong, never rewrite them to look better.
 ## 2026-10-07 — Keep patient overview failure distinct from missing records
 
 **Agent:** GPT-6 via Codex
-**Commits:** application and evidence in this commit; baseline `a3136e7`.
+**Commits:** application `1165e52`; acceptance in this commit; baseline `a3136e7`.
 
 **Changed**
 - Freshly fetch/review all five unchanged open PR heads; dispositions unchanged.
@@ -55,16 +55,25 @@ wrong, never rewrite them to look better.
 - First post-fix two targeted suites passed 53 tests plus typecheck; two more
   cache/retry checks added afterward. Final full check passed typecheck, lint
   (zero warnings), formatting, 118 suites / 1536 app tests + three workflows.
+- Normal source push-hook repeat passed; exact-source CI `37599737521`
+  completed/success, including migrations and Android bundle.
+- Signed arm64 owner APK passed version/code, ABI, signature and native-library
+  inspection; same certificate as 0.11.27. Exact hash is in validation-0.11.28.
+- Inspected x86_64 APK upgraded the owned API 36.1 AVD offline, without clearing
+  data; installed hash matched. Independent fresh-archive comparison preserved
+  all 39 application tables and 18 media files exactly.
+- Native standing/A/B order scenario kept only standing + current B in overview
+  and one-tap kardex; cold reopen retained it. Independent final archive checked
+  original rows/media and episode ownership. Bounded crash log was empty.
 
 **Not verified**
-- Exact-source CI and signed/native packages pending.
 - Physical phone, complete shift timings, native failure/lifecycle matrix,
   stopped-draft voice/process interruption, clinical validation or completeness.
 
 **Open threads**
-- Finish this exact source's package/native/CI gates, then compatible
-  dependency patches, durable new-note/capture stopped voices, remaining raw
-  recovery and measured offline shift. Revised PRs must pass their witnesses.
+- Compatible dependency patches, durable new-note/capture stopped voices,
+  remaining raw recovery and measured offline shift. Revised PRs must pass
+  their witnesses. Root patient-read retry remains a source-reviewed follow-up.
 
 **Gotchas**
 - Joined-read fault injection affects both timeline panel/value queries; retry
@@ -72,6 +81,11 @@ wrong, never rewrite them to look better.
   loose clock substring were corrected before the valid pre-fix evidence.
 - The order projection must keep a real encounter join: subquery tables alone
   are not observed by useLive. No existing migration/backup scheme was changed.
+- Initial pre-upgrade hierarchy was blank under concurrent compilation. After
+  builds, a System UI ANR on the old installation resolved through Wait. Neither
+  is attributed to new source or accepted as a screen/timing check. No data clear.
+  Use absolute gradlew path on Windows. Source is frozen at `1165e52`; emulator
+  artifact stays private, arm64 stays in dist, owned AVD stopped after acceptance.
 
 ## 2026-10-07 — Review all five PRs and keep clinical completion truthful
 
