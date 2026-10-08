@@ -39,14 +39,17 @@ order; do not treat a successful test suite as acceptance of the entire product.
 0.11.38 fixes two additional numerical-integrity defects: pasted explicit
 units no longer inherit another unit's reference range, and trend grouping
 does not case-fold SI prefixes. New fail-before/pass-after SQLite and chart
-witnesses pass; full check is137 suites/1,864 app tests and five workflows.
+witnesses pass; full check is 137 suites/1,864 app tests and five workflows.
 No historical result is converted or rewritten. Actual inspected/installed
 source `cf5c571` passes clipboard/raw cold recovery/publication and case-distinct
-native trend grouping; independent upgrade/final comparisons preserve4,079/
-4,092 rows,44 tables and28 media hashes respectively. The separately signed/
+native trend grouping; independent upgrade/final comparisons preserve 4,079/
+4,092 rows, 44 tables and 28 media hashes respectively. The separately signed/
 inspected owner arm64 APK has actual JS bytes identical to accepted QA; it has
-not been tested on the A52s. Hosted delivery acceptance belongs in
-validation-0.11.38.md and HANDOFF. The remaining
+not been tested on the A52s. Normal push and exact `4dd10bb` hosted CI pass.
+The old 0.11.33 focus ANR now has a recovered late stack matching its pre-upgrade
+exit evidence; it does not establish the pressure cause or an actionable app
+operation. Record event-time scheduling/stack evidence on reproduction. Full
+identities and limitations belong in validation-0.11.38.md and HANDOFF. The remaining
 raw-form, media-batch, physical and pressure gates below are still open.
 
 0.11.37 closes companion raw-form recovery via migration0024 and hardens the

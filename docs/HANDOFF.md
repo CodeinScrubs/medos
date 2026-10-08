@@ -36,7 +36,8 @@ wrong, never rewrite them to look better.
 ## 2026-10-08 — Clipboard lab units and reference compatibility (0.11.38)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.
-**Commits:** application `cf5c571`; native/artifact delivery follows separately.
+**Commits:** application `cf5c571`, native/artifact record `4dd10bb`; this
+follow-up records successful delivery and recovered historical ANR evidence.
 
 **Changed**
 - Keep explicit pasted values and their units together. Clear an existing range
@@ -45,34 +46,39 @@ wrong, never rewrite them to look better.
   Charts exclude differently labelled units rather than silently combining them.
 - Reuse the existing brief paste acknowledgment for suppressed incompatible
   ranges. No conversion, formula, dependency, permission, route or migration.
-  Version0.11.38/code54; earlier stored results are not guessed or rewritten.
-- Record the actual successful0.11.37 hosted CI delivery.
+  Version 0.11.38/code 54; earlier stored results are not guessed or rewritten.
+- Record the actual successful 0.11.37 hosted CI delivery.
 
 **Verified**
 - New SQLite screen and chart witnesses fail before correction; the focused
-  two suites pass98 tests afterwards. Full check passes137 suites/1,864 app
+  two suites pass 98 tests afterwards. Full check passes 137 suites/1,864 app
   tests and five workflows, including typecheck/lint/formatting.
 - Inspected/installed byte-identical QA APK passes real clipboard reads, same-
   unit range retention, changed-unit raw cold recovery and publication, new
   differing-unit preset refusal and case-distinct native trend grouping.
-- Independent upgrade comparison preserves4,079 rows/44 tables/28 media hashes;
-  final cold comparison preserves4,092 rows with only intended test additions/
+- Independent upgrade comparison preserves 4,079 rows/44 tables/28 media hashes;
+  final cold comparison preserves 4,092 rows with only intended test additions/
   soft-retained revisions. Integrity/FKs clean. Three captured Save returns
   keep their PID/no fatal. No app data cleared; airplane mode remains on.
 - Five PR heads unchanged from previous review; none merged or commented on.
 - Signed/inspected owner APK is built: arm64-v8a, 53,118,611 bytes, SHA-256
   `c96496eb36d12640a6db8a2ce646b9eb98c85a0dbdff6bc68904154126cf20b1`.
   Actual embedded JS is byte-identical to accepted QA. See validation-0.11.38.md.
+- Normal push check passes 137 suites/1,864 app tests+5 workflows. Exact
+  `4dd10bb` passes hosted CI 37815414966, including migrations and Android bundle.
+- A private bugreport recovers the old PID 11600 input-focus ANR's late stack;
+  it matches the 0.11.33 pre-upgrade evidence. No ANR is recorded since this
+  guest boot. The late stack identifies no actionable app Java operation;
+  pressure cause remains open, with time-aligned tracing next.
 
 **Not verified**
-- Normal push and hosted CI are next. Earlier 0.11.37 artifacts/CI do not prove
-  0.11.38 delivery.
 - Physical A52s, pressure/full-shift and clinical-review gates remain open.
 
 **Open threads**
-- Finish normal push and hosted CI delivery, then record the actual result.
 - Remaining raw doctor/photo forms and photo batch recovery are unchanged.
   Historical incorrectly imported ranges need source/physician review.
+- Reproduce pressure with main/JS/render/system scheduling and event-time
+  stack/exit evidence. Do not silently relabel the recovered old ANR as fixed.
 
 **Gotchas**
 - `mg` and `Mg` cannot be case-folded. See validation-0.11.38.md for the

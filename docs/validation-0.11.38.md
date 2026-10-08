@@ -129,8 +129,43 @@ owner certificate as the accepted QA artifact.
 
 ### Hosted delivery
 
-Normal push and hosted CI are next on the delivery commit. No earlier run or
-APK identity substitutes for its checks; record the actual run before checkout.
+Normal push reruns the full check successfully: 137 suites/1,864 app tests and
+five workflows, plus typecheck/lint/formatting. Delivery
+`4dd10bb9bcfd8c00e2a149116e30a890b5c7ab87` passes
+[hosted CI run37815414966](https://github.com/CodeinScrubs/medos/actions/runs/37815414966),
+including migration regeneration and the Android bundle. No hook or check was
+bypassed. Application code and owner/QA bundles remain pinned to `cf5c571`.
+
+## Recovered historical ANR trace
+
+A read-only emulator bugreport now recovers the historical stack that was not
+available during the original 0.11.34 investigation. It is not a new 0.11.38 ANR:
+its PID 11600, FocusEvent reason and timestamp match the preserved pre-upgrade
+exit/logcat evidence from that earlier 0.11.33 setup failure.
+
+- Private bugreport: 7,521,476 bytes, SHA-256
+  `b9e45106e7b6353eaab23d1fccf1181346b6d08357ada80896bfcd10d62fac60`.
+- Entry `FS/data/anr/anr_2026-10-08-03-30-10-066` reports a 5,133 ms input-focus
+  timeout. Its PID dump timestamp is 03:30:24.109+0330, later than the file's
+  03:30:10.066 name timestamp. The main Java frames are `MessageQueue.nativePollOnce`,
+  `MessageQueue.next` and `Looper`; native frames above them include an ART
+  JNI-transition condition-variable wait. The snapshot does not identify an
+  application Java operation responsible for the earlier delay.
+- `dumpsys activity lastanr` reports no ANR since the current guest boot. The
+  archive also contains older SystemUI/system-server/input-method startup ANRs;
+  their existence is environmental context, not proof of the cause of MedOS's
+  earlier timeout. None is counted as a new app failure or passing app trial.
+- [Android's ANR diagnosis guide](https://developer.android.com/topic/performance/anrs/diagnose-and-fix-anrs)
+  distinguishes app blocking from system scheduling/resource constraints and
+  cautions that late input-dispatch `nativePollOnce` snapshots may not identify
+  actionable app code. Do not infer a resolved defect or patch Java/JS from this
+  late sample alone.
+
+The pressure gate remains open. Reproduce with a time-aligned Perfetto/input
+trace, record app main/JS/render and system-server scheduling, and capture the
+stack/exit record at the event. Ordinary emulator success, historical stack
+recovery and CI do not prove physical A52s or full-shift readiness. No arbitrary
+application change was made to conceal or guess away this failure.
 
 ## Still open
 
@@ -138,5 +173,6 @@ Durable doctor/profile/rating and photo-caption/imaging raw input, photo batch
 publication/journal and orphan inventory remain open. No existing unlinked
 original is deleted. Physical A52s camera/HEIC/audio/reminders/SAF, low-space/
 power behavior and a complete heavy shift remain separate. The earlier 0.11.33
-pressure ANR is unresolved. Clinical tools still require per-tool sources,
+pressure ANR now has a recovered late stack, but its cause remains unresolved.
+Clinical tools still require per-tool sources,
 boundary evidence and physician review. No formula from a chat was introduced.
