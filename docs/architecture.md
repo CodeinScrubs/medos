@@ -1652,5 +1652,7 @@ Clipboard additionally captures latest rows before native retrieval and compares
 arrival fields before applying paste lines. Newer manual values/clears, renamed/
 removed rows and new typed values are preserved; unrelated typing stays enabled.
 This local comparison avoids a silent overwrite without freezing every field
-or adding a general merge framework. A return to the identical baseline value
-is indistinguishable from no net edit; there is no per-keystroke intent history.
+or adding a general merge framework. Rows are updated immutably; reference
+identity within this one native wait also protects a user retyping the same
+baseline value. Do not replace this with value equality or mutate rows in place.
+There is no persisted per-keystroke intent history.

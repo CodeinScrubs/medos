@@ -44,6 +44,9 @@ wrong, never rewrite them to look better.
   Newer value/unit edits, clears, renames/deletes and newly entered nonempty rows
   survive; unrelated typing remains available. The existing alert reports skipped
   changed values. No dependency/schema/route or second saver/guard.
+- Final refinement compares immutable row identity: even explicitly retyping
+  the original value survives. Value equality alone missed that intent; its
+  additional witness fails before refinement. Keep row updates immutable.
 
 **Verified**
 - Two overwrite witnesses (type15 or clear while waiting for Hb14) fail before;

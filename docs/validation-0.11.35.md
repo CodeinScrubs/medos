@@ -135,3 +135,8 @@ renames/removal and newly entered values, while permitting unrelated typing.
 The existing alert reports values it preserved; no normal-path additional UI.
 Four suites/54 checks pass, including persisted raw recovery and no clinical
 write. Final-source full check/CI/artifact/native retest must still run.
+
+A further witness retypes the original value during retrieval. Equality alone
+overwrote that explicit input (one failure/two passes); comparing immutable row
+identity within the native wait preserves it too. No edit counters/schema or
+persistent keystroke history are added. Final checks follow this refinement.

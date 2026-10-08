@@ -240,16 +240,10 @@ function LabEntry({
             const before = requestedRows.find((r) => r.analyte.toLowerCase() === name);
             const current = before ? fields.rows.find((r) => r.key === before.key) : undefined;
             const addedManually = !before && fields.rows.find((r) => r.analyte.toLowerCase() === name);
-            // A late clipboard result must not undo newer typing, clears, renames
-            // or deletion. Compare the arrival snapshot, not earlier pasted lines.
-            if (
-              (before &&
-                (!current ||
-                  current.analyte !== before.analyte ||
-                  current.value !== before.value ||
-                  current.unit !== before.unit)) ||
-              (addedManually && addedManually.value.trim())
-            ) {
+            // Rows are immutable: identity also detects retyping the baseline
+            // value. Never undo a row touched during this wait. Compare arrival
+            // fields, not earlier lines in this same paste.
+            if ((before && current !== before) || (addedManually && addedManually.value.trim())) {
               preserved++;
               continue;
             }
