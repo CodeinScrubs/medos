@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { ImagePickerOptions, ImagePickerResult } from 'expo-image-picker';
+import { Dimensions, StyleSheet, Text as RNText } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
@@ -45,11 +46,10 @@ jest.mock('@/components/ui', () => ({
   EmptyState: 'EmptyState',
   Row: 'Row',
   Segmented: 'Segmented',
-  Text: 'Text',
+  Text: jest.requireActual<typeof import('@/components/ui/text')>('@/components/ui/text').Text,
   Screen: 'Screen',
   Divider: 'Divider',
 }));
-jest.mock('@/theme', () => ({ useTheme: () => ({ spacing: {}, colors: {} }) }));
 jest.mock('@/platform/media', () => ({
   mediaUri: (value: string) => value,
   storePhoto: (...args: Parameters<typeof storePhoto>) => mockStore(...args),
@@ -129,6 +129,31 @@ afterEach(() => {
 });
 
 describe('lab photo callback', () => {
+  it.each([1, 1.6])('fits actual numeric value and unit inside one aligned row at font scale %s', async (fontScale) => {
+    const original = Dimensions.get('window');
+    const dimension = jest.spyOn(Dimensions, 'get').mockReturnValue({ ...original, fontScale });
+    try {
+      await createLabPanel({
+        patientId,
+        collectedAt: new Date(1_700_000_000_000),
+        source: 'manual',
+        values: [{ analyte: 'Synthetic custom', value: '12.4', unit: 'mg/dL' }],
+      });
+      await act(async () => {
+        tree!.update(<LabsTab patientId={patientId} />);
+      });
+      const unit = tree!.root.findAllByType(Text).find((n) => n.props.children === 'mg/dL')!;
+      const cell = unit.parent!;
+      const value = cell.findAllByType(Text).find((n) => n !== unit)!;
+      const unitStyle = StyleSheet.flatten(unit.findByType(RNText).props.style);
+      const valueStyle = StyleSheet.flatten(value.findByType(RNText).props.style);
+      const cellStyle = StyleSheet.flatten(cell.props.style);
+      expect(cellStyle.height).toBeGreaterThanOrEqual((unitStyle.lineHeight + valueStyle.lineHeight) * fontScale + 6);
+      expect(unitStyle.fontSize).toBeLessThan(valueStyle.fontSize);
+    } finally {
+      dimension.mockRestore();
+    }
+  });
   it('labels every recorded value with its own unit in the flowsheet and trend history', async () => {
     for (const [index, unit] of ['mg/dL', 'µmol/L', null].entries()) {
       await createLabPanel({

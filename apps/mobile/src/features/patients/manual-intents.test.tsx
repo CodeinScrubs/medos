@@ -85,7 +85,15 @@ jest.mock('@/components/ui', () => ({
   Segmented: 'Segmented',
   Text: 'Text',
 }));
-jest.mock('@/theme', () => ({ MIN_TOUCH: 48, useTheme: () => ({ colors: {}, spacing: {}, radii: {} }) }));
+jest.mock('@/theme', () => ({
+  MIN_TOUCH: 48,
+  useTheme: () => ({
+    colors: {},
+    spacing: {},
+    radii: {},
+    typography: jest.requireActual<typeof import('@/theme/tokens')>('@/theme/tokens').typography,
+  }),
+}));
 jest.mock('@/features/attachments/capture', () => ({
   askPhotoSource: (choose: typeof mockSource) => {
     mockSource = choose;

@@ -42,6 +42,9 @@ same-turn duplicate and field overwrite defects. Their raw crash recovery is
 still open. Imported photo checksums/original MIME are now actually persisted;
 custom lab units and flagged-row Remove are accessible. Tables/history show
 each recorded unit. No dependency, permission, route or clinical formula added.
+Actual IME acceptance added a stable header publication/Close slot to companion
+and manual doctor forms. The actual table exposed inherited mono line metrics;
+explicit value/unit lines and shared font-scaled geometry preserve row separation.
 Verification and explicit remaining acceptance gates belong in
 validation-0.11.37.md and the newest HANDOFF; do not treat these fixes as full
 P0 or product completion. Next: doctor/profile/rating and photo-caption/imaging

@@ -80,6 +80,29 @@ android/. That invocation failed without building an artifact. The corrected
 invocation succeeds in11m48s after prebuild regenerated native code. Rejected
 trials/logs remain private; no app data was wiped or orphan media swept.
 
+Sourcef1ae818/code53 rebuilt in2m53s and installed with byte-identical inspected
+copy. Actual IME-open invalid contact Save refuses publication. Full archives
+prove exact partial raw recovery (4,071 rows), one contact plus soft-retired token
+(4,072), and an independent soft-discard preserving the contact (4,073).
+The native process stays14990 through Save/Discard; no fatal for that PID.
+
+Directory/profile/rating header Save/Close and lab custom unit/invalid/H/L Remove
+pass native interaction. Independent archive comparison then caught a QA-driver
+mistake: duplicate "Notes" captions selected Tags. That trial does not prove
+doctor-note persistence. Tags were restored and the actual Notes field exercised
+again; corrected archive comparison passes all4,078 rows/44 tables/28 media,
+exact doctor/profile/rating text, one lab value+mg/dL and unchanged unrelated data.
+
+The actual flowsheet also exposed inherited mono line-height overflowing its
+fixed row. Explicit value/unit line metrics and font-scaled row/column/header
+geometry correct it; two real-Text/theme witnesses fail before, then pass at
+font scales1/1.6. The nine-test table group passes. First full layout check fails
+only because an older intent-test Theme double omitted typography; that double
+now preserves the real typography contract. Related group26 tests passes; final
+integrated `npm run check` passes137 suites/1,857 app tests+5 workflows with
+typecheck/lint/formatting. Rebuilt layout/native acceptance is pending. Do not
+count the rejected check as green.
+
 ## Still open
 
 - Durable raw recovery for doctor/profile/rating and photo-caption/imaging

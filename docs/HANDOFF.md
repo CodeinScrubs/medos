@@ -58,6 +58,9 @@ recorded in a follow-up documentation commit, not inferred from software tests.
   remaining priorities are in architecture/IMPLEMENTATION/validation-0.11.37.md.
 - Actual native follow-up adds one stable publication/Close slot above the IME
   for companion and the three manual doctor forms, using their existing handler.
+- Native table follow-up sets explicit number/unit line metrics and scales the
+  shared row/header/column geometry with font size. Inherited numeric mono
+  metrics overflowed the original fixed height; original values are unchanged.
 
 **Verified**
 - Clean baseline a08bc18: brief/check green,134 suites/1,780 app tests+5 workflows.
@@ -75,6 +78,14 @@ recorded in a follow-up documentation commit, not inferred from software tests.
   trial is rejected. Four new header witnesses fail before correction; corrected
   contact/manual-doctor group passes50 tests. Full header-final check passes137
   suites/1,855 app tests+5 workflows, typecheck/lint/formatting. Native retest pending.
+- Inspected/installedf1ae818 passes actual IME refusal/publication/discard,
+  raw cold recovery, contact/lab/doctor-family Save/Close with unchanged PID.
+  Independent archives prove4,071 raw /4,072 published /4,073 discarded rows;
+  all unrelated data/media are exact. Corrected doctor/lab checkpoint is4,078/
+  44/28, with exact requested text/unit and unchanged unrelated rows.
+- Real-text layout group9 tests and related layout/intent group26 pass, including
+  font scales1/1.6. Final integrated check passes137 suites/1,857 app tests+5
+  workflows, typecheck/lint/formatting. Layout APK/native retest is pending.
 
 **Not verified**
 - Final stable-header0.11.37 APK/native restore/publication/close are pending.
@@ -96,6 +107,11 @@ recorded in a follow-up documentation commit, not inferred from software tests.
   String host mocks concealed the very native-parent invariant being tested.
 - Underlying UI-dump button bounds may be covered by the IME. Inspect the real
   screenshot and use the stable header; tapping hidden footer bounds is invalid.
+- Duplicate section/field captions also misled the QA driver into Tags. The
+  independent SQLite oracle caught it; use the final field caption, verify the
+  screenshot and stored column, and retain the rejected trial as evidence.
+- `Text numeric` uses mono metrics even with a tiny variant. Use actual Text
+  and theme in a cell-fit test; string mocks hid the inherited line height.
 - Export/compare the existing synthetic dataset before upgrade. Never wipe
   app data, sweep orphan media or substitute a QA ABI artifact for owner dist/.
 

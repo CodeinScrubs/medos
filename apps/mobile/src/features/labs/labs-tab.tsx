@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
@@ -26,6 +26,8 @@ import { createLabPanel, deleteLabPanel, patientLabPanelsQuery, patientLabValues
 const ROW_H = 38;
 const NAME_W = 92;
 const COL_W = 70;
+const VALUE_LINE_H = 18;
+const UNIT_LINE_H = 14;
 
 type LabsView = 'flowsheet' | 'panels';
 
@@ -143,7 +145,15 @@ type ValueRow = { value: LabValue; collectedAt: Date; panelId: string };
 
 function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] }) {
   const router = useRouter();
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, typography } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const scale = Number.isFinite(fontScale) ? Math.max(1, fontScale) : 1;
+  // Numeric Text uses mono metrics, even with variant="tiny". Both lines must
+  // fit in their row, including when Android increases the owner's font size.
+  const rowHeight = Math.max(ROW_H, Math.ceil((VALUE_LINE_H + UNIT_LINE_H) * scale + 6));
+  const headerHeight = Math.max(rowHeight + 8, Math.ceil(2 * (typography.tiny.lineHeight ?? 18) * scale + 8));
+  const nameWidth = Math.ceil(NAME_W * scale);
+  const columnWidth = Math.ceil(COL_W * scale);
 
   const { columns, analytes, cell } = useMemo(() => {
     const colMap = new Map<string, Date>();
@@ -204,8 +214,8 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
     <Card padded={false} style={{ overflow: 'hidden' }}>
       {/* The flowsheet is an LTR table regardless of the app's direction. */}
       <View style={styles.ltr}>
-        <View style={{ width: NAME_W, borderRightWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
-          <View style={[styles.headerCell, { height: ROW_H + 8, backgroundColor: colors.surfaceAlt }]} />
+        <View style={{ width: nameWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+          <View style={[styles.headerCell, { height: headerHeight, backgroundColor: colors.surfaceAlt }]} />
           {analytes.map((a, i) => (
             <Pressable
               key={a.key}
@@ -215,7 +225,7 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
               style={({ pressed }) => [
                 styles.nameCell,
                 {
-                  height: ROW_H,
+                  height: rowHeight,
                   paddingHorizontal: spacing.sm,
                   backgroundColor: pressed ? colors.primarySoft : i % 2 ? colors.surfaceAlt : colors.surface,
                 },
@@ -239,7 +249,10 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
               {columns.map((c) => (
                 <View
                   key={c.panelId}
-                  style={[styles.headerCell, { width: COL_W, height: ROW_H + 8, backgroundColor: colors.surfaceAlt }]}
+                  style={[
+                    styles.headerCell,
+                    { width: columnWidth, height: headerHeight, backgroundColor: colors.surfaceAlt },
+                  ]}
                 >
                   <Text variant="tiny" color="textMuted" align="center">
                     {(() => {
@@ -263,7 +276,11 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
                       key={c.panelId}
                       style={[
                         styles.valueCell,
-                        { width: COL_W, height: ROW_H, backgroundColor: i % 2 ? colors.surfaceAlt : colors.surface },
+                        {
+                          width: columnWidth,
+                          height: rowHeight,
+                          backgroundColor: i % 2 ? colors.surfaceAlt : colors.surface,
+                        },
                       ]}
                     >
                       {v ? (
@@ -272,14 +289,14 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
                             numeric
                             numberOfLines={1}
                             align="center"
-                            style={{ color: unreadable(v) ? colors.danger : color, fontSize: 13 }}
+                            style={[styles.valueText, { color: unreadable(v) ? colors.danger : color }]}
                           >
                             {ltrIsolate(
                               (v.value ?? '') +
                                 (unreadable(v) ? ' ?' : v.flag && v.flag !== 'normal' ? ` ${FLAG_LABEL[v.flag]}` : ''),
                             )}
                           </Text>
-                          <Text variant="tiny" color="textMuted" numeric align="center" numberOfLines={1}>
+                          <Text color="textMuted" numeric align="center" numberOfLines={1} style={styles.unitText}>
                             {v.unit?.trim() || 'بدون واحد'}
                           </Text>
                         </>
@@ -424,4 +441,6 @@ const styles = StyleSheet.create({
   headerCell: { alignItems: 'center', justifyContent: 'center' },
   nameCell: { justifyContent: 'center' },
   valueCell: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  valueText: { fontSize: 13, lineHeight: VALUE_LINE_H },
+  unitText: { fontSize: 10, lineHeight: UNIT_LINE_H },
 });
