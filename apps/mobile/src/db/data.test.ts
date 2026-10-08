@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { createCapture } from '@/features/capture/queries';
@@ -113,6 +113,21 @@ describe('tablesOf', () => {
       .leftJoin(specialties, eq(specialties.id, patients.id));
     expect(tablesOf(query).sort()).toEqual(['follow_ups', 'patients', 'specialties']);
     expect(tablesOf(t.db.select().from(patients))).toEqual(['patients']);
+  });
+  it('watches nested FROM, predicate subqueries and union branches', () => {
+    const selected = t.db
+      .select({ id: patients.id })
+      .from(patients)
+      .where(inArray(patients.id, t.db.select({ id: followUps.patientId }).from(followUps)))
+      .as('selected_patients');
+    expect(tablesOf(t.db.select().from(selected)).sort()).toEqual(['follow_ups', 'patients']);
+    const sameName = t.db.select({ id: patients.id }).from(patients).as('patients');
+    expect(tablesOf(t.db.select().from(sameName))).toEqual(['patients']);
+    const union = t.db
+      .select({ id: patients.id })
+      .from(patients)
+      .unionAll(t.db.select({ id: captureInbox.id }).from(captureInbox));
+    expect(tablesOf(union)).toEqual(['patients', 'capture_inbox']);
   });
 });
 

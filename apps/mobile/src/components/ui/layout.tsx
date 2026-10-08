@@ -1,6 +1,6 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, type Ref } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KeyboardAwareScrollView, type KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { toPersianDigits } from '@/lib/persian';
@@ -20,6 +20,7 @@ export function Screen({
   tabRoot = false,
   style,
   contentStyle,
+  scrollRef,
 }: {
   children: ReactNode;
   scroll?: boolean;
@@ -29,6 +30,8 @@ export function Screen({
   tabRoot?: boolean;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Optional scrolling control without replacing the screen's native parent. */
+  scrollRef?: Ref<KeyboardAwareScrollViewRef>;
 }) {
   const { colors, spacing } = useTheme();
   const pad = padded ? { paddingHorizontal: spacing.lg } : null;
@@ -46,6 +49,7 @@ export function Screen({
     return (
       <SafeAreaView edges={safeEdges} style={[styles.flex, { backgroundColor: colors.background }, style]}>
         <KeyboardAwareScrollView
+          ref={scrollRef}
           style={styles.flex}
           contentContainerStyle={[pad, { paddingBottom: spacing.huge }, contentStyle]}
           keyboardShouldPersistTaps="handled"

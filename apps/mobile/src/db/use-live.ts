@@ -16,7 +16,7 @@ import { tablesOf } from './query-tables';
  * 3. Its initial `data` is `[]`, indistinguishable from "no rows", so screens
  *    flash "not found" before the first result lands.
  *
- * This hook watches every table the query touches (FROM plus joins), coalesces
+ * This hook watches every table the query touches (including subqueries), coalesces
  * bursts of change events into one re-run, and reports `data: undefined`
  * until the first result, so `loading` is real.
  * `retry` re-runs a failed read without requiring a write or navigation. A

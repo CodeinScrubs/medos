@@ -36,6 +36,21 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.41 bounds the clinical timeline to40 displayed events. Each source reads
+at most41 short candidates after the selected kind/keyset boundary; only visible
+panels hydrate at most six values each, retaining units and explicit preview
+counts. Admission/discharge sort independently; old episodes with recent discharge
+are not lost. Existing records open directly under the patient's autosave and
+original navigation/dataset ownership. Failed reads remain visible and prevent
+skipping an incomplete page. The same native scroll/header parent stays mounted.
+Full check passes147 suites/2,006 app tests and five workflows, including2,000
+long notes and360 tied mixed events. Table subscriptions now include nested
+projections/predicates/unions, with pinned SQL contract tests. No dependency,
+permission, migration, route or clinical formula added. Exact APK acceptance of
+this source (also including .40 vitals) is pending; large-phone/pressure/full-shift
+gates remain distinct. Then finish manual raw forms, appropriate clinical trash
+and visual rich text; do not call the physical phone the only remaining work.
+
 0.11.40 completes the software slice for raw vitals through additive
 migration0026. Invalid numbers/date/clock and exact mixed text remain recoverable;
 publication, original encounter association and draft retirement are atomic.
@@ -480,10 +495,10 @@ and media/editor-versus-restore gates in D10/C05.
 | ID | Deliverable | Acceptance requirement |
 |---|---|---|
 | W01 | Inbox and task retrieval | Implemented retrieval slice: full matching totals, search and load-more for inbox/filed captures/tasks; patient/global task editor and completed/cancelled/deleted lists; reopen and restore; capture links open the actual task. Task text/outcome edits autosave with guarded exit. Quick-add titles persist as separate drafts until Add, recover inline and publish atomically without duplicates. SQLite/component tests cover overflow, ordering, partial edits, restore, draft recovery/conflicts and write failures. Remaining: device navigation/large-list performance and broad search coverage. |
-| W02 | Shift history and rounds | Past-shift browse/detail implemented without restarting a shift. Removed memberships retain readable handoff notes; deleted patient identities are hidden. History deliberately omits current encounter location because it is not a historical snapshot. Remaining: persistent explicit reorder, optional editable ward/place/supervisor context (fast start currently records none), and device acceptance. Reviewed remains separate from tasks completed. |
+| W02 | Shift history and rounds | Past-shift browse/detail and persistent explicit reorder are implemented; reorder flushes the handoff and rechecks membership/order/dataset. Removed memberships retain readable notes; deleted patient identities are hidden. History omits current encounter location because it is not a historical snapshot. Remaining: optional editable ward/place/supervisor context (fast start currently records none), and device acceptance. Reviewed remains separate from tasks completed. |
 | W03 | Priorities and due work | Task high/normal/low and consult emergency/urgent/routine use explicit tested SQL ranks. Known deadlines sort before undated tasks within a rank; closed history uses completion date. Task priority is editable. Date fields now report visible-input validity and all 13 existing consumer forms guard explicit save; invalid/incomplete text never authorizes saving the old date. Day/clock validity are independent. Task deadline editor now preserves raw incomplete date/clock drafts, applies validated schedules atomically, and offers optional patient/global reminders with repair after native failure. Task schedule recovery/conflicts, old-backup defaults and notification lifecycle have regression tests. Both open consult statuses now share the first rank before urgency; route-driven tab changes wait for autosave. 0.11.9 also fixes shared prompt first-Back/IME handling and backup Next focus; bounded native evidence is in validation-0.11.9.md. Remaining: physical-phone/software-IME, other editor exit/alarm acceptance and raw date drafts in other forms. |
 | W04 | Patient summary | Identity, encounter/location, impressions, current problem, allergies with unknown state, relevant latest observations/labs with timestamps, medications and open work in a quick readable view. **Implemented 2026-09-26 (0.10.0):** the record's first tab leads with the episode card and «در یک نگاه» — last vitals, newest lab result per analyte that is flagged or unreadable, running kardex orders, last note's A/P, each with its age and one tap from its tab (`patient-snapshot.test.tsx`); allergies show «ثبت نشده» when blank, distinct from NKDA; problems, tasks, consults and follow-ups follow. Emulator-checked with fabricated data; phone acceptance and physician review of what belongs on it remain. |
-| W05 | Clinical record completion | Encounter history/transfers, PMHx/conditions, medication lifecycle, consult response/follow-up, imaging location/report/result review, lab manual/paste/file import and units, timeline filters. Timeline read errors now name failed sources, retain available events, mark partial counts and retry failed reads. Unbounded assembly/rendering still needs measured large-record acceptance and bounded retrieval/one scroll owner if necessary. |
+| W05 | Clinical record completion | Encounter history/transfers, PMHx/conditions, medication lifecycle, consult response/follow-up, imaging location/report/result review, lab manual/paste/file import and units are implemented. .41 adds real timeline filters, bounded projections/previews, keyset pages and direct record access using one scroll owner. Errors name failed sources, retain good events and block incomplete pagination. SQLite/component checks pass; exact APK and physical/pressure/full-shift acceptance remain open. |
 | W06 | Close the follow-up loop | Request, result received, physician reviewed, subsequent action and closed state are distinct and linked. No inferred completion; outstanding results remain findable. |
 | W07 | Trash and correction | Task restore is available in the task list's deleted tab and preserves status/outcome/links; delete, restore and status changes are audited without clinical text. Other soft-deleted clinical entities still need appropriate restore paths. Review cross-patient moves with explicit destination identity and undo. |
 | W08 | Notes and media | Visual rich text with versioned document codec and plain-text export/search; preserve old text; templates; quick text/voice/photo anywhere applicable; original images/crop comparison, external file import. |

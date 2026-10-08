@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Bounded clinical timeline and direct record access (0.11.41 source)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; preceding raw-vitals checkpoint `05b6ca3`.
+
+**Changed**
+- Timeline pages display40 events; selected kind/cursor bounds SQL before each
+  source's41 short candidates. Visible panels hydrate at most six values, with
+  original units, critical/flagged priority and an explicit limited-result count.
+- Sort admission/discharge independently and keyset by time/binary id. No cloned
+  events table. Invalid persisted dates become a partial-read error, not a crash.
+- Filters remain visible, page changes reset scroll through the existing host,
+  and taps open the actual record. Original autosave/dataset/focus/mount ownership
+  refuses failed/delayed navigation. Incomplete pages cannot skip failed sources.
+- Watch nested SQL projections/predicates/unions as well as direct FROM/joins;
+  exclude synthetic projection aliases without excluding real tables of that name.
+- Correct the ledger's stale claim that persistent shift reorder is not built.
+- Version0.11.41/code57. No dependency, permission, route, migration or formula.
+
+**Verified**
+- Full `npm run check`:147 suites/2,006 app tests and five workflows; typecheck,
+  lint/format green. Includes2,000 long notes,360 tied events without loss/repeat,
+  later insertion, old admission/recent discharge, late consult response, bounded
+  lab hydration, retained partial reads and actual handler navigation guards.
+- `05b6ca3` normal push and exact-source hosted CI are green:
+  https://github.com/CodeinScrubs/medos/actions/runs/37847693567.
+
+**Not verified**
+- APK/native acceptance of .40 vitals or this .41 timeline source, physical phone,
+  power/provider/pressure handling or full product completion. Font wrapping has
+  the final pre-push check and exact native inspection still ahead.
+
+**Open threads**
+- Build/inspect/install frozen source and accept new vitals, timeline pages/filter/
+  direct access/IME/font/Back, compatible backup/cold/old-current restores.
+- Then the seven remaining manual raw forms, appropriate clinical trash, visual
+  rich text, optional shift context/follow-up review stages and full-shift/pressure
+  gates. These software gaps mean the phone is not the sole remaining gate.
+
+**Gotchas**
+- Existing note/consult queries sort by pinned/status rather than clinical time;
+  limiting those queries directly loses recent events. Admission-date ordering
+  alone also loses a recent discharge. The timeline has its own minimal queries.
+- A subquery alias is not a SQLite change-event table. Preserve the underlying
+  lab/patient subscriptions. Handler tests do not establish native behavior.
+
 ## 2026-10-09 — Raw vitals and exact 0.11.39 acceptance (0.11.40 source)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.

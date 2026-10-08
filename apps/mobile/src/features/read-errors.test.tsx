@@ -627,12 +627,9 @@ describe('timeline partial reads', () => {
     expect(text()).not.toContain('در حال خواندن');
     await retryAll();
     await refresh(<TimelineTab patientId={patientId} />);
-    // A panel failure also affects the joined value query; both reads recover.
-    expect(mockRetried).toEqual([
-      tableOf(patientLabPanelsQuery(patientId)),
-      tableOf(patientLabPanelsQuery(patientId)),
-      tableOf(patientConsultsQuery(patientId)),
-    ]);
+    // No panels were read, so the bounded value preview is inactive. Retry only
+    // the failed sources; do not read every lab value as a separate fallback.
+    expect(mockRetried).toEqual([tableOf(patientLabPanelsQuery(patientId)), tableOf(patientConsultsQuery(patientId))]);
     expect(tree.root.findByType(EmptyState).props.title).toBe('هنوز چیزی ثبت نشده');
   });
 

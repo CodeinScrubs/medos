@@ -133,7 +133,8 @@ proof of native power-loss recovery.
 Today and timeline expose failed sources and retry, withhold unreliable totals
 and empty/success claims, and retain available rows. `ErrorNotice` keeps technical
 diagnostics behind an explicit details action; displayed details remain redacted.
-The timeline is still assembled in memory and is not yet accepted for large records.
+The timeline's bounded source projections are merged in memory (see the0.11.41
+contract below). Large-phone/pressure/full-shift acceptance remains separate.
 
 `EditGate` requires the read error and retry callback. Failed initial reads (including
 a previously empty result) show retry instead of loading forever or claiming absence.
@@ -1891,3 +1892,36 @@ revision under the original dataset admission. Keep resumes autosave; an old
 confirmation cannot affect a replacement dataset. Publication is above the long
 form, with a stable native parent. Source/component checks do not establish native
 IME/Back/process-death acceptance; that belongs in the exact APK validation record.
+
+## Bounded clinical timeline (0.11.41)
+
+The timeline is a projection, never a second clinical events table. Each source
+reads at most41 candidates after kind/cursor filtering and sorts by clinical
+event time then binary event id. Admission and discharge are separate sources;
+limiting admission history cannot select the latest discharge reliably. Consults
+use response/request/creation time. Unknown imaging dates remain unknown.
+The global merge shows40 events, with an explicit older/newer boundary. A newer
+insert does not shift an older page as it would with OFFSET. Returning to newer
+pages reads current data; this is not a frozen whole-history snapshot across edits.
+
+SQL projects only ids/time/type and short title/summary text, not full notes or
+reports. Only visible lab panels hydrate; a windowed query returns at most six
+short values each, prioritizing critical/flagged results then missing numeric
+projections. It retains unit labels, complete result counts and a truncation
+marker; truncated numeric text is never reparsed as a complete value. Preview
+counts do not claim a panel is normal or clinically reviewed. The record itself
+is unchanged and opens directly through its existing route.
+
+One patient scroll/native-header host remains mounted. Filters/pages replace
+only the read-only timeline child and use the host's optional scroll ref. The
+patient's original AutosaveScope must acknowledge other fields before navigation;
+dataset/focus/mount/duplicate checks also apply after that await. A failed source
+retains good rows and labels the page partial; it cannot authorize skipping to
+older events. Invalid persisted dates are a read error, not a render exception.
+
+`tablesOf` walks the select's SQL tree as well as its original FROM/join config,
+so windowed projections, predicate subqueries and unions remain reactive. Virtual
+projection aliases are excluded; a real table with the same name remains watched.
+The Drizzle metadata contract is pinned by tests. SQLite/component checks with
+2,000 long notes and360 tied events establish bounds/order/handlers, not native
+phone throughput, power recovery or whole-shift clinical acceptance.

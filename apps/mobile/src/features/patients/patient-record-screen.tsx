@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRoute, useRouter } from 'expo-router';
 import { StackActions, useNavigation } from 'expo-router/react-navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { useDatasetIntent } from '@/components/dataset-intent';
@@ -59,6 +60,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
   const route = useRoute();
   const { stale } = useDatasetIntent();
   const mounted = useRef(true);
+  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
   const renewalPending = useRef<symbol | null>(null);
   useEffect(() => {
     mounted.current = true;
@@ -223,7 +225,7 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
         }}
       />
 
-      <Screen scroll padded>
+      <Screen scroll padded scrollRef={scrollRef}>
         <Column gap="md" style={{ paddingTop: spacing.md }}>
           {staleNotice}
           <ErrorNotice error={error} what="پرونده" onRetry={retry} />
@@ -271,7 +273,9 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
           </View>
 
           {tab === 'overview' && <OverviewTab patient={patient} />}
-          {tab === 'timeline' && <TimelineTab patientId={id} />}
+          {tab === 'timeline' && (
+            <TimelineTab patientId={id} onPageChange={() => scrollRef.current?.scrollTo({ y: 0, animated: false })} />
+          )}
           {tab === 'notes' && <NotesTab patientId={id} />}
           {tab === 'kardex' && <KardexTab patientId={id} />}
           {tab === 'vitals' && <VitalsTab patientId={id} />}
