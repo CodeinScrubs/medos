@@ -36,6 +36,22 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.40 completes the software slice for raw vitals through additive
+migration0026. Invalid numbers/date/clock and exact mixed text remain recoverable;
+publication, original encounter association and draft retirement are atomic.
+The blood-pressure pair cannot silently merge conflicting halves. Close retains
+the acknowledged draft; Compare/Load/Keep/discard keep the original dataset and
+recheck the shown versions. One existing patient AutosaveScope owns the inline
+editor; publication is above the long form, without another route. Doctor draft
+discard moves below the fields to avoid a layout jump on first acknowledgment.
+Full check passes145 suites/1,986 app tests and five workflows. These source
+changes are not yet accepted in a new APK. Exact 0.11.39 native/artifact/cold/
+old-current restore evidence is complete in [validation-0.11.39.md](validation-0.11.39.md).
+No new dependency, permission, route or clinical formula. Remaining: other seven
+manual raw forms, appropriate clinical trash, bounded timelines, visual rich text,
+pressure/full-shift and physical gates. The baseline and new full checks exit
+cleanly without the previous worker-exit warning; this does not prove its cause.
+
 0.11.39 completes the software slice for directory/profile/rating, imaging and
 photo-caption raw recovery. Migration0025 adds strict versioned/CAS draft stores
 and a durable photo-batch journal. Whole-batch attachments, optional lab panel,

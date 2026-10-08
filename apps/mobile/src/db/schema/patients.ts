@@ -471,6 +471,29 @@ export const vitals = sqliteTable(
   (t) => [index('vitals_patient_idx').on(t.patientId, t.measuredAt)],
 );
 
+/** Raw bedside input, including incomplete numbers/time; never a clinical observation. */
+export const vitalFormDrafts = sqliteTable(
+  'vital_form_drafts',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id),
+    vitalId: text('vital_id').references(() => vitals.id),
+    scope: text('scope').notNull(),
+    encounterId: text('encounter_id').references(() => encounters.id),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedVitalId: text('committed_vital_id').references(() => vitals.id),
+  },
+  (t) => [
+    uniqueIndex('vital_form_drafts_open_target_idx')
+      .on(t.patientId, t.scope)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type VitalFormDraft = typeof vitalFormDrafts.$inferSelect;
+
 /* -------------------------------------------------------------------------- */
 /*  Labs: a panel is one draw, values are the individual analytes               */
 /* -------------------------------------------------------------------------- */

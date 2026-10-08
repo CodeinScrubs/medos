@@ -33,6 +33,55 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Raw vitals and exact 0.11.39 acceptance (0.11.40 source)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; see git log for its identity.
+
+**Changed**
+- Migration0026 adds one versioned/CAS raw vitals store. Exact invalid/incomplete
+  number/date/clock/text is retained independently from clinical measurements.
+- Atomic publication/retirement preserves the original encounter (including
+  null), sub-minute time and unrelated edits; conflicting BP halves require
+  explicit comparison. Retry cannot duplicate the measurement. Close keeps the
+  draft; explicit discard soft-retires it. One patient AutosaveScope owns all.
+- Publication sits above the long inline form. Doctor draft discard moves below
+  fields so the first acknowledgment no longer pushes the active input down.
+- Version0.11.40/code56; no new dependency, permission, route or clinical formula.
+- Record exact prior APK/native/independent archive evidence in validation-0.11.39.md.
+
+**Verified**
+- Full `npm run check`:145 suites/1,986 app tests and five workflow checks;
+  typecheck/lint/format green. Includes raw remount, invalid publication, original
+  admission, rollback, revision conflicts, BP pair, dataset replacement, late
+  acknowledgment, failed switch/Close and continued autosave after rebase.
+- Prior d21ca0e APK: actual native raw recovery/publication, two-photo source
+  import, font/IME/Back checks, inspected signed QA/owner artifacts and identical
+  JS bundles. Strict independent oracle:4,092 prior rows preserved with exactly
+  two intended edits and12 additions;34 media checked. Cold/old/current-cold
+  restores preserve4,104/4,092/4,104 rows exactly. Exact-source hosted CI passes.
+- Fresh fetch0/0 with origin/main; five reviewed PR heads remain unchanged.
+  Baseline144 suites/1,957 tests and this full check exit without worker warnings.
+
+**Not verified**
+- New 0.11.40 source in an APK or on a phone; .39 evidence does not cover it.
+- Physical hardware/audio/power/storage pressure or full product completion.
+
+**Open threads**
+- Bound/filter large timelines and direct access to their records. Then remaining
+  topic/idea/specialty/prescription/place/extension/credential raw forms, clinical
+  trash, visual rich text and whole-shift/pressure acceptance. Build/accept exact
+  final source. The physical phone is not the sole remaining gate yet.
+
+**Gotchas**
+- A post-emulator-restart System UI ANR interrupted one rejected .39 QA trial;
+  acknowledgment and subsequent native restore/export succeeded. It is not a
+  MedOS crash, and does not close the older .33 pressure/focus ANR.
+- UIAutomator reports an empty date field's hint as text; test actual valid input,
+  not an assertion that a reported hint is empty. Keep abandoned trial evidence.
+- Vitals fixtures use the same controlled clock for useNow and database defaults;
+  future-date validation was not weakened to accommodate a mismatched fixture.
+
 ## 2026-10-08 — Durable remaining raw forms and atomic photo batches (0.11.39)
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh contributors for doctor forms

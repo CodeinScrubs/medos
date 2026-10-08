@@ -26,6 +26,7 @@ export type AuditAction =
   | 'image.draftResolved'
   | 'vital.updated'
   | 'vital.deleted'
+  | 'vital.draftDiscarded'
   | 'diagnosis.updated'
   | 'diagnosis.deleted'
   | 'encounter.discharged'

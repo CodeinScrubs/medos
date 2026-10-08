@@ -12,7 +12,7 @@ import { validateDateInput } from '@/lib/date-input';
 import { useTheme } from '@/theme';
 
 import type { DoctorFormRow } from './form-draft-queries';
-import { DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
+import { DoctorDraftDiscard, DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
 
 /**
  * The social layer: where they are from, what they like, how we met.
@@ -207,6 +207,7 @@ function ProfileForm({
           loading={saving}
           full
         />
+        <DoctorDraftDiscard editing={editing} />
         {!editing.completed ? (
           <Button label="انصراف" variant="ghost" onPress={editing.close} disabled={saving} full haptic={false} />
         ) : null}

@@ -3,23 +3,41 @@ import { eq } from 'drizzle-orm';
 import { Alert, Pressable } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { AutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, EmptyState, Input, SectionHeader } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
-import { vitals } from '@/db/schema';
+import { tablesOf as mockTablesOf } from '@/db/query-tables';
+import { vitalFormDrafts, vitals } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
-import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
+import { openEncounter } from '@/features/encounters/queries';
+import { DatasetBusyError, DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
+import { dateInputText } from '@/lib/date-input';
+import { formatClock } from '@/lib/time';
+import { replacementFailure } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
+import { decodeVitalForm } from './form-draft';
+import * as draftQueries from './form-draft-queries';
 import { recordVital, updateVital, patientVitalsQuery, vitalQuery } from './queries';
 import { VitalsTab } from './vitals-tab';
 import { createPatient } from '../patients/queries';
 
 let mockReadError: Error | undefined;
-let mockRows: unknown[] | undefined;
+const mockRows = new Map<string, unknown[]>();
+let mockFocused = true;
+let mockFlush: (() => Promise<boolean>) | undefined;
+const mockNavigation = { isFocused: () => mockFocused, setOptions: jest.fn() };
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }), useNavigation: () => mockNavigation }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => mockNavigation }));
+jest.mock('@/components/use-save-before-leave', () => ({
+  useSaveBeforeLeave: (flush: () => Promise<boolean>) => {
+    mockFlush = flush;
+  },
+}));
 const mockRetry = jest.fn(() => {
   mockReadError = undefined;
 });
@@ -32,8 +50,9 @@ jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[] }) => {
-    if (!mockReadError) mockRows = query.all();
-    return { data: mockRows, error: mockReadError, retry: mockRetry };
+    const key = mockTablesOf(query).sort().join(',');
+    if (!mockReadError) mockRows.set(key, query.all());
+    return { data: mockRows.get(key), error: mockReadError, retry: mockRetry };
   },
 }));
 jest.mock('@/components/ui', () => ({
@@ -82,21 +101,29 @@ function snapshot() {
 const input = (label: string) => tree!.root.findAllByType(Input).find((node) => node.props.label === label)!;
 const button = (label: string) => tree!.root.findAllByType(Button).find((node) => node.props.label === label)!;
 async function settle() {
-  for (let i = 0; i < 16; i++) await Promise.resolve();
+  for (let i = 0; i < 70; i++) await Promise.resolve();
 }
+const app = () => (
+  <AutosaveScope>
+    <VitalsTab patientId={patientId} />
+  </AutosaveScope>
+);
 async function render() {
   await act(async () => {
-    tree = create(<VitalsTab patientId={patientId} />);
+    tree = create(app());
+    await settle();
   });
 }
 async function startNew() {
   await act(async () => {
-    button('اندازه‌گیری تازه').props.onPress();
+    (button('اندازه‌گیری تازه') ?? button('ادامهٔ اندازه‌گیری')).props.onPress();
+    await settle();
   });
 }
 async function startEdit() {
   await act(async () => {
     tree!.root.findAllByType(Pressable)[0]!.props.onPress();
+    await settle();
   });
 }
 async function type(label: string, value: string) {
@@ -112,10 +139,13 @@ async function save() {
 }
 
 beforeEach(async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-10-02T08:00:00Z'));
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Vitals' });
   mockReadError = undefined;
-  mockRows = undefined;
+  mockRows.clear();
+  mockFocused = true;
+  mockFlush = undefined;
   mockRetry.mockClear();
   jest.mocked(alertError).mockClear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -123,19 +153,237 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => {
     tree?.unmount();
+    await settle();
   });
   tree = undefined;
+  jest.clearAllTimers();
+  jest.useRealTimers();
   jest.restoreAllMocks();
 });
 
 describe('real observation form handlers', () => {
+  it('cold remount recovers exact invalid raw input without creating a reading', async () => {
+    await render();
+    await startNew();
+    await type('فشار (mmHg)', ' 120/x ');
+    await type('نبض', '8,0');
+    await type('توضیح', '  فارسی / English\nunfinished  ');
+    await act(async () => {
+      tree!.root
+        .findByType(QuickDateField)
+        .props.onRawInputChange({ dateText: '1400/12/30', clockText: '25:', customOpen: true });
+      expect(await mockFlush!()).toBe(true);
+    });
+    const raw = t.db.select().from(vitalFormDrafts).get()!;
+    expect(decodeVitalForm(raw.body).fields).toMatchObject({
+      bp: ' 120/x ',
+      heartRate: '8,0',
+      notes: '  فارسی / English\nunfinished  ',
+    });
+    expect(await patientVitalsQuery(patientId)).toHaveLength(0);
+    await act(async () => {
+      tree!.unmount();
+      await settle();
+    });
+    tree = undefined;
+    await render();
+    await startNew();
+    expect(input('فشار (mmHg)').props.value).toBe(' 120/x ');
+    expect(input('نبض').props.value).toBe('8,0');
+    expect(tree!.root.findByType(QuickDateField).props.rawInput).toEqual({
+      dateText: '1400/12/30',
+      clockText: '25:',
+      customOpen: true,
+    });
+    await save();
+    expect(await patientVitalsQuery(patientId)).toHaveLength(0);
+    expect(t.db.select().from(vitalFormDrafts).get()?.deletedAt).toBeNull();
+  });
+
+  it('closing acknowledges raw input and reopening resumes it without publishing', async () => {
+    await render();
+    await startNew();
+    await type('نبض', '8');
+    await act(async () => {
+      button('بستن').props.onPress();
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+    expect(await patientVitalsQuery(patientId)).toHaveLength(0);
+    expect(decodeVitalForm(t.db.select().from(vitalFormDrafts).get()!.body).fields.heartRate).toBe('8');
+    await startNew();
+    expect(input('نبض').props.value).toBe('8');
+  });
+
+  it('captures the original null admission before a later admission is opened', async () => {
+    await render();
+    await startNew();
+    await type('نبض', '80');
+    await openEncounter({ patientId, kind: 'admission', admittedAt: new Date('2026-10-02T07:00:00Z') });
+    await save();
+    expect((await patientVitalsQuery(patientId))[0]?.encounterId).toBeNull();
+  });
+
+  it('keeps the editor open when raw persistence fails and retries before publication', async () => {
+    await render();
+    await startNew();
+    await type('نبض', '80');
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_draft BEFORE INSERT ON vital_form_drafts BEGIN SELECT RAISE(ABORT, 'synthetic'); END",
+    );
+    await act(async () => {
+      button('بستن').props.onPress();
+      await settle();
+    });
+    expect(input('نبض').props.value).toBe('80');
+    expect(await patientVitalsQuery(patientId)).toHaveLength(0);
+    t.sqlite.exec('DROP TRIGGER fail_draft');
+    await act(async () => {
+      button('تلاش دوباره').props.onPress();
+      await settle();
+    });
+    expect(decodeVitalForm(t.db.select().from(vitalFormDrafts).get()!.body).fields.heartRate).toBe('80');
+    await save();
+    expect(await patientVitalsQuery(patientId)).toHaveLength(1);
+  });
+
+  it('does not replace an editor while its raw save is refused during a reading switch', async () => {
+    const id = await recordVital({ patientId, heartRate: 70 });
+    await render();
+    await startNew();
+    await type('نبض', '80');
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_draft BEFORE INSERT ON vital_form_drafts BEGIN SELECT RAISE(ABORT, 'synthetic'); END",
+    );
+    await startEdit();
+    expect(input('نبض').props.value).toBe('80');
+    expect((await vitalQuery(id))[0]?.heartRate).toBe(70);
+    t.sqlite.exec('DROP TRIGGER fail_draft');
+    await startEdit();
+    expect(input('نبض').props.value).toBe('70');
+    const raw = t.db.select().from(vitalFormDrafts).get()!;
+    expect(raw.vitalId).toBeNull();
+    expect(decodeVitalForm(raw.body).fields.heartRate).toBe('80');
+  });
+
+  it('holds dataset admission through delayed clinical acknowledgment and retains an unfocused completed form', async () => {
+    const commit = draftQueries.commitVitalFormDraft;
+    let release!: () => void;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.spyOn(draftQueries, 'commitVitalFormDraft').mockImplementation(async (...args) => {
+      const id = await commit(...args);
+      await wait;
+      return id;
+    });
+    await render();
+    await startNew();
+    await type('نبض', '80');
+    await save();
+    expect(await patientVitalsQuery(patientId)).toHaveLength(1);
+    expect(replacementFailure()).toBeInstanceOf(DatasetBusyError);
+    mockFocused = false;
+    await act(async () => {
+      release();
+      await settle();
+    });
+    expect(input('نبض').props.value).toBe('80');
+    expect(input('نبض').props.editable).toBe(false);
+    mockFocused = true;
+    await act(async () => {
+      button('بستن').props.onPress();
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+    expect(await patientVitalsQuery(patientId)).toHaveLength(1);
+  });
+
+  it('keeps raw input after a rollback and publishes once after the fault is removed', async () => {
+    await render();
+    await startNew();
+    await type('نبض', '80');
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_retire BEFORE UPDATE ON vital_form_drafts BEGIN SELECT RAISE(ABORT, 'synthetic'); END",
+    );
+    await save();
+    expect(await patientVitalsQuery(patientId)).toHaveLength(0);
+    expect(input('نبض').props.value).toBe('80');
+    expect(t.db.select().from(vitalFormDrafts).get()?.deletedAt).toBeNull();
+    t.sqlite.exec('DROP TRIGGER fail_retire');
+    await save();
+    expect(await patientVitalsQuery(patientId)).toHaveLength(1);
+  });
+
+  it('refuses a delayed draft discard after actual replacement without losing visible input', async () => {
+    await render();
+    await startNew();
+    await type('نبض', '80');
+    await act(async () => {
+      expect(await mockFlush!()).toBe(true);
+    });
+    const restore = snapshot();
+    await act(async () => button('حذف پیش‌نویس').props.onPress());
+    const discard = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((choice) => choice.text === 'حذف پیش‌نویس')!;
+    await act(async () => {
+      restore();
+      discard.onPress!();
+      await settle();
+    });
+    expect(input('نبض').props.value).toBe('80');
+    expect(t.db.select().from(vitalFormDrafts).get()?.deletedAt).toBeNull();
+    expect(alertError).toHaveBeenCalledWith('ثبت نشد', expect.any(DatasetChangedError));
+  });
+
+  it('continues autosaving after explicit Keep mine while retaining an independent correction', async () => {
+    const id = await recordVital({ patientId, heartRate: 70, temperature: 37 });
+    await render();
+    await startEdit();
+    await type('نبض', '80');
+    await updateVital(id, { heartRate: 75, temperature: 38 });
+    await save();
+    await act(async () => {
+      button('بررسی پیش‌نویس ذخیره‌شده').props.onPress();
+      await settle();
+    });
+    await act(async () => button('نگه‌داشتن نسخهٔ من').props.onPress());
+    const keep = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((choice) => choice.text === 'نگه‌داشتن نسخهٔ من')!;
+    await act(async () => {
+      keep.onPress!();
+      await settle();
+    });
+    await type('توضیح', '  Edited after Keep mine  ');
+    await act(async () => {
+      expect(await mockFlush!()).toBe(true);
+    });
+    expect(decodeVitalForm(t.db.select().from(vitalFormDrafts).get()!.body).fields.notes).toBe(
+      '  Edited after Keep mine  ',
+    );
+    await save();
+    expect((await vitalQuery(id))[0]).toMatchObject({
+      heartRate: 80,
+      temperature: 38,
+      notes: 'Edited after Keep mine',
+    });
+  });
+
   it('retains raw input and refuses an old new measurement after real dataset replacement', async () => {
     const restore = snapshot();
     await render();
     await startNew();
     await type('نبض', '81');
+    const oldSave = button('ثبت').props.onPress;
     await act(async () => restore());
-    await save();
+    await act(async () => {
+      oldSave();
+      await settle();
+    });
     expect(await patientVitalsQuery(patientId)).toHaveLength(0);
     expect(input('نبض').props.value).toBe('81');
     expect(alertError).toHaveBeenCalledWith('ثبت نشد', expect.any(DatasetChangedError));
@@ -147,8 +395,12 @@ describe('real observation form handlers', () => {
     await render();
     await startEdit();
     await type('نبض', '90');
+    const oldSave = button('ثبت').props.onPress;
     await act(async () => restore());
-    await save();
+    await act(async () => {
+      oldSave();
+      await settle();
+    });
     expect((await vitalQuery(id))[0]?.heartRate).toBe(80);
     expect(input('نبض').props.value).toBe('90');
     expect(alertError).toHaveBeenCalledWith('ثبت نشد', expect.any(DatasetChangedError));
@@ -251,7 +503,11 @@ describe('real observation form handlers', () => {
     const measuredAt = new Date('2026-10-01T08:15:00Z');
     const submit = button('ثبت').props.onPress;
     await act(async () => {
-      tree!.root.findByType(QuickDateField).props.onChange(measuredAt);
+      tree!.root.findByType(QuickDateField).props.onRawInputChange({
+        dateText: dateInputText(measuredAt),
+        clockText: formatClock(measuredAt),
+        customOpen: true,
+      });
       submit();
       await settle();
     });
@@ -277,15 +533,18 @@ describe('real observation form handlers', () => {
     await type('نبض', '90');
     mockReadError = new Error('Synthetic refresh failure');
     await act(async () => {
-      tree!.update(<VitalsTab patientId={patientId} />);
+      tree!.update(app());
     });
     expect(input('نبض').props.value).toBe('90');
     expect(
       tree!.root.findAllByType(SectionHeader).find((node) => node.props.title === 'اندازه‌گیری‌ها')?.props.count,
     ).toBeUndefined();
     await act(async () => {
-      tree!.root.findByType(ErrorNotice).props.onRetry();
-      tree!.update(<VitalsTab patientId={patientId} />);
+      tree!.root
+        .findAllByType(ErrorNotice)
+        .find((node) => node.props.what === 'علائم حیاتی')!
+        .props.onRetry();
+      tree!.update(app());
     });
     expect(input('نبض').props.value).toBe('90');
     expect(
@@ -297,11 +556,11 @@ describe('real observation form handlers', () => {
     mockReadError = new Error('Synthetic read failure');
     await render();
     expect(tree!.root.findAllByType(EmptyState)).toHaveLength(0);
-    const notice = tree!.root.findByType(ErrorNotice);
+    const notice = tree!.root.findAllByType(ErrorNotice).find((node) => node.props.what === 'علائم حیاتی')!;
     expect(notice.props.onRetry).toBe(mockRetry);
     await act(async () => {
       notice.props.onRetry();
-      tree!.update(<VitalsTab patientId={patientId} />);
+      tree!.update(app());
     });
     expect(mockRetry).toHaveBeenCalledTimes(1);
     expect(tree!.root.findAllByType(EmptyState)).toHaveLength(1);

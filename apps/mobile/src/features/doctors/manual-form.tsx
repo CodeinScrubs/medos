@@ -429,8 +429,6 @@ export function DoctorDraftNotice({
     | 'compare'
     | 'loadStored'
     | 'keepMine'
-    | 'hasDraft'
-    | 'discard'
   >;
   recovered: boolean;
 }) {
@@ -503,11 +501,19 @@ export function DoctorDraftNotice({
           </Column>
         </Card>
       ) : null}
-      {editing.hasDraft && !completed && !stale ? (
-        <Button label="حذف پیش‌نویس" variant="ghost" disabled={locked} onPress={editing.discard} />
-      ) : null}
     </>
   );
+}
+
+/** Keep the first autosave acknowledgment from inserting a control above the active input. */
+export function DoctorDraftDiscard({
+  editing,
+}: {
+  editing: Pick<ReturnType<typeof useManualDoctorForm>, 'hasDraft' | 'completed' | 'stale' | 'locked' | 'discard'>;
+}) {
+  return editing.hasDraft && !editing.completed && !editing.stale ? (
+    <Button label="حذف پیش‌نویس" variant="ghost" disabled={editing.locked} onPress={editing.discard} />
+  ) : null;
 }
 
 const FIELD_LABELS: Record<string, string> = {

@@ -1869,3 +1869,25 @@ each copy. The obsolete non-journal photo-storage path is removed.
 No backup format, dependency, permission, route or clinical formula changes.
 Native/device acceptance and the remaining raw-form/product gates belong in the
 execution ledger and validation record; these source contracts do not close them.
+
+## Raw vitals and inline editor ownership (0.11.40)
+
+Migration0026 adds `vital_form_drafts`, separate from clinical measurements. A
+strict version1 codec stores exact raw strings, date/clock/open-picker state,
+initial fields, sub-minute timestamp, original encounter and clinical basis.
+Invalid/incomplete input can be acknowledged as raw without creating a clinical
+number. One combined read supplies the first seed; refresh does not reset input.
+New publication uses the original encounter, including null. Updating preserves
+untouched fields/whitespace; BP is one pair, not two independently merged numbers.
+Atomic clinical publication plus draft retirement supports replay after a late
+acknowledgment. A deleted owner is never revived. Opening a date picker alone
+does not rewrite measurement time during rebase.
+
+The inline editor joins the patient screen's existing AutosaveScope and original
+dataset intent. Switching/Close flushes raw input before replacing the seed;
+failed acknowledgment leaves the editor intact. No competing removal guard or
+new route is added. Compare/Load/Keep/discard recheck the shown snapshot and CAS
+revision under the original dataset admission. Keep resumes autosave; an old
+confirmation cannot affect a replacement dataset. Publication is above the long
+form, with a stable native parent. Source/component checks do not establish native
+IME/Back/process-death acceptance; that belongs in the exact APK validation record.

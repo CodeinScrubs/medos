@@ -16,7 +16,7 @@ import { useTheme } from '@/theme';
 
 import type { DoctorFormRow } from './form-draft-queries';
 import { RELATIONSHIP_LABELS, RELATIONSHIP_ORDER } from './labels';
-import { DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
+import { DoctorDraftDiscard, DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
 import { specialtiesQuery } from './queries';
 
 const RELATIONSHIP_OPTIONS = RELATIONSHIP_ORDER.map((r) => ({ value: r, label: RELATIONSHIP_LABELS[r] }));
@@ -379,6 +379,7 @@ function DoctorForm({
           full
           style={{ marginTop: spacing.sm }}
         />
+        <DoctorDraftDiscard editing={editing} />
         {!editing.completed ? (
           <Button label="انصراف" variant="ghost" disabled={saving} onPress={editing.close} full haptic={false} />
         ) : null}

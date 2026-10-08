@@ -27,6 +27,7 @@ import m0022 from './0022_cultured_bishop.sql';
 import m0023 from './0023_milky_darkhawk.sql';
 import m0024 from './0024_happy_celestials.sql';
 import m0025 from './0025_faithful_power_pack.sql';
+import m0026 from './0026_woozy_callisto.sql';
 
   export default {
     journal,
@@ -56,7 +57,8 @@ m0021,
 m0022,
 m0023,
 m0024,
-m0025
+m0025,
+m0026
     }
   }
   

@@ -13,7 +13,7 @@ import { useTheme } from '@/theme';
 import type { DoctorFormRow } from './form-draft-queries';
 import { RATING_STEP_LABELS } from './labels';
 import { doctorDisplayName, ratingAverage } from './logic';
-import { DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
+import { DoctorDraftDiscard, DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
 
 const STEPS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: toPersianDigits(n) }));
 
@@ -146,6 +146,7 @@ function RatingForm({
           loading={saving}
           full
         />
+        <DoctorDraftDiscard editing={editing} />
         {!editing.completed ? (
           <Button label="انصراف" variant="ghost" onPress={editing.close} disabled={saving} full haptic={false} />
         ) : null}
