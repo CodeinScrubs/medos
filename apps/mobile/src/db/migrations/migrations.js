@@ -25,6 +25,7 @@ import m0020 from './0020_happy_bucky.sql';
 import m0021 from './0021_aromatic_millenium_guard.sql';
 import m0022 from './0022_cultured_bishop.sql';
 import m0023 from './0023_milky_darkhawk.sql';
+import m0024 from './0024_happy_celestials.sql';
 
   export default {
     journal,
@@ -52,7 +53,8 @@ m0019,
 m0020,
 m0021,
 m0022,
-m0023
+m0023,
+m0024
     }
   }
   

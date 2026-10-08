@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import * as Clipboard from 'expo-clipboard';
-import { Alert, AppState, TextInput, View, type AppStateStatus } from 'react-native';
+import { Alert, AppState, Pressable, TextInput, View, type AppStateStatus } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
@@ -145,6 +145,54 @@ afterEach(async () => {
 });
 
 describe('lab entry mounted intent and retained raw values', () => {
+  it('recovers and publishes a custom unit without changing the value or preset units', async () => {
+    await render();
+    await invoke(() => button('آنالیت دیگر').props.onPress());
+    const field = (placeholder: string) =>
+      tree!.root.findAllByType(TextInput).find((n) => n.props.placeholder === placeholder)!;
+    await invoke(() => field('Analyte').props.onChangeText('Synthetic custom'));
+    await invoke(() => field('Unit').props.onChangeText('  mmol/L  '));
+    const custom = () => tree!.root.findAll((n) => n.props.row?.analyte === 'Synthetic custom')[0]!;
+    await invoke(() => custom().props.onChange({ value: '5.8' }));
+    await invoke(() => jest.advanceTimersByTime(850));
+    const draft = decodeLabForm(t.db.select().from(labFormDrafts).get()!.body);
+    expect(draft.fields.rows.find((r) => r.analyte === 'Synthetic custom')).toMatchObject({
+      unit: '  mmol/L  ',
+      value: '5.8',
+    });
+    await act(async () => tree!.unmount());
+    tree = undefined;
+    await render();
+    expect(field('Unit').props.value).toBe('  mmol/L  ');
+    await invoke(() => save().props.onPress());
+    expect(current().values).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ analyte: 'Synthetic custom', value: '5.8', unit: '  mmol/L  ' }),
+        expect.objectContaining({ analyte: 'Hb', unit: 'g/dL', value: '12' }),
+      ]),
+    );
+  });
+
+  it.each(['5,8', '2', '20'])('keeps custom-row removal accessible for flagged input %s', async (raw) => {
+    await render();
+    await invoke(() => button('آنالیت دیگر').props.onPress());
+    const custom = () => tree!.root.findAll((n) => n.props.row?.custom && n.props.onChange)[0]!;
+    await invoke(() => custom().props.onChange({ analyte: 'Synthetic custom', value: raw, refLow: 5, refHigh: 15 }));
+    const remove = tree!.root.findAllByType(Pressable).find((n) => n.props.accessibilityLabel === 'حذف ردیف');
+    expect(remove).toBeDefined();
+    if (raw === '5,8')
+      expect(tree!.root.findAllByType(Text).some((n) => n.props.accessibilityLabel === 'عدد خوانا نیست')).toBe(true);
+    await invoke(() => remove!.props.onPress());
+    await invoke(() => jest.advanceTimersByTime(850));
+    expect(decodeLabForm(t.db.select().from(labFormDrafts).get()!.body).fields.rows.map((r) => r.analyte)).toEqual([
+      'Hb',
+    ]);
+    await act(async () => tree!.unmount());
+    tree = undefined;
+    await render();
+    expect(tree!.root.findAll((n) => n.props.row?.custom && n.props.onChange)).toHaveLength(0);
+  });
+
   it.each(['new', 'edit'] as const)('keeps %s lab publication accessible in the stable header', async (kind) => {
     if (kind === 'new') {
       mockParams = { id: mockParams.id };

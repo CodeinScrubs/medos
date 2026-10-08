@@ -1729,3 +1729,51 @@ Do not sweep those files to hide failure. Active pointer events before an acknow
 draft write are also not crash-durable. Native rendering/export, physical A52s,
 power/space pressure and full product acceptance remain distinct gates. Record
 actual artifact and device evidence in validation-0.11.36.md.
+
+## Companion raw details and remaining manual doctor forms (0.11.37)
+
+`contact_form_drafts` is additive migration0024. A partial unique index permits
+one open companion draft per patient; published contacts remain independent.
+The strict v1 document preserves phone/name/relation/notes exactly, including
+incomplete numbers and whitespace. Untouched forms create nothing. Autosave
+uses the existing quiet interval/ceiling, background flush and one always-on
+AutosaveScope. Its state describes a raw draft, never a published contact.
+
+Saving a contact checks the live parent, validates the visible number, inserts
+the contact and retires the draft in one synchronous transaction. Its revision
+and committedContactId make replay return the original contact without new
+rows or timestamps. Draft saving on a soft-deleted patient is permitted to
+preserve input; publication is refused. Unknown documents are readable as raw
+bytes, with generic errors, and cannot be silently replaced with a blank form.
+
+One query reads parent/draft together; the gate retains the first seed through
+read failure, deletion and dataset replacement. All saves, comparisons,
+loads, resolutions and delayed confirmations carry the original generation.
+Compare presents the saved raw branch. Keep and Load require the same observed
+draft before replacing a branch; a third write requires another review.
+Discard soft-retires only the acknowledged draft. The same scroll host,
+non-collapsible native parent and header stay mounted during submission and
+completion. An unfocused acknowledgment cannot Back a newer route; completion
+offers explicit Close. Stale Close requires reviewing/copying old input first.
+
+The doctor directory/profile/rating forms now use a feature-local manual
+submission helper for original intent, retained seeds, synchronous latest and
+acting refs, focused acknowledgment and readable completion. It is explicitly
+**not** raw crash recovery. Directory/profile edits compare the original
+editable basis and write only locally changed fields; same-field conflicts are
+refused, while unrelated flags/tags/text/coordinates survive. Specialty,
+subspecialty and their displayed text form one conflict group. Profile upsert
+and rating append check the live doctor in a synchronous transaction. Profile
+date text is controlled and validated from its current raw value.
+
+Imported photo attachments now persist the checksum and original MIME returned
+by storage; earlier rows with null metadata are not guessed or rewritten.
+Custom lab units use the existing raw lab document, with Latin digits and no
+conversion. Remove is independent of an unreadable/H/L marker. Every flowsheet
+cell and trend-history row shows its recorded unit (or missing-unit label),
+while existing axis grouping remains unchanged.
+
+Doctor/profile/rating and photo-caption/imaging raw crash recovery, durable
+multi-photo import/journal and safe orphan inventory remain open. This release
+does not certify phone hardware, power/low-space behavior or a 24-hour heavy
+shift. Keep bounded native acceptance separate from software tests.

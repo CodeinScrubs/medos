@@ -3,7 +3,7 @@ import type { ImagePickerOptions, ImagePickerResult } from 'expo-image-picker';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
-import { Button } from '@/components/ui';
+import { Button, Text } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
 import { attachments, labPanels } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
@@ -15,14 +15,22 @@ import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { LabsTab } from './labs-tab';
+import { createLabPanel } from './queries';
+import { TrendScreen } from './trend-screen';
 
 let mockChoose: ((source: 'camera' | 'library') => void) | undefined;
+let mockTrendParams: { id: string; analyte: string };
 const mockPicker = jest.fn<(options: ImagePickerOptions) => Promise<ImagePickerResult>>();
 const mockStore = jest.fn<typeof storePhoto>();
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/db/use-live', () => ({ useLive: (query: { all(): unknown[] }) => ({ data: query.all() }) }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+  useLocalSearchParams: () => mockTrendParams,
+}));
+jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
+jest.mock('@/components/trend-chart', () => ({ TrendChart: 'TrendChart' }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: (options: ImagePickerOptions) => mockPicker(options),
@@ -38,8 +46,10 @@ jest.mock('@/components/ui', () => ({
   Row: 'Row',
   Segmented: 'Segmented',
   Text: 'Text',
+  Screen: 'Screen',
+  Divider: 'Divider',
 }));
-jest.mock('@/theme', () => ({ useTheme: () => ({ spacing: {} }) }));
+jest.mock('@/theme', () => ({ useTheme: () => ({ spacing: {}, colors: {} }) }));
 jest.mock('@/platform/media', () => ({
   mediaUri: (value: string) => value,
   storePhoto: (...args: Parameters<typeof storePhoto>) => mockStore(...args),
@@ -90,6 +100,7 @@ beforeEach(async () => {
   expect(fileJobsActive()).toBe(false);
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Lab' });
+  mockTrendParams = { id: patientId, analyte: 'Synthetic custom' };
   mockChoose = undefined;
   jest.mocked(alertError).mockClear();
   mockPicker.mockReset().mockResolvedValue(picked());
@@ -118,6 +129,29 @@ afterEach(() => {
 });
 
 describe('lab photo callback', () => {
+  it('labels every recorded value with its own unit in the flowsheet and trend history', async () => {
+    for (const [index, unit] of ['mg/dL', 'µmol/L', null].entries()) {
+      await createLabPanel({
+        patientId,
+        collectedAt: new Date(1_700_000_000_000 + index * 86400000),
+        source: 'manual',
+        values: [{ analyte: mockTrendParams.analyte, value: String(20 + index), unit }],
+      });
+    }
+    const visibleUnits = () => tree!.root.findAllByType(Text).map((n) => n.props.children);
+    await act(async () => {
+      tree!.update(<LabsTab patientId={patientId} />);
+    });
+    expect(visibleUnits()).toEqual(expect.arrayContaining(['mg/dL', 'µmol/L', 'بدون واحد']));
+    await act(async () => {
+      tree!.unmount();
+    });
+    await act(async () => {
+      tree = create(<TrendScreen />);
+    });
+    expect(visibleUnits()).toEqual(expect.arrayContaining(['mg/dL', 'µmol/L', 'بدون واحد']));
+  });
+
   it('refuses a source selection held across same-ID replacement before opening the picker', async () => {
     const restore = snapshot();
     await act(async () => restore());

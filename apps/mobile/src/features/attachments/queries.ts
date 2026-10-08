@@ -198,6 +198,8 @@ export function addAttachmentInTransaction(
       relativePath: input.relativePath,
       thumbnailPath: input.thumbnailPath ?? null,
       originalPath: input.originalPath ?? null,
+      originalMimeType: input.originalMimeType ?? null,
+      checksum: input.checksum ?? null,
       mimeType: input.mimeType ?? null,
       sizeBytes: input.sizeBytes ?? null,
       width: input.width ?? null,

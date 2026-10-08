@@ -36,6 +36,18 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.37 closes companion raw-form recovery via migration0024 and hardens the
+remaining manual doctor submissions against original-intent, late navigation,
+same-turn duplicate and field overwrite defects. Their raw crash recovery is
+still open. Imported photo checksums/original MIME are now actually persisted;
+custom lab units and flagged-row Remove are accessible. Tables/history show
+each recorded unit. No dependency, permission, route or clinical formula added.
+Verification and explicit remaining acceptance gates belong in
+validation-0.11.37.md and the newest HANDOFF; do not treat these fixes as full
+P0 or product completion. Next: doctor/profile/rating and photo-caption/imaging
+raw durability, durable photo batch publication/recovery and orphan inventory;
+then physical, pressure and full-shift evidence.
+
 0.11.36 adds reversible photo annotation without overwriting the original or
 working image. The viewer opens a single editor with pen/highlight/arrow/text,
 crop/rotate, undo/redo and history. Raw text and marks use recoverable/CAS drafts;

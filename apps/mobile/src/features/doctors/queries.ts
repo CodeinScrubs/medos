@@ -7,6 +7,7 @@ import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { normalizePhone } from '@/lib/persian';
 
+import { checkedEditPatch, DoctorFormConflict } from './edit-basis';
 import { doctorDisplayName, doctorSearchText, parseDoctorName } from './logic';
 import { repairOccasionReminders } from './occasion-reminder-queries';
 
@@ -75,7 +76,7 @@ export async function createDoctor(input: DoctorInput): Promise<string> {
   return id;
 }
 
-export async function updateDoctor(id: string, input: Partial<DoctorInput>): Promise<void> {
+export async function updateDoctor(id: string, input: Partial<DoctorInput>, basis?: Doctor): Promise<void> {
   const renamed = db.transaction((tx) => {
     const current = tx
       .select()
@@ -83,12 +84,20 @@ export async function updateDoctor(id: string, input: Partial<DoctorInput>): Pro
       .where(and(alive, eq(doctors.id, id)))
       .get();
     if (!current) throw new Error('پزشک پیدا نشد یا حذف شده است.');
-    const merged = { ...current, ...input };
+    if (basis && basis.id !== id) throw new DoctorFormConflict();
+    const normalized = {
+      ...input,
+      ...(input.phone !== undefined ? { phone: normalizePhone(input.phone ?? '') || null } : {}),
+    };
+    const patch = basis
+      ? checkedEditPatch(current, basis, normalized, [['specialtyId', 'subspecialtyId', 'specialtyText']])
+      : normalized;
+    if (Object.keys(patch).length === 0) return false;
+    const merged = { ...current, ...patch };
     tx.update(doctors)
       .set({
-        ...input,
+        ...patch,
         ...touch(),
-        phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
         searchText: doctorSearchText(merged, specialtyWords(merged)),
       })
       .where(and(alive, eq(doctors.id, id)))

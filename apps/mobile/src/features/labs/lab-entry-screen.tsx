@@ -695,9 +695,24 @@ function LabRowEditor({
               {row.analyte}
             </Text>
           )}
-          <Pressable onPress={onEditRange} hitSlop={6} disabled={disabled}>
+          {row.custom ? (
+            <TextInput
+              accessibilityLabel="واحد آزمایش"
+              editable={!disabled}
+              value={row.unit ?? ''}
+              onChangeText={(t) => onChange({ unit: toLatinDigits(t) })}
+              placeholder="Unit"
+              placeholderTextColor={colors.textFaint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[typography.caption, styles.ltrText, { color: colors.textMuted, minHeight: 36, padding: 0 }]}
+            />
+          ) : null}
+          <Pressable onPress={onEditRange} hitSlop={6} disabled={disabled} accessibilityRole="button">
             <Text variant="tiny" color="textFaint" ltr>
-              {[row.unit, range ? `ref ${range}` : row.qualitative ? null : 'no ref range'].filter(Boolean).join(' · ')}
+              {[row.custom ? null : row.unit, range ? `ref ${range}` : row.qualitative ? null : 'no ref range']
+                .filter(Boolean)
+                .join(' · ')}
             </Text>
           </Pressable>
         </View>
@@ -736,12 +751,20 @@ function LabRowEditor({
             <Text variant="captionStrong" ltr style={{ color: flagColor ?? colors.text }}>
               {FLAG_LABEL[flag]}
             </Text>
-          ) : row.custom ? (
-            <Pressable onPress={onRemove} hitSlop={8} accessibilityLabel="حذف ردیف" disabled={disabled}>
-              <Ionicons name="close" size={16} color={colors.textFaint} />
-            </Pressable>
           ) : null}
         </View>
+        {row.custom ? (
+          <Pressable
+            onPress={onRemove}
+            hitSlop={8}
+            accessibilityLabel="حذف ردیف"
+            accessibilityRole="button"
+            disabled={disabled}
+            style={{ minWidth: 32, minHeight: 40, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="close" size={16} color={colors.textFaint} />
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );

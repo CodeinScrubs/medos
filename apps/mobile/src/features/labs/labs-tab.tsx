@@ -267,17 +267,22 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
                       ]}
                     >
                       {v ? (
-                        <Text
-                          numeric
-                          numberOfLines={1}
-                          align="center"
-                          style={{ color: unreadable(v) ? colors.danger : color, fontSize: 13 }}
-                        >
-                          {ltrIsolate(
-                            (v.value ?? '') +
-                              (unreadable(v) ? ' ?' : v.flag && v.flag !== 'normal' ? ` ${FLAG_LABEL[v.flag]}` : ''),
-                          )}
-                        </Text>
+                        <>
+                          <Text
+                            numeric
+                            numberOfLines={1}
+                            align="center"
+                            style={{ color: unreadable(v) ? colors.danger : color, fontSize: 13 }}
+                          >
+                            {ltrIsolate(
+                              (v.value ?? '') +
+                                (unreadable(v) ? ' ?' : v.flag && v.flag !== 'normal' ? ` ${FLAG_LABEL[v.flag]}` : ''),
+                            )}
+                          </Text>
+                          <Text variant="tiny" color="textMuted" numeric align="center" numberOfLines={1}>
+                            {v.unit?.trim() || 'بدون واحد'}
+                          </Text>
+                        </>
                       ) : (
                         <Text variant="tiny" color="textFaint" align="center">
                           ·

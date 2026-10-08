@@ -1,9 +1,10 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { doctorProfiles, doctorRatings, type DoctorProfile } from '@/db/schema';
+import { doctorProfiles, doctorRatings, doctors, type DoctorProfile } from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
+import { checkedEditPatch, DoctorFormConflict } from './edit-basis';
 import type { RatingScores } from './logic';
 
 /*
@@ -36,13 +37,25 @@ export type RatingInput = RatingScores & { reasoning?: string | null; ratedAt?: 
 export async function addDoctorRating(doctorId: string, input: RatingInput): Promise<string> {
   const id = newId();
   const { reasoning, ratedAt, ...scores } = input;
-  await db.insert(doctorRatings).values({
-    id,
-    ...stamps(),
-    doctorId,
-    ...scores,
-    reasoning: reasoning?.trim() || null,
-    ratedAt: ratedAt ?? new Date(),
+  db.transaction((tx) => {
+    if (
+      !tx
+        .select({ id: doctors.id })
+        .from(doctors)
+        .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
+        .get()
+    )
+      throw new Error('پزشک پیدا نشد یا حذف شده است.');
+    tx.insert(doctorRatings)
+      .values({
+        id,
+        ...stamps(),
+        doctorId,
+        ...scores,
+        reasoning: reasoning?.trim() || null,
+        ratedAt: ratedAt ?? new Date(),
+      })
+      .run();
   });
   return id;
 }
@@ -76,21 +89,72 @@ export function doctorProfileQuery(doctorId: string) {
     .limit(1);
 }
 
+/** Resolve the live parent and optional profile in the same watched SQLite statement. */
+export function doctorProfileFormQuery(doctorId: string) {
+  return db
+    .select({ doctor: doctors, profile: doctorProfiles })
+    .from(doctors)
+    .leftJoin(doctorProfiles, and(eq(doctorProfiles.doctorId, doctors.id), profileAlive))
+    .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
+    .limit(1);
+}
+
 export type ProfileInput = Partial<Omit<DoctorProfile, 'id' | 'doctorId' | 'createdAt' | 'updatedAt' | 'deletedAt'>>;
 
 /** One profile per doctor: written if it exists, created if it does not. */
-export async function saveDoctorProfile(doctorId: string, input: ProfileInput): Promise<string> {
-  const current = (await doctorProfileQuery(doctorId))[0];
-  if (current) {
-    await db
-      .update(doctorProfiles)
-      .set({ ...input, ...touch() })
-      .where(eq(doctorProfiles.id, current.id));
-    return current.id;
-  }
-  const id = newId();
-  await db.insert(doctorProfiles).values({ id, ...stamps(), doctorId, ...input });
-  return id;
+export async function saveDoctorProfile(
+  doctorId: string,
+  input: ProfileInput,
+  basis?: DoctorProfile | null,
+): Promise<string> {
+  return db.transaction((tx) => {
+    if (
+      !tx
+        .select({ id: doctors.id })
+        .from(doctors)
+        .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
+        .get()
+    )
+      throw new Error('پزشک پیدا نشد یا حذف شده است.');
+    const current = tx
+      .select()
+      .from(doctorProfiles)
+      .where(and(profileAlive, eq(doctorProfiles.doctorId, doctorId)))
+      .get();
+    if (basis && (!current || current.id !== basis.id)) throw new DoctorFormConflict();
+    if (current) {
+      const initial =
+        basis === null
+          ? {
+              ...current,
+              birthDate: null,
+              hometown: null,
+              almaMater: null,
+              graduationYear: null,
+              familyNotes: null,
+              interests: [],
+              favoriteTopics: null,
+              dislikes: null,
+              howWeMet: null,
+              memorableMoments: null,
+              communicationStyle: null,
+              personalNotes: null,
+            }
+          : basis;
+      const patch = initial ? checkedEditPatch(current, initial, input) : input;
+      if (Object.keys(patch).length)
+        tx.update(doctorProfiles)
+          .set({ ...patch, ...touch() })
+          .where(and(profileAlive, eq(doctorProfiles.id, current.id)))
+          .run();
+      return current.id;
+    }
+    const id = newId();
+    tx.insert(doctorProfiles)
+      .values({ id, ...stamps(), doctorId, ...input })
+      .run();
+    return id;
+  });
 }
 
 /**

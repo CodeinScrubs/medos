@@ -102,6 +102,26 @@ export const patientContacts = sqliteTable(
   (t) => [index('patient_contacts_patient_idx').on(t.patientId)],
 );
 
+/** Unfinished companion details stay separate from the published patient record. */
+export const contactFormDrafts = sqliteTable(
+  'contact_form_drafts',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedContactId: text('committed_contact_id').references(() => patientContacts.id),
+  },
+  (t) => [
+    uniqueIndex('contact_form_drafts_open_patient_idx')
+      .on(t.patientId)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type ContactFormDraft = typeof contactFormDrafts.$inferSelect;
+
 /* -------------------------------------------------------------------------- */
 /*  Encounter: one admission, or one outpatient episode                         */
 /* -------------------------------------------------------------------------- */

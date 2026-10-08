@@ -169,6 +169,13 @@
       "when": 1791430350119,
       "tag": "0023_milky_darkhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1791463564200,
+      "tag": "0024_happy_celestials",
+      "breakpoints": true
     }
   ]
 }

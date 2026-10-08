@@ -203,29 +203,36 @@ export async function addPatientContact(
   patientId: string,
   contact: { name?: string; relation?: string; phone: string; isPrimary?: boolean; notes?: string },
 ): Promise<string> {
+  return db.transaction((tx) => addPatientContactInTransaction(tx, patientId, contact));
+}
+
+/** Shared by manual publication and raw-draft retirement in the same transaction. */
+export function addPatientContactInTransaction(
+  tx: DbTransaction,
+  patientId: string,
+  contact: { name?: string; relation?: string; phone: string; isPrimary?: boolean; notes?: string },
+): string {
   const id = newId();
-  db.transaction((tx) => {
-    if (
-      !tx
-        .select({ id: patients.id })
-        .from(patients)
-        .where(and(alive, eq(patients.id, patientId)))
-        .get()
-    )
-      throw new Error('پروندهٔ بیمار پیدا نشد.');
-    tx.insert(patientContacts)
-      .values({
-        id,
-        ...stamps(),
-        patientId,
-        name: contact.name ?? null,
-        relation: contact.relation ?? null,
-        phone: normalizePhone(contact.phone),
-        isPrimary: contact.isPrimary ?? false,
-        notes: contact.notes ?? null,
-      })
-      .run();
-  });
+  if (
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(alive, eq(patients.id, patientId)))
+      .get()
+  )
+    throw new Error('پروندهٔ بیمار پیدا نشد.');
+  tx.insert(patientContacts)
+    .values({
+      id,
+      ...stamps(),
+      patientId,
+      name: contact.name ?? null,
+      relation: contact.relation ?? null,
+      phone: normalizePhone(contact.phone),
+      isPrimary: contact.isPrimary ?? false,
+      notes: contact.notes ?? null,
+    })
+    .run();
   return id;
 }
 

@@ -37,6 +37,8 @@ const stored = (): Awaited<ReturnType<typeof storePhoto>> => ({
   relativePath: 'media/synthetic/photo.jpg',
   thumbnailPath: 'media/synthetic/thumb.jpg',
   originalPath: 'media/synthetic/original.jpg',
+  originalMimeType: 'image/heic',
+  checksum: 'b'.repeat(64),
   mimeType: 'image/jpeg',
   sizeBytes: 100,
   width: 640,
@@ -56,6 +58,15 @@ beforeEach(async () => {
 });
 
 describe('whole photo job exclusion', () => {
+  it('publishes original format and checksum returned by storage without guessing from the edited JPEG', async () => {
+    await storeAndAttach([asset()], target());
+    expect(t.db.select().from(attachments).get()).toMatchObject({
+      mimeType: 'image/jpeg',
+      originalMimeType: 'image/heic',
+      checksum: 'b'.repeat(64),
+    });
+  });
+
   it('keeps the picker source intact even when an older caller requests crop', async () => {
     await attachPhotos({ ...target(), source: 'library', crop: true });
     expect(mockPicker.mock.calls[0]![0].allowsEditing).toBe(false);

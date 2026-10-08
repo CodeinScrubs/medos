@@ -114,6 +114,21 @@ const input = (entityType: AttachmentEntity, patient?: string | null) => ({
 });
 
 describe('attachment ownership at publication', () => {
+  it('keeps the verified file checksum and original MIME in the committed metadata', async () => {
+    const id = await addAttachment({
+      ...input('patient', patientId),
+      kind: 'clinical_photo',
+      originalPath: 'media/test/original.png',
+      originalMimeType: 'image/png',
+      checksum: 'a'.repeat(64),
+    });
+    expect((await attachmentQuery(id))[0]).toMatchObject({
+      originalPath: 'media/test/original.png',
+      originalMimeType: 'image/png',
+      checksum: 'a'.repeat(64),
+    });
+  });
+
   it('refuses an empty patient target instead of treating it as general media', async () => {
     await expect(addAttachment({ ...input('patient'), entityId: '' })).rejects.toThrow();
     expect(t.db.select().from(attachments).all()).toEqual([]);

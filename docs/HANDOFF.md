@@ -33,6 +33,60 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Companion raw recovery and manual form integrity
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh reviews. Primary owns integration
+and verification; both reviewers stopped at their usage limits. No further
+delegation is running.
+**Commits:** this source checkpoint. Final native/artifact evidence will be
+recorded in a follow-up documentation commit, not inferred from software tests.
+
+**Changed**
+- Add migration0024/contact_form_drafts for exact companion input, CAS,
+  explicit competing-draft comparison and atomic publication/soft retirement.
+  Incomplete input is recoverable without publishing a patient contact.
+- Retain companion/directory/profile/rating forms through read failure,
+  deletion and restore; original dataset admission, synchronous input/submission
+  locks and focused Close prevent stale publication or popping another route.
+  Directory/profile patches compare only changed fields; specialty fields
+  conflict as a group. Doctor raw text is still process-local.
+- Persist photo checksum/original MIME already returned by import. Add custom
+  lab Unit, independent Remove beside invalid/H/L flags, and units per value
+  in flowsheet/history. No unit guessing, conversion or clinical formula.
+- Version0.11.37/code53; no new dependency, route or permission. Contracts and
+  remaining priorities are in architecture/IMPLEMENTATION/validation-0.11.37.md.
+
+**Verified**
+- Clean baseline a08bc18: brief/check green,134 suites/1,780 app tests+5 workflows.
+- Photo/lab regression witnesses fail before correction; corrected group83
+  tests passes. Integrated form/occasion/flowsheet group111 tests passes.
+- Final full `npm run check`:137 suites/1,851 app tests+5 workflows, typecheck,
+  lint and formatting green. Real SQLite includes CAS, rollback/replay, raw
+  roundtrip, competing third writer, original generation and old/current restore.
+- Real Screen/Column/View tests retain native stacking parent/header through
+  submission/close. These tests do not prove native Android behavior.
+
+**Not verified**
+- Rebuilt0.11.37 APK/native upgrade/restore/close are pending this checkpoint.
+- Physical A52s, HEIC/camera, voice/reminders/SAF, power/low-space, pressure and
+  full heavy-shift acceptance. Earlier0.11.33 pressure ANR remains open.
+
+**Open threads**
+- Finish actual0.11.37 emulator upgrade/raw cold recovery/Save/Discard and
+  signed owner APK inspection; record hashes/source/CI in this entry/report.
+- Next P0: durable doctor/profile/rating and photo-caption/imaging raw forms;
+  durable photo-batch journal/atomic batch/new lab panel and orphan inventory.
+- Physical/performance/clinical gates in IMPLEMENTATION remain open. Five PR
+  heads are unchanged; none was merged or commented on in this scope.
+
+**Gotchas**
+- Keep one AutosaveScope and original token, including a child mounted after
+  restore. Recheck compared id/revision/body before accepting delayed Load.
+- Retain scroll/native noncollapsible parent/header throughout completion.
+  String host mocks concealed the very native-parent invariant being tested.
+- Export/compare the existing synthetic dataset before upgrade. Never wipe
+  app data, sweep orphan media or substitute a QA ABI artifact for owner dist/.
+
 ## 2026-10-08 — Verify native image editing, raw recovery and restore
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviews earlier in

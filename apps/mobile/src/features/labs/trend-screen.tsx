@@ -132,6 +132,9 @@ export function TrendScreen() {
                           <Text numeric style={{ color }}>
                             {ltrIsolate(r.value.value)}
                           </Text>
+                          <Text variant="caption" color="textMuted" ltr>
+                            {r.value.unit?.trim() || 'بدون واحد'}
+                          </Text>
                           {r.value.flag && r.value.flag !== 'normal' ? (
                             <Text variant="captionStrong" ltr style={{ color }}>
                               {FLAG_LABEL[r.value.flag]}

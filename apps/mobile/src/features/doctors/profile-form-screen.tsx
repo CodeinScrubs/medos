@@ -1,17 +1,21 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import type { ReactNode } from 'react';
 
-import { alertError } from '@/components/feedback';
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
+import { notify } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, Input, Screen, SectionHeader, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
+import { useNow } from '@/components/use-now';
 import type { DoctorProfile } from '@/db/schema';
-import { useLive } from '@/db/use-live';
+import { dateInputText, validateDateInput } from '@/lib/date-input';
+import { fromIsoDate } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
-import { doctorProfileQuery, saveDoctorProfile } from './ratings-queries';
+import { changedFormPatch } from './edit-basis';
+import { ManualDoctorGate, useManualDoctorForm } from './manual-form';
+import { doctorProfileFormQuery, saveDoctorProfile } from './ratings-queries';
 
 const toList = (text: string) =>
   text
@@ -31,49 +35,111 @@ const toList = (text: string) =>
  */
 export function ProfileFormScreen() {
   const { doctorId } = useLocalSearchParams<{ doctorId: string }>();
-  const { data } = useLive(doctorProfileQuery(doctorId ?? ''), [doctorId]);
-  // Not the usual edit-or-new decision: there is one profile row per doctor,
-  // written if it exists and created if it does not. So this waits for the
-  // read and then always renders the form — "no row yet" is the normal case,
-  // not the "it was deleted" case `EditGate` is for.
-  if (!data) return <Loading />;
-  return <ProfileForm doctorId={doctorId} profile={data[0] ?? null} />;
-}
-
-function Loading() {
-  const { colors, spacing } = useTheme();
-  return (
-    <Screen>
-      <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.huge }} />
-    </Screen>
+  const parent = useAutosaveScope();
+  const form = (
+    <ManualDoctorGate key={doctorId} query={doctorProfileFormQuery(doctorId ?? '')} what="پروفایل پزشک">
+      {(row, notice, generation, unavailable) =>
+        row ? (
+          <ProfileForm
+            doctorId={row.doctor.id}
+            profile={row.profile}
+            readNotice={notice}
+            generation={generation}
+            unavailable={unavailable}
+          />
+        ) : null
+      }
+    </ManualDoctorGate>
   );
+  return parent ? form : <AutosaveScope key={doctorId}>{form}</AutosaveScope>;
 }
 
-function ProfileForm({ doctorId, profile }: { doctorId: string; profile: DoctorProfile | null }) {
-  const router = useRouter();
+function ProfileForm({
+  doctorId,
+  profile,
+  readNotice,
+  generation,
+  unavailable,
+}: {
+  doctorId: string;
+  profile: DoctorProfile | null;
+  readNotice: ReactNode;
+  generation: number;
+  unavailable: boolean;
+}) {
   const { spacing } = useTheme();
-
-  const [birthDate, setBirthDate] = useState(profile?.birthDate ?? null);
-  const [hometown, setHometown] = useState(profile?.hometown ?? '');
-  const [almaMater, setAlmaMater] = useState(profile?.almaMater ?? '');
-  const [graduationYear, setGraduationYear] = useState(profile?.graduationYear ?? '');
-  const [familyNotes, setFamilyNotes] = useState(profile?.familyNotes ?? '');
-  const [interests, setInterests] = useState((profile?.interests ?? []).join('، '));
-  const [favoriteTopics, setFavoriteTopics] = useState(profile?.favoriteTopics ?? '');
-  const [dislikes, setDislikes] = useState(profile?.dislikes ?? '');
-  const [howWeMet, setHowWeMet] = useState(profile?.howWeMet ?? '');
-  const [memorableMoments, setMemorableMoments] = useState(profile?.memorableMoments ?? '');
-  const [communicationStyle, setCommunicationStyle] = useState(profile?.communicationStyle ?? '');
-  const [personalNotes, setPersonalNotes] = useState(profile?.personalNotes ?? '');
-  const [saving, setSaving] = useState(false);
+  const now = useNow();
+  const birth = fromIsoDate(profile?.birthDate);
+  const editing = useManualDoctorForm(
+    {
+      birthDate: birth ? dateInputText(birth) : '',
+      hometown: profile?.hometown ?? '',
+      almaMater: profile?.almaMater ?? '',
+      graduationYear: profile?.graduationYear ?? '',
+      familyNotes: profile?.familyNotes ?? '',
+      interests: (profile?.interests ?? []).join('، '),
+      favoriteTopics: profile?.favoriteTopics ?? '',
+      dislikes: profile?.dislikes ?? '',
+      howWeMet: profile?.howWeMet ?? '',
+      memorableMoments: profile?.memorableMoments ?? '',
+      communicationStyle: profile?.communicationStyle ?? '',
+      personalNotes: profile?.personalNotes ?? '',
+    },
+    generation,
+    unavailable,
+  );
+  const {
+    birthDate,
+    hometown,
+    almaMater,
+    graduationYear,
+    familyNotes,
+    interests,
+    favoriteTopics,
+    dislikes,
+    howWeMet,
+    memorableMoments,
+    communicationStyle,
+    personalNotes,
+  } = editing.fields;
+  const setBirthDate = (value: typeof birthDate) => editing.change({ birthDate: value });
+  const setHometown = (value: typeof hometown) => editing.change({ hometown: value });
+  const setAlmaMater = (value: typeof almaMater) => editing.change({ almaMater: value });
+  const setGraduationYear = (value: typeof graduationYear) => editing.change({ graduationYear: value });
+  const setFamilyNotes = (value: typeof familyNotes) => editing.change({ familyNotes: value });
+  const setInterests = (value: typeof interests) => editing.change({ interests: value });
+  const setFavoriteTopics = (value: typeof favoriteTopics) => editing.change({ favoriteTopics: value });
+  const setDislikes = (value: typeof dislikes) => editing.change({ dislikes: value });
+  const setHowWeMet = (value: typeof howWeMet) => editing.change({ howWeMet: value });
+  const setMemorableMoments = (value: typeof memorableMoments) => editing.change({ memorableMoments: value });
+  const setCommunicationStyle = (value: typeof communicationStyle) => editing.change({ communicationStyle: value });
+  const setPersonalNotes = (value: typeof personalNotes) => editing.change({ personalNotes: value });
+  const { busy: saving, locked } = editing;
   const dateValidation = useDateValidation();
 
   async function save() {
-    if (!dateValidation.check()) return;
-    setSaving(true);
-    try {
-      await saveDoctorProfile(doctorId, {
+    await editing.submit(async (current) => {
+      const {
         birthDate,
+        hometown,
+        almaMater,
+        graduationYear,
+        familyNotes,
+        interests,
+        favoriteTopics,
+        dislikes,
+        howWeMet,
+        memorableMoments,
+        communicationStyle,
+        personalNotes,
+      } = current;
+      const date = validateDateInput(birthDate, { now: new Date(now), required: false, allowFuture: false });
+      if (!dateValidation.check() || !date.valid) {
+        if (!date.valid) notify('تاریخ تولد معتبر نیست');
+        return false;
+      }
+      const payload = {
+        birthDate: date.iso,
         hometown: hometown.trim() || null,
         almaMater: almaMater.trim() || null,
         graduationYear: graduationYear.trim() || null,
@@ -85,19 +151,18 @@ function ProfileForm({ doctorId, profile }: { doctorId: string; profile: DoctorP
         memorableMoments: memorableMoments.trim() || null,
         communicationStyle: communicationStyle.trim() || null,
         personalNotes: personalNotes.trim() || null,
-      });
-      router.back();
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      setSaving(false);
-    }
+      };
+      await saveDoctorProfile(doctorId, changedFormPatch(editing.basis, current, payload), profile);
+      return true;
+    });
   }
 
   return (
     <Screen scroll>
       <ScreenOptions options={{ title: 'پروفایل شخصی' }} />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <Column collapsable={false} gap="md" style={{ paddingTop: spacing.md }}>
+        {readNotice}
+        {editing.completed ? <Text>ذخیره شد؛ برای برگشت، «بستن» را بزنید.</Text> : null}
         <Text variant="tiny" color="textFaint">
           یادداشت خصوصی شماست. برای تبریک تولد، کافی است تاریخ تولد را بنویسید و بعد از ذخیره، مناسبت تولد را اضافه
           کنید.
@@ -106,33 +171,85 @@ function ProfileForm({ doctorId, profile }: { doctorId: string; profile: DoctorP
         <JalaliDateField
           onValidityChange={dateValidation.setValid}
           label="تاریخ تولد"
-          value={birthDate}
-          onChange={setBirthDate}
+          value={profile?.birthDate ?? null}
+          rawText={birthDate}
+          onRawTextChange={setBirthDate}
+          editable={!locked}
+          onChange={() => {}}
         />
-        <Input label="زادگاه" value={hometown} onChangeText={setHometown} />
-        <Input label="دانشگاه" value={almaMater} onChangeText={setAlmaMater} />
-        <Input label="سال فارغ‌التحصیلی" value={graduationYear} onChangeText={setGraduationYear} numericFold />
+        <Input editable={!locked} label="زادگاه" value={hometown} onChangeText={setHometown} />
+        <Input editable={!locked} label="دانشگاه" value={almaMater} onChangeText={setAlmaMater} />
+        <Input
+          editable={!locked}
+          label="سال فارغ‌التحصیلی"
+          value={graduationYear}
+          onChangeText={setGraduationYear}
+          numericFold
+        />
 
         <SectionHeader title="شناختن بهتر" />
-        <Input label="علایق" value={interests} onChangeText={setInterests} hint="با ویرگول جدا کنید" />
-        <Input label="موضوع‌های مورد علاقه" value={favoriteTopics} onChangeText={setFavoriteTopics} multiline />
-        <Input label="چیزهایی که خوشش نمی‌آید" value={dislikes} onChangeText={setDislikes} multiline />
-        <Input label="خانواده" value={familyNotes} onChangeText={setFamilyNotes} multiline />
+        <Input
+          editable={!locked}
+          label="علایق"
+          value={interests}
+          onChangeText={setInterests}
+          hint="با ویرگول جدا کنید"
+        />
+        <Input
+          editable={!locked}
+          label="موضوع‌های مورد علاقه"
+          value={favoriteTopics}
+          onChangeText={setFavoriteTopics}
+          multiline
+        />
+        <Input
+          editable={!locked}
+          label="چیزهایی که خوشش نمی‌آید"
+          value={dislikes}
+          onChangeText={setDislikes}
+          multiline
+        />
+        <Input editable={!locked} label="خانواده" value={familyNotes} onChangeText={setFamilyNotes} multiline />
 
         <SectionHeader title="سابقه‌ی آشنایی" />
-        <Input label="چطور آشنا شدیم" value={howWeMet} onChangeText={setHowWeMet} multiline />
-        <Input label="خاطره‌ها" value={memorableMoments} onChangeText={setMemorableMoments} multiline />
+        <Input editable={!locked} label="چطور آشنا شدیم" value={howWeMet} onChangeText={setHowWeMet} multiline />
         <Input
+          editable={!locked}
+          label="خاطره‌ها"
+          value={memorableMoments}
+          onChangeText={setMemorableMoments}
+          multiline
+        />
+        <Input
+          editable={!locked}
           label="سبک ارتباط"
           value={communicationStyle}
           onChangeText={setCommunicationStyle}
           multiline
           placeholder="مثلاً: پیام را بهتر از تماس جواب می‌دهد؛ بعد از ساعت ۲۲ زنگ نزنید."
         />
-        <Input label="یادداشت شخصی" value={personalNotes} onChangeText={setPersonalNotes} multiline />
+        <Input
+          editable={!locked}
+          label="یادداشت شخصی"
+          value={personalNotes}
+          onChangeText={setPersonalNotes}
+          multiline
+        />
 
-        <Button label="ذخیره" icon="checkmark" onPress={() => void save()} loading={saving} full />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button
+          label={editing.completed ? 'بستن' : 'ذخیره'}
+          icon="checkmark"
+          onPress={() => {
+            if (editing.completed) editing.close();
+            else void save();
+          }}
+          disabled={locked && !editing.completed}
+          loading={saving}
+          full
+        />
+        {!editing.completed ? (
+          <Button label="انصراف" variant="ghost" onPress={editing.close} disabled={saving} full haptic={false} />
+        ) : null}
       </Column>
     </Screen>
   );
