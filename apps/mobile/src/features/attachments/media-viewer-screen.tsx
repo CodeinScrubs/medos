@@ -33,6 +33,8 @@ export function MediaViewerScreen() {
   const [editing, setEditing] = useState(false);
   const { generation } = useDatasetIntent();
   const captionBusy = useRef(false);
+  const shareBusy = useRef(false);
+  const [sharing, setSharing] = useState(false);
   const [savingCaption, setSavingCaption] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const exporter = useImageExport();
@@ -55,21 +57,29 @@ export function MediaViewerScreen() {
   const missing = shown ? !mediaExists(shown) : false;
 
   async function share() {
-    await withDatasetWrite(generation, async () => {
-      if (!item || !uri || missing || documentError) throw new Error('عکس برای اشتراک‌گذاری در دسترس نیست.');
-      if (!(await Sharing.isAvailableAsync())) {
-        notify('اشتراک‌گذاری روی این گوشی در دسترس نیست');
-        return;
-      }
-      if (showOriginal && originalMissing) throw new Error('اصل عکس پیدا نشد؛ نسخهٔ فشرده به جای آن فرستاده نشد.');
-      const shareUri = document ? await exporter.render(document) : uri;
-      const mimeType = document
-        ? 'image/png'
-        : originalShown
-          ? (item.originalMimeType ?? imageMimeFromPath(shown!))
-          : (item.mimeType ?? imageMimeFromPath(shown!));
-      await Sharing.shareAsync(shareUri, mimeType ? { mimeType } : {});
-    });
+    if (shareBusy.current) return;
+    shareBusy.current = true;
+    setSharing(true);
+    try {
+      await withDatasetWrite(generation, async () => {
+        if (!item || !uri || missing || documentError) throw new Error('عکس برای اشتراک‌گذاری در دسترس نیست.');
+        if (!(await Sharing.isAvailableAsync())) {
+          notify('اشتراک‌گذاری روی این گوشی در دسترس نیست');
+          return;
+        }
+        if (showOriginal && originalMissing) throw new Error('اصل عکس پیدا نشد؛ نسخهٔ فشرده به جای آن فرستاده نشد.');
+        const shareUri = document ? await exporter.render(document) : uri;
+        const mimeType = document
+          ? 'image/png'
+          : originalShown
+            ? (item.originalMimeType ?? imageMimeFromPath(shown!))
+            : (item.mimeType ?? imageMimeFromPath(shown!));
+        await Sharing.shareAsync(shareUri, mimeType ? { mimeType } : {});
+      });
+    } finally {
+      shareBusy.current = false;
+      setSharing(false);
+    }
   }
 
   async function saveCaption(text: string) {
@@ -158,7 +168,7 @@ export function MediaViewerScreen() {
               icon="share-outline"
               label="اشتراک‌گذاری"
               color={mediaViewerColors.text}
-              disabled={exporter.busy || missing || !!documentError}
+              disabled={sharing || exporter.busy || missing || !!documentError}
               onPress={() => void share().catch((e) => alertError('اشتراک‌گذاری انجام نشد', e))}
             />
             <IconButton icon="trash-outline" label="حذف" color={mediaViewerColors.text} onPress={remove} />

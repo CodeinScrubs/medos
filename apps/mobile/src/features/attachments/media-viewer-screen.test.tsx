@@ -249,7 +249,11 @@ describe('media viewer mutation intent and actual caption prompt', () => {
     });
     jest.mocked(Sharing.shareAsync).mockImplementation(() => ack);
     await render();
-    await invoke(() => icon('اشتراک‌گذاری').props.onPress());
+    const heldShare = icon('اشتراک‌گذاری').props.onPress;
+    await invoke(heldShare);
+    await invoke(heldShare);
+    expect(icon('اشتراک‌گذاری').props.disabled).toBe(true);
+    expect(Sharing.shareAsync).toHaveBeenCalledTimes(1);
     let refused = false;
     try {
       const replacement = reserveDatasetReplacement();
@@ -263,6 +267,7 @@ describe('media viewer mutation intent and actual caption prompt', () => {
       await settle();
     });
     expect(refused).toBe(true);
+    expect(icon('اشتراک‌گذاری').props.disabled).toBe(false);
     expect(Sharing.shareAsync).toHaveBeenCalledWith('file://imports/synthetic-original.jpg', expect.any(Object));
   });
   it('soft-deletes and returns only after an ordinary acknowledged deletion', async () => {

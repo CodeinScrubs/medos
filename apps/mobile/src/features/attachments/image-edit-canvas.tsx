@@ -268,6 +268,9 @@ export function ImageEditCanvas({
   /* eslint-enable react-hooks/refs */
   return (
     <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel="بوم ویرایش عکس"
       style={styles.fill}
       onLayout={(e) => {
         setViewport({

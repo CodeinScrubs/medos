@@ -37,7 +37,8 @@ wrong, never rewrite them to look better.
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers, primary
 owns integration, tests and native acceptance.
-**Commits:** this source commit; native artifact/evidence follow separately.
+**Commits:** image foundation `7d5b6d9`, then this focused share/canvas correction;
+native artifact/evidence follow separately.
 
 **Changed**
 - Viewer opens one editor: pen/highlight/arrow, Persian/English text, crop/rotate,
@@ -47,9 +48,11 @@ owns integration, tests and native acceptance.
 - Verify photo copies and cache PNG readback; correct original MIME and bounds.
   Picker crops only after import. No npm dependency. Version .36/code52.
 - Pinned SVG 15.15.4 cache-hit onLoad patch in config plugin; see architecture.
+- Native share admission also rejects rapid duplicate taps through sheet close;
+  the canvas has one accessible label for explicit touch geometry and review.
 
 **Verified**
-- `npm run check` green: full application suite plus five workflow tests.
+- `npm run check` green: 134 suites/1,761 app tests plus five workflow tests.
 - Real migrated SQLite: atomic failure rollback, retry, exact raw text, competing
   editors, same-ID restore fencing, old-backup absent-table/default behavior.
 - Pointer witnesses: text taps, letterbox rejection, denied strokes, combined
