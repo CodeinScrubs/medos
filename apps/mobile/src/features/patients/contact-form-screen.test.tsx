@@ -111,6 +111,54 @@ afterEach(async () => {
 });
 
 describe('companion form original intent', () => {
+  it('keeps publication in a stable header through latest input and delayed acknowledgment', async () => {
+    await mount();
+    const header = () => {
+      const right = tree!.root.findByType(ScreenOptions).props.options.headerRight;
+      expect(right).toEqual(expect.any(Function));
+      return right({}).props;
+    };
+    const first = header();
+    expect(first.label).toBe('ثبت همراه');
+    const screen = tree!.root.findByType(Screen);
+    const real = drafts.commitContactFormDraft;
+    let release!: () => void;
+    jest.spyOn(drafts, 'commitContactFormDraft').mockImplementationOnce(async (...args) => {
+      const id = await real(...args);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return id;
+    });
+    mockFocused = false;
+    await act(async () => {
+      input('شماره تماس').props.onChangeText('+12025550123');
+      input('یادداشت').props.onChangeText('Latest header input');
+      first.onPress();
+      first.onPress();
+      await settle();
+    });
+    expect(header().disabled).toBe(true);
+    expect(tree!.root.findByType(Screen)).toBe(screen);
+    expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      release();
+      await settle();
+    });
+    expect(header().label).toBe('بستن');
+    expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+    expect(await patientContactsQuery(mockPatientId)).toEqual([
+      expect.objectContaining({ notes: 'Latest header input', phone: '+12025550123' }),
+    ]);
+    expect(mockBack).not.toHaveBeenCalled();
+    mockFocused = true;
+    await act(async () => {
+      header().onPress();
+      await settle();
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(await patientContactsQuery(mockPatientId)).toHaveLength(1);
+  });
   it('refuses same-id replacement and retains all actual input', async () => {
     await mount();
     await type('شماره تماس', '+12025550123');

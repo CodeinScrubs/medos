@@ -1732,6 +1732,13 @@ actual artifact and device evidence in validation-0.11.36.md.
 
 ## Companion raw details and remaining manual doctor forms (0.11.37)
 
+These forms keep their publication/Close action in a stable header slot as well
+as the existing footer. An IME-open native trial covered footer Save and the
+underlying UI-dump coordinates typed a keypad digit. Both entry points call one
+handler; neither creates a second writer or route. Header slot/title, scrolling
+host and noncollapsible native parent remain mounted throughout acknowledgment
+and Close. Software slot witnesses do not replace rebuilt native acceptance.
+
 `contact_form_drafts` is additive migration0024. A partial unique index permits
 one open companion draft per patient; published contacts remain independent.
 The strict v1 document preserves phone/name/relation/notes exactly, including

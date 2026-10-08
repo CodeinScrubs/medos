@@ -108,9 +108,29 @@ function ContactForm({
       /* Never replace unreadable data with a blank form. */
     }
   }
+  function finish() {
+    if (editing.completed) editing.close();
+    else void editing.save();
+  }
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: 'شمارهٔ همراه' }} />
+      <ScreenOptions
+        options={{
+          title: 'شمارهٔ همراه',
+          // Keep the existing publication path reachable above the keyboard.
+          // Retain this slot during acknowledgment and close.
+          headerRight: () => (
+            <Button
+              label={editing.completed ? 'بستن' : 'ثبت همراه'}
+              size="sm"
+              variant="ghost"
+              onPress={finish}
+              loading={editing.busy}
+              disabled={editing.busy || (editing.stale && !editing.completed)}
+            />
+          ),
+        }}
+      />
       <Column
         gap="md"
         collapsable={false}
@@ -149,6 +169,7 @@ function ContactForm({
           editable={!disabled}
         />
         <ChipSelect
+          disabled={disabled}
           label="نسبت"
           options={RELATIONS.map((r) => ({ value: r, label: r }))}
           value={f.relation}
@@ -213,10 +234,7 @@ function ContactForm({
         ) : null}
         <Button
           label={editing.completed ? 'بستن' : 'ذخیره'}
-          onPress={() => {
-            if (editing.completed) editing.close();
-            else void editing.save();
-          }}
+          onPress={finish}
           loading={editing.busy}
           disabled={editing.stale && !editing.completed}
         />

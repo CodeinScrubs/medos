@@ -157,9 +157,27 @@ function ProfileForm({
     });
   }
 
+  function finish() {
+    if (editing.completed) editing.close();
+    else void save();
+  }
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: 'پروفایل شخصی' }} />
+      <ScreenOptions
+        options={{
+          title: 'پروفایل شخصی',
+          headerRight: () => (
+            <Button
+              label={editing.completed ? 'بستن' : 'ذخیره'}
+              size="sm"
+              variant="ghost"
+              onPress={finish}
+              disabled={locked && !editing.completed}
+              loading={saving}
+            />
+          ),
+        }}
+      />
       <Column collapsable={false} gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         {editing.completed ? <Text>ذخیره شد؛ برای برگشت، «بستن» را بزنید.</Text> : null}
@@ -239,10 +257,7 @@ function ProfileForm({
         <Button
           label={editing.completed ? 'بستن' : 'ذخیره'}
           icon="checkmark"
-          onPress={() => {
-            if (editing.completed) editing.close();
-            else void save();
-          }}
+          onPress={finish}
           disabled={locked && !editing.completed}
           loading={saving}
           full

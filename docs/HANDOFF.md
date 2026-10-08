@@ -38,7 +38,8 @@ wrong, never rewrite them to look better.
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh reviews. Primary owns integration
 and verification; both reviewers stopped at their usage limits. No further
 delegation is running.
-**Commits:** this source checkpoint. Final native/artifact evidence will be
+**Commits:** source checkpoint `856ef8d`; stable-header native follow-up is being
+recorded separately. Final native/artifact evidence will be
 recorded in a follow-up documentation commit, not inferred from software tests.
 
 **Changed**
@@ -55,6 +56,8 @@ recorded in a follow-up documentation commit, not inferred from software tests.
   in flowsheet/history. No unit guessing, conversion or clinical formula.
 - Version0.11.37/code53; no new dependency, route or permission. Contracts and
   remaining priorities are in architecture/IMPLEMENTATION/validation-0.11.37.md.
+- Actual native follow-up adds one stable publication/Close slot above the IME
+  for companion and the three manual doctor forms, using their existing handler.
 
 **Verified**
 - Clean baseline a08bc18: brief/check green,134 suites/1,780 app tests+5 workflows.
@@ -65,9 +68,16 @@ recorded in a follow-up documentation commit, not inferred from software tests.
   roundtrip, competing third writer, original generation and old/current restore.
 - Real Screen/Column/View tests retain native stacking parent/header through
   submission/close. These tests do not prove native Android behavior.
+- First inspected856ef8d QA APK installs in place and preserves all4,070 old
+  rows/43 old tables/28 media exactly, adding one empty table/25th migration.
+  Actual incomplete phone/name/notes/relation survive force-stop/cold reopen.
+- Native IME covered footer Save; the attempted tap typed a keypad digit. This
+  trial is rejected. Four new header witnesses fail before correction; corrected
+  contact/manual-doctor group passes50 tests. Full header-final check passes137
+  suites/1,855 app tests+5 workflows, typecheck/lint/formatting. Native retest pending.
 
 **Not verified**
-- Rebuilt0.11.37 APK/native upgrade/restore/close are pending this checkpoint.
+- Final stable-header0.11.37 APK/native restore/publication/close are pending.
 - Physical A52s, HEIC/camera, voice/reminders/SAF, power/low-space, pressure and
   full heavy-shift acceptance. Earlier0.11.33 pressure ANR remains open.
 
@@ -84,6 +94,8 @@ recorded in a follow-up documentation commit, not inferred from software tests.
   restore. Recheck compared id/revision/body before accepting delayed Load.
 - Retain scroll/native noncollapsible parent/header throughout completion.
   String host mocks concealed the very native-parent invariant being tested.
+- Underlying UI-dump button bounds may be covered by the IME. Inspect the real
+  screenshot and use the stable header; tapping hidden footer bounds is invalid.
 - Export/compare the existing synthetic dataset before upgrade. Never wipe
   app data, sweep orphan media or substitute a QA ABI artifact for owner dist/.
 

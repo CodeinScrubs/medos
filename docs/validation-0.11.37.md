@@ -25,6 +25,9 @@ explicitly recorded below.
   Keep Remove available beside invalid/H/L markers. Flowsheet/history show each
   recorded unit; no numerical unit conversion or new clinical formula.
 - Version0.11.37/code53. No dependency, permission or route added.
+- A stable header uses the existing publication/Close handler for companion,
+  directory, profile and rating forms, keeping it reachable above the keyboard.
+  Slot/title/scroll/native parent remain mounted through acknowledgment.
 
 ## Software evidence
 
@@ -50,10 +53,32 @@ executed scope counts, not separate certifications of every screen or device.
 
 ## Native and artifact evidence
 
-Pending in this report until the actual rebuilt APK is inspected and installed.
-Only isolated emulator-5556 is connected. The prior0.11.36 synthetic dataset
-and owner arm64 artifact remain separate; no app data or phone installation
-will be removed to make tests pass.
+Only isolated emulator-5556/API36.1/x86_64 is connected. The first inspected
+source856ef8d/code53 APK installed in place with byte-identical installed copy.
+Independent full-backup decryption/SQLite/hash comparison preserves all4,070
+old rows/43 old app tables/28 media files exactly, adding one empty draft table
+and migration0024 (25 migrations total); integrity/FKs are clean.
+
+Actual partial phone/name/notes/relation survive force-stop/cold reopen. Native
+radio state is `selected`, not `checked`; the first relation assertion used the
+wrong field and is not evidence of a product failure. Fresh state confirms all
+four exact fields without a clinical contact being intentionally published.
+The final archive oracle still needs to verify that last assertion independently.
+
+The first native invalid-Save trial instead exposed an actual usability defect:
+the IME covered footer Save, and tapping its underlying UI-dump coordinates
+inserted a keypad digit rather than publishing. Do not count that trial as a
+passing validation refusal. A header correction is being rebuilt and must pass
+actual IME-open refusal/publication/Close before acceptance. Four corresponding
+source witnesses fail before correction; the corrected two-suite group passes
+50 tests. Final full `npm run check` passes137 suites/1,855 app tests and five
+workflows, including typecheck/lint/formatting. Owner APK and rebuilt native
+continuation are pending.
+
+The first QA Gradle invocation used the mobile directory rather than generated
+android/. That invocation failed without building an artifact. The corrected
+invocation succeeds in11m48s after prebuild regenerated native code. Rejected
+trials/logs remain private; no app data was wiped or orphan media swept.
 
 ## Still open
 

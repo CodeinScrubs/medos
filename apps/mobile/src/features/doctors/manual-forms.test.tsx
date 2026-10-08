@@ -8,6 +8,7 @@ import { AutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen } from '@/components/ui';
 import { doctorProfiles, doctorRatings, doctors, places } from '@/db/schema';
 import { DatasetBusyError } from '@/lib/dataset-write';
@@ -148,6 +149,42 @@ afterEach(async () => {
 });
 
 describe('remaining manual doctor forms with real SQLite and original intent', () => {
+  it.each(forms)('publishes latest $kind input from its stable header and offers focused Close', async (form) => {
+    await mount(form.element());
+    const header = () => {
+      const right = tree!.root.findByType(ScreenOptions).props.options.headerRight;
+      expect(right).toEqual(expect.any(Function));
+      return right({}).props;
+    };
+    const first = header();
+    const screen = tree!.root.findByType(Screen);
+    const title = tree!.root.findByType(ScreenOptions).props.options.title;
+    expect(first.label).toBe(form.save);
+    mockFocused = false;
+    await act(async () => {
+      input(form.text).props.onChangeText('Latest header input');
+      first.onPress();
+      first.onPress();
+      await settle();
+    });
+    expect(tree!.root.findByType(Screen)).toBe(screen);
+    expect(tree!.root.findByType(ScreenOptions).props.options.title).toBe(title);
+    expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+    expect(header().label).toBe('بستن');
+    const rows = t.sqlite
+      .exec(`SELECT * FROM ${form.table} WHERE deleted_at IS NULL`)
+      .flatMap((r) => r.values.map((v) => Object.fromEntries(r.columns.map((c, i) => [c, v[i]]))));
+    expect(rows).toHaveLength(1);
+    const text = form.kind === 'doctor' ? 'notes' : form.kind === 'profile' ? 'personal_notes' : 'reasoning';
+    expect(rows[0]![text]).toBe('Latest header input');
+    expect(mockBack).not.toHaveBeenCalled();
+    mockFocused = true;
+    await act(async () => {
+      header().onPress();
+      await settle();
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
   it.each(forms)('can explicitly close a stale $kind form after reviewing its input', async (form) => {
     await mount(form.element());
     await type(form.text, 'Copy before stale close');

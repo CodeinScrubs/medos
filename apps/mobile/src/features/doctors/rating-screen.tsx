@@ -71,9 +71,27 @@ function RatingForm({
     });
   }
 
+  function finish() {
+    if (editing.completed) editing.close();
+    else void save();
+  }
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: 'امتیاز جدید' }} />
+      <ScreenOptions
+        options={{
+          title: 'امتیاز جدید',
+          headerRight: () => (
+            <Button
+              label={editing.completed ? 'بستن' : 'ثبت امتیاز'}
+              size="sm"
+              variant="ghost"
+              onPress={finish}
+              disabled={locked && !editing.completed}
+              loading={saving}
+            />
+          ),
+        }}
+      />
       <Column collapsable={false} gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
         {editing.completed ? <Text>ذخیره شد؛ برای برگشت، «بستن» را بزنید.</Text> : null}
@@ -114,10 +132,7 @@ function RatingForm({
         <Button
           label={editing.completed ? 'بستن' : 'ثبت امتیاز'}
           icon="checkmark"
-          onPress={() => {
-            if (editing.completed) editing.close();
-            else void save();
-          }}
+          onPress={finish}
           disabled={locked && !editing.completed}
           loading={saving}
           full
