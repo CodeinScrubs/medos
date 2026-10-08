@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -17,6 +16,7 @@ import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
 import { askPhotoSource, attachPhotos } from './capture';
+import { ImageThumbnail } from './image-thumbnail';
 import { ATTACHMENT_KIND_LABELS } from './labels';
 import { deleteAttachment, patientMediaQuery } from './queries';
 import { RecordingRecovery } from './recording-recovery';
@@ -43,7 +43,7 @@ const PHOTO_KINDS: AttachmentKind[] = ['photo', 'clinical_photo', 'radiology', '
 export function MediaTab({ patientId }: { patientId: string }) {
   const { generation } = useDatasetIntent();
   const router = useRouter();
-  const { colors, radii, spacing } = useTheme();
+  const { radii, spacing } = useTheme();
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<PhotoFilter>('all');
   const [adding, setAdding] = useState(false);
@@ -75,8 +75,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
             entityId: patientId,
             patientId,
             kind: addKind,
-            // Camera shots get the cropper; gallery picks allow several at once.
-            crop: source === 'camera',
+            // Originals are imported intact; crop/annotation happens in the viewer.
             multiple: source === 'library',
           }),
         );
@@ -111,6 +110,8 @@ export function MediaTab({ patientId }: { patientId: string }) {
           {photos.map((a) => (
             <Pressable
               key={a.id}
+              accessibilityRole="button"
+              accessibilityLabel={`نمایش عکس ${a.caption ?? ATTACHMENT_KIND_LABELS[a.kind]}`}
               onPress={() => router.push({ pathname: '/media/[attachmentId]', params: { attachmentId: a.id } })}
               onLongPress={() =>
                 Alert.alert('حذف عکس؟', a.caption ?? formatJalaliDateTime(a.capturedAt), [
@@ -126,12 +127,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
                 ])
               }
             >
-              <Image
-                source={{ uri: mediaUri(a.thumbnailPath ?? a.relativePath) ?? undefined }}
-                style={{ width: tile, height: tile, borderRadius: radii.sm, backgroundColor: colors.surfaceAlt }}
-                contentFit="cover"
-                recyclingKey={a.id}
-              />
+              <ImageThumbnail attachment={a} width={tile} height={tile} radius={radii.sm} />
             </Pressable>
           ))}
         </View>

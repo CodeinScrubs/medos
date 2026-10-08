@@ -1,7 +1,10 @@
 import { Image } from 'expo-image';
+import { useState, type ReactNode } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+
+import { containedImageRect, imagePanBound } from '@/lib/image-edit';
 
 const MAX_SCALE = 6;
 const DOUBLE_TAP_SCALE = 2.5;
@@ -18,7 +21,16 @@ function clamp(v: number, min: number, max: number) {
  * Panning is bounded so the image cannot be dragged off into the void; the
  * bound grows with the zoom level.
  */
-export function ZoomableImage({ uri }: { uri: string }) {
+export function ZoomableImage({
+  uri,
+  imageSize,
+  renderImage,
+}: {
+  uri: string;
+  imageSize?: { width: number; height: number };
+  renderImage?: (viewport: { width: number; height: number }) => ReactNode;
+}) {
+  const [viewport, setViewport] = useState({ width: 1, height: 1 });
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const tx = useSharedValue(0);
@@ -27,19 +39,33 @@ export function ZoomableImage({ uri }: { uri: string }) {
   const savedTy = useSharedValue(0);
   const width = useSharedValue(1);
   const height = useSharedValue(1);
+  const imageWidth = useSharedValue(imageSize?.width ?? 1);
+  const imageHeight = useSharedValue(imageSize?.height ?? 1);
 
   const onLayout = (e: LayoutChangeEvent) => {
-    width.value = e.nativeEvent.layout.width;
-    height.value = e.nativeEvent.layout.height;
+    const nextWidth = Math.max(1, e.nativeEvent.layout.width);
+    const nextHeight = Math.max(1, e.nativeEvent.layout.height);
+    // A keyboard/window resize changes the contain rectangle and pan bounds.
+    // Recenter instead of retaining an offset that can hide a thin image.
+    if (width.value !== nextWidth || height.value !== nextHeight) {
+      scale.value = savedScale.value = 1;
+      tx.value = savedTx.value = 0;
+      ty.value = savedTy.value = 0;
+    }
+    width.value = nextWidth;
+    height.value = nextHeight;
+    setViewport({ width: width.value, height: height.value });
   };
 
   const boundX = (s: number) => {
     'worklet';
-    return ((s - 1) * width.value) / 2;
+    const fit = containedImageRect(width.value, height.value, imageWidth.value, imageHeight.value);
+    return imagePanBound(fit.width, width.value, s);
   };
   const boundY = (s: number) => {
     'worklet';
-    return ((s - 1) * height.value) / 2;
+    const fit = containedImageRect(width.value, height.value, imageWidth.value, imageHeight.value);
+    return imagePanBound(fit.height, height.value, s);
   };
 
   const reset = () => {
@@ -100,7 +126,19 @@ export function ZoomableImage({ uri }: { uri: string }) {
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.fill, style]} onLayout={onLayout}>
-        <Image source={{ uri }} style={styles.fill} contentFit="contain" />
+        {renderImage ? (
+          renderImage(viewport)
+        ) : (
+          <Image
+            source={{ uri }}
+            style={styles.fill}
+            contentFit="contain"
+            onLoad={(event) => {
+              imageWidth.value = event.source.width;
+              imageHeight.value = event.source.height;
+            }}
+          />
+        )}
       </Animated.View>
     </GestureDetector>
   );

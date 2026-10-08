@@ -72,6 +72,10 @@ export const attachments = sqliteTable(
      * means the original was not kept, never that it is missing.
      */
     originalPath: text('original_path'),
+    originalMimeType: text('original_mime_type'),
+    /** Non-destructive annotations/crop/rotation; relativePath remains immutable. */
+    imageEditBody: text('image_edit_body'),
+    imageEditRevision: integer('image_edit_revision').notNull().default(0),
     mimeType: text('mime_type'),
     sizeBytes: integer('size_bytes'),
     width: integer('width'),
@@ -136,3 +140,36 @@ export const recordingJobs = sqliteTable(
 );
 
 export type RecordingJob = typeof recordingJobs.$inferSelect;
+
+/** Raw text/marks survive closing or restarting the editor without publishing. */
+export const imageEditDrafts = sqliteTable(
+  'image_edit_drafts',
+  {
+    ...baseColumns,
+    attachmentId: text('attachment_id')
+      .notNull()
+      .references(() => attachments.id),
+    /** Frozen attachment identity, source and published revision on editor entry. */
+    basis: text('basis').notNull(),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedVersionId: text('committed_version_id'),
+  },
+  (t) => [index('image_edit_drafts_open_idx').on(t.attachmentId, t.deletedAt)],
+);
+
+/** Published image documents are immutable; reverting creates a new revision. */
+export const imageEditVersions = sqliteTable(
+  'image_edit_versions',
+  {
+    ...baseColumns,
+    attachmentId: text('attachment_id')
+      .notNull()
+      .references(() => attachments.id),
+    revision: integer('revision').notNull(),
+    body: text('body').notNull(),
+  },
+  (t) => [uniqueIndex('image_edit_versions_revision_idx').on(t.attachmentId, t.revision)],
+);
+export type ImageEditDraft = typeof imageEditDrafts.$inferSelect;
+export type ImageEditVersion = typeof imageEditVersions.$inferSelect;

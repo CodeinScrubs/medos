@@ -36,6 +36,15 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.36 adds reversible photo annotation without overwriting the original or
+working image. The viewer opens a single editor with pen/highlight/arrow/text,
+crop/rotate, undo/redo and history. Raw text and marks use recoverable/CAS drafts;
+publication/version retention is atomic. Source copies and PNG shares are
+verified; cache-hit native readiness is a pinned config-plugin patch, not a new
+dependency. Native evidence and its limits belong in validation-0.11.36.md.
+This does not close the photo-import journal/orphan, other raw forms, physical,
+pressure or complete product gates below.
+
 0.11.35: manual lab entry now persists its versioned raw form, including invalid
 date/clock/number and open range text, through additive migration0022. Clinical
 publication plus draft retirement is atomic/CAS-guarded, original encounter and

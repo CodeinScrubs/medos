@@ -2,7 +2,7 @@
   "expo": {
     "name": "MedOS",
     "slug": "medos",
-    "version": "0.11.35",
+    "version": "0.11.36",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "medos",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "android": {
       "package": "com.shayan.medos",
-      "versionCode": 51,
+      "versionCode": 52,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#0E4A5F",
@@ -84,7 +84,8 @@
       "./plugins/with-dev-variant",
       "./plugins/with-system-bars",
       "./plugins/with-app-shortcuts",
-      "./plugins/with-share-target"
+      "./plugins/with-share-target",
+      "./plugins/with-svg-image-ready"
     ],
     "experiments": {
       "typedRoutes": true,

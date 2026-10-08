@@ -3,6 +3,9 @@ import { copyAsync } from 'expo-file-system/legacy';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { newId } from '@/lib/ids';
+import { imageMimeFromPath } from '@/lib/image-edit';
+
+import { fingerprintFile, fingerprintSourceFile } from './file-integrity';
 
 /**
  * On-device storage for photos, voice notes and documents.
@@ -118,6 +121,8 @@ export type StoredPhoto = StoredFile & {
   thumbnailPath: string;
   /** The untouched file, when the setting asks for it to be kept. */
   originalPath: string | null;
+  originalMimeType?: string | null;
+  checksum?: string;
   width: number;
   height: number;
   mimeType: 'image/jpeg';
@@ -133,13 +138,25 @@ async function renderJpeg(uri: string, width: number, height: number, maxEdge: n
   const context = ImageManipulator.manipulate(uri);
   const resize = fitWithin(width, height, maxEdge);
   if (resize) context.resize(resize);
-  const image = await context.renderAsync();
   try {
-    return await image.saveAsync({ compress: quality, format: SaveFormat.JPEG });
+    const image = await context.renderAsync();
+    try {
+      return await image.saveAsync({ compress: quality, format: SaveFormat.JPEG });
+    } finally {
+      image.release();
+    }
   } finally {
-    image.release();
     context.release();
   }
+}
+
+async function storeVerifiedPhotoFile(uri: string, extension: string, move = false) {
+  const source = await fingerprintSourceFile(uri);
+  const stored = await storeFile(uri, extension, { move, verifySize: true });
+  const copied = await fingerprintFile(() => mediaFile(stored.relativePath));
+  if (source.checksum !== copied.checksum || source.sizeBytes !== copied.sizeBytes)
+    throw new Error('کپی عکس با فایل اولیه یکسان نیست؛ عکس ثبت نشد.');
+  return { ...stored, checksum: copied.checksum };
 }
 
 /**
@@ -156,21 +173,22 @@ async function renderJpeg(uri: string, width: number, height: number, maxEdge: n
  * preserved original.
  */
 export async function storePhoto(
-  source: { uri: string; width: number; height: number },
+  source: { uri: string; width: number; height: number; mimeType?: string | null },
   { keepOriginal = false }: { keepOriginal?: boolean } = {},
 ): Promise<StoredPhoto> {
-  const original = keepOriginal ? await storeFile(source.uri, extensionOf(source.uri, 'jpg')) : null;
+  const original = keepOriginal ? await storeVerifiedPhotoFile(source.uri, extensionOf(source.uri, 'jpg')) : null;
 
   const full = await renderJpeg(source.uri, source.width, source.height, PHOTO_MAX_EDGE, PHOTO_QUALITY);
   const thumb = await renderJpeg(source.uri, source.width, source.height, THUMB_MAX_EDGE, THUMB_QUALITY);
 
-  const stored = await storeFile(full.uri, 'jpg', { move: true });
-  const storedThumb = await storeFile(thumb.uri, 'jpg', { move: true });
+  const stored = await storeVerifiedPhotoFile(full.uri, 'jpg', true);
+  const storedThumb = await storeVerifiedPhotoFile(thumb.uri, 'jpg', true);
 
   return {
     ...stored,
     thumbnailPath: storedThumb.relativePath,
     originalPath: original?.relativePath ?? null,
+    originalMimeType: original ? (source.mimeType ?? imageMimeFromPath(source.uri) ?? null) : null,
     width: full.width,
     height: full.height,
     mimeType: 'image/jpeg',

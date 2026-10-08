@@ -15,13 +15,13 @@ export type PhotoSource = 'camera' | 'library';
 /**
  * Open the camera or the system photo picker.
  *
- * `crop` turns on the native cropper — the "crop the lab sheet to just the
- * results" step. Android's cropper only handles one image at a time, so crop
- * and multi-select are mutually exclusive.
+ * Import before editing. Android's native cropper replaces the picker URI,
+ * which would make an already-cropped result masquerade as the original.
+ * Older callers may still request `crop`; it is deliberately ignored here.
  */
 export async function pickPhotos(
   source: PhotoSource,
-  { crop = false, multiple = false }: { crop?: boolean; multiple?: boolean } = {},
+  { multiple = false }: { crop?: boolean; multiple?: boolean } = {},
 ): Promise<ImagePicker.ImagePickerAsset[] | null> {
   if (source === 'camera') {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -36,8 +36,8 @@ export async function pickPhotos(
     // Full quality in; storePhoto() does the one controlled compression pass.
     quality: 1,
     exif: false,
-    allowsEditing: crop && !multiple,
-    allowsMultipleSelection: multiple && !crop,
+    allowsEditing: false,
+    allowsMultipleSelection: multiple,
     selectionLimit: multiple ? 20 : 1,
   };
 
@@ -63,7 +63,7 @@ export type AttachTarget = {
 export async function storeAndAttach(assets: ImagePicker.ImagePickerAsset[], target: AttachTarget): Promise<string[]> {
   // Capture caller-owned values before yielding, and protect direct callers too.
   const captured = { ...target };
-  const sources = assets.map(({ uri, width, height }) => ({ uri, width, height }));
+  const sources = assets.map(({ uri, width, height, mimeType }) => ({ uri, width, height, mimeType }));
   return withFileJob(async () => {
     checkAttachmentTarget(captured);
     const ids: string[] = [];
@@ -80,6 +80,8 @@ export async function storeAndAttach(assets: ImagePicker.ImagePickerAsset[], tar
           relativePath: stored.relativePath,
           thumbnailPath: stored.thumbnailPath,
           originalPath: stored.originalPath,
+          originalMimeType: stored.originalMimeType,
+          checksum: stored.checksum,
           mimeType: stored.mimeType,
           sizeBytes: stored.sizeBytes,
           width: stored.width,

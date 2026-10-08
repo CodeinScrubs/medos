@@ -67,6 +67,8 @@ export type AttachmentInput = {
   thumbnailPath?: string | null;
   /** The untouched file, when it was kept; see `attachments.originalPath`. */
   originalPath?: string | null;
+  originalMimeType?: string | null;
+  checksum?: string | null;
   mimeType?: string | null;
   sizeBytes?: number | null;
   width?: number | null;

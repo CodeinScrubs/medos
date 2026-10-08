@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
@@ -20,7 +21,15 @@ import * as queries from './queries';
 
 const mockBack = jest.fn();
 let mockParams: { attachmentId: string };
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => mockParams, useRouter: () => ({ back: mockBack }) }));
+let mockFocused = true;
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => mockParams,
+  useRouter: () => ({ back: mockBack, push: jest.fn() }),
+  useNavigation: () => ({ isFocused: () => mockFocused }),
+}));
+jest.mock('./image-export', () => ({ useImageExport: () => ({ render: jest.fn(), scene: null, busy: false }) }));
+jest.mock('@/components/annotated-image', () => ({ AnnotatedImage: 'AnnotatedImage' }));
+jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(), shareAsync: jest.fn() }));
 jest.mock('expo-status-bar', () => ({ StatusBar: 'StatusBar' }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
@@ -107,6 +116,7 @@ beforeEach(async () => {
   });
   mockParams = { attachmentId: id };
   mockBack.mockClear();
+  mockFocused = true;
   jest.mocked(alertError).mockClear();
   jest.mocked(Sharing.isAvailableAsync).mockReset().mockResolvedValue(true);
   jest.mocked(Sharing.shareAsync).mockReset().mockResolvedValue(undefined);
@@ -266,6 +276,43 @@ describe('media viewer mutation intent and actual caption prompt', () => {
     );
     expect(current()[0]!.deletedAt).not.toBeNull();
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+  it('does not pop a newer route when a delayed deletion acknowledges', async () => {
+    const actual = queries.deleteAttachment;
+    let release!: () => void;
+    const ack = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.spyOn(queries, 'deleteAttachment').mockImplementation(async (...args) => {
+      await actual(...args);
+      await ack;
+    });
+    await render();
+    await invoke(() => icon('حذف').props.onPress());
+    await invoke(
+      jest
+        .mocked(Alert.alert)
+        .mock.calls.at(-1)![2]!
+        .find((choice) => choice.text === 'حذف')!.onPress!,
+    );
+    mockFocused = false;
+    await invoke(release);
+    expect(current()[0]!.deletedAt).not.toBeNull();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it('shares a retained PNG original with its actual MIME instead of the JPEG preview MIME', async () => {
+    t.db
+      .update(attachments)
+      .set({
+        originalPath: 'imports/synthetic-original.png',
+        originalMimeType: 'image/png',
+        mimeType: 'image/jpeg',
+      })
+      .where(eq(attachments.id, mockParams.attachmentId))
+      .run();
+    await render();
+    await invoke(() => icon('اشتراک‌گذاری').props.onPress());
+    expect(Sharing.shareAsync).toHaveBeenCalledWith('file://imports/synthetic-original.png', { mimeType: 'image/png' });
   });
   it('catches native share failure without losing the attachment', async () => {
     await render();

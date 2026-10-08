@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Reversible image annotation and recoverable raw text
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers, primary
+owns integration, tests and native acceptance.
+**Commits:** this source commit; native artifact/evidence follow separately.
+
+**Changed**
+- Viewer opens one editor: pen/highlight/arrow, Persian/English text, crop/rotate,
+  undo/redo, recoverable drafts and retained versions. No original overwrite.
+- Additive migration0023 and CAS publication; explicit compared conflicts retain
+  both branches. Original generation/focused navigation/stable native parent.
+- Verify photo copies and cache PNG readback; correct original MIME and bounds.
+  Picker crops only after import. No npm dependency. Version .36/code52.
+- Pinned SVG 15.15.4 cache-hit onLoad patch in config plugin; see architecture.
+
+**Verified**
+- `npm run check` green: full application suite plus five workflow tests.
+- Real migrated SQLite: atomic failure rollback, retry, exact raw text, competing
+  editors, same-ID restore fencing, old-backup absent-table/default behavior.
+- Pointer witnesses: text taps, letterbox rejection, denied strokes, combined
+  zoom/pan and crop. Copy corruption/truncation and PNG incompleteness refused.
+
+**Not verified**
+- Native photo editing/render/export acceptance, physical A52s and pressure.
+  A software pass is not proof of native shaping, bitmap content or stability.
+
+**Open threads**
+- Finish native .36 acceptance before calling the new image workflow delivered;
+  build/inspect owner APK only from the final source. Log validation-0.11.36.md.
+- Other P0s remain: contacts/doctor raw recovery, safe orphan accounting, custom
+  lab units/Remove and physical/pressure/24-hour gates in IMPLEMENTATION.
+
+**Gotchas**
+- SVG onLoad previously skipped cached images; prebuild must apply the plugin
+  before Gradle. Invisible export host is 240dp; output dimensions are physical.
+- An acknowledged draft is recoverable; an active pointer before persistence
+  is not. Photo imports still lack a durable journal and may leave orphan copies.
+
 ## 2026-10-08 — Verify raw lab recovery and deliver the signed owner APK
 
 **Agent:** GPT-6 via Codex; primary owns integration and native verification.

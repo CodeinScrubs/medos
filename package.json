@@ -1,7 +1,7 @@
 {
   "name": "medos",
   "private": true,
-  "version": "0.11.35",
+  "version": "0.11.36",
   "description": "MedOS — personal clinical operating system",
   "workspaces": [
     "apps/*",
@@ -19,7 +19,7 @@
     "typecheck": "npm run typecheck --workspace=@medos/mobile",
     "lint": "npm run lint --workspace=@medos/mobile",
     "test": "npm run test --workspace=@medos/mobile",
-    "test:workflow": "node --test scripts/handoff.test.js",
+    "test:workflow": "node --test scripts/handoff.test.js scripts/svg-image-ready.test.js",
     "format": "prettier --write \"scripts/**/*.js\" \"*.json\" \".github/**/*.yml\" && npm run format --workspace=@medos/mobile",
     "format:check": "prettier --check \"scripts/**/*.js\" \"*.json\" \".github/**/*.yml\""
   },

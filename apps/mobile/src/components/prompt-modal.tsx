@@ -20,6 +20,7 @@ export function PromptModal({
   optional = true,
   secret = false,
   busy = false,
+  maxLength,
   value,
   onChangeText,
   onSubmit,
@@ -41,6 +42,7 @@ export function PromptModal({
   secret?: boolean;
   /** Retain text and prevent edits/dismissal until its caller acknowledges submission. */
   busy?: boolean;
+  maxLength?: number;
   /** Optional paired controlled input for a caller-owned durable raw draft. */
   onSubmit: (text: string) => void;
   onCancel: () => void;
@@ -108,6 +110,7 @@ export function PromptModal({
                 </Text>
               ) : null}
               <Input
+                maxLength={maxLength}
                 value={text}
                 editable={!busy}
                 onChangeText={(next) => {

@@ -140,6 +140,15 @@ export const mediaViewerColors = {
   textDim: 'rgba(255, 255, 255, 0.7)',
 } as const;
 
+/** Fixed annotation ink remains the same in light/dark themes and exports. */
+export const imageInk = {
+  yellow: '#FFD600',
+  red: '#E31B23',
+  blue: '#1367DC',
+  white: '#FFFFFF',
+  black: '#000000',
+} as const;
+
 /** 4pt scale. `md` is the default gap between related elements. */
 export const spacing = {
   none: 0,

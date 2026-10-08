@@ -1,8 +1,8 @@
-import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { EditGate } from '@/components/edit-gate';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
@@ -11,8 +11,9 @@ import { useDateValidation } from '@/components/use-date-validation';
 import type { ImagingStudy } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, attachPhotos } from '@/features/attachments/capture';
+import { ImageThumbnail } from '@/features/attachments/image-thumbnail';
 import { entityAttachmentsQuery } from '@/features/attachments/queries';
-import { mediaUri } from '@/platform/media';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { useTheme } from '@/theme';
 
 import { IMAGING_STATUS_LABELS, MODALITY_LABELS } from './labels';
@@ -32,11 +33,14 @@ const DEFAULT_LOCATIONS = ['PACS بیمارستان', 'CD دست همراه', '�
 
 /** Create or edit an imaging study. Params: `id` (patient), optional `studyId`. */
 export function ImagingFormScreen() {
+  useDatasetIntent();
   const { id: patientId, studyId } = useLocalSearchParams<{ id: string; studyId?: string }>();
   const { data, error, retry } = useLive(imagingStudyQuery(studyId ?? ''), [studyId]);
   return (
-    <EditGate editing={Boolean(studyId)} rows={data} error={error} onRetry={retry} what="تصویربرداری">
-      {(study, readNotice) => <ImagingForm readNotice={readNotice} patientId={patientId} study={study} />}
+    <EditGate editing={Boolean(studyId)} rows={data} error={error} onRetry={retry} what="تصویربرداری" fenceDataset>
+      {(study, readNotice, generation) => (
+        <ImagingForm readNotice={readNotice} patientId={patientId} study={study} generation={generation} />
+      )}
     </EditGate>
   );
 }
@@ -45,13 +49,20 @@ function ImagingForm({
   patientId,
   study,
   readNotice,
+  generation: expectedGeneration,
 }: {
   readNotice: ReactNode;
   patientId: string;
   study: ImagingStudy | null;
+  generation: number;
 }) {
   const router = useRouter();
-  const { colors, radii, spacing } = useTheme();
+  const navigation = useNavigation();
+  const { generation, stale } = useDatasetIntent(expectedGeneration);
+  const { radii, spacing } = useTheme();
+  const acting = useRef(false);
+  const adding = useRef(false);
+  const [completed, setCompleted] = useState(false);
 
   const [modality, setModality] = useState<ImagingStudy['modality']>(study?.modality ?? 'ct');
   const [region, setRegion] = useState(study?.region ?? '');
@@ -71,13 +82,17 @@ function ImagingForm({
   const { data: photos } = useLive(entityAttachmentsQuery('imaging_study', study?.id ?? ''), [study?.id]);
 
   useEffect(() => {
-    void recentStorageLocations().then(setRecent);
+    void recentStorageLocations()
+      .then(setRecent)
+      .catch((e) => alertError('محل‌های قبلی خوانده نشد', e));
   }, []);
 
   const locationOptions = [...new Set([...recent.locations, ...DEFAULT_LOCATIONS])].slice(0, 8);
 
   async function save() {
+    if (acting.current || completed) return;
     if (!dateValidation.check()) return;
+    acting.current = true;
     setSaving(true);
     const payload = {
       modality,
@@ -93,19 +108,28 @@ function ImagingForm({
       reportText: reportText.trim() || null,
     };
     try {
-      if (study) await updateImagingStudy(study.id, payload);
-      else await createImagingStudy({ patientId, ...payload });
-      router.back();
+      await withDatasetWrite(generation, async () => {
+        if (study) await updateImagingStudy(study.id, payload);
+        else await createImagingStudy({ patientId, ...payload });
+        setCompleted(true);
+        if (navigation.isFocused()) router.back();
+      });
     } catch (e) {
       alertError('ذخیره نشد', e);
     } finally {
       setSaving(false);
+      acting.current = false;
     }
   }
 
   return (
     <Screen scroll>
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <Column
+        collapsable={false}
+        gap="md"
+        pointerEvents={completed || saving ? 'none' : 'auto'}
+        style={{ paddingTop: spacing.md }}
+      >
         {readNotice}
         <ChipSelect label="نوع" options={MODALITY_OPTIONS} value={modality} onChange={(v) => v && setModality(v)} />
         <Input label="ناحیه / شرح" value={region} onChangeText={setRegion} placeholder="مثلاً Brain w/o contrast" ltr />
@@ -174,13 +198,11 @@ function ImagingForm({
                 {photos.map((a) => (
                   <Pressable
                     key={a.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`نمایش عکس ${a.caption ?? 'تصویربرداری'}`}
                     onPress={() => router.push({ pathname: '/media/[attachmentId]', params: { attachmentId: a.id } })}
                   >
-                    <Image
-                      source={{ uri: mediaUri(a.thumbnailPath ?? a.relativePath) ?? undefined }}
-                      style={{ width: 96, height: 96, borderRadius: radii.md, backgroundColor: colors.surfaceAlt }}
-                      contentFit="cover"
-                    />
+                    <ImageThumbnail attachment={a} width={96} height={96} radius={radii.md} />
                   </Pressable>
                 ))}
               </ScrollView>
@@ -189,18 +211,25 @@ function ImagingForm({
               label="عکس از فیلم یا مانیتور"
               icon="camera-outline"
               variant="ghost"
+              disabled={stale || completed || saving}
               onPress={() =>
-                askPhotoSource(
-                  (source) =>
-                    void attachPhotos({
+                askPhotoSource((source) => {
+                  if (adding.current || completed) return;
+                  adding.current = true;
+                  void withDatasetWrite(generation, () =>
+                    attachPhotos({
                       source,
                       entityType: 'imaging_study',
                       entityId: study.id,
                       patientId,
                       kind: 'radiology',
-                      crop: true,
                     }),
-                )
+                  )
+                    .catch((e) => alertError('عکس ذخیره نشد', e))
+                    .finally(() => {
+                      adding.current = false;
+                    });
+                })
               }
             />
           </Column>
@@ -217,12 +246,22 @@ function ImagingForm({
               icon="checkmark"
               onPress={() => void save()}
               loading={saving}
+              disabled={stale || completed}
               full
             />
           </View>
           <Button label="انصراف" variant="ghost" onPress={() => router.back()} haptic={false} />
         </Row>
       </Column>
+      {completed ? (
+        <Button
+          label="ثبت شد؛ بستن"
+          variant="ghost"
+          onPress={() => {
+            if (navigation.isFocused()) router.back();
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

@@ -1656,3 +1656,58 @@ or adding a general merge framework. Rows are updated immutably; reference
 identity within this one native wait also protects a user retyping the same
 baseline value. Do not replace this with value equality or mutate rows in place.
 There is no persisted per-keystroke intent history.
+
+## Reversible image editing (0.11.36)
+
+The viewer opens one editor directly: pen, translucent highlight, arrow, typed
+Persian/English text, crop, quarter-turn rotation, mark removal and undo/redo.
+No image server, new dependency or alternate gallery is involved. An immutable
+2400px working JPEG provides coordinates; the retained original and thumbnail
+are never overwritten. Default original retention remains `always`. The native
+picker no longer crops before import, which previously made the cropped result
+masquerade as the original. Previously discarded/cropped originals cannot be
+reconstructed. New copies verify size and SHA-256 before attachment publication.
+
+Additive migration0023 adds attachment edit body/revision/original MIME and two
+tables: unpublished `image_edit_drafts` and immutable `image_edit_versions`.
+Versioned strict documents keep physical source-pixel coordinates, source path,
+dimensions, crop, rotation and bounded marks. Raw pending text, including spaces,
+newlines and incomplete text, belongs to the draft. The codec has one symmetric
+2M-character image limit, 200 marks/20K points and a bounded pending-text allowance.
+Corrupt/future documents produce an error; they are not silently reset.
+
+One AutosaveScope and captured dataset generation span pointer events, text,
+background/leave flush, delayed dialogs and manual publication. Latest refs
+precede React state. Draft revision and frozen source/published basis guard
+concurrent edits. Publication atomically inserts the previous baseline and new
+version, updates the attachment, and retires the draft. Compare exposes the
+current image/raw text before an explicit choice; both branches are retained on
+a recoverable shelf, and a changing comparison is refused. Deleted clinical
+parents cannot receive publication. Completed/unfocused editors remain readable;
+late acknowledgment cannot pop a newer route. The native header and form parent
+remain mounted through submission. A stale dataset can only be reviewed/copied
+or explicitly closed, never rebound to fresh write authority.
+
+One SVG scene renders editor, thumbnail, viewer and share output with explicit
+crop clipping and rotation. Text uses Android's shaped/wrapped TSpan path with
+the bundled Persian font. Repeated cached images need a native onLoad event:
+`with-svg-image-ready` patches exactly react-native-svg 15.15.4 during prebuild,
+once per source, failing closed on source/version drift. Its contract test runs
+in root `test:workflow`. Review/remove the patch on an upstream update; never
+replace readiness with an elapsed timer. No npm/native dependency was added.
+
+Sharing explicitly renders a PNG with a maximum 2400px long edge. The invisible
+render host is at most 240dp, avoiding density-amplified bitmap allocation;
+toDataURL receives the physical output dimensions. Native load acknowledgment
+precedes capture. Complete chunks/IEND, dimensions and exact cache readback are
+checked before sharing. Originals use their own MIME rather than the JPEG preview
+MIME. Share derivatives live only in cache; clinical backups include original
+files, drafts and versions through existing table/media discovery. Old backups
+clear absent new tables and apply SQL defaults without changing MEDOSBAK/keys.
+
+This is not a durable photo-import journal: a killed import or failed attachment
+SQL can leave copied orphan files, and a multi-image import may commit partially.
+Do not sweep those files to hide failure. Active pointer events before an acknowledged
+draft write are also not crash-durable. Native rendering/export, physical A52s,
+power/space pressure and full product acceptance remain distinct gates. Record
+actual artifact and device evidence in validation-0.11.36.md.

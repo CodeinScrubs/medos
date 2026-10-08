@@ -56,6 +56,12 @@ beforeEach(async () => {
 });
 
 describe('whole photo job exclusion', () => {
+  it('keeps the picker source intact even when an older caller requests crop', async () => {
+    await attachPhotos({ ...target(), source: 'library', crop: true });
+    expect(mockPicker.mock.calls[0]![0].allowsEditing).toBe(false);
+    expect(mockStore.mock.calls[0]![0].uri).toBe(asset().uri);
+  });
+
   it.each(['camera', 'library'] as const)('reserves before the %s picker and releases on cancel', async (source) => {
     const waiting = deferred<ImagePickerResult>();
     mockPicker.mockReturnValue(waiting.promise);

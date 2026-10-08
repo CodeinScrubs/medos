@@ -1,22 +1,27 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AnnotatedImage } from '@/components/annotated-image';
 import { useDatasetIntent } from '@/components/dataset-intent';
+import { ErrorNotice } from '@/components/error-notice';
 import { notify, alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { ScreenOptions } from '@/components/screen-options';
-import { Column, IconButton, Row, Text } from '@/components/ui';
+import { Button, Column, IconButton, Row, Text } from '@/components/ui';
 import { ZoomableImage } from '@/components/zoomable-image';
 import { useLive } from '@/db/use-live';
 import { withDatasetWrite } from '@/lib/dataset-write';
+import { imageDisplaySize, imageMimeFromPath, type ImageDocument } from '@/lib/image-edit';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { mediaExists, mediaUri } from '@/platform/media';
 import { mediaViewerColors } from '@/theme';
 
+import { attachmentImageDocument } from './image-edit-queries';
+import { useImageExport } from './image-export';
 import { ATTACHMENT_KIND_LABELS } from './labels';
 import { attachmentQuery, deleteAttachment, updateAttachment } from './queries';
 
@@ -24,28 +29,46 @@ import { attachmentQuery, deleteAttachment, updateAttachment } from './queries';
 export function MediaViewerScreen() {
   const { attachmentId } = useLocalSearchParams<{ attachmentId: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const [editing, setEditing] = useState(false);
   const { generation } = useDatasetIntent();
   const captionBusy = useRef(false);
   const [savingCaption, setSavingCaption] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const exporter = useImageExport();
 
-  const { data } = useLive(attachmentQuery(attachmentId), [attachmentId]);
+  const { data, error, retry } = useLive(attachmentQuery(attachmentId), [attachmentId]);
   const item = data?.[0];
-  // Zoom against the original when one was kept: this screen is where the
-  // difference between the sensor's pixels and a 2400px re-encode is the whole
-  // point. Sharing follows suit — what leaves is what arrived.
-  const shown = item && item.originalPath && mediaExists(item.originalPath) ? item.originalPath : item?.relativePath;
+  let document: ImageDocument | null = null;
+  let documentError: Error | undefined;
+  if (item?.imageEditBody && !showOriginal) {
+    try {
+      document = attachmentImageDocument(item);
+    } catch {
+      documentError = new Error('سند ویرایش عکس خوانده نشد؛ اصل عکس را می‌توانید جداگانه ببینید.');
+    }
+  }
+  const originalMissing = !!item?.originalPath && !mediaExists(item.originalPath);
+  const originalShown = !document && !documentError && !!item?.originalPath && !originalMissing;
+  const shown = originalShown ? item!.originalPath : item?.relativePath;
   const uri = shown ? mediaUri(shown) : null;
   const missing = shown ? !mediaExists(shown) : false;
 
   async function share() {
     await withDatasetWrite(generation, async () => {
-      if (!uri) return;
+      if (!item || !uri || missing || documentError) throw new Error('عکس برای اشتراک‌گذاری در دسترس نیست.');
       if (!(await Sharing.isAvailableAsync())) {
         notify('اشتراک‌گذاری روی این گوشی در دسترس نیست');
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: item?.mimeType ?? 'image/jpeg' });
+      if (showOriginal && originalMissing) throw new Error('اصل عکس پیدا نشد؛ نسخهٔ فشرده به جای آن فرستاده نشد.');
+      const shareUri = document ? await exporter.render(document) : uri;
+      const mimeType = document
+        ? 'image/png'
+        : originalShown
+          ? (item.originalMimeType ?? imageMimeFromPath(shown!))
+          : (item.mimeType ?? imageMimeFromPath(shown!));
+      await Sharing.shareAsync(shareUri, mimeType ? { mimeType } : {});
     });
   }
 
@@ -77,7 +100,7 @@ export function MediaViewerScreen() {
         onPress: () => {
           void withDatasetWrite(generation, async () => {
             await deleteAttachment(item.id);
-            router.back();
+            if (navigation.isFocused()) router.back();
           }).catch((e) => alertError('عکس حذف نشد', e));
         },
       },
@@ -89,8 +112,19 @@ export function MediaViewerScreen() {
       <ScreenOptions options={{ headerShown: false, animation: 'fade' }} />
       <StatusBar style="light" />
 
-      {uri && !missing ? (
-        <ZoomableImage uri={uri} />
+      {uri && !missing && !documentError ? (
+        <ZoomableImage
+          key={`${shown}-${item?.imageEditRevision}-${showOriginal}`}
+          uri={uri}
+          imageSize={document ? imageDisplaySize(document) : undefined}
+          renderImage={
+            document
+              ? (viewport) => (
+                  <AnnotatedImage document={document!} uri={uri} width={viewport.width} height={viewport.height} />
+                )
+              : undefined
+          }
+        />
       ) : (
         <View style={[styles.flex, styles.center]}>
           <Text variant="body" style={styles.white}>
@@ -104,6 +138,17 @@ export function MediaViewerScreen() {
           <IconButton icon="close" label="بستن" color={mediaViewerColors.text} onPress={() => router.back()} />
           <Row gap="xs">
             <IconButton
+              icon="color-palette-outline"
+              label="ویرایش عکس"
+              color={mediaViewerColors.text}
+              disabled={!item || missing || !!documentError}
+              onPress={() => {
+                void withDatasetWrite(generation, async () => {
+                  router.push({ pathname: '/media/edit/[attachmentId]', params: { attachmentId } });
+                }).catch((e) => alertError('ویرایش باز نشد', e));
+              }}
+            />
+            <IconButton
               icon="create-outline"
               label="ویرایش توضیح"
               color={mediaViewerColors.text}
@@ -113,16 +158,31 @@ export function MediaViewerScreen() {
               icon="share-outline"
               label="اشتراک‌گذاری"
               color={mediaViewerColors.text}
+              disabled={exporter.busy || missing || !!documentError}
               onPress={() => void share().catch((e) => alertError('اشتراک‌گذاری انجام نشد', e))}
             />
             <IconButton icon="trash-outline" label="حذف" color={mediaViewerColors.text} onPress={remove} />
           </Row>
         </Row>
+        <ErrorNotice error={error ?? documentError} what="عکس" onRetry={retry} />
       </SafeAreaView>
 
       {item ? (
-        <SafeAreaView style={styles.bottomBar} edges={['bottom']} pointerEvents="none">
+        <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
           <Column gap="xxs" style={styles.caption}>
+            {item.imageEditBody ? (
+              <Button
+                label={showOriginal ? 'نمایش ویرایش' : item.originalPath ? 'نمایش اصل عکس' : 'عکس بدون ویرایش'}
+                variant="ghost"
+                size="sm"
+                onPress={() => setShowOriginal(!showOriginal)}
+              />
+            ) : null}
+            {originalMissing ? (
+              <Text variant="tiny" style={styles.dim}>
+                اصل عکس پیدا نشد؛ نسخهٔ فشرده نمایش داده می‌شود.
+              </Text>
+            ) : null}
             {item.caption ? (
               <Text variant="body" style={styles.white}>
                 {item.caption}
@@ -147,6 +207,7 @@ export function MediaViewerScreen() {
         }}
         onSubmit={(text) => void saveCaption(text)}
       />
+      {exporter.scene}
     </View>
   );
 }

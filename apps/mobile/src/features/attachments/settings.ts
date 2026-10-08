@@ -12,8 +12,8 @@ import { defineSetting } from '@/db/settings';
  * ECGs. The re-encode cannot be undone, so the choice has to be made before
  * the photo is stored, not when it is finally needed.
  *
- * The default splits it by what the photo is of: skin and imaging keep their
- * originals, paperwork does not. A lab sheet gains nothing from 12 megabytes.
+ * The default keeps every original. The optional clinical-only mode limits
+ * original retention to skin and imaging; it must remain an explicit choice.
  */
 export const KEEP_ORIGINAL_KINDS: readonly AttachmentKind[] = ['clinical_photo', 'radiology'];
 

@@ -1,11 +1,10 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
-import { Directory, File, FileMode, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import { copyAsync } from 'expo-file-system/legacy';
 
+import { fingerprintFile, type FileFingerprint } from './file-integrity';
 import { mediaFile } from './media';
 
-export type FileFingerprint = { checksum: string; sizeBytes: number };
+export type { FileFingerprint } from './file-integrity';
 
 /** Bounded memory, explicit EOF, no private path in errors. */
 export async function fingerprintImportFile(path: string): Promise<FileFingerprint> {
@@ -18,40 +17,6 @@ export async function fingerprintRecordingSource(uri: string): Promise<FileFinge
     return await fingerprintFile(() => new File(uri));
   } catch {
     throw new Error('فایل اولیهٔ وویس کامل خوانده نشد؛ ذخیره انجام نشد.');
-  }
-}
-
-async function fingerprintFile(openFile: () => File): Promise<FileFingerprint> {
-  try {
-    const file = openFile();
-    const handle = file.open(FileMode.ReadOnly);
-    const hash = sha256.create();
-    let sizeBytes = 0;
-    let nextYield = 1024 * 1024;
-    try {
-      for (;;) {
-        const bytes = handle.readBytes(64 * 1024);
-        if (!bytes.length) break;
-        hash.update(bytes);
-        sizeBytes += bytes.length;
-        // Short native reads must not postpone yielding indefinitely.
-        if (sizeBytes >= nextYield) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
-          nextYield = sizeBytes + 1024 * 1024;
-        }
-      }
-      if (!sizeBytes || (file.size != null && file.size !== sizeBytes)) throw new Error();
-      return { checksum: bytesToHex(hash.digest()), sizeBytes };
-    } finally {
-      try {
-        handle.close();
-      } finally {
-        hash.destroy();
-      }
-    }
-  } catch {
-    // Native errors can include a provider URI, filename or private path.
-    throw new Error('فایل کامل خوانده نشد؛ کپی برای بررسی حفظ شده است.');
   }
 }
 
