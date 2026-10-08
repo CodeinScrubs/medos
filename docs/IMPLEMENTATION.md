@@ -40,9 +40,13 @@ order; do not treat a successful test suite as acceptance of the entire product.
 units no longer inherit another unit's reference range, and trend grouping
 does not case-fold SI prefixes. New fail-before/pass-after SQLite and chart
 witnesses pass; full check is137 suites/1,864 app tests and five workflows.
-No historical result is converted or rewritten. Native clipboard, artifact
-and delivery acceptance belongs in validation-0.11.38.md and HANDOFF; earlier
-native evidence must not be reused as acceptance of this source. The remaining
+No historical result is converted or rewritten. Actual inspected/installed
+source `cf5c571` passes clipboard/raw cold recovery/publication and case-distinct
+native trend grouping; independent upgrade/final comparisons preserve4,079/
+4,092 rows,44 tables and28 media hashes respectively. The separately signed/
+inspected owner arm64 APK has actual JS bytes identical to accepted QA; it has
+not been tested on the A52s. Hosted delivery acceptance belongs in
+validation-0.11.38.md and HANDOFF. The remaining
 raw-form, media-batch, physical and pressure gates below are still open.
 
 0.11.37 closes companion raw-form recovery via migration0024 and hardens the

@@ -36,7 +36,7 @@ wrong, never rewrite them to look better.
 ## 2026-10-08 — Clipboard lab units and reference compatibility (0.11.38)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.
-**Commits:** this source checkpoint; native/artifact delivery follows separately.
+**Commits:** application `cf5c571`; native/artifact delivery follows separately.
 
 **Changed**
 - Keep explicit pasted values and their units together. Clear an existing range
@@ -52,21 +52,33 @@ wrong, never rewrite them to look better.
 - New SQLite screen and chart witnesses fail before correction; the focused
   two suites pass98 tests afterwards. Full check passes137 suites/1,864 app
   tests and five workflows, including typecheck/lint/formatting.
+- Inspected/installed byte-identical QA APK passes real clipboard reads, same-
+  unit range retention, changed-unit raw cold recovery and publication, new
+  differing-unit preset refusal and case-distinct native trend grouping.
+- Independent upgrade comparison preserves4,079 rows/44 tables/28 media hashes;
+  final cold comparison preserves4,092 rows with only intended test additions/
+  soft-retained revisions. Integrity/FKs clean. Three captured Save returns
+  keep their PID/no fatal. No app data cleared; airplane mode remains on.
+- Five PR heads unchanged from previous review; none merged or commented on.
+- Signed/inspected owner APK is built: arm64-v8a, 53,118,611 bytes, SHA-256
+  `c96496eb36d12640a6db8a2ce646b9eb98c85a0dbdff6bc68904154126cf20b1`.
+  Actual embedded JS is byte-identical to accepted QA. See validation-0.11.38.md.
 
 **Not verified**
-- Rebuilt0.11.38 native clipboard behavior and signed owner artifact are next;
-  earlier0.11.37 native evidence is not evidence for this new source.
+- Normal push and hosted CI are next. Earlier 0.11.37 artifacts/CI do not prove
+  0.11.38 delivery.
 - Physical A52s, pressure/full-shift and clinical-review gates remain open.
 
 **Open threads**
-- Finish actual clipboard/raw recovery/publication acceptance, preserve all
-  unrelated data/media on upgrade, inspect both APKs and run hosted CI.
+- Finish normal push and hosted CI delivery, then record the actual result.
 - Remaining raw doctor/photo forms and photo batch recovery are unchanged.
   Historical incorrectly imported ranges need source/physician review.
 
 **Gotchas**
 - `mg` and `Mg` cannot be case-folded. See validation-0.11.38.md for the
   precise cases and primary SI reference. Do not add guessed unit aliases.
+- Focused lab Save immediately returns; a driver waiting for completed Close
+  was rejected. Later trials verify the expected return and stored columns.
 
 ## 2026-10-08 — Final 0.11.37 native recovery and artifact acceptance
 
