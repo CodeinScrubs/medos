@@ -14,7 +14,10 @@ import {
   discardImageEditDraft,
   imageEditQuery,
   imageEditSeed,
+  imageShelvedDraftsQuery,
+  imageVersionsQuery,
   inspectImageEdit,
+  loadImageHistoryBody,
   publishImageEditDraft,
   resolveImageEdit,
   saveImageEditDraft,
@@ -68,6 +71,60 @@ beforeEach(async () => {
 });
 
 describe('image draft and publication consistency', () => {
+  it('lists compact history and loads only the chosen large version or retired raw draft', async () => {
+    const large = edited();
+    large.image.marks = Array.from({ length: 200 }, (_, i) => ({
+      id: `large-${i}`,
+      kind: 'text' as const,
+      color: 'red' as const,
+      x: 20,
+      y: 30,
+      width: 350,
+      size: 25,
+      text: 'X'.repeat(2000),
+    }));
+    await saveImageEditDraft(draftId, seed.basis, large, 0);
+    const versionId = await publishImageEditDraft(draftId, seed.basis, 1);
+    const versions = imageVersionsQuery(attachmentId).all();
+    expect(versions.map((row) => row.revision)).toEqual([1, 0]);
+    expect(JSON.stringify(versions).length).toBeLessThan(1000);
+    const body = loadImageHistoryBody(attachmentId, versionId, 'version');
+    expect(body.length).toBeGreaterThan(400000);
+    expect(JSON.parse(body)).toEqual(large.image);
+
+    const next = imageEditSeed(imageEditQuery(attachmentId).get()!);
+    const pendingText = {
+      id: 'raw-shelf',
+      x: 20,
+      y: 30,
+      width: 350,
+      size: 25,
+      color: 'red' as const,
+      text: '  Raw shelf\n',
+    };
+    await saveImageEditDraft('shelf', next.basis, { ...large, pendingText }, 0);
+    await discardImageEditDraft('shelf', next.basis, 1);
+    const shelves = imageShelvedDraftsQuery(attachmentId).all();
+    expect(shelves).toHaveLength(1);
+    expect(JSON.stringify(shelves).length).toBeLessThan(1000);
+    expect(decodeImageDraft(loadImageHistoryBody(attachmentId, 'shelf', 'draft')).pendingText?.text).toBe(
+      '  Raw shelf\n',
+    );
+  });
+  it('does not load foreign, deleted, active or committed history rows by id', async () => {
+    await saveImageEditDraft(draftId, seed.basis, edited(), 0);
+    expect(() => loadImageHistoryBody(attachmentId, draftId, 'draft')).toThrow(ImageEditConflict);
+    const versionId = await publishImageEditDraft(draftId, seed.basis, 1);
+    expect(() => loadImageHistoryBody(attachmentId, draftId, 'draft')).toThrow(ImageEditConflict);
+    expect(() => loadImageHistoryBody('other-attachment', versionId, 'version')).toThrow(ImageEditConflict);
+    t.db
+      .update(imageEditVersions)
+      .set({ deletedAt: new Date(1) })
+      .where(eq(imageEditVersions.id, versionId))
+      .run();
+    expect(() => loadImageHistoryBody(attachmentId, versionId, 'version')).toThrow(ImageEditConflict);
+    expect(() => loadImageHistoryBody(attachmentId, 'missing', 'version')).toThrow(ImageEditConflict);
+  });
   it('clears new image history/drafts and applies defaults when restoring a table-absent old backup', async () => {
     t.sqlite.exec("VACUUM INTO '/old-image-schema.db'");
     await saveImageEditDraft(draftId, seed.basis, edited(), 0);

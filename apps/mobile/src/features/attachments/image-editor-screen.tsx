@@ -26,6 +26,7 @@ import {
   imageEditSeed,
   imageShelvedDraftsQuery,
   imageVersionsQuery,
+  loadImageHistoryBody,
   type ImageEditRow,
   type ImageEditSeed,
 } from './image-edit-queries';
@@ -333,8 +334,13 @@ function ImageEditor({
                 disabled={disabled}
                 onPress={() => {
                   void withDatasetWrite(generation, async () => {
-                    const draft = item.draft ? decodeImageDraft(item.body) : null;
-                    edit.changeImage(draft ? draft.image : decodeImageDocument(item.body));
+                    const body = loadImageHistoryBody(
+                      seed.basis.attachmentId,
+                      item.id,
+                      item.draft ? 'draft' : 'version',
+                    );
+                    const draft = item.draft ? decodeImageDraft(body) : null;
+                    edit.changeImage(draft ? draft.image : decodeImageDocument(body));
                     if (draft?.pendingText) edit.text(draft.pendingText);
                     setHistoryOpen(false);
                   }).catch((error) => alertError('نسخه بارگذاری نشد', error));

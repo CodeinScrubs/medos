@@ -43,16 +43,18 @@ export function imageEditQuery(id: string) {
     .limit(1);
 }
 export type ImageEditRow = Awaited<ReturnType<typeof imageEditQuery>>[number];
+// A lifetime history can hold many large documents. Read only row metadata
+// while the editor is open; fetch a single body after explicit selection.
 export function imageVersionsQuery(id: string) {
   return db
-    .select()
+    .select({ id: imageEditVersions.id, revision: imageEditVersions.revision, createdAt: imageEditVersions.createdAt })
     .from(imageEditVersions)
     .where(and(eq(imageEditVersions.attachmentId, id), isNull(imageEditVersions.deletedAt)))
     .orderBy(desc(imageEditVersions.revision));
 }
 export function imageShelvedDraftsQuery(id: string) {
   return db
-    .select()
+    .select({ id: imageEditDrafts.id, revision: imageEditDrafts.revision, createdAt: imageEditDrafts.createdAt })
     .from(imageEditDrafts)
     .where(
       and(
@@ -62,6 +64,36 @@ export function imageShelvedDraftsQuery(id: string) {
       ),
     )
     .orderBy(desc(imageEditDrafts.updatedAt));
+}
+/** Caller keeps the originating dataset admission through read and adoption. */
+export function loadImageHistoryBody(attachmentId: string, id: string, kind: 'version' | 'draft'): string {
+  const row =
+    kind === 'version'
+      ? db
+          .select({ body: imageEditVersions.body })
+          .from(imageEditVersions)
+          .where(
+            and(
+              eq(imageEditVersions.id, id),
+              eq(imageEditVersions.attachmentId, attachmentId),
+              isNull(imageEditVersions.deletedAt),
+            ),
+          )
+          .get()
+      : db
+          .select({ body: imageEditDrafts.body })
+          .from(imageEditDrafts)
+          .where(
+            and(
+              eq(imageEditDrafts.id, id),
+              eq(imageEditDrafts.attachmentId, attachmentId),
+              isNotNull(imageEditDrafts.deletedAt),
+              isNull(imageEditDrafts.committedVersionId),
+            ),
+          )
+          .get();
+  if (!row) throw new ImageEditConflict('نسخهٔ عکس برای بارگذاری در دسترس نیست.');
+  return row.body;
 }
 export function attachmentImageDocument(row: Attachment): ImageDocument {
   if (!row.width || !row.height || row.kind === 'voice' || row.kind === 'video')

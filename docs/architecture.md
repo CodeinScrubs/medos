@@ -1711,6 +1711,12 @@ MIME. Share derivatives live only in cache; clinical backups include original
 files, drafts and versions through existing table/media discovery. Old backups
 clear absent new tables and apply SQL defaults without changing MEDOSBAK/keys.
 
+History lists project only id/revision/date, including when they refresh during
+autosave. A selected body is read by id and matching attachment/readable state
+inside the original dataset admission, then decoded/adopted. Loading every saved
+document upfront would make permanent history a growing editor-memory cost.
+The history itself is never pruned to improve performance.
+
 This is not a durable photo-import journal: a killed import or failed attachment
 SQL can leave copied orphan files, and a multi-image import may commit partially.
 Do not sweep those files to hide failure. Active pointer events before an acknowledged

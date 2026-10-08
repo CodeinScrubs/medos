@@ -33,6 +33,58 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Verify native image editing, raw recovery and restore
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviews earlier in
+this image scope. Primary owns all integration, checks and native interaction.
+**Commits:** verified native checkpoint `4c24534`, following `7d5b6d9`, `04cf61f`,
+`9591ee0`; lightweight-history source is this follow-up commit; final artifact
+evidence follows separately.
+
+**Changed**
+- Record bounded image acceptance in validation-0.11.36.md and update execution
+  ledger. One viewer/editor, recoverable raw typing, reversible marks/crop/rotate
+  and retained history; no source overwrite, new dependency or permission.
+- Follow-up: history lists fetch only id/revision/date; load one chosen body
+  within the original admission and matching attachment/readable row state.
+  Opening the editor must not load every lifetime image document into memory.
+
+**Verified**
+- Checkpoint `4c24534` full source/pre-push checks: 134 suites/1,768 app tests
+  and five workflows; exact checkpoint CI37765074893 success.
+- Lightweight-history full check: 134 suites/1,770 app tests and five workflows.
+  Large-body metadata budget and matching readable/owned selection pass on real
+  SQLite. No schema or persistence format changes in this follow-up.
+- Installed QA APK bytes/signature/JNI inspected; offline in-place upgrades
+  preserve data. Native final-point/erase/Undo, mixed Persian/English text,
+  cached readiness/repeated PNG, crop/rotation, original sharing and history pass.
+- New full restore and cold reopen preserve exactly 4,070 rows/43 app tables/
+  28 media hashes, including six versions and live pending text. Old .35 restore
+  applies SQL defaults and clears absent new image tables. Integrity/FKs clean.
+- Native process retained through final Save/Back closes; no MedOS fatal/ANR
+  record observed. Five PR heads still unchanged; none merged or commented on.
+
+**Not verified**
+- Lightweight-history final APK/native recheck/hosted CI are being completed;
+  checkpoint `4c24534` owner arm64 was built and inspected, not delivered.
+- Physical A52s, power/low-space, actual HEIC/camera, pressure/24-hour use and
+  complete product/performance acceptance. Earlier .33 pressure ANR stays open.
+
+**Open threads**
+- Next P0: companion/doctor raw recovery and remaining original-intent/navigation
+  gates; photo captions/imaging raw forms also remain. Keep existing scope/CAS
+  contracts rather than adding a general form framework or duplicate screen.
+- Safe orphan inventory/photo-import journal; custom lab units/Remove access;
+  physical/pressure/clinical gates in IMPLEMENTATION. Do not sweep orphan files.
+
+**Gotchas**
+- Read actual native release coordinates; move-only tests missed a clipped line
+  end. Source tests alone missed that and cached-image onLoad behavior.
+- Viewer retains selected original mode; explicitly select edited mode when
+  validating an annotated/baseline PNG. QA receiver is emulator-only/private.
+- Old restore retains three unreferenced synthetic files; all old media remain
+  intact. This is open orphan accounting, not proof of complete restore cleanup.
+
 ## 2026-10-08 — Reversible image annotation and recoverable raw text
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers, primary
