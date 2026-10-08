@@ -50,6 +50,8 @@ native artifact/evidence follow separately.
 - Pinned SVG 15.15.4 cache-hit onLoad patch in config plugin; see architecture.
 - Native share admission also rejects rapid duplicate taps through sheet close;
   the canvas has one accessible label for explicit touch geometry and review.
+- Autosave status keeps its row mounted; a viewport resize stops the active
+  pointer rather than mapping later points into a changed coordinate frame.
 
 **Verified**
 - `npm run check` green: 134 suites/1,761 app tests plus five workflow tests.
@@ -57,6 +59,8 @@ native artifact/evidence follow separately.
   editors, same-ID restore fencing, old-backup absent-table/default behavior.
 - Pointer witnesses: text taps, letterbox rejection, denied strokes, combined
   zoom/pan and crop. Copy corruption/truncation and PNG incompleteness refused.
+- Six focused canvas witnesses pass, including an interrupted resize; final
+  full source/pre-push check follows native acceptance.
 
 **Not verified**
 - Native photo editing/render/export acceptance, physical A52s and pressure.

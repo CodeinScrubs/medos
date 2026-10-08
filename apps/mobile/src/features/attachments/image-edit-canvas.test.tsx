@@ -149,6 +149,17 @@ describe('post-render pointer contracts', () => {
     const transform = scene.parent!.props.style[1].transform;
     expect(transform).toEqual([{ translateX: 20 }, { translateY: 0 }, { scale: 2 }]);
   });
+  it('keeps accepted points and stops a gesture when the coordinate frame resizes', async () => {
+    await render('pen');
+    await act(async () => mockGestures.pan!.callbacks.start!(pointer(100, 200)));
+    await act(async () => mockGestures.pan!.callbacks.update!(pointer(200, 200)));
+    await act(async () =>
+      tree!.root.findAllByType(View)[0]!.props.onLayout({ nativeEvent: { layout: { width: 400, height: 360 } } }),
+    );
+    await act(async () => mockGestures.pan!.callbacks.update!(pointer(300, 200)));
+    expect(change).toHaveBeenCalledTimes(2);
+    expect(activity.mock.calls.at(-1)).toEqual([false]);
+  });
   it('commits a source-space crop from the full letterboxed image', async () => {
     await render('crop');
     await act(async () => mockGestures.pan!.callbacks.start!(pointer(40, 120)));

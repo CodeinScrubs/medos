@@ -5,8 +5,8 @@ import { restoreDatabase } from '@/db/client';
 import { attachments, imageEditDrafts, imageEditVersions } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { createPatient, deletePatient } from '@/features/patients/queries';
-import { decodeImageDraft, ImageEditConflict, type ImageDraftDocument } from '@/lib/image-edit';
 import { reserveDatasetReplacement } from '@/lib/dataset-write';
+import { decodeImageDraft, ImageEditConflict, type ImageDraftDocument } from '@/lib/image-edit';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 

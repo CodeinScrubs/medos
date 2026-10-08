@@ -148,16 +148,13 @@ function ImageEditor({
           {edit.state.status === 'failed' && !edit.stale ? (
             <Button label="مقایسه با نسخهٔ ذخیره‌شده" variant="ghost" size="sm" onPress={() => void edit.compare()} />
           ) : null}
-          {edit.state.status === 'pending' || edit.state.status === 'writing' ? (
-            <Text variant="tiny" color="textMuted">
-              در حال ذخیرهٔ پیش‌نویس…
-            </Text>
-          ) : null}
-          {edit.state.status === 'saved' ? (
-            <Text variant="tiny" color="textMuted">
-              پیش‌نویس ذخیره شد
-            </Text>
-          ) : null}
+          <Text variant="tiny" color="textMuted" numberOfLines={1}>
+            {edit.state.status === 'pending' || edit.state.status === 'writing'
+              ? 'در حال ذخیرهٔ پیش‌نویس…'
+              : edit.state.status === 'saved'
+                ? 'پیش‌نویس ذخیره شد'
+                : ' '}
+          </Text>
         </View>
         <View style={[styles.fill, { backgroundColor: mediaViewerColors.background }]}>
           <ImageEditCanvas

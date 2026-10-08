@@ -273,6 +273,15 @@ export function ImageEditCanvas({
       accessibilityLabel="بوم ویرایش عکس"
       style={styles.fill}
       onLayout={(e) => {
+        // A resize during a pointer gesture invalidates its local coordinate
+        // frame. Keep the accepted points, stop this gesture, and never draw
+        // the remaining events through a different contain rectangle.
+        if (start.current || stroke.current) {
+          start.current = null;
+          stroke.current = null;
+          setCropPreview(null);
+          onActivity(false);
+        }
         setViewport({
           width: Math.max(1, e.nativeEvent.layout.width),
           height: Math.max(1, e.nativeEvent.layout.height),
