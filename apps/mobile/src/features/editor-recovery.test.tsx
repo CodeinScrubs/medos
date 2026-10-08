@@ -35,8 +35,9 @@ import { topicQuery } from './knowledge/queries';
 import { SpecialtyFormScreen } from './knowledge/specialty-form-screen';
 import { specialtyProfileQuery } from './knowledge/specialty-profiles-queries';
 import { TopicFormScreen } from './knowledge/topic-form-screen';
+import { labFormQuery } from './labs/form-draft-queries';
 import { LabEntryScreen } from './labs/lab-entry-screen';
-import { createLabPanel, labPanelQuery, panelValuesQuery } from './labs/queries';
+import { createLabPanel } from './labs/queries';
 import { noteDraftQuery } from './notes/draft-queries';
 import { NoteEditorScreen } from './notes/note-editor-screen';
 import { createNote, noteQuery } from './notes/queries';
@@ -375,8 +376,7 @@ describe('editors survive database read failures', () => {
     ['place', 'placeId', placeQuery, () => <PlaceFormScreen />],
     ['extension', 'extensionId', extensionQuery, () => <ExtensionFormScreen />],
     ['credential', 'credentialId', credentialQuery, () => <CredentialFormScreen />],
-    ['lab panel', 'panelId', labPanelQuery, () => <LabEntryScreen />],
-    ['lab values', 'panelId', panelValuesQuery, () => <LabEntryScreen />],
+    ['lab form snapshot', 'panelId', (id: string) => labFormQuery(patientId, id), () => <LabEntryScreen />],
     ['note', 'noteId', noteQuery, () => <NoteEditorScreen />],
     ['occasion', 'occasionId', (id) => occasionFormQuery('example', id), () => <OccasionFormScreen />],
     ['task', 'taskId', taskQuery, () => <TaskScreen />],
@@ -398,7 +398,7 @@ describe('editors survive database read failures', () => {
     expect(mockRetried).toContain(key);
   });
 
-  it('retains edited lab values when the value query fails after loading', async () => {
+  it('retains edited lab values when the combined form read fails after loading', async () => {
     const id = await createLabPanel({
       patientId,
       collectedAt: new Date('2026-09-25T12:00:00Z'),
@@ -413,7 +413,7 @@ describe('editors survive database read failures', () => {
         .find((node) => node.props.value === '12.5')!
         .props.onChangeText('13.0');
     });
-    const key = tablesOf(panelValuesQuery(id))[0]!;
+    const key = tablesOf(labFormQuery(patientId, id))[0]!;
     mockErrors.set(key, new Error('Synthetic read failure'));
     await refresh(<LabEntryScreen />);
     expectReadError();

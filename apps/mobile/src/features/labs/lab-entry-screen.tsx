@@ -2,56 +2,35 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { EditGate } from '@/components/edit-gate';
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { QuickDateField } from '@/components/quick-date-field';
+import { ScreenOptions } from '@/components/screen-options';
 import { Button, Card, Column, Divider, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
-import type { LabPanel, LabValue } from '@/db/schema';
+import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { entityAttachmentsQuery } from '@/features/attachments/queries';
-import { patientQuery } from '@/features/patients/queries';
 import { withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
-import { ageInYears } from '@/lib/jalali';
+import { ageInYears, formatJalaliDateTime } from '@/lib/jalali';
 import { toLatinDigits, toPersianDigits } from '@/lib/persian';
 import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
 
 import { computeFlag, FLAG_LABEL, flagTone, formatRange, parseLabValue, parseRangeInput } from './flags';
+import { decodeLabForm, initialLabForm, labDisplayDate, type LabEntryRow as EntryRow } from './form-draft';
+import { labFormBasis, labFormQuery, type LabFormRows } from './form-draft-queries';
 import { isUnreadableNumber, parsePastedTable } from './logic';
 import { analyteDef, LAB_PRESETS, rangeFor } from './presets';
-import { createLabPanel, labPanelQuery, panelValuesQuery, updateLabPanel } from './queries';
-
-type EntryRow = {
-  key: string;
-  analyte: string;
-  value: string;
-  unit: string | null;
-  refLow: number | null;
-  refHigh: number | null;
-  qualitative: boolean;
-  /** Custom rows have an editable analyte name; preset rows do not. */
-  custom: boolean;
-};
-
-/** Rows for the editor from a saved panel's values. */
-function initialRows(values: LabValue[]): EntryRow[] {
-  return values.map((v) => ({
-    key: newId(),
-    analyte: v.analyte,
-    value: v.value ?? '',
-    unit: v.unit,
-    refLow: v.refLow,
-    refHigh: v.refHigh,
-    qualitative: Boolean(analyteDef(v.analyte)?.qualitative),
-    custom: !analyteDef(v.analyte),
-  }));
-}
+import { useLabForm } from './use-lab-form';
 
 /**
  * Lab entry. Params: `id` (patient), optional `panelId` to edit or to
@@ -59,72 +38,110 @@ function initialRows(values: LabValue[]): EntryRow[] {
  */
 export function LabEntryScreen() {
   const { id: patientId, panelId } = useLocalSearchParams<{ id: string; panelId?: string }>();
-  const { data: panels, error: panelError, retry: retryPanel } = useLive(labPanelQuery(panelId ?? ''), [panelId]);
-  const { data: values, error: valuesError, retry: retryValues } = useLive(panelValuesQuery(panelId ?? ''), [panelId]);
   return (
-    <EditGate
+    <AutosaveScope key={`${patientId}:${panelId ?? 'new'}`}>
+      <LabEntryGate patientId={patientId ?? ''} panelId={panelId ?? null} />
+    </AutosaveScope>
+  );
+}
+
+function LabEntryGate({ patientId, panelId }: { patientId: string; panelId: string | null }) {
+  const { stale } = useDatasetIntent();
+  const scope = useAutosaveScope()!;
+  const router = useRouter();
+  const query = useLive(labFormQuery(patientId, panelId), [patientId, panelId]);
+  const [retained, setRetained] = useState<LabFormRows>();
+  const [reset, setReset] = useState(0);
+  if (!stale && !retained && query.data?.[0]) setRetained(query.data);
+  const rows = retained ?? query.data;
+  let invalidDraft: Error | undefined;
+  if (rows?.[0]) {
+    try {
+      labFormBasis(rows);
+      if (rows[0].draft) decodeLabForm(rows[0].draft.body);
+    } catch (e) {
+      invalidDraft = e instanceof Error ? e : new Error('پیش‌نویس خوانده نشد.');
+    }
+  }
+  if (invalidDraft || (stale && !retained))
+    return (
+      <Screen scroll>
+        <ErrorNotice error={invalidDraft} what="پیش‌نویس آزمایش" />
+        {stale ? <Text color="danger">اطلاعات جایگزین شده؛ فرم را دوباره باز کنید.</Text> : null}
+        <Text selectable>{rows?.[0]?.draft?.body}</Text>
+        <Button
+          label="بازگشت"
+          variant="ghost"
+          onPress={() => {
+            if (stale) scope.abandonStale();
+            router.back();
+          }}
+        />
+      </Screen>
+    );
+  return (
+    <EditGate<LabFormRows>
       fenceDataset
-      editing={Boolean(panelId)}
-      rows={panels && values ? panels : undefined}
-      error={panelError ?? valuesError}
-      onRetry={() => {
-        retryPanel();
-        retryValues();
-      }}
+      editing
+      rows={rows ? (rows[0] ? [rows] : []) : undefined}
+      error={query.error}
+      onRetry={query.retry}
       what="آزمایش"
     >
-      {(panel, readNotice, generation) => (
-        <LabEntry
-          patientId={patientId}
-          panel={panel}
-          values={values ?? []}
-          readNotice={readNotice}
-          generation={generation}
-        />
-      )}
+      {(seed, readNotice, generation) =>
+        seed ? (
+          <LabEntry
+            key={reset}
+            seed={seed}
+            readNotice={
+              <>
+                {readNotice}
+                {!stale && retained && query.data?.length === 0 && !query.error ? (
+                  <Text color="danger">آزمایش یا بیمار در دسترس نیست؛ نوشته نگه داشته شد.</Text>
+                ) : null}
+              </>
+            }
+            generation={generation}
+            onReset={(next) => {
+              setRetained(next);
+              setReset((n) => n + 1);
+            }}
+          />
+        ) : null
+      }
     </EditGate>
   );
 }
 
 function LabEntry({
-  patientId,
-  panel,
-  values,
+  seed,
   readNotice,
   generation,
+  onReset,
 }: {
-  patientId: string;
-  panel: LabPanel | null;
-  values: LabValue[];
+  seed: LabFormRows;
   readNotice: ReactNode;
   generation: number;
+  onReset: (rows: LabFormRows) => void;
 }) {
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
 
-  const [collectedAt, setCollectedAt] = useState(() => panel?.collectedAt ?? new Date());
-  const [rows, setRows] = useState<EntryRow[]>(() => initialRows(values));
-  const [presetKeys, setPresetKeys] = useState<string[]>([]);
-  const [name, setName] = useState(panel?.name ?? '');
-  const [nameTouched, setNameTouched] = useState(Boolean(panel?.name));
-  const [labName, setLabName] = useState(panel?.labName ?? '');
-  const [notes, setNotes] = useState(panel?.notes ?? '');
-  const [saving, setSaving] = useState(false);
-  const saveBusy = useRef(false);
+  const editing = useLabForm(seed, onReset);
+  const { rows, presetKeys, name, labName, notes, rangeEditor } = editing.form;
+  const panel = seed[0]!.panel;
+  const patient = seed[0]!.patient;
+  const now = new Date(useNow());
+  const collectedAt = labDisplayDate(editing.document, now);
+  const saving = editing.busy || !!editing.completed || editing.stale;
   const pasteBusy = useRef(false);
   const [pasting, setPasting] = useState(false);
   const dateValidation = useDateValidation();
-  const [editingRange, setEditingRange] = useState<EntryRow | null>(null);
-
-  const { data: patientRows } = useLive(patientQuery(patientId), [patientId]);
-  const patient = patientRows?.[0];
-  const rangeContext = useMemo(
-    () => ({
-      sex: patient?.sex ?? null,
-      ageYears: patient ? ageInYears(patient.birthDate, patient.ageYears) : null,
-    }),
-    [patient],
-  );
+  const editingRange = rows.find((r) => r.key === rangeEditor?.rowKey) ?? null;
+  const rangeContext = {
+    sex: patient?.sex ?? null,
+    ageYears: ageInYears(patient.birthDate, patient.ageYears, now),
+  };
 
   // A photo of the sheet, when transcribing values into a photo-only panel.
   const { data: sheetPhotos } = useLive(entityAttachmentsQuery('lab_panel', panel?.id ?? ''), [panel?.id]);
@@ -133,57 +150,70 @@ function LabEntry({
     const preset = LAB_PRESETS.find((p) => p.key === key);
     if (!preset) return;
 
-    const have = new Set(rows.map((r) => r.analyte.toLowerCase()));
-    const added = preset.analytes
-      .filter((a) => !have.has(a.analyte.toLowerCase()))
-      .map((a): EntryRow => {
-        const range = rangeFor(a, rangeContext);
-        return {
-          key: newId(),
-          analyte: a.analyte,
-          value: '',
-          unit: a.unit ?? null,
-          refLow: range?.low ?? null,
-          refHigh: range?.high ?? null,
-          qualitative: Boolean(a.qualitative),
-          custom: false,
-        };
-      });
-    setRows([...rows, ...added]);
-
-    const nextKeys = presetKeys.includes(key) ? presetKeys : [...presetKeys, key];
-    setPresetKeys(nextKeys);
-    if (!nameTouched) {
-      setName(nextKeys.map((k) => LAB_PRESETS.find((p) => p.key === k)?.label ?? k).join(' + '));
-    }
+    editing.change((fields) => {
+      const have = new Set(fields.rows.map((r) => r.analyte.toLowerCase()));
+      const added = preset.analytes
+        .filter((a) => !have.has(a.analyte.toLowerCase()))
+        .map((a): EntryRow => {
+          const range = rangeFor(a, rangeContext);
+          return {
+            key: newId(),
+            analyte: a.analyte,
+            value: '',
+            unit: a.unit ?? null,
+            refLow: range?.low ?? null,
+            refHigh: range?.high ?? null,
+            notes: null,
+            qualitative: Boolean(a.qualitative),
+            custom: false,
+          };
+        });
+      const nextKeys = fields.presetKeys.includes(key) ? fields.presetKeys : [...fields.presetKeys, key];
+      return {
+        ...fields,
+        rows: [...fields.rows, ...added],
+        presetKeys: nextKeys,
+        name: fields.nameTouched
+          ? fields.name
+          : nextKeys.map((k) => LAB_PRESETS.find((p) => p.key === k)?.label ?? k).join(' + '),
+      };
+    });
   }
 
   function addCustomRow() {
-    setRows((current) => [
-      ...current,
-      {
-        key: newId(),
-        analyte: '',
-        value: '',
-        unit: null,
-        refLow: null,
-        refHigh: null,
-        qualitative: false,
-        custom: true,
-      },
-    ]);
+    editing.change((fields) => ({
+      ...fields,
+      rows: [
+        ...fields.rows,
+        {
+          key: newId(),
+          analyte: '',
+          value: '',
+          unit: null,
+          refLow: null,
+          refHigh: null,
+          notes: null,
+          qualitative: false,
+          custom: true,
+        },
+      ],
+    }));
   }
 
   function patchRow(key: string, patch: Partial<EntryRow>) {
-    setRows((current) => current.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+    editing.change((fields) => ({ ...fields, rows: fields.rows.map((r) => (r.key === key ? { ...r, ...patch } : r)) }));
   }
 
   function removeRow(key: string) {
-    setRows((current) => current.filter((r) => r.key !== key));
+    editing.change((fields) => ({
+      ...fields,
+      rows: fields.rows.filter((r) => r.key !== key),
+      rangeEditor: fields.rangeEditor?.rowKey === key ? null : fields.rangeEditor,
+    }));
   }
 
   async function pasteFromClipboard() {
-    if (saveBusy.current || pasteBusy.current) return;
+    if (pasteBusy.current || !editing.beginPaste()) return;
     pasteBusy.current = true;
     setPasting(true);
     try {
@@ -198,8 +228,8 @@ function LabEntry({
           return;
         }
 
-        setRows((current) => {
-          const next = [...current];
+        editing.change((fields) => {
+          const next = [...fields.rows];
           for (const [analyte, value, unit] of lines) {
             const idx = next.findIndex((r) => r.analyte.toLowerCase() === analyte.toLowerCase());
             const existing = next[idx];
@@ -216,11 +246,12 @@ function LabEntry({
               unit: unit ?? def?.unit ?? null,
               refLow: range?.low ?? null,
               refHigh: range?.high ?? null,
+              notes: null,
               qualitative: Boolean(def?.qualitative),
               custom: !def,
             });
           }
-          return next;
+          return { ...fields, rows: next };
         });
         notify(
           'چسبانده شد',
@@ -229,6 +260,7 @@ function LabEntry({
       });
     } finally {
       pasteBusy.current = false;
+      editing.endPaste();
       setPasting(false);
     }
   }
@@ -236,55 +268,44 @@ function LabEntry({
   const filledCount = rows.filter((r) => r.analyte.trim() && r.value.trim()).length;
 
   async function save() {
-    if (saveBusy.current || pasteBusy.current) return;
-    saveBusy.current = true;
-    setSaving(true);
-    try {
-      await withDatasetWrite(generation, async () => {
-        if (!dateValidation.check()) return;
-        if (filledCount === 0 && !(sheetPhotos && sheetPhotos.length > 0)) {
-          notify('هیچ مقداری وارد نشده');
-          return;
-        }
-        const unreadable = rows.filter((r) => !r.qualitative && isUnreadableNumber(r.value, !r.custom));
-        if (unreadable.length > 0) {
-          notify(
-            'این مقدارها عدد خوانا نیستند',
-            `${unreadable.map((r) => `${r.analyte}: ${r.value.trim()}`).join('\n')}\n\nاعشار را با نقطه بنویسید (مثلاً 5.8). نتیجه‌ی متنی مثل «hemolyzed» را در یادداشت برگه بنویسید.`,
-          );
-          return;
-        }
-        const payload = {
-          collectedAt,
-          name: name.trim() || null,
-          // A photo panel keeps its origin when values are transcribed into it later.
-          source: panel?.source ?? 'manual',
-          labName: labName.trim() || null,
-          notes: notes.trim() || null,
-          values: rows.map((r) => ({
-            analyte: r.analyte,
-            value: r.value,
-            unit: r.unit,
-            refLow: r.refLow,
-            refHigh: r.refHigh,
-          })),
-        };
-        if (panel) await updateLabPanel(panel.id, payload);
-        else await createLabPanel({ patientId, ...payload });
-        router.back();
-      });
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      saveBusy.current = false;
-      setSaving(false);
-    }
+    if (pasteBusy.current) return;
+    if (editing.completed) editing.close();
+    else if (dateValidation.check()) await editing.save(Boolean(sheetPhotos?.length));
   }
 
   return (
     <Screen scroll>
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <ScreenOptions options={{ title: panel ? 'ویرایش آزمایش' : 'آزمایش جدید' }} />
+      <Column
+        gap="md"
+        collapsable={false}
+        pointerEvents={editing.busy ? 'none' : 'auto'}
+        style={{ paddingTop: spacing.md }}
+      >
         {readNotice}
+        <Text variant="tiny" color={editing.state.status === 'failed' ? 'danger' : 'textMuted'}>
+          {editing.completed === 'saved'
+            ? 'آزمایش ثبت شد.'
+            : editing.completed === 'discarded'
+              ? 'پیش‌نویس حذف شد.'
+              : editing.state.status === 'failed'
+                ? 'پیش‌نویس ذخیره نشد؛ نوشته نگه داشته شد.'
+                : editing.state.status === 'pending' || editing.state.status === 'writing'
+                  ? 'در حال ذخیرهٔ پیش‌نویس…'
+                  : editing.state.status === 'saved'
+                    ? 'پیش‌نویس ذخیره شد.'
+                    : seed[0]?.draft
+                      ? 'پیش‌نویس بازیابی شد.'
+                      : 'نوشته‌ها خودکار در پیش‌نویس ذخیره می‌شوند.'}
+        </Text>
+        {editing.state.status === 'failed' && !editing.stale ? (
+          <Button
+            label="ذخیره نشد؛ تلاش دوباره"
+            variant="ghost"
+            onPress={() => void editing.retry()}
+            disabled={saving}
+          />
+        ) : null}
         {sheetPhotos && sheetPhotos.length > 0 && (
           <Column gap="xs">
             <Text variant="captionStrong" color="textMuted">
@@ -312,7 +333,8 @@ function LabEntry({
           onValidityChange={dateValidation.setValid}
           label="زمان نمونه‌گیری"
           value={collectedAt}
-          onChange={setCollectedAt}
+          rawInput={editing.form.date}
+          onRawInputChange={(patch) => editing.change((fields) => ({ ...fields, date: { ...fields.date, ...patch } }))}
           direction="past"
           withTime
         />
@@ -384,7 +406,21 @@ function LabEntry({
                   row={r}
                   onChange={(patch) => patchRow(r.key, patch)}
                   onRemove={() => removeRow(r.key)}
-                  onEditRange={() => setEditingRange(r)}
+                  onEditRange={() =>
+                    editing.change((fields) => {
+                      const current = fields.rows.find((row) => row.key === r.key);
+                      return !current
+                        ? fields
+                        : {
+                            ...fields,
+                            rangeEditor: {
+                              id: newId(),
+                              rowKey: r.key,
+                              text: formatRange(current.refLow, current.refHigh).replace('–', '-'),
+                            },
+                          };
+                    })
+                  }
                 />
               </View>
             ))}
@@ -403,24 +439,55 @@ function LabEntry({
           label="نام پنل"
           value={name}
           onChangeText={(t) => {
-            setName(t);
-            setNameTouched(true);
+            editing.change({ name: t, nameTouched: true });
           }}
           ltr
         />
-        <Input label="آزمایشگاه" value={labName} onChangeText={setLabName} editable={!saving} />
-        <Input label="یادداشت" value={notes} onChangeText={setNotes} multiline editable={!saving} />
+        <Input
+          label="آزمایشگاه"
+          value={labName}
+          onChangeText={(labName) => editing.change({ labName })}
+          editable={!saving}
+        />
+        <Input
+          label="یادداشت"
+          value={notes}
+          onChangeText={(notes) => editing.change({ notes })}
+          multiline
+          editable={!saving}
+        />
 
         <Button
-          label={filledCount > 0 ? `ذخیره (${toPersianDigits(filledCount)} مقدار)` : 'ذخیره'}
+          label={
+            editing.completed ? 'بستن' : filledCount > 0 ? `ذخیره (${toPersianDigits(filledCount)} مقدار)` : 'ذخیره'
+          }
           icon="checkmark"
           onPress={() => void save()}
-          loading={saving}
-          disabled={pasting}
+          loading={editing.busy}
+          disabled={pasting || (editing.stale && !editing.completed)}
           full
           style={{ marginTop: spacing.sm }}
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} disabled={saving} />
+        {editing.state.status === 'failed' || editing.failedWrite || editing.comparison ? (
+          <Button
+            label="بررسی نسخهٔ ذخیره‌شده"
+            variant="ghost"
+            disabled={saving || pasting}
+            onPress={() => void editing.compare()}
+          />
+        ) : null}
+        {editing.comparison ? <LabFormComparison editing={editing} disabled={pasting} /> : null}
+        {!editing.completed && editing.hasDraft ? (
+          <Button label="حذف پیش‌نویس" variant="ghost" full disabled={saving || pasting} onPress={editing.discard} />
+        ) : null}
+        <Button
+          label={editing.completed ? 'بازگشت' : 'بازگشت؛ نگه‌داشتن پیش‌نویس'}
+          variant="ghost"
+          onPress={editing.close}
+          full
+          haptic={false}
+          disabled={editing.busy || pasting}
+        />
       </Column>
 
       <PromptModal
@@ -429,18 +496,118 @@ function LabEntry({
         title={`محدوده‌ی نرمال ${editingRange?.analyte ?? ''}`}
         message="مثلاً ۱۳۵-۱۴۵ یا <5 یا >40. خالی بگذارید تا پرچم H/L نزند."
         initialValue={editingRange ? formatRange(editingRange.refLow, editingRange.refHigh).replace('–', '-') : ''}
-        onCancel={() => setEditingRange(null)}
+        value={rangeEditor?.text ?? ''}
+        onChangeText={(text) =>
+          editing.change((fields) =>
+            fields.rangeEditor?.id !== rangeEditor?.id
+              ? fields
+              : {
+                  ...fields,
+                  rangeEditor: fields.rangeEditor ? { ...fields.rangeEditor, text } : null,
+                },
+          )
+        }
+        onCancel={() =>
+          editing.change((fields) =>
+            fields.rangeEditor?.id === rangeEditor?.id ? { ...fields, rangeEditor: null } : fields,
+          )
+        }
         onSubmit={(text) => {
           const parsed = parseRangeInput(text);
           if (!parsed) {
             notify('محدوده خوانده نشد', 'به شکل ۱۳۵-۱۴۵ بنویسید.');
             return;
           }
-          if (editingRange) patchRow(editingRange.key, { refLow: parsed.low, refHigh: parsed.high });
-          setEditingRange(null);
+          if (editingRange)
+            editing.change((fields) =>
+              fields.rangeEditor?.id !== rangeEditor?.id ||
+              fields.rangeEditor?.rowKey !== editingRange.key ||
+              fields.rangeEditor.text.trim() !== text.trim()
+                ? fields
+                : {
+                    ...fields,
+                    rows: fields.rows.map((r) =>
+                      r.key === editingRange.key ? { ...r, refLow: parsed.low, refHigh: parsed.high } : r,
+                    ),
+                    rangeEditor: null,
+                  },
+            );
         }}
       />
     </Screen>
+  );
+}
+
+function LabFormComparison({ editing, disabled }: { editing: ReturnType<typeof useLabForm>; disabled: boolean }) {
+  const rows = editing.comparison!.rows;
+  const context = rows[0]!;
+  const now = new Date(useNow());
+  let stored;
+  try {
+    stored = context.draft
+      ? decodeLabForm(context.draft.body).fields
+      : initialLabForm(
+          context.panel,
+          rows.flatMap((r) => (r.value ? [r.value] : [])),
+          context.active?.id ?? null,
+          now,
+        ).fields;
+  } catch {
+    return (
+      <Card>
+        <Text color="danger">پیش‌نویس ذخیره‌شده خوانا نیست؛ نوشتهٔ این صفحه حفظ شده است.</Text>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <Column gap="sm">
+        {context.panel ? (
+          <>
+            <Text variant="bodyStrong">آزمایش ثبت‌شدهٔ فعلی</Text>
+            <Text selectable>
+              {context.panel.name || 'بدون نام'} — {formatJalaliDateTime(context.panel.collectedAt)}
+            </Text>
+            <Text selectable>{context.panel.labName}</Text>
+            <Text selectable>{context.panel.notes}</Text>
+            {rows
+              .flatMap((r) => (r.value ? [r.value] : []))
+              .map((r) => (
+                <Text key={r.id} numeric selectable>
+                  {r.analyte}: {r.value} {r.unit} {formatRange(r.refLow, r.refHigh)}
+                  {r.notes ? ` · ${r.notes}` : ''}
+                </Text>
+              ))}
+            <Divider />
+          </>
+        ) : null}
+        <Text variant="bodyStrong">پیش‌نویس ذخیره‌شده</Text>
+        <Text selectable>
+          {stored.name || 'بدون نام'} — {stored.date.dateText} {stored.date.clockText}
+        </Text>
+        <Text selectable>{stored.labName}</Text>
+        <Text selectable>{stored.notes}</Text>
+        {stored.rows.map((r) => (
+          <Text key={r.key} numeric selectable>
+            {r.analyte}: {r.value} {r.unit} {formatRange(r.refLow, r.refHigh)}
+            {r.notes ? ` · ${r.notes}` : ''}
+          </Text>
+        ))}
+        {stored.rangeEditor ? <Text selectable>محدودهٔ ناتمام: {stored.rangeEditor.text}</Text> : null}
+        <Button
+          label="بارگذاری نسخهٔ ذخیره‌شده"
+          variant="ghost"
+          disabled={disabled || editing.busy || editing.stale}
+          onPress={editing.loadStored}
+        />
+        <Button
+          label="نگه‌داشتن نسخهٔ من"
+          variant="ghost"
+          disabled={disabled || editing.busy || editing.stale}
+          onPress={editing.keepMine}
+        />
+      </Column>
+    </Card>
   );
 }
 

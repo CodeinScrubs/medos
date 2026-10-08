@@ -48,6 +48,43 @@ afterEach(() => {
 });
 
 describe('prompt text survives Android Back', () => {
+  it('keeps controlled raw text with its owner and submits the latest same-event input', () => {
+    const changed = jest.fn();
+    act(() => {
+      tree = create(
+        <PromptModal
+          visible
+          title="Reference"
+          value="135-"
+          onChangeText={changed}
+          onCancel={cancel}
+          onSubmit={submit}
+        />,
+      );
+    });
+    const type = input().props.onChangeText;
+    const publish = button('ثبت').props.onPress;
+    act(() => {
+      type(' 135-145 ');
+      publish();
+    });
+    expect(changed).toHaveBeenCalledWith(' 135-145 ');
+    expect(submit).toHaveBeenCalledWith('135-145');
+    act(() => {
+      tree!.update(
+        <PromptModal
+          visible
+          title="Reference"
+          value=" 135-145 "
+          onChangeText={changed}
+          onCancel={cancel}
+          onSubmit={submit}
+        />,
+      );
+    });
+    expect(input().props.value).toBe(' 135-145 ');
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
   it('retains typed text and rejects Back, backdrop, submit and cancellation while awaiting acknowledgment', () => {
     render();
     act(() => input().props.onChangeText('Pending text'));

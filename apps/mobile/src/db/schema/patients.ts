@@ -475,6 +475,29 @@ export const labPanels = sqliteTable(
   (t) => [index('lab_panels_patient_idx').on(t.patientId, t.collectedAt)],
 );
 
+/** Unpublished raw lab input; clinical queries never read this table. */
+export const labFormDrafts = sqliteTable(
+  'lab_form_drafts',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id),
+    panelId: text('panel_id').references(() => labPanels.id),
+    encounterId: text('encounter_id').references(() => encounters.id),
+    formKey: text('form_key').notNull(),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedPanelId: text('committed_panel_id').references(() => labPanels.id),
+  },
+  (t) => [
+    uniqueIndex('lab_form_drafts_open_target_idx')
+      .on(t.patientId, t.formKey)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type LabFormDraft = typeof labFormDrafts.$inferSelect;
+
 export const labValues = sqliteTable(
   'lab_values',
   {

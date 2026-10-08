@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { KeyboardController } from 'react-native-keyboard-controller';
 
@@ -20,6 +20,8 @@ export function PromptModal({
   optional = true,
   secret = false,
   busy = false,
+  value,
+  onChangeText,
   onSubmit,
   onCancel,
 }: {
@@ -39,11 +41,17 @@ export function PromptModal({
   secret?: boolean;
   /** Retain text and prevent edits/dismissal until its caller acknowledges submission. */
   busy?: boolean;
+  /** Optional paired controlled input for a caller-owned durable raw draft. */
   onSubmit: (text: string) => void;
   onCancel: () => void;
-}) {
+} & ({ value?: never; onChangeText?: never } | { value: string; onChangeText: (text: string) => void })) {
   const { colors, radii, spacing, shadows } = useTheme();
-  const [text, setText] = useState(initialValue);
+  const [localText, setText] = useState(initialValue);
+  const text = value ?? localText;
+  const latest = useRef(text);
+  useLayoutEffect(() => {
+    latest.current = text;
+  }, [text]);
 
   // Reset on every open, and cleared on close so a typed passphrase does not
   // linger in memory. (State adjusted during render, React's pattern for state
@@ -58,7 +66,7 @@ export function PromptModal({
   // the explicit «انصراف» button still cancels straight away.
   function dismiss() {
     if (busy) return;
-    if (!text.trim() || text === initialValue) {
+    if (!latest.current.trim() || latest.current === initialValue) {
       onCancel();
       return;
     }
@@ -102,7 +110,12 @@ export function PromptModal({
               <Input
                 value={text}
                 editable={!busy}
-                onChangeText={setText}
+                onChangeText={(next) => {
+                  if (busy) return;
+                  latest.current = next;
+                  if (onChangeText) onChangeText(next);
+                  else setText(next);
+                }}
                 placeholder={placeholder}
                 multiline={multiline && !secret}
                 autoFocus
@@ -116,7 +129,7 @@ export function PromptModal({
                   <Button
                     label={submitLabel}
                     onPress={() => {
-                      if (!busy) onSubmit(secret ? text : text.trim());
+                      if (!busy) onSubmit(secret ? latest.current : latest.current.trim());
                     }}
                     disabled={busy || (!optional && !text.trim())}
                     loading={busy}

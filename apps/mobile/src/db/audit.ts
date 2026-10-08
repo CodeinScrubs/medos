@@ -33,6 +33,7 @@ export type AuditAction =
   | 'followup.statusChanged'
   | 'followup.deleted'
   | 'followup.draftDiscarded'
+  | 'lab.draftDiscarded'
   | 'occasion.deleted'
   | 'occasion.draftDiscarded'
   | 'greeting.sentConfirmed'

@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Durable raw lab forms and atomic publication
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers.
+**Commits:** source in this commit; preceding accepted application `730b4d9`.
+
+**Changed**
+- 0.11.35/code51, additive0022: recoverable manual lab raw form, including
+  invalid date/clock/number and pending range text. One snapshot/Scope/original
+  token; latest input, CAS, atomic publication/retirement and idempotent replay.
+- Preserve existing source/encounter/value notes/sub-minute time and soft edit
+  history. Explicit comparison/rebase, pending clipboard exclusion, focused
+  completion and stable native parent/header. No dependency/route/formula change.
+
+**Verified**
+- Recovery/time/comparison witnesses failed before correction. Four targeted
+  suites/87 tests pass; full check128 suites/1,699 app tests and three workflows.
+- Real SQLite fault rollback, stale/foreign/deleted context, older/full/invalid-FK
+  restore and five-table observation; real date/range widgets/Scope latest-event,
+  exit refusal/retry, background/remount, focused completion and retained callback
+  guards. Import warnings corrected; normal pre-push checks must still run.
+
+**Not verified**
+- .35 exact-source CI/artifacts, native cold recovery/upgrade/publication yet;
+  see validation-0.11.35.md. No physical A52s, power/low-space/performance/24-hour
+  or whole-product acceptance. Last optional extra reviewer pass hit usage limits
+  and is not counted. Existing completed reviews remain distinct.
+
+**Open threads**
+- Freeze/commit source; build/inspect both APKs and compare installed bytes.
+  Preserve .34's4,049rows/40tables/25files on upgrade; run invalid raw lab cold
+  recovery and keyboard-open publication/discard, independently verify exports.
+- Then companion/doctor recovery, original-intent gates and safe orphan accounting.
+
+**Gotchas**
+- Old editor-recovery mocks watched separate lab queries. They now fail the
+  actual combined snapshot; tests must follow the executed query, not bypass it.
+- Root owns edits/checks; no native UI while concurrent builds/checks saturate
+  the host. Preserve the earlier pressure ANR as unresolved, not host-only proof.
+
 ## 2026-10-08 — Native note-close and stopped draft voice acceptance
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers.

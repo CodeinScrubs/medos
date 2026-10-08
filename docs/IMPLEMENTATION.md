@@ -36,6 +36,19 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.35: manual lab entry now persists its versioned raw form, including invalid
+date/clock/number and open range text, through additive migration0022. Clinical
+publication plus draft retirement is atomic/CAS-guarded, original encounter and
+dataset intent stay captured, and delayed acknowledgment cannot Back a newer
+route. Existing value notes/source/sub-minute time survive editing. Compare
+exposes current clinical data and raw draft before explicit whole-panel rebase.
+Native parent/header stay stable; no dependency, route or formula was added.
+Software check passes 128 suites/1,699 app tests and three workflow checks.
+Exact-source artifact/CI/native upgrade and cold recovery gates are tracked in
+validation-0.11.35.md. Next implementation: companion/doctor raw recovery and
+remaining original-intent gates, then safe orphan accounting. Do not treat the
+software result as physical/power/performance or complete P0 acceptance.
+
 0.11.34: 0.11.33 retained the header but still failed the exact native Save
 reproduction. Both corresponding note form Columns now retain one native
 stacking parent when saving toggles pointerEvents. Real Column/View tests cover
@@ -51,11 +64,9 @@ preserves 4,049 rows/40 tables/25 files exactly. Native playback progress/Pause
 works; acoustic output and physical/performance/power gates remain separate.
 Preserve the pre-upgrade .33 picker-focus ANR under concurrent host load as an
 unresolved pressure trial; its cause was not proved by later success.
-Next P0: manual lab raw recovery, then companion/doctor raw forms. Lab currently
-has no durable raw draft (including invalid date/time and pending range text),
-and late Save acknowledgment can still Back a newer route. Reuse existing
-versioned raw-form/Autosave/Scope patterns, atomically publish+retire, preserve
-original ownership and latest input. Do not store partial labs as clinical rows.
+At that checkpoint, the next P0 was manual lab raw recovery, then companion/
+doctor raw forms. The manual lab source correction now appears above in .35;
+its native recovery gates remain separate. Do not store partial labs as clinical rows.
 
 0.11.33: native 0.11.32 acceptance found/repeated a note-close crash after correct
 SQL publication. The completed branch now keeps the same scroll host so its

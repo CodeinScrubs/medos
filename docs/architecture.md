@@ -1612,3 +1612,35 @@ Column `collapsable={false}`. This retains one native parent throughout idle,
 pending, failed/retry and completed states without weakening input freeze.
 Real Column/View regression checks protect the contract; native acceptance is
 separate evidence in validation-0.11.34.md. Do not disable flattening globally.
+
+## Raw manual lab drafts (0.11.35)
+
+Additive migration0022 stores an unpublished versioned raw form separately from
+lab panels/values. It includes ordered rows, hidden per-value notes, incomplete
+date/clock text, preset/name state and the pending reference-range editor session.
+One combined SQL snapshot resolves identity, existing panel/values, draft and
+initial encounter; all joined tables are observed. Opening an untouched form
+creates nothing. Invalid raw input is recoverable without becoming a result.
+
+Draft revisions guard stale editors. Publication validates stored raw fields,
+compares canonical live clinical data, checks parent/encounter ownership, writes
+the panel/values and retires/links the draft in one synchronous transaction.
+The original admission stays captured even if closed; a newer current admission
+does not silently retarget historical work. Existing source, encounter, value
+notes and unchanged timestamp seconds/milliseconds survive editing. The existing
+replace-all behavior soft-retains old values; it does not preserve their live ids.
+
+One AutosaveScope and original dataset token span drafts, clipboard waits, manual
+publication and delayed dialogs. Latest-event refs prevent stale publication.
+The same Screen/header/native Column survive submission and completed states;
+late acknowledgment closes only the focused originating route. Failure retains
+input. Compare shows current clinical data alongside the persisted raw draft;
+explicit keep-mine rechecks both before whole-panel rebase. No automatic merge.
+
+**Rejected: saving partial clinical rows or trusting the widget's last valid Date.**
+Both can turn incomplete/invalid visible input into apparently valid results.
+The feature-local codec/table/hook reuse existing form contracts rather than a
+new general form framework. Backup table discovery includes drafts and clears
+them on older table-absent dataset replacement; the archive/key formats stay
+unchanged. Software witnesses and native evidence are recorded separately in
+validation-0.11.35.md. Other raw forms and physical/power/performance gates remain.

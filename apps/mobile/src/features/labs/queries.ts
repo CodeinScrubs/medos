@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 
-import { db } from '@/db/client';
-import { labPanels, labValues, type LabPanel } from '@/db/schema';
+import { db, type DbTransaction } from '@/db/client';
+import { labPanels, labValues, patients, type LabPanel } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -104,28 +104,47 @@ function valueRows(panelId: string, patientId: string, values: LabValueInput[], 
 }
 
 export async function createLabPanel(input: LabPanelInput): Promise<string> {
+  return db.transaction((tx) =>
+    createLabPanelInTransaction(tx, input, new Date(), resolveActiveEncounterId(input.patientId, tx)),
+  );
+}
+
+function requirePatient(tx: DbTransaction, patientId: string) {
+  if (
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new Error('پروندهٔ بیمار در دسترس نیست؛ آزمایش ثبت نشد.');
+}
+
+/** Raw form publication calls these helpers in its own retirement transaction. */
+export function createLabPanelInTransaction(
+  tx: DbTransaction,
+  input: LabPanelInput,
+  now: Date,
+  encounterId: string | null,
+): string {
+  requirePatient(tx, input.patientId);
+  if (!Number.isFinite(input.collectedAt.getTime())) throw new Error('زمان نمونه‌گیری معتبر نیست.');
   const panelId = newId();
-  const now = new Date();
-  const encounterId = await resolveActiveEncounterId(input.patientId);
   const rows = valueRows(panelId, input.patientId, input.values, now);
-
-  db.transaction((tx) => {
-    tx.insert(labPanels)
-      .values({
-        id: panelId,
-        ...stamps(now),
-        patientId: input.patientId,
-        encounterId,
-        name: input.name ?? null,
-        collectedAt: input.collectedAt,
-        source: input.source,
-        labName: input.labName ?? null,
-        notes: input.notes ?? null,
-      })
-      .run();
-    for (const row of rows) tx.insert(labValues).values(row).run();
-  });
-
+  tx.insert(labPanels)
+    .values({
+      id: panelId,
+      ...stamps(now),
+      patientId: input.patientId,
+      encounterId,
+      name: input.name ?? null,
+      collectedAt: input.collectedAt,
+      source: input.source,
+      labName: input.labName ?? null,
+      notes: input.notes ?? null,
+    })
+    .run();
+  for (const row of rows) tx.insert(labValues).values(row).run();
   return panelId;
 }
 
@@ -134,29 +153,40 @@ export async function createLabPanel(input: LabPanelInput): Promise<string> {
  * than overwritten, so an edit never destroys what was there before.
  */
 export async function updateLabPanel(panelId: string, input: Omit<LabPanelInput, 'patientId'>): Promise<void> {
-  const panel = (await labPanelQuery(panelId))[0];
-  if (!panel) throw new Error(`Lab panel ${panelId} not found`);
-  const now = new Date();
-  const rows = valueRows(panelId, panel.patientId, input.values, now);
+  db.transaction((tx) => updateLabPanelInTransaction(tx, panelId, input, new Date()));
+}
 
-  db.transaction((tx) => {
-    tx.update(labPanels)
-      .set({
-        collectedAt: input.collectedAt,
-        name: input.name ?? null,
-        source: input.source,
-        labName: input.labName ?? null,
-        notes: input.notes ?? null,
-        ...touch(now),
-      })
-      .where(and(panelAlive, eq(labPanels.id, panelId)))
-      .run();
-    tx.update(labValues)
-      .set(softDelete(now))
-      .where(and(eq(labValues.panelId, panelId), isNull(labValues.deletedAt)))
-      .run();
-    for (const row of rows) tx.insert(labValues).values(row).run();
-  });
+export function updateLabPanelInTransaction(
+  tx: DbTransaction,
+  panelId: string,
+  input: Omit<LabPanelInput, 'patientId'>,
+  now: Date,
+): void {
+  const panel = tx
+    .select()
+    .from(labPanels)
+    .where(and(panelAlive, eq(labPanels.id, panelId)))
+    .get();
+  if (!panel) throw new Error('آزمایش در دسترس نیست؛ نوشته نگه داشته شد.');
+  requirePatient(tx, panel.patientId);
+  if (!Number.isFinite(input.collectedAt.getTime())) throw new Error('زمان نمونه‌گیری معتبر نیست.');
+  const rows = valueRows(panelId, panel.patientId, input.values, now);
+  tx.update(labPanels)
+    .set({
+      collectedAt: input.collectedAt,
+      name: input.name ?? null,
+      source: input.source,
+      labName: input.labName ?? null,
+      notes: input.notes ?? null,
+      ...touch(now),
+    })
+    .where(and(panelAlive, eq(labPanels.id, panelId)))
+    .run();
+  tx.update(labValues)
+    .set(softDelete(now))
+    .where(and(eq(labValues.panelId, panelId), isNull(labValues.deletedAt)))
+    .run();
+  for (const row of rows) tx.insert(labValues).values(row).run();
 }
 
 export async function deleteLabPanel(panelId: string): Promise<void> {
