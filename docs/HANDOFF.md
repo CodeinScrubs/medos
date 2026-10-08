@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Preserve manual values during delayed lab clipboard retrieval
+
+**Agent:** GPT-6 via Codex; narrow follow-up owned/reviewed by primary.
+**Commits:** correction in this commit; header source `b10b4c2`.
+
+**Changed**
+- Clipboard takes its baseline from the form's synchronous latest fields before
+  native retrieval, and compares arrival rows before applying each paste line.
+  Newer value/unit edits, clears, renames/deletes and newly entered nonempty rows
+  survive; unrelated typing remains available. The existing alert reports skipped
+  changed values. No dependency/schema/route or second saver/guard.
+
+**Verified**
+- Two overwrite witnesses (type15 or clear while waiting for Hb14) fail before;
+  four suites/54 tests pass after, including real persisted raw values unchanged
+  clinical data. Final full/pre-push check remains required.
+- Exact b10b4c2 CI37716809376 succeeds. Its inspected installed QA bytes preserve
+  all4,050rows/41tables/25files across replacement of the earlier probe. Actual
+  keyboard-open header Save/native close passes; independent export confirms one
+  new panel/value, retired original draft, original encounter and4,052rows with
+  all unrelated data/media unchanged. See validation-0.11.35.md.
+
+**Not verified**
+- Final clipboard-source CI/APKs/native retest/owner build yet. No physical A52s,
+  native delayed-clipboard fault, pressure/24-hour/power/low-space/full acceptance.
+
+**Open threads**
+- Freeze/push final source; rebuild/inspect x86_64, compare actual installed hash
+  and preserve new35-published baseline. Run actual edit raw cold recovery,
+  invalid Save refusal, keyboard-open edit publication, soft draft discard and
+  final cold exact export. Then build/inspect owner arm64 and record evidence.
+- Continue companion/doctor raw recovery, original-intent gates and safe orphan
+  accounting. Later UI: manual custom units and remove-row access when a flag/
+  invalid marker occupies the custom row's only action position (source-visible).
+
+**Gotchas**
+- Compare against arrival fields, not the mutable paste accumulator: duplicate
+  rows within one clipboard must retain their existing last-line behavior.
+- Extra QA keystroke was corrected before header acceptance. No failed footer
+  tap was counted as publication, and no owner .35 artifact has been delivered yet.
+
 ## 2026-10-08 — Reach lab publication above the keyboard
 
 **Agent:** GPT-6 via Codex; this narrow follow-up was reviewed/tested by primary.

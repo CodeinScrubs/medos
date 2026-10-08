@@ -273,6 +273,7 @@ export function useLabForm(seed: LabFormRows, onReset: (rows: LabFormRows) => vo
       pasting.current = false;
     },
     form: document.fields,
+    getFields: () => latest.current.fields,
     document,
     change,
     state,

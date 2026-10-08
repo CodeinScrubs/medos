@@ -218,6 +218,7 @@ function LabEntry({
     setPasting(true);
     try {
       await withDatasetWrite(generation, async () => {
+        const requestedRows = editing.getFields().rows;
         const text = await Clipboard.getStringAsync();
         const lines = parsePastedTable(text);
         if (lines.length === 0) {
@@ -228,9 +229,31 @@ function LabEntry({
           return;
         }
 
+        let applied = false;
+        let inserted = 0;
+        let preserved = 0;
         editing.change((fields) => {
+          applied = true;
           const next = [...fields.rows];
           for (const [analyte, value, unit] of lines) {
+            const name = analyte.toLowerCase();
+            const before = requestedRows.find((r) => r.analyte.toLowerCase() === name);
+            const current = before ? fields.rows.find((r) => r.key === before.key) : undefined;
+            const addedManually = !before && fields.rows.find((r) => r.analyte.toLowerCase() === name);
+            // A late clipboard result must not undo newer typing, clears, renames
+            // or deletion. Compare the arrival snapshot, not earlier pasted lines.
+            if (
+              (before &&
+                (!current ||
+                  current.analyte !== before.analyte ||
+                  current.value !== before.value ||
+                  current.unit !== before.unit)) ||
+              (addedManually && addedManually.value.trim())
+            ) {
+              preserved++;
+              continue;
+            }
+            inserted++;
             const idx = next.findIndex((r) => r.analyte.toLowerCase() === analyte.toLowerCase());
             const existing = next[idx];
             if (existing) {
@@ -253,9 +276,10 @@ function LabEntry({
           }
           return { ...fields, rows: next };
         });
+        if (!applied) return;
         notify(
-          'چسبانده شد',
-          `${toPersianDigits(lines.length)} مقدار وارد شد. قبل از ذخیره، واحدها و محدوده‌ها را یک نگاه بیندازید.`,
+          inserted ? 'چسبانده شد' : 'مقادیر تازه نگه داشته شدند',
+          `${toPersianDigits(inserted)} مقدار وارد شد.${preserved ? ` ${toPersianDigits(preserved)} مقدار تازهٔ این فرم جایگزین نشد.` : ''} قبل از ذخیره، واحدها و محدوده‌ها را یک نگاه بیندازید.`,
         );
       });
     } finally {

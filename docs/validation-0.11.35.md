@@ -109,3 +109,29 @@ rebuilt exact-source keyboard-open native acceptance must follow separately.
 
 No owner arm64 artifact or physical installation has yet been produced for this
 checkpoint. The first QA APK above is a probe, not the final owner candidate.
+
+### Header source native result and clipboard follow-up
+
+Header source`b10b4c249d294f335d08eeb6313f443893a45e4b` passed the full/pre-push
+check (128suites/1,701app tests and three workflows) and exact
+[CI37716809376](https://github.com/CodeinScrubs/medos/actions/runs/37716809376).
+Its inspected signed QA APK is54,581,966bytes, SHA-256
+`402b9f979ec23250c513764cef4333ce9d1ada080ba8ff92ca3b07d8bf1d3394`;
+actual installed bytes match. The original25media files and every4,050row in
+41app tables survive the header-source replacement exactly (23migrations).
+
+With actual IME shown, the observed header target lies above it. Actual Save
+and native close retain one process with no new fatal. Independent export
+confirms exactly one new panel/value and retirement of the original raw draft,
+same captured encounter, correct value/range/metadata, all unrelated rows and
+25media hashes unchanged (4,052rows). This is header-source acceptance, not
+acceptance of a later source change or acoustic/physical/performance behavior.
+
+Source review and two failing software witnesses then found another race:
+delayed clipboard retrieval overwrote a manually typed or cleared value. The
+corrected paste captures latest rows before retrieval and compares the arrival
+snapshot before overwriting matching fields. It preserves intervening edits,
+renames/removal and newly entered values, while permitting unrelated typing.
+The existing alert reports values it preserved; no normal-path additional UI.
+Four suites/54 checks pass, including persisted raw recovery and no clinical
+write. Final-source full check/CI/artifact/native retest must still run.

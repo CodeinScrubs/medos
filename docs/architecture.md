@@ -1644,3 +1644,13 @@ new general form framework. Backup table discovery includes drafts and clears
 them on older table-absent dataset replacement; the archive/key formats stay
 unchanged. Software witnesses and native evidence are recorded separately in
 validation-0.11.35.md. Other raw forms and physical/power/performance gates remain.
+
+Native lab acceptance found the footer is obscured by the IME. A compact stable
+header publication/Close slot uses the same action as the footer, following the
+note editor; title/slot presence never change during submission or completion.
+Clipboard additionally captures latest rows before native retrieval and compares
+arrival fields before applying paste lines. Newer manual values/clears, renamed/
+removed rows and new typed values are preserved; unrelated typing stays enabled.
+This local comparison avoids a silent overwrite without freezing every field
+or adding a general merge framework. A return to the identical baseline value
+is indistinguishable from no net edit; there is no per-keystroke intent history.

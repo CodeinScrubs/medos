@@ -444,6 +444,23 @@ describe('lab entry mounted intent and retained raw values', () => {
     expect(raw.rows[0]!.value).toBe('14');
     expect(current().values.filter((r) => !r.deletedAt)[0]!.value).toBe('12');
   });
+  it.each(['15', ''])('preserves a newer manual value %p while clipboard retrieval is pending', async (latest) => {
+    await render();
+    let release!: (text: string) => void;
+    jest.mocked(Clipboard.getStringAsync).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    await invoke(() => button('چسباندن از اکسل').props.onPress());
+    await invoke(() => value().props.onChangeText(latest));
+    await invoke(() => release('Hb\t14\tg/dL'));
+    expect(value().props.value).toBe(latest);
+    await invoke(() => jest.advanceTimersByTime(850));
+    expect(decodeLabForm(t.db.select().from(labFormDrafts).get()!.body).fields.rows[0]!.value).toBe(latest);
+    expect(current().values.filter((r) => !r.deletedAt)[0]!.value).toBe('12');
+  });
   it('refuses publication into a same-ID restored panel and retains raw fields', async () => {
     const restore = snapshot();
     const before = current();
