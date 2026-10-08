@@ -145,6 +145,53 @@ afterEach(async () => {
 });
 
 describe('lab entry mounted intent and retained raw values', () => {
+  it.each(['new', 'edit'] as const)('keeps %s lab publication accessible in the stable header', async (kind) => {
+    if (kind === 'new') {
+      mockParams = { id: mockParams.id };
+      await render();
+      await invoke(() => button('آنالیت دیگر').props.onPress());
+      await invoke(() =>
+        tree!.root
+          .findAllByType(TextInput)
+          .find((n) => n.props.placeholder === 'Analyte')!
+          .props.onChangeText('QA'),
+      );
+      await invoke(() => value().props.onChangeText('14'));
+    } else await render();
+    const header = () => {
+      const right = tree!.root.findByType(ScreenOptions).props.options.headerRight;
+      expect(typeof right).toBe('function');
+      return right().props;
+    };
+    const title = tree!.root.findByType(ScreenOptions).props.options.title;
+    const first = header();
+    expect(first.label).toBe('ثبت آزمایش');
+    let release!: () => void;
+    const real = drafts.commitLabFormDraft;
+    jest.spyOn(drafts, 'commitLabFormDraft').mockImplementation(async (...args) => {
+      const result = await real(...args);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return result;
+    });
+    mockFocused = false;
+    await invoke(() => {
+      input('یادداشت')!.props.onChangeText('Latest header publication');
+      first.onPress();
+    });
+    expect(header().disabled).toBe(true);
+    expect(tree!.root.findByType(ScreenOptions).props.options.title).toBe(title);
+    expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+    await invoke(release);
+    expect(header().label).toBe('بستن');
+    expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+    expect(current().panels.some((r) => r.notes === 'Latest header publication')).toBe(true);
+    expect(mockBack).not.toHaveBeenCalled();
+    mockFocused = true;
+    await invoke(() => header().onPress());
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
   it('recovers acknowledged raw edits after leaving and reopening without changing clinical values', async () => {
     const before = current();
     await render();

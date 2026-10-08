@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Reach lab publication above the keyboard
+
+**Agent:** GPT-6 via Codex; this narrow follow-up was reviewed/tested by primary.
+**Commits:** correction in this commit; raw lab source `1daa513`.
+
+**Changed**
+- Retain a compact lab header publication/Close slot, using the same validated
+  action as the footer. Stable title/right-slot presence throughout pending and
+  completed states; no guard/writer/route/dependency/schema/version change.
+- .35 is still under native acceptance; no owner .35 APK has been delivered.
+
+**Verified**
+- Initial .35 source check/CI and inspected installed QA hash. Offline upgrade:
+  every4,049old rows/40tables/25file hashes preserved, new empty draft table,
+  23migrations and clean integrity/FKs. Actual invalid raw range cold recovery;
+  independent export confirms all raw fields and unchanged clinical data.
+- Native IME occlusion witness: footer target in app hierarchy was behind Gboard;
+  tap appended a synthetic character, did not invoke Save. No publication/close
+  success was claimed. New/edit header witnesses fail before correction.
+
+**Not verified**
+- Rebuilt final-source .35 header publication/native close, edit/discard/cold
+  round-trip and owner APK yet. Final check/CI must follow this source too.
+- Physical A52s, low-space/power, pressure/24-hour/full-product gates remain.
+
+**Open threads**
+- Correct the extra synthetic character, export pre-header baseline, freeze
+  this source and rebuild x86_64 without prebuild (code51 native project exists).
+  Inspect actual installed bytes, preserve all rows/files, exercise actual header
+  Save with IME open and edit/discard, then build/inspect owner arm64.
+- Then companion/doctor recovery and other execution-ledger gates.
+
+**Gotchas**
+- An app-only UI dump omits IME occlusion. Confirm target lies above the observed
+  keyboard inset; never tap through it or count a Gboard keystroke as Save.
+- The date label's horizontal overlap identifies the wrong input in the old QA
+  helper. Use its observed unique hint and verify that same field focused/typed.
+- Wait for actual cold-ready markers; retain rejected setup evidence.
+
 ## 2026-10-08 — Durable raw lab forms and atomic publication
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers.

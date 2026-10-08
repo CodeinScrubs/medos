@@ -275,7 +275,23 @@ function LabEntry({
 
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: panel ? 'ویرایش آزمایش' : 'آزمایش جدید' }} />
+      <ScreenOptions
+        options={{
+          title: panel ? 'ویرایش آزمایش' : 'آزمایش جدید',
+          // Keep explicit publication reachable while the keyboard covers the footer.
+          // The slot stays mounted through pending/completed states without setOptions.
+          headerRight: () => (
+            <Button
+              label={editing.completed ? 'بستن' : 'ثبت آزمایش'}
+              size="sm"
+              variant="ghost"
+              onPress={() => void save()}
+              loading={editing.busy}
+              disabled={pasting || editing.busy || (editing.stale && !editing.completed)}
+            />
+          ),
+        }}
+      />
       <Column
         gap="md"
         collapsable={false}

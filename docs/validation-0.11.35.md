@@ -69,3 +69,43 @@ pending. Component remount tests do not prove process-death recovery. Preserve t
 .34 baseline rows/files and independently compare exported SQLite/media before
 claiming native acceptance. Physical A52s, power/low-space, active recording,
 pressure/24-hour performance and complete product acceptance remain open.
+
+## Native checkpoint and header access correction
+
+Source `1daa513091a9eaaea4c16153815eaad21c14233d` passed normal pre-push checks
+without lint warnings. [CI37713171025](https://github.com/CodeinScrubs/medos/actions/runs/37713171025)
+reports Success on GitHub's public run page. Local API connection/TLS errors are
+preserved; the web page independently confirms this exact run/source.
+
+Its signed/inspected x86_64 QA APK is54,581,738bytes, code51/name0.11.35,
+target36/min24, SHA-256
+`dc50e4a2edbddd229498db57091e34a3dacc35cbb4b3cadd03855f5164f30d9c`.
+The actual installed APK matches; unchanged owner signer and required native
+libraries passed inspection. Offline in-place upgrade preserves every original
+4,049row/40table and25media hashes, adds only an empty draft table and reaches
+23migrations; independently decrypted export has clean integrity/FKs.
+
+Actual new manual raw entry survives force-stop and cold reopen, including the
+open `135-` range buffer. Independent export confirms the exact incomplete
+date/clock, ambiguous value, name/laboratory/notes, row/session identity and
+captured encounter; no clinical row or unrelated data/file changed. This is
+process-death recovery, distinct from the earlier component remount witnesses.
+
+The attempted footer Save with IME open did not invoke Save: UIAutomator exposed
+an occluded app button while Gboard received the tap and appended a character.
+The process survived and no publication was claimed. Screenshot/window inset
+evidence explains the setup failure and a real access issue: only a footer is
+poor access for long forms. The known synthetic extra character must be corrected
+before continuing. Earlier selector/cold-start setup failures are also preserved:
+the date's label lies beside the calendar icon rather than over its input, and
+an initial cold hierarchy was splash, not proof that recovery failed.
+
+The corrected source retains one compact header publication/Close slot, following
+the note editor's existing pattern. It calls the same validation, latest-input,
+dataset/CAS and focused-navigation path as the footer, without another guard,
+route or draft writer. Title and slot presence remain constant while pending and
+completed. Two new/edit witnesses fail before correction; final checks and the
+rebuilt exact-source keyboard-open native acceptance must follow separately.
+
+No owner arm64 artifact or physical installation has yet been produced for this
+checkpoint. The first QA APK above is a probe, not the final owner candidate.

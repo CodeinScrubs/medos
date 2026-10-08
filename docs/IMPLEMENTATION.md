@@ -45,7 +45,10 @@ exposes current clinical data and raw draft before explicit whole-panel rebase.
 Native parent/header stay stable; no dependency, route or formula was added.
 Software check passes 128 suites/1,699 app tests and three workflow checks.
 Exact-source artifact/CI/native upgrade and cold recovery gates are tracked in
-validation-0.11.35.md. Next implementation: companion/doctor raw recovery and
+validation-0.11.35.md. Initial native upgrade/raw cold recovery pass; native QA
+also found footer-only publication was occluded by the keyboard. A compact,
+stable header uses the same publication path; rebuild/retest its final source
+before acceptance. Next implementation: companion/doctor raw recovery and
 remaining original-intent gates, then safe orphan accounting. Do not treat the
 software result as physical/power/performance or complete P0 acceptance.
 
