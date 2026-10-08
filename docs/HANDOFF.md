@@ -48,6 +48,9 @@ evidence follows separately.
 - Follow-up: history lists fetch only id/revision/date; load one chosen body
   within the original admission and matching attachment/readable row state.
   Opening the editor must not load every lifetime image document into memory.
+- Capture the true source-coordinate touch-down before pan activation. Pen and
+  highlight taps leave a dot; arrow/view keep their movement threshold. Resize
+  before activation and initial letterbox touches cannot become a mark.
 
 **Verified**
 - Checkpoint `4c24534` full source/pre-push checks: 134 suites/1,768 app tests
@@ -55,6 +58,8 @@ evidence follows separately.
 - Lightweight-history full check: 134 suites/1,770 app tests and five workflows.
   Large-body metadata budget and matching readable/owned selection pass on real
   SQLite. No schema or persistence format changes in this follow-up.
+- Touch-down follow-up full check: 134 suites/1,775 app tests and five workflows;
+  five regression witnesses fail before correction and pass afterwards.
 - Installed QA APK bytes/signature/JNI inspected; offline in-place upgrades
   preserve data. Native final-point/erase/Undo, mixed Persian/English text,
   cached readiness/repeated PNG, crop/rotation, original sharing and history pass.
@@ -65,7 +70,7 @@ evidence follows separately.
   record observed. Five PR heads still unchanged; none merged or commented on.
 
 **Not verified**
-- Lightweight-history final APK/native recheck/hosted CI are being completed;
+- History/touch-down final APK/native recheck/hosted CI are being completed;
   checkpoint `4c24534` owner arm64 was built and inspected, not delivered.
 - Physical A52s, power/low-space, actual HEIC/camera, pressure/24-hour use and
   complete product/performance acceptance. Earlier .33 pressure ANR stays open.

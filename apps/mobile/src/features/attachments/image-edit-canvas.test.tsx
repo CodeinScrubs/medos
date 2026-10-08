@@ -29,6 +29,10 @@ jest.mock('react-native-gesture-handler', () => {
       runOnJS() {
         return this;
       },
+      onBegin(fn: Callbacks[string]) {
+        this.callbacks.begin = fn;
+        return this;
+      },
       onStart(fn: Callbacks[string]) {
         this.callbacks.start = fn;
         return this;
@@ -103,6 +107,31 @@ afterEach(async () => {
   tree = undefined;
 });
 describe('post-render pointer contracts', () => {
+  it.each(['pen', 'highlight', 'arrow'] as const)('keeps the original touch-down point of a %s', async (tool) => {
+    await render(tool);
+    await act(async () => mockGestures.pan!.callbacks.begin?.(pointer(100, 200)));
+    await act(async () => mockGestures.pan!.callbacks.start!(pointer(110, 205)));
+    const mark = change.mock.calls[0]![0].marks[0]!;
+    expect(mark.kind === 'arrow' ? mark.start : mark.kind === 'text' ? null : mark.points[0]).toEqual({
+      x: 250,
+      y: 250,
+    });
+  });
+  it('refuses to reinterpret a touch-down after a resize before activation', async () => {
+    await render('arrow');
+    await act(async () => mockGestures.pan!.callbacks.begin?.(pointer(100, 200)));
+    await act(async () =>
+      tree!.root.findAllByType(View)[0]!.props.onLayout({ nativeEvent: { layout: { width: 400, height: 360 } } }),
+    );
+    await act(async () => mockGestures.pan!.callbacks.start!(pointer(110, 205)));
+    expect(change).not.toHaveBeenCalled();
+  });
+  it('does not turn a letterbox touch into a stroke when activation occurs over the photo', async () => {
+    await render('arrow');
+    await act(async () => mockGestures.pan!.callbacks.begin?.(pointer(100, 50)));
+    await act(async () => mockGestures.pan!.callbacks.start!(pointer(110, 205)));
+    expect(change).not.toHaveBeenCalled();
+  });
   it.each(['pen', 'highlight'] as const)('erases the middle of a sparse %s segment', async (kind) => {
     await render('erase', {
       ...initialImageDocument('media/synthetic.jpg', 1000, 500),

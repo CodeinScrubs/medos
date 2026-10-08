@@ -54,6 +54,7 @@ export function ImageEditCanvas({
   const gestureImage = useRef(document);
   const stroke = useRef<ImageMark | null>(null);
   const start = useRef<ImagePoint | null>(null);
+  const touchDown = useRef<{ point: ImagePoint | null } | null>(null);
   const [cropPreview, setCropPreview] = useState<ImageMark | null>(null);
   // Crop selection shows the whole image, preserving rotation and annotations.
   const display =
@@ -88,7 +89,7 @@ export function ImageEditCanvas({
   function begin(x: number, y: number) {
     gestureImage.current = document;
     stroke.current = null;
-    start.current = pointAt(x, y);
+    start.current = touchDown.current ? touchDown.current.point : pointAt(x, y);
     if (!start.current || ['view', 'crop', 'text', 'erase'].includes(tool)) return;
     if (document.marks.length >= MAX_IMAGE_MARKS) {
       notify('تعداد علامت‌ها زیاد شده است', 'علامت‌های اضافی را پاک کنید.');
@@ -154,8 +155,14 @@ export function ImageEditCanvas({
   const pan = Gesture.Pan()
     .enabled(!disabled && tool !== 'text' && tool !== 'erase')
     .maxPointers(tool === 'view' ? 2 : 1)
-    .minDistance(1)
+    .minDistance(tool === 'pen' || tool === 'highlight' || tool === 'crop' ? 0 : 1)
     .runOnJS(true)
+    .onBegin((e) => {
+      // Activation can arrive at a later move sample. Capture the actual
+      // touch-down in source coordinates before that segment is lost.
+      touchDown.current = { point: pointAt(e.x, e.y) };
+      if (tool !== 'view') onActivity(true);
+    })
     .onStart((e) => {
       if (tool === 'view') panOrigin.current = currentZoom.current;
       else {
@@ -191,6 +198,7 @@ export function ImageEditCanvas({
       setCropPreview(null);
       start.current = null;
       stroke.current = null;
+      touchDown.current = null;
       onActivity(false);
     });
   const pinch = Gesture.Pinch()
@@ -279,7 +287,8 @@ export function ImageEditCanvas({
         // A resize during a pointer gesture invalidates its local coordinate
         // frame. Keep the accepted points, stop this gesture, and never draw
         // the remaining events through a different contain rectangle.
-        if (start.current || stroke.current) {
+        if (touchDown.current || start.current || stroke.current) {
+          touchDown.current = { point: null };
           start.current = null;
           stroke.current = null;
           setCropPreview(null);
