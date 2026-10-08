@@ -55,6 +55,7 @@ export function ImageEditCanvas({
   const stroke = useRef<ImageMark | null>(null);
   const start = useRef<ImagePoint | null>(null);
   const touchDown = useRef<{ point: ImagePoint | null } | null>(null);
+  const tapDown = useRef<{ point: ImagePoint | null } | null>(null);
   const [cropPreview, setCropPreview] = useState<ImageMark | null>(null);
   // Crop selection shows the whole image, preserving rotation and annotations.
   const display =
@@ -86,10 +87,10 @@ export function ImageEditCanvas({
       ),
     };
   }
-  function begin(x: number, y: number) {
+  function begin(x: number, y: number, point = touchDown.current ? touchDown.current.point : pointAt(x, y)) {
     gestureImage.current = document;
     stroke.current = null;
-    start.current = touchDown.current ? touchDown.current.point : pointAt(x, y);
+    start.current = point;
     if (!start.current || ['view', 'crop', 'text', 'erase'].includes(tool)) return;
     if (document.marks.length >= MAX_IMAGE_MARKS) {
       notify('تعداد علامت‌ها زیاد شده است', 'علامت‌های اضافی را پاک کنید.');
@@ -155,7 +156,7 @@ export function ImageEditCanvas({
   const pan = Gesture.Pan()
     .enabled(!disabled && tool !== 'text' && tool !== 'erase')
     .maxPointers(tool === 'view' ? 2 : 1)
-    .minDistance(tool === 'pen' || tool === 'highlight' || tool === 'crop' ? 0 : 1)
+    .minDistance(1)
     .runOnJS(true)
     .onBegin((e) => {
       // Activation can arrive at a later move sample. Capture the actual
@@ -213,13 +214,23 @@ export function ImageEditCanvas({
       ),
     );
   const tap = Gesture.Tap()
-    .enabled(!disabled && (tool === 'text' || tool === 'erase'))
+    .enabled(!disabled && (tool === 'text' || tool === 'erase' || tool === 'pen' || tool === 'highlight'))
     .runOnJS(true)
+    .onBegin((e) => {
+      tapDown.current = { point: pointAt(e.x, e.y) };
+      if (tool === 'pen' || tool === 'highlight') onActivity(true);
+    })
     .onEnd((e, success) => {
       if (!success) return;
-      const point = pointAt(e.x, e.y);
+      const point = tapDown.current ? tapDown.current.point : pointAt(e.x, e.y);
       if (!point) return;
-      if (tool === 'text') {
+      if (tool === 'pen' || tool === 'highlight') {
+        // Android pan activation needs movement even with minDistance(0).
+        // A successful tap is a separate, complete undo command.
+        begin(e.x, e.y, point);
+        start.current = null;
+        stroke.current = null;
+      } else if (tool === 'text') {
         const existing = [...document.marks]
           .reverse()
           .find(
@@ -275,6 +286,10 @@ export function ImageEditCanvas({
         const chosen = [...document.marks].reverse().find((m) => distance(m) <= limit);
         if (chosen) onChange({ ...document, marks: document.marks.filter((m) => m.id !== chosen.id) });
       }
+    })
+    .onFinalize(() => {
+      tapDown.current = null;
+      if (tool === 'pen' || tool === 'highlight') onActivity(false);
     });
   /* eslint-enable react-hooks/refs */
   return (
@@ -287,8 +302,9 @@ export function ImageEditCanvas({
         // A resize during a pointer gesture invalidates its local coordinate
         // frame. Keep the accepted points, stop this gesture, and never draw
         // the remaining events through a different contain rectangle.
-        if (touchDown.current || start.current || stroke.current) {
+        if (touchDown.current || tapDown.current || start.current || stroke.current) {
           touchDown.current = { point: null };
+          tapDown.current = { point: null };
           start.current = null;
           stroke.current = null;
           setCropPreview(null);
@@ -301,7 +317,7 @@ export function ImageEditCanvas({
         applyZoom({ scale: 1, x: 0, y: 0 });
       }}
     >
-      <GestureDetector gesture={Gesture.Simultaneous(pan, pinch, tap)}>
+      <GestureDetector gesture={Gesture.Simultaneous(Gesture.Exclusive(pan, tap), pinch)}>
         <View collapsable={false} style={styles.fill}>
           <View
             pointerEvents="none"

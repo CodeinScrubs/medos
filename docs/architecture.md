@@ -1699,9 +1699,11 @@ replace readiness with an elapsed timer. No npm/native dependency was added.
 Pointer coordinates include the final release event, not only move events;
 otherwise a native swipe truncates pen/highlight strokes and arrow targets.
 The source-coordinate start is captured at touch-down, before pan activation
-can advance to a later sample. Pen/highlight/crop activate without a movement
-threshold; a pen/highlight tap leaves a dot. Arrow/view retain a small threshold.
-An initial letterbox touch or a resize before activation cannot become a mark.
+can advance to a later sample. Pan retains a small movement threshold; a separate
+pen/highlight tap leaves a dot only when pan fails, through Exclusive(pan, tap).
+Setting minDistance(0) alone did not activate a stationary native tap. Tap and
+pan keep separate source-coordinate intents, so pan finalization cannot discard
+the dot start. An initial letterbox touch or a resize invalidates either intent.
 Erase tests distance to line segments, including sparse paths. Autosave status
 keeps one mounted row so its text cannot resize the canvas midway through a
 stroke. A real viewport resize stops the pointer, retaining accepted points.

@@ -51,6 +51,10 @@ evidence follows separately.
 - Capture the true source-coordinate touch-down before pan activation. Pen and
   highlight taps leave a dot; arrow/view keep their movement threshold. Resize
   before activation and initial letterbox touches cannot become a mark.
+- Native follow-up correction: `427c6d5` fixes initial crop/arrow coordinates,
+  but zero-distance pan did not draw a stationary dot. Exclusive pan/tap now
+  separates a completed dot from a stroke; independent tap intent survives pan
+  finalization. Acknowledged marks/history remain unchanged.
 
 **Verified**
 - Checkpoint `4c24534` full source/pre-push checks: 134 suites/1,768 app tests
@@ -60,6 +64,10 @@ evidence follows separately.
   SQLite. No schema or persistence format changes in this follow-up.
 - Touch-down follow-up full check: 134 suites/1,775 app tests and five workflows;
   five regression witnesses fail before correction and pass afterwards.
+- Native stationary-dot witness failed on `427c6d5`; two focused software
+  witnesses also fail before the tap correction. All 21 pointer tests pass
+  after it. Full check passes 134 suites/1,780 app tests and five workflows;
+  rebuilt native recheck is pending below.
 - Installed QA APK bytes/signature/JNI inspected; offline in-place upgrades
   preserve data. Native final-point/erase/Undo, mixed Persian/English text,
   cached readiness/repeated PNG, crop/rotation, original sharing and history pass.

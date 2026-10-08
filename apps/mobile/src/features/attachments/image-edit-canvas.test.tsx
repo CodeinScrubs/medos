@@ -59,6 +59,7 @@ jest.mock('react-native-gesture-handler', () => {
       Pan: () => builder('pan'),
       Pinch: () => builder('pinch'),
       Tap: () => builder('tap'),
+      Exclusive: () => ({}),
       Simultaneous: () => ({}),
     },
   };
@@ -107,6 +108,41 @@ afterEach(async () => {
   tree = undefined;
 });
 describe('post-render pointer contracts', () => {
+  it.each(['pen', 'highlight'] as const)('records a %s dot after pan fails to activate', async (tool) => {
+    await render(tool);
+    expect(mockGestures.tap!.enabledValue).toBe(true);
+    await act(async () => mockGestures.tap!.callbacks.begin?.(pointer(100, 200)));
+    await act(async () => mockGestures.pan!.callbacks.finalize!(pointer(100, 200)));
+    await act(async () => mockGestures.tap!.callbacks.end!(pointer(100, 200), true));
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(change.mock.calls[0]![1]).toBe(true);
+    expect(change.mock.calls[0]![0].marks[0]).toEqual(
+      expect.objectContaining({ kind: tool, points: [{ x: 250, y: 250 }] }),
+    );
+  });
+  it('does not add a dot from a failed tap after a stroke', async () => {
+    await render('pen');
+    await act(async () => mockGestures.pan!.callbacks.start!(pointer(100, 200)));
+    await act(async () => mockGestures.pan!.callbacks.end!(pointer(300, 200)));
+    const accepted = change.mock.calls.length;
+    await act(async () => mockGestures.tap!.callbacks.end!(pointer(300, 200), false));
+    expect(change).toHaveBeenCalledTimes(accepted);
+  });
+  it('rejects a dot whose touch-down was invalidated by layout', async () => {
+    await render('pen');
+    await act(async () => mockGestures.tap!.callbacks.begin?.(pointer(100, 200)));
+    await act(async () =>
+      tree!.root.findAllByType(View)[0]!.props.onLayout({ nativeEvent: { layout: { width: 400, height: 360 } } }),
+    );
+    await act(async () => mockGestures.tap!.callbacks.end!(pointer(100, 200), true));
+    expect(change).not.toHaveBeenCalled();
+  });
+  it('rejects a dot started in letterboxing even if release is over the photo', async () => {
+    await render('highlight');
+    await act(async () => mockGestures.tap!.callbacks.begin?.(pointer(100, 50)));
+    await act(async () => mockGestures.tap!.callbacks.end!(pointer(100, 200), true));
+    expect(change).not.toHaveBeenCalled();
+  });
   it.each(['pen', 'highlight', 'arrow'] as const)('keeps the original touch-down point of a %s', async (tool) => {
     await render(tool);
     await act(async () => mockGestures.pan!.callbacks.begin?.(pointer(100, 200)));
