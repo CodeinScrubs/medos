@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Native note-close and stopped draft voice acceptance
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers.
+**Commits:** application `730b4d9`; evidence in this commit.
+
+**Changed**
+- Recorded exact .34 CI/installed-byte and native acceptance; the preceding
+  .33 header-only correction was insufficient, while stable native form parent
+  fixes the repeated bounded Save-close reproduction. Added the contract to AGENTS.
+
+**Verified**
+- Full/pre-push check: 127 suites/1,670 app tests and three workflows; hosted
+  CI37706082664 passed on exact application730b4d9. Signed QA package inspected
+  and actual installed bytes match. No native dependency/schema change.
+- Offline upgrade preserves 4,039 rows/40 tables/23 files. Actual legacy Save,
+  stopped new voice, cold recovery and IME-open publication pass without crash.
+- Seeded ready Save/discard refusal, explicit pending-copy+draft discard and
+  cacheless recovery retaining newer text pass complete row/hash comparisons.
+- Actual playback progresses 0:02 to0:05 and pauses. Final cold export preserves
+  4,049 rows/40 tables/25 files exactly; integrity/FKs clean. Details in
+  validation-0.11.34.md, synthetic evidence private.
+- Exact-source signed owner arm64 APK built and inspected: code50/name0.11.34,
+  required native libraries and unchanged signer. Available in dist/.
+
+**Not verified**
+- No physical A52s installation, acoustic output, active/pre-journal
+  interruption, power/low-space/fault or
+  24-hour/performance/full-product acceptance.
+- A pre-upgrade .33 picker-focus ANR under concurrent host build/check pressure
+  is preserved; exact cause remains unresolved. Later successful .34 trials
+  do not prove pressure readiness or that the old ANR was solely host-caused.
+
+**Open threads**
+- Next raw manual lab recovery. Source review:
+  no raw draft, hidden date/range text and unfenced late Back after Save ACK.
+  Reuse current raw-form contracts and atomic clinical publication/retirement.
+- Then companion/doctor form recovery/ownership, safe orphan accounting and
+  remaining ledger gates. Playback across restore still needs a witness.
+
+**Gotchas**
+- Fast UI helper's apparent OK can accompany an aborted API36 test. Require
+  an actual fresh nonempty XML; platform test-base jar and nested dump path
+  matter on this unrooted AVD. Never swipe through an open IME or use off-screen
+  absence as missing data; earlier failed QA setup attempts remain preserved.
+
 ## 2026-10-08 — Keep the note form's native parent stable during submission
 
 **Agent:** GPT-6 via Codex; two read-only GPT-6.1 Sol/xhigh reviewers.

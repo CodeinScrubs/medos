@@ -44,6 +44,19 @@ dependency, global layout change or new workflow. Native correction and remainin
 draft voice acceptance are tracked in validation-0.11.34.md; never infer native
 success from the software witness. The 0.11.32 and 0.11.33 artifacts both failed.
 
+0.11.34 bounded native acceptance now passes on exact installed QA bytes:
+legacy Save, new stopped/cold draft voice, IME-open publication, ready refusal,
+explicit discard and cacheless recovery retaining newer text. Final cold reopen
+preserves 4,049 rows/40 tables/25 files exactly. Native playback progress/Pause
+works; acoustic output and physical/performance/power gates remain separate.
+Preserve the pre-upgrade .33 picker-focus ANR under concurrent host load as an
+unresolved pressure trial; its cause was not proved by later success.
+Next P0: manual lab raw recovery, then companion/doctor raw forms. Lab currently
+has no durable raw draft (including invalid date/time and pending range text),
+and late Save acknowledgment can still Back a newer route. Reuse existing
+versioned raw-form/Autosave/Scope patterns, atomically publish+retire, preserve
+original ownership and latest input. Do not store partial labs as clinical rows.
+
 0.11.33: native 0.11.32 acceptance found/repeated a note-close crash after correct
 SQL publication. The completed branch now keeps the same scroll host so its
 ScreenOptions cannot remount/rewrite the native header during Back. Real
