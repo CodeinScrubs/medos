@@ -182,7 +182,7 @@ export function ImageEditCanvas({
           onChange({ ...document, crop });
           applyZoom({ scale: 1, x: 0, y: 0 });
         }
-      }
+      } else if (stroke.current) move(e.x, e.y);
       setCropPreview(null);
       start.current = null;
       stroke.current = null;
@@ -259,7 +259,10 @@ export function ImageEditCanvas({
               : Infinity;
           if (m.kind === 'arrow') return pointSegmentDistance(point, m.start, m.end);
           const points = m.points;
-          return Math.min(...points.map((p) => Math.hypot(p.x - point.x, p.y - point.y)));
+          let closest = Math.hypot(points[0]!.x - point.x, points[0]!.y - point.y);
+          for (let i = 1; i < points.length; i++)
+            closest = Math.min(closest, pointSegmentDistance(point, points[i - 1]!, points[i]!));
+          return closest;
         };
         const chosen = [...document.marks].reverse().find((m) => distance(m) <= limit);
         if (chosen) onChange({ ...document, marks: document.marks.filter((m) => m.id !== chosen.id) });

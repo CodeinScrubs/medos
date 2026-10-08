@@ -1696,6 +1696,12 @@ once per source, failing closed on source/version drift. Its contract test runs
 in root `test:workflow`. Review/remove the patch on an upstream update; never
 replace readiness with an elapsed timer. No npm/native dependency was added.
 
+Pointer coordinates include the final release event, not only move events;
+otherwise a native swipe truncates pen/highlight strokes and arrow targets.
+Erase tests distance to line segments, including sparse paths. Autosave status
+keeps one mounted row so its text cannot resize the canvas midway through a
+stroke. A real viewport resize stops the pointer, retaining accepted points.
+
 Sharing explicitly renders a PNG with a maximum 2400px long edge. The invisible
 render host is at most 240dp, avoiding density-amplified bitmap allocation;
 toDataURL receives the physical output dimensions. Native load acknowledgment

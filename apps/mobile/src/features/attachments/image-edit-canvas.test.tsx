@@ -75,14 +75,14 @@ const pointer = (x: number, y: number, extra: Partial<Pointer> = {}): Pointer =>
   translationY: 0,
   ...extra,
 });
-async function render(tool: ImageTool) {
+async function render(tool: ImageTool, document = initialImageDocument('media/synthetic.jpg', 1000, 500)) {
   change.mockReset().mockReturnValue(true);
   text.mockClear();
   activity.mockClear();
   await act(async () => {
     tree = create(
       <ImageEditCanvas
-        document={initialImageDocument('media/synthetic.jpg', 1000, 500)}
+        document={document}
         tool={tool}
         color="red"
         thick={false}
@@ -103,6 +103,35 @@ afterEach(async () => {
   tree = undefined;
 });
 describe('post-render pointer contracts', () => {
+  it.each(['pen', 'highlight'] as const)('erases the middle of a sparse %s segment', async (kind) => {
+    await render('erase', {
+      ...initialImageDocument('media/synthetic.jpg', 1000, 500),
+      marks: [
+        {
+          id: 'sparse-stroke',
+          kind,
+          color: 'red',
+          width: 4,
+          points: [
+            { x: 50, y: 200 },
+            { x: 950, y: 200 },
+          ],
+        },
+      ],
+    });
+    await act(async () => mockGestures.tap!.callbacks.end!(pointer(200, 180), true));
+    expect(change).toHaveBeenCalledWith(expect.objectContaining({ marks: [] }));
+  });
+  it.each(['pen', 'highlight', 'arrow'] as const)('keeps the final release point of a %s gesture', async (tool) => {
+    await render(tool);
+    await act(async () => mockGestures.pan!.callbacks.start!(pointer(100, 200)));
+    await act(async () => mockGestures.pan!.callbacks.update!(pointer(200, 200)));
+    await act(async () => mockGestures.pan!.callbacks.end!(pointer(300, 220)));
+    const mark = change.mock.calls.at(-1)![0].marks[0]!;
+    expect(
+      mark.kind === 'arrow' ? mark.end : mark.kind === 'pen' || mark.kind === 'highlight' ? mark.points.at(-1) : null,
+    ).toEqual({ x: 750, y: 300 });
+  });
   it('keeps text taps independent of pan finalization and ignores letterboxing', async () => {
     await render('text');
     expect(mockGestures.pan!.enabledValue).toBe(false);

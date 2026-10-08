@@ -37,7 +37,8 @@ wrong, never rewrite them to look better.
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers, primary
 owns integration, tests and native acceptance.
-**Commits:** image foundation `7d5b6d9`, then this focused share/canvas correction;
+**Commits:** image foundation `7d5b6d9`, share `04cf61f`, coordinates `9591ee0`,
+then the focused release-point/draft-limit correction;
 native artifact/evidence follow separately.
 
 **Changed**
@@ -52,18 +53,22 @@ native artifact/evidence follow separately.
   the canvas has one accessible label for explicit touch geometry and review.
 - Autosave status keeps its row mounted; a viewport resize stops the active
   pointer rather than mapping later points into a changed coordinate frame.
+- Native PNG/SQLite exposed a missing final release point; all three drawing
+  tools now commit it. Erase also handles the middle of sparse path segments.
+  The draft decoder enforces the same embedded-image limit as its encoder.
 
 **Verified**
-- `npm run check` green: 134 suites/1,761 app tests plus five workflow tests.
+- `npm run check` green: 134 suites/1,768 app tests plus five workflow tests.
 - Real migrated SQLite: atomic failure rollback, retry, exact raw text, competing
   editors, same-ID restore fencing, old-backup absent-table/default behavior.
 - Pointer witnesses: text taps, letterbox rejection, denied strokes, combined
   zoom/pan and crop. Copy corruption/truncation and PNG incompleteness refused.
-- Six focused canvas witnesses pass, including an interrupted resize; final
-  full source/pre-push check follows native acceptance.
+- Eleven canvas witnesses pass, including final release coordinates, sparse
+  erasure and interrupted resize. The oversized embedded draft witness failed
+  before the matching decoder correction and passes with final source.
 
 **Not verified**
-- Native photo editing/render/export acceptance, physical A52s and pressure.
+- Native acceptance of final source, physical A52s and pressure.
   A software pass is not proof of native shaping, bitmap content or stability.
 
 **Open threads**

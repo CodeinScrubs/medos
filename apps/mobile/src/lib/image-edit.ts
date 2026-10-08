@@ -129,7 +129,7 @@ export function validateImageDraft(value: unknown): ImageDraftDocument {
     .object({ version: z.literal(1), image: documentSchema, pendingText: pendingSchema.nullable() })
     .strict()
     .parse(value);
-  validateImageDocument(draft.image);
+  encodeImageDocument(draft.image);
   const p = draft.pendingText;
   if (
     p &&
@@ -143,7 +143,6 @@ export function validateImageDraft(value: unknown): ImageDraftDocument {
 }
 export function encodeImageDraft(value: ImageDraftDocument): string {
   const body = JSON.stringify(validateImageDraft(value));
-  encodeImageDocument(value.image);
   if (body.length > MAX_DOCUMENT_CHARS + 20000) throw new Error('پیش‌نویس عکس بیش از اندازه بزرگ است.');
   return body;
 }

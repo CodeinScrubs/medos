@@ -83,6 +83,25 @@ describe('non-destructive image documents', () => {
     image.marks = [image.marks[0]!, image.marks[0]!];
     expect(() => encodeImageDocument(image)).toThrow('تکراری');
   });
+  it('applies the image size limit inside both draft codecs, not just at publication', () => {
+    const image = initialImageDocument('media/synthetic/grid.jpg', 640, 480);
+    image.marks = Array.from({ length: 200 }, (_, i) => ({
+      id: `text-${i}`,
+      kind: 'text' as const,
+      color: 'red' as const,
+      x: 0,
+      y: 0,
+      size: 20,
+      width: 500,
+      text: '\u0001'.repeat(1582) + 'X'.repeat(418),
+    }));
+    const draft = { version: 1 as const, image, pendingText: null };
+    const raw = JSON.stringify(draft);
+    expect(JSON.stringify(image).length).toBeGreaterThan(2000000);
+    expect(raw.length).toBeLessThan(2020000);
+    expect(() => decodeImageDraft(raw)).toThrow('بزرگ');
+    expect(() => encodeImageDraft(draft)).toThrow('بزرگ');
+  });
 });
 
 describe('image-space geometry', () => {
