@@ -37,9 +37,9 @@ wrong, never rewrite them to look better.
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviews earlier in
 this image scope. Primary owns all integration, checks and native interaction.
-**Commits:** verified native checkpoint `4c24534`, following `7d5b6d9`, `04cf61f`,
-`9591ee0`; lightweight-history source is this follow-up commit; final artifact
-evidence follows separately.
+**Commits:** final application `f5cd5df`, following history `0c7d788` and true
+touch-down `427c6d5`. Earlier verified checkpoint `4c24534` follows `7d5b6d9`,
+`04cf61f`, `9591ee0`. This documentation commit records final artifact evidence.
 
 **Changed**
 - Record bounded image acceptance in validation-0.11.36.md and update execution
@@ -67,19 +67,29 @@ evidence follows separately.
 - Native stationary-dot witness failed on `427c6d5`; two focused software
   witnesses also fail before the tap correction. All 21 pointer tests pass
   after it. Full check passes 134 suites/1,780 app tests and five workflows;
-  rebuilt native recheck is pending below.
+  final inspected installed `f5cd5df` passes stationary pen/highlight dots,
+  Down/Up/crop, actual PNG pixels, lazy baseline/reapplied history and native
+  Save/Back with unchanged PID. Nine experimental versions remain archived.
 - Installed QA APK bytes/signature/JNI inspected; offline in-place upgrades
   preserve data. Native final-point/erase/Undo, mixed Persian/English text,
   cached readiness/repeated PNG, crop/rotation, original sharing and history pass.
 - New full restore and cold reopen preserve exactly 4,070 rows/43 app tables/
   28 media hashes, including six versions and live pending text. Old .35 restore
   applies SQL defaults and clears absent new image tables. Integrity/FKs clean.
+- Final `f5cd5df` repeat restore/cold comparison again preserves exactly 4,070/
+  43/28, six versions and exact pending text; no MedOS fatal/ANR record observed.
+- Signed owner arm64 APK built and inspected: 53,061,747 bytes, SHA-256
+  `2af6e2018b17d22f281319fdea4f98c8148d0738101bee26afe0c4cfb03aa449`.
+  Actual owner/installed QA bundles match exactly; artifact details are in
+  validation-0.11.36.md. No QA artifact is copied to dist/.
+- Final application `f5cd5df` normal pre-push check passes 134 suites/1,780 app
+  tests and five workflows; exact CI37773234503 succeeds, including schema
+  migration consistency and Android bundling.
 - Native process retained through final Save/Back closes; no MedOS fatal/ANR
   record observed. Five PR heads still unchanged; none merged or commented on.
 
 **Not verified**
-- History/touch-down final APK/native recheck/hosted CI are being completed;
-  checkpoint `4c24534` owner arm64 was built and inspected, not delivered.
+- Owner arm64 APK has not been installed on a physical device in this run.
 - Physical A52s, power/low-space, actual HEIC/camera, pressure/24-hour use and
   complete product/performance acceptance. Earlier .33 pressure ANR stays open.
 
@@ -97,6 +107,9 @@ evidence follows separately.
   validating an annotated/baseline PNG. QA receiver is emulator-only/private.
 - Old restore retains three unreferenced synthetic files; all old media remain
   intact. This is open orphan accounting, not proof of complete restore cleanup.
+- Idle-based QA reads timed out during one ongoing restore; later fresh native
+  completion and exact cold data were checked. A failed temporary-XML pull also
+  required a new dump. Do not count failed automation reads as accepted UI.
 
 ## 2026-10-08 — Reversible image annotation and recoverable raw text
 

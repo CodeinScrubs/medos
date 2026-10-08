@@ -45,6 +45,17 @@ dependency. Native evidence and its limits belong in validation-0.11.36.md.
 This does not close the photo-import journal/orphan, other raw forms, physical,
 pressure or complete product gates below.
 
+Image checkpoint `4c24534` passes native mixed-text recovery, erase/Undo, release
+coordinates, cached PNG repeat, crop/rotation, original sharing and old/new restore.
+Final application `f5cd5df` passes 134 suites/1,780 app tests and five workflows.
+History lists read metadata only; selected documents are loaded within original
+dataset admission. Inspected installed final QA bytes also pass stationary pen/
+highlight dots, exact Down/Up coordinates, lazy baseline/reapplied history and
+actual PNG pixel/byte checks. Final cold comparison preserves all 4,070 rows/
+43 app tables/28 media hashes and live raw text exactly. Originals remain intact.
+This is bounded emulator evidence; owner/physical/performance gates stay distinct.
+See validation-0.11.36.md and HANDOFF for final artifact/CI identity.
+
 0.11.35: manual lab entry now persists its versioned raw form, including invalid
 date/clock/number and open range text, through additive migration0022. Clinical
 publication plus draft retirement is atomic/CAS-guarded, original encounter and
