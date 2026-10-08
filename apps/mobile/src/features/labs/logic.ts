@@ -2,6 +2,11 @@ import type { LabValue } from '@/db/schema';
 
 import { FLAG_LABEL, parseLabValue } from './flags';
 
+/** Compare labels only; never case-fold SI prefixes or infer a conversion. */
+export function sameLabUnitLabel(left: string | null | undefined, right: string | null | undefined): boolean {
+  return (left ?? '').trim() === (right ?? '').trim();
+}
+
 /**
  * Rows copied from Excel, Google Sheets or a CSV, as [analyte, value, unit?].
  *
@@ -84,7 +89,7 @@ function splitCsv(line: string): string[] {
 export function sameUnitSeries<T extends { unit: string | null }>(
   rows: T[],
 ): { series: T[]; unit: string | null; excluded: number; unlabelled: number } {
-  const normal = (u: string | null) => (u ?? '').trim().toLowerCase();
+  const normal = (u: string | null) => (u ?? '').trim();
   let unit: string | null = null;
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     if (normal(rows[i]!.unit)) {
@@ -92,7 +97,7 @@ export function sameUnitSeries<T extends { unit: string | null }>(
       break;
     }
   }
-  const series = rows.filter((r) => !normal(r.unit) || normal(r.unit) === normal(unit));
+  const series = rows.filter((r) => !normal(r.unit) || sameLabUnitLabel(r.unit, unit));
   // Counted, not hidden: once a unit is known for the series, a point with no
   // unit is an assumption the chart is making, and the screen says so.
   const unlabelled = unit == null ? 0 : series.filter((r) => !normal(r.unit)).length;

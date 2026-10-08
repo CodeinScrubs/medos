@@ -622,6 +622,46 @@ describe('lab entry mounted intent and retained raw values', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(alertError).not.toHaveBeenCalled();
   });
+  it('uses the explicit clipboard unit and clears references expressed in the previous unit', async () => {
+    await render();
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue('Hb\t140\tg/L');
+    await invoke(() => button('چسباندن از اکسل').props.onPress());
+    expect(value().props.value).toBe('140');
+    await invoke(() => save().props.onPress());
+    expect(current().values.filter((row) => !row.deletedAt)[0]).toEqual(
+      expect.objectContaining({ value: '140', unit: 'g/L', refLow: null, refHigh: null, flag: null }),
+    );
+  });
+  it.each(['mmol/L', 'Mg/dL'])("keeps explicit unit %p without another unit's preset range", async (unit) => {
+    const id = await createPatient({ firstName: 'Synthetic', lastName: 'Unit', ageYears: 30, sex: 'female' });
+    mockParams = { id };
+    await render();
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue(`FBS\t7\t${unit}`);
+    await invoke(() => button('چسباندن از اکسل').props.onPress());
+    await invoke(() => save().props.onPress());
+    expect(current().values.filter((row) => !row.deletedAt && row.analyte === 'FBS')[0]).toEqual(
+      expect.objectContaining({ value: '7', unit, refLow: null, refHigh: null, flag: null }),
+    );
+  });
+  it('does not carry a unitless existing reference into an explicitly labelled clipboard value', async () => {
+    t.db.update(labValues).set({ unit: null }).run();
+    await render();
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue('Hb\t140\tg/L');
+    await invoke(() => button('چسباندن از اکسل').props.onPress());
+    await invoke(() => save().props.onPress());
+    expect(current().values.filter((row) => !row.deletedAt)[0]).toEqual(
+      expect.objectContaining({ value: '140', unit: 'g/L', refLow: null, refHigh: null, flag: null }),
+    );
+  });
+  it('retains the recorded reference when explicit clipboard units match after trimming', async () => {
+    await render();
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue('Hb\t14\t  g/dL  ');
+    await invoke(() => button('چسباندن از اکسل').props.onPress());
+    await invoke(() => save().props.onPress());
+    expect(current().values.filter((row) => !row.deletedAt)[0]).toEqual(
+      expect.objectContaining({ value: '14', unit: 'g/dL', refLow: 10, refHigh: 17, flag: 'normal' }),
+    );
+  });
   it('retains raw values after a failed write and saves on explicit retry', async () => {
     await render();
     await invoke(() => input('یادداشت')!.props.onChangeText('Retry laboratory note'));

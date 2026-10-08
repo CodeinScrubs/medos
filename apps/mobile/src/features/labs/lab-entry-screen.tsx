@@ -28,7 +28,7 @@ import { useTheme } from '@/theme';
 import { computeFlag, FLAG_LABEL, flagTone, formatRange, parseLabValue, parseRangeInput } from './flags';
 import { decodeLabForm, initialLabForm, labDisplayDate, type LabEntryRow as EntryRow } from './form-draft';
 import { labFormBasis, labFormQuery, type LabFormRows } from './form-draft-queries';
-import { isUnreadableNumber, parsePastedTable } from './logic';
+import { isUnreadableNumber, parsePastedTable, sameLabUnitLabel } from './logic';
 import { analyteDef, LAB_PRESETS, rangeFor } from './presets';
 import { useLabForm } from './use-lab-form';
 
@@ -232,6 +232,7 @@ function LabEntry({
         let applied = false;
         let inserted = 0;
         let preserved = 0;
+        let rangesNotApplied = 0;
         editing.change((fields) => {
           applied = true;
           const next = [...fields.rows];
@@ -251,16 +252,28 @@ function LabEntry({
             const idx = next.findIndex((r) => r.analyte.toLowerCase() === analyte.toLowerCase());
             const existing = next[idx];
             if (existing) {
-              next[idx] = { ...existing, value, unit: existing.unit ?? unit ?? null };
+              const unitChanged = unit != null && !sameLabUnitLabel(existing.unit, unit);
+              if (unitChanged && (existing.refLow != null || existing.refHigh != null)) rangesNotApplied++;
+              next[idx] = {
+                ...existing,
+                value,
+                // An explicit clipboard unit belongs to its value, not the old row.
+                unit: unit ?? existing.unit,
+                refLow: unitChanged ? null : existing.refLow,
+                refHigh: unitChanged ? null : existing.refHigh,
+              };
               continue;
             }
             const def = analyteDef(analyte);
-            const range = rangeFor(def, rangeContext);
+            const pastedUnit = unit ?? def?.unit ?? null;
+            const presetRange = rangeFor(def, rangeContext);
+            const range = sameLabUnitLabel(pastedUnit, def?.unit) ? presetRange : null;
+            if (!range && presetRange && (presetRange.low != null || presetRange.high != null)) rangesNotApplied++;
             next.push({
               key: newId(),
               analyte: def?.analyte ?? analyte,
               value,
-              unit: unit ?? def?.unit ?? null,
+              unit: pastedUnit,
               refLow: range?.low ?? null,
               refHigh: range?.high ?? null,
               notes: null,
@@ -273,7 +286,7 @@ function LabEntry({
         if (!applied) return;
         notify(
           inserted ? 'چسبانده شد' : 'مقادیر تازه نگه داشته شدند',
-          `${toPersianDigits(inserted)} مقدار وارد شد.${preserved ? ` ${toPersianDigits(preserved)} مقدار تازهٔ این فرم جایگزین نشد.` : ''} قبل از ذخیره، واحدها و محدوده‌ها را یک نگاه بیندازید.`,
+          `${toPersianDigits(inserted)} مقدار وارد شد.${preserved ? ` ${toPersianDigits(preserved)} مقدار تازهٔ این فرم جایگزین نشد.` : ''}${rangesNotApplied ? ` محدودهٔ ${toPersianDigits(rangesNotApplied)} مقدار با واحد متفاوت اعمال نشد.` : ''} قبل از ذخیره، واحدها و محدوده‌ها را یک نگاه بیندازید.`,
         );
       });
     } finally {

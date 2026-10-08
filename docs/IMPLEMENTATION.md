@@ -36,6 +36,15 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.38 fixes two additional numerical-integrity defects: pasted explicit
+units no longer inherit another unit's reference range, and trend grouping
+does not case-fold SI prefixes. New fail-before/pass-after SQLite and chart
+witnesses pass; full check is137 suites/1,864 app tests and five workflows.
+No historical result is converted or rewritten. Native clipboard, artifact
+and delivery acceptance belongs in validation-0.11.38.md and HANDOFF; earlier
+native evidence must not be reused as acceptance of this source. The remaining
+raw-form, media-batch, physical and pressure gates below are still open.
+
 0.11.37 closes companion raw-form recovery via migration0024 and hardens the
 remaining manual doctor submissions against original-intent, late navigation,
 same-turn duplicate and field overwrite defects. Their raw crash recovery is

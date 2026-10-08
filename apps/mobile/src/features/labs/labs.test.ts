@@ -214,8 +214,15 @@ describe('sameUnitSeries', () => {
     expect(sameUnitSeries(rows)).toEqual({ series: [rows[1], rows[2]], unit: 'mg/dL', excluded: 1, unlabelled: 0 });
   });
 
-  it('treats spacing and case as the same unit', () => {
-    expect(sameUnitSeries([row('MG/DL ', 1), row('mg/dL', 1.4)]).excluded).toBe(0);
+  it('treats outer spacing as the same unit', () => {
+    expect(sameUnitSeries([row(' mg/dL ', 1), row('mg/dL', 1.4)]).excluded).toBe(0);
+  });
+  it.each([
+    ['mg/dL', 'Mg/dL'],
+    ['mmol/L', 'Mmol/L'],
+  ])('does not merge prefix case in %p and %p', (older, newer) => {
+    const rows = [row(older, 1), row(newer, 1.4)];
+    expect(sameUnitSeries(rows)).toEqual({ series: [rows[1]], unit: newer, excluded: 1, unlabelled: 0 });
   });
 
   // Most results are typed without a unit. That is a unit nobody wrote down,

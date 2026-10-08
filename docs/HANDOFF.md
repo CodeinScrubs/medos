@@ -33,6 +33,41 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Clipboard lab units and reference compatibility (0.11.38)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; native/artifact delivery follows separately.
+
+**Changed**
+- Keep explicit pasted values and their units together. Clear an existing range
+  when the explicit unit changes; apply a preset range only to its own unit.
+- Compare unit labels after outer trimming, without case folding SI prefixes.
+  Charts exclude differently labelled units rather than silently combining them.
+- Reuse the existing brief paste acknowledgment for suppressed incompatible
+  ranges. No conversion, formula, dependency, permission, route or migration.
+  Version0.11.38/code54; earlier stored results are not guessed or rewritten.
+- Record the actual successful0.11.37 hosted CI delivery.
+
+**Verified**
+- New SQLite screen and chart witnesses fail before correction; the focused
+  two suites pass98 tests afterwards. Full check passes137 suites/1,864 app
+  tests and five workflows, including typecheck/lint/formatting.
+
+**Not verified**
+- Rebuilt0.11.38 native clipboard behavior and signed owner artifact are next;
+  earlier0.11.37 native evidence is not evidence for this new source.
+- Physical A52s, pressure/full-shift and clinical-review gates remain open.
+
+**Open threads**
+- Finish actual clipboard/raw recovery/publication acceptance, preserve all
+  unrelated data/media on upgrade, inspect both APKs and run hosted CI.
+- Remaining raw doctor/photo forms and photo batch recovery are unchanged.
+  Historical incorrectly imported ranges need source/physician review.
+
+**Gotchas**
+- `mg` and `Mg` cannot be case-folded. See validation-0.11.38.md for the
+  precise cases and primary SI reference. Do not add guessed unit aliases.
+
 ## 2026-10-08 — Final 0.11.37 native recovery and artifact acceptance
 
 **Agent:** GPT-6 via Codex. The two GPT-6.1 Sol/xhigh reviewers reached their
@@ -77,16 +112,16 @@ the actual delivery evidence. Application source stays `5924bd1`.
   SHA-256 `2939d2832bdb0feae1480b4f642bfa07c765a3852f681545e910ae326675b817`.
   Version/code/signature/JNI checks pass; actual embedded JS bundle is identical
   to the accepted final QA APK. See validation-0.11.37.md for full identities.
+- Normal push/check passes137 suites/1,857 app tests+5 workflows. Exact delivery
+  `3b420d3` passes hosted CI run37802082123 (checks, migration regeneration and
+  Android bundle). No hook or check bypassed.
 
 **Not verified**
-- Hosted CI is pending the normal push; record the actual head/run afterward.
 - Physical A52s hardware, acoustic voice output, HEIC/camera, real reminders/
   SAF grants, power/low-space and a full heavy shift. Earlier0.11.33 pressure
   ANR remains unresolved; ordinary emulator success does not close it.
 
 **Open threads**
-- Finish normal push/CI, then update
-  this entry and validation-0.11.37.md with actual evidence.
 - Next P0: durable doctor/profile/rating and photo-caption/imaging raw input;
   photo batch journal/atomic batch/new lab panel publication and orphan inventory.
   Never delete unlinked originals as a shortcut.

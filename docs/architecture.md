@@ -1784,3 +1784,23 @@ Doctor/profile/rating and photo-caption/imaging raw crash recovery, durable
 multi-photo import/journal and safe orphan inventory remain open. This release
 does not certify phone hardware, power/low-space behavior or a 24-hour heavy
 shift. Keep bounded native acceptance separate from software tests.
+
+## Lab unit labels and clipboard references (0.11.38)
+
+`sameLabUnitLabel` compares labels after outer trimming only. Prefix case is
+significant; no case folding, unit alias or numeric conversion is inferred.
+The existing latest-labelled-unit trend policy remains, with differently
+labelled values excluded and unlabelled assumptions still explicitly counted.
+
+Clipboard values and explicit units are one input. For an existing row, a new
+explicit unit replaces the old label and clears both old reference bounds when
+the labels differ. A pasted value without a unit retains the existing unit and
+range. For a newly inserted analyte, a preset range is used only if the effective
+unit matches that preset's unit; a differing explicit unit has no guessed bounds
+or normal/abnormal classification. Same-unit pastes keep existing recorded bounds.
+Intervening local edits during the awaited clipboard read remain protected.
+
+The existing acknowledgment briefly counts ranges not applied; there is no new
+dialog workflow or automatic conversion. Raw recovery and atomic publication use
+the existing lab form contract. Legacy stored rows are not retrospectively
+corrected: their original units cannot be recovered by guessing.

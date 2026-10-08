@@ -167,7 +167,11 @@ certificate/package/version/code/minSDK/targetSDK as the QA artifact.
 - Only emulator-5556 is connected. The owner arm64 APK has not been installed or
   tested on the physical A52s. x86_64 acceptance is not hardware acceptance.
 
-Hosted CI remains a separate delivery check, recorded after the actual run.
+Normal push reruns the full check successfully (137 suites/1,857 app tests and
+five workflows). Exact delivery `3b420d3f64a42d4c6ffbaf1a28e3798e7459fa00`
+passes [hosted CI run37802082123](https://github.com/CodeinScrubs/medos/actions/runs/37802082123):
+typecheck/lint/formatting/tests, unchanged generated migrations and Android bundle.
+No hook or check was bypassed.
 
 ## Still open
 
