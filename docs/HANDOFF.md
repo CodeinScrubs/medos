@@ -33,6 +33,77 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Final 0.11.37 native recovery and artifact acceptance
+
+**Agent:** GPT-6 via Codex. The two GPT-6.1 Sol/xhigh reviewers reached their
+usage limits; the primary completed integration and verification without
+further delegation.
+**Commits:** application `856ef8d`, `f1ae818`, `5924bd1`; this follow-up records
+the actual delivery evidence. Application source stays `5924bd1`.
+
+**Changed**
+- Recover exact companion raw input in additive migration0024; explicit
+  publication and soft retirement are atomic and replay-safe. Harden the three
+  manual doctor forms against stale intent, duplicate submit and field overwrite.
+- Persist imported photo checksum/original MIME. Add custom lab Unit, independent
+  Remove beside invalid/H/L markers and recorded units in table/history.
+- Keep publication/Close above the IME in one stable header slot. Actual numeric
+  mono metrics exposed a table overflow; explicit value/unit lines and shared
+  font-scaled geometry keep each value within its own row. No dependency,
+  permission, route or clinical formula added. Version0.11.37/code53.
+
+**Verified**
+- Final full `npm run check`:137 suites/1,857 app tests and five workflow tests;
+  typecheck/lint/formatting green. New regression witnesses fail before correction.
+- In-place emulator upgrade preserves all4,070 old rows/43 old tables/28 media
+  hashes, adding one empty table. Native companion raw cold recovery, IME-open
+  invalid refusal, one publication and soft discard pass on `f1ae818`.
+- Directory/profile/rating publication/Close and lab Unit/invalid/H/L Remove
+  pass on `f1ae818`; independent archive comparison catches/corrects a QA-driver
+  field-selection error and proves4,078 exact rows/44 tables/28 media hashes.
+- Final `5924bd1` QA APK is inspected, installed in place and byte-checked.
+  Actual screenshots/native bounds pass at font scales1/1.6. Another in-place
+  archive comparison proves all4,078 rows and media unchanged.
+- Final incomplete companion is exact after acknowledged autosave/force-stop:
+  4,079 rows, one live raw draft, no additional published contact. Current restore
+  retains old forms read-only until explicit Close; cold comparison is exact.
+- Actual0.11.36 restore preserves4,070 old rows/media and clears the new draft
+  table. Returning to0.11.37 and cold reopening preserves all4,079 rows/44 tables/
+  28 media hashes, with clean integrity/FKs. Tested Close keeps its PID/no fatal.
+- Airplane mode is enabled. Normal font/previous hardware-IME setting restored;
+  app stopped before the owner build. Five open PR heads remain unchanged from
+  the earlier review; none was merged or commented on.
+- Signed owner APK built/inspected: arm64-v8a,53,118,223 bytes,
+  SHA-256 `2939d2832bdb0feae1480b4f642bfa07c765a3852f681545e910ae326675b817`.
+  Version/code/signature/JNI checks pass; actual embedded JS bundle is identical
+  to the accepted final QA APK. See validation-0.11.37.md for full identities.
+
+**Not verified**
+- Hosted CI is pending the normal push; record the actual head/run afterward.
+- Physical A52s hardware, acoustic voice output, HEIC/camera, real reminders/
+  SAF grants, power/low-space and a full heavy shift. Earlier0.11.33 pressure
+  ANR remains unresolved; ordinary emulator success does not close it.
+
+**Open threads**
+- Finish normal push/CI, then update
+  this entry and validation-0.11.37.md with actual evidence.
+- Next P0: durable doctor/profile/rating and photo-caption/imaging raw input;
+  photo batch journal/atomic batch/new lab panel publication and orphan inventory.
+  Never delete unlinked originals as a shortcut.
+- Continue physical/performance/clinical acceptance in IMPLEMENTATION.md.
+  No claim of complete product acceptance or zero crashes.
+
+**Gotchas**
+- Duplicate section/field captions selected Tags instead of Notes in one QA
+  trial; the independent database oracle caught it. Use actual field bounds and
+  confirm the stored column. IME-covered footer taps are also invalid evidence.
+- Use actual Text/theme metrics, not string mocks, for font/cell-fit checks.
+  Font configuration recreation may race deep links; reject that driver attempt
+  and obtain a fresh route. Intermittent fast-hierarchy pulls are not success.
+- Source-specific details, rejected trials and APK hashes are in
+  validation-0.11.37.md. Detailed synthetic evidence remains ignored under
+  private/validation-0.11.37; no patient data or keys were added to the repository.
+
 ## 2026-10-08 — Companion raw recovery and manual form integrity
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh reviews. Primary owns integration

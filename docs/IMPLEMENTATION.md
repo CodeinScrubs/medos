@@ -51,6 +51,15 @@ P0 or product completion. Next: doctor/profile/rating and photo-caption/imaging
 raw durability, durable photo batch publication/recovery and orphan inventory;
 then physical, pressure and full-shift evidence.
 
+Final .37 source `5924bd1` passes 137 suites/1,857 app tests and five workflows.
+Inspected/installed emulator bytes pass native font scales1/1.6, raw cold
+recovery and current/old/current restore. Independent comparisons preserve
+4,079 rows/44 application tables/28 media hashes exactly; old .36 restore
+preserves4,070 rows and leaves the new draft table empty. The signed/inspected
+owner arm64 APK is built, with an actual JS bundle identical to accepted QA.
+It has not been tested on the A52s. See validation-0.11.37.md for artifact
+identities and rejected trials; remaining P0 and acceptance work stays open.
+
 0.11.36 adds reversible photo annotation without overwriting the original or
 working image. The viewer opens a single editor with pen/highlight/arrow/text,
 crop/rotate, undo/redo and history. Raw text and marks use recoverable/CAS drafts;
