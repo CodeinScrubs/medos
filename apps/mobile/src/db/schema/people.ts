@@ -103,6 +103,26 @@ export const doctors = sqliteTable(
   ],
 );
 
+/** Unpublished directory, private profile and rating input; never a partial doctor. */
+export const doctorFormDrafts = sqliteTable(
+  'doctor_form_drafts',
+  {
+    ...baseColumns,
+    kind: text('kind', { enum: ['directory', 'profile', 'rating'] }).notNull(),
+    scope: text('scope').notNull(),
+    doctorId: text('doctor_id').references(() => doctors.id),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedEntityId: text('committed_entity_id'),
+  },
+  (t) => [
+    uniqueIndex('doctor_form_drafts_open_scope_idx')
+      .on(t.kind, t.scope)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type DoctorFormDraft = typeof doctorFormDrafts.$inferSelect;
+
 /* -------------------------------------------------------------------------- */
 /*  Personal ratings                                                            */
 /* -------------------------------------------------------------------------- */

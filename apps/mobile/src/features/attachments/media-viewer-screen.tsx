@@ -1,41 +1,59 @@
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnnotatedImage } from '@/components/annotated-image';
+import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { notify, alertError } from '@/components/feedback';
-import { PromptModal } from '@/components/prompt-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, IconButton, Row, Text } from '@/components/ui';
 import { ZoomableImage } from '@/components/zoomable-image';
 import { useLive } from '@/db/use-live';
-import { withDatasetWrite } from '@/lib/dataset-write';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { imageDisplaySize, imageMimeFromPath, type ImageDocument } from '@/lib/image-edit';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { mediaExists, mediaUri } from '@/platform/media';
 import { mediaViewerColors } from '@/theme';
 
+import { CaptionEditor } from './caption-editor';
 import { attachmentImageDocument } from './image-edit-queries';
 import { useImageExport } from './image-export';
 import { ATTACHMENT_KIND_LABELS } from './labels';
-import { attachmentQuery, deleteAttachment, updateAttachment } from './queries';
+import { attachmentQuery, deleteAttachment } from './queries';
 
 /** Full-screen photo viewer. Param: `attachmentId`. */
 export function MediaViewerScreen() {
+  const scope = useAutosaveScope();
+  return scope ? (
+    <MediaViewer />
+  ) : (
+    <AutosaveScope>
+      <MediaViewer />
+    </AutosaveScope>
+  );
+}
+function MediaViewer() {
+  const scope = useAutosaveScope()!;
   const { attachmentId } = useLocalSearchParams<{ attachmentId: string }>();
   const router = useRouter();
   const navigation = useNavigation();
-  const [editing, setEditing] = useState(false);
   const { generation } = useDatasetIntent();
-  const captionBusy = useRef(false);
   const shareBusy = useRef(false);
   const [sharing, setSharing] = useState(false);
-  const [savingCaption, setSavingCaption] = useState(false);
+  const closeDialog = useRef<symbol | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      closeDialog.current = null;
+    };
+  }, []);
   const [showOriginal, setShowOriginal] = useState(false);
   const exporter = useImageExport();
 
@@ -55,6 +73,36 @@ export function MediaViewerScreen() {
   const shown = originalShown ? item!.originalPath : item?.relativePath;
   const uri = shown ? mediaUri(shown) : null;
   const missing = shown ? !mediaExists(shown) : false;
+
+  function close() {
+    if (closeDialog.current || !mounted.current || !navigation.isFocused()) return;
+    if (generation === datasetGeneration()) {
+      router.back();
+      return;
+    }
+    const token = Symbol();
+    closeDialog.current = token;
+    const consume = (accepted: boolean) => {
+      if (!mounted.current || closeDialog.current !== token) return;
+      closeDialog.current = null;
+      if (!accepted || !navigation.isFocused() || generation === datasetGeneration()) return;
+      try {
+        scope.abandonStale();
+        router.back();
+      } catch (e) {
+        alertError('بسته نشد', e);
+      }
+    };
+    Alert.alert(
+      'بستن عکس قدیمی؟',
+      'پیش از بستن، توضیح نوشته‌شده را مرور یا کپی کنید.',
+      [
+        { text: 'ادامهٔ مرور', style: 'cancel', onPress: () => consume(false) },
+        { text: 'بستن', onPress: () => consume(true) },
+      ],
+      { cancelable: true, onDismiss: () => consume(false) },
+    );
+  }
 
   async function share() {
     if (shareBusy.current) return;
@@ -79,24 +127,6 @@ export function MediaViewerScreen() {
     } finally {
       shareBusy.current = false;
       setSharing(false);
-    }
-  }
-
-  async function saveCaption(text: string) {
-    if (captionBusy.current) return;
-    captionBusy.current = true;
-    setSavingCaption(true);
-    try {
-      await withDatasetWrite(generation, async () => {
-        if (!item) return;
-        await updateAttachment(item.id, { caption: text || null });
-        setEditing(false);
-      });
-    } catch (e) {
-      alertError('توضیح ذخیره نشد', e);
-    } finally {
-      captionBusy.current = false;
-      setSavingCaption(false);
     }
   }
 
@@ -145,7 +175,7 @@ export function MediaViewerScreen() {
 
       <SafeAreaView style={styles.topBar} edges={['top']} pointerEvents="box-none">
         <Row justify="space-between" style={styles.barRow}>
-          <IconButton icon="close" label="بستن" color={mediaViewerColors.text} onPress={() => router.back()} />
+          <IconButton icon="close" label="بستن" color={mediaViewerColors.text} onPress={close} />
           <Row gap="xs">
             <IconButton
               icon="color-palette-outline"
@@ -158,12 +188,7 @@ export function MediaViewerScreen() {
                 }).catch((e) => alertError('ویرایش باز نشد', e));
               }}
             />
-            <IconButton
-              icon="create-outline"
-              label="ویرایش توضیح"
-              color={mediaViewerColors.text}
-              onPress={() => setEditing(true)}
-            />
+            <CaptionEditor key={attachmentId} attachmentId={attachmentId} />
             <IconButton
               icon="share-outline"
               label="اشتراک‌گذاری"
@@ -206,17 +231,6 @@ export function MediaViewerScreen() {
         </SafeAreaView>
       ) : null}
 
-      <PromptModal
-        visible={editing}
-        busy={savingCaption}
-        title="توضیح عکس"
-        initialValue={item?.caption ?? ''}
-        placeholder="مثلاً ضایعه‌ی ساق پای چپ، روز سوم درمان"
-        onCancel={() => {
-          if (!captionBusy.current) setEditing(false);
-        }}
-        onSubmit={(text) => void saveCaption(text)}
-      />
       {exporter.scene}
     </View>
   );

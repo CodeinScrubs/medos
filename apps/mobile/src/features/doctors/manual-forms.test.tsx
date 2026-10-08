@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import type { ReactElement } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, AppState, View, type AppStateStatus } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { AutosaveScope } from '@/components/autosave-scope';
@@ -10,7 +10,7 @@ import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen } from '@/components/ui';
-import { doctorProfiles, doctorRatings, doctors, places } from '@/db/schema';
+import { doctorFormDrafts, doctorProfiles, doctorRatings, doctors, places } from '@/db/schema';
 import { DatasetBusyError } from '@/lib/dataset-write';
 import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
@@ -18,12 +18,13 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { DoctorFormScreen } from './doctor-form-screen';
 import { DoctorFormConflict } from './edit-basis';
+import { decodeDoctorForm, initialDoctorForm } from './form-draft';
+import { doctorFormQuery, saveDoctorFormDraft } from './form-draft-queries';
+import * as draftQueries from './form-draft-queries';
 import { ProfileFormScreen } from './profile-form-screen';
 import { createDoctor, doctorQuery, updateDoctor } from './queries';
-import * as queries from './queries';
 import { RatingScreen } from './rating-screen';
 import { doctorProfileQuery, saveDoctorProfile } from './ratings-queries';
-import * as ratingQueries from './ratings-queries';
 
 let mockParams: { doctorId?: string };
 let mockFocused = true;
@@ -148,7 +149,261 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-describe('remaining manual doctor forms with real SQLite and original intent', () => {
+describe('raw doctor forms with real SQLite and original intent', () => {
+  it.each(forms)('raw cold recovery restores exact unfinished $kind input without publication', async (form) => {
+    await mount(form.element());
+    const clinical = databaseRows(t);
+    expect(t.db.select().from(doctorFormDrafts).all()).toEqual([]);
+    await type(form.text, '  Raw exact\nفارسی / English  ');
+    if (form.kind === 'doctor') await type('نام', '  ');
+    if (form.kind === 'profile') await type('تاریخ تولد', '۱۴۰۵/');
+    if (form.kind === 'rating')
+      await act(async () => {
+        tree!.root.findAllByType(ChipSelect)[0]!.props.onChange('4');
+        tree!.root.findAllByType(ChipSelect)[1]!.props.onChange(null);
+        await settle();
+      });
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+      await settle();
+    });
+    const saved = t.db.select().from(doctorFormDrafts).get()!;
+    expect(saved).toMatchObject({ revision: 1, deletedAt: null, committedEntityId: null });
+    expect(databaseRows(t).doctors).toEqual(clinical.doctors);
+    expect(databaseRows(t).doctor_profiles).toEqual(clinical.doctor_profiles);
+    expect(databaseRows(t).doctor_ratings).toEqual(clinical.doctor_ratings);
+    await act(async () => {
+      tree!.unmount();
+      await settle();
+    });
+    tree = undefined;
+    await mount(form.element());
+    expect(input(form.text).props.value).toBe('  Raw exact\nفارسی / English  ');
+    if (form.kind === 'doctor') expect(input('نام').props.value).toBe('  ');
+    if (form.kind === 'profile') expect(input('تاریخ تولد').props.value).toBe('۱۴۰۵/');
+    if (form.kind === 'rating') {
+      expect(tree!.root.findAllByType(ChipSelect)[0]!.props.value).toBe('4');
+      expect(tree!.root.findAllByType(ChipSelect)[1]!.props.value).toBeNull();
+    }
+    expect(t.db.select().from(doctorFormDrafts).all()).toEqual([saved]);
+    expect(tree!.root.findAllByType(AutosaveScope)).toHaveLength(1);
+  });
+  it('raw cold recovery resumes an incomplete new directory form without creating a doctor', async () => {
+    mockParams = {};
+    await mount(<DoctorFormScreen />);
+    expect(t.db.select().from(doctorFormDrafts).all()).toEqual([]);
+    await type('نام', '  New partial  ');
+    await type('موبایل', ' +۱۲۳ ');
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+      await settle();
+    });
+    expect(t.db.select().from(doctors).all()).toHaveLength(1);
+    await act(async () => {
+      tree!.unmount();
+      await settle();
+    });
+    tree = undefined;
+    await mount(<DoctorFormScreen />);
+    expect(input('نام').props.value).toBe('  New partial  ');
+    expect(input('نام خانوادگی').props.value).toBe('');
+    expect(input('موبایل').props.value).toBe(' +۱۲۳ ');
+    await press('ثبت پزشک');
+    expect(t.db.select().from(doctors).all()).toHaveLength(1);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it.each(forms)('flushes the $kind raw writer on background and through its existing leave guard', async (form) => {
+    const listeners: ((state: AppStateStatus) => void)[] = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
+      listeners.push(listener);
+      return { remove: jest.fn() };
+    });
+    await mount(form.element());
+    await type(form.text, 'Background exact input');
+    await act(async () => {
+      listeners.forEach((listener) => listener('background'));
+      await settle();
+    });
+    const key = form.kind === 'doctor' ? 'notes' : form.kind === 'profile' ? 'personalNotes' : 'reasoning';
+    expect(decodeDoctorForm(t.db.select().from(doctorFormDrafts).get()!.body).fields).toMatchObject({
+      [key]: 'Background exact input',
+    });
+    await type(form.text, 'Final leave input');
+    await act(async () => {
+      expect(await mockFlush!()).toBe(true);
+      await settle();
+    });
+    expect(decodeDoctorForm(t.db.select().from(doctorFormDrafts).get()!.body).fields).toMatchObject({
+      [key]: 'Final leave input',
+    });
+  });
+  it('waits for the new directory draft read and exposes retry instead of mounting a blank form over it', async () => {
+    mockParams = {};
+    t.sqlite.exec('ALTER TABLE doctor_form_drafts RENAME TO unavailable_doctor_drafts');
+    await mount(<DoctorFormScreen />);
+    expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+    const notice = tree!.root.findAllByType(ErrorNotice).find((node) => node.props.error)!;
+    expect(notice).toBeDefined();
+    t.sqlite.exec('ALTER TABLE unavailable_doctor_drafts RENAME TO doctor_form_drafts');
+    await act(async () => {
+      notice.props.onRetry();
+      await settle();
+    });
+    expect(input('نام').props.value).toBe('');
+    expect(t.db.select().from(doctorFormDrafts).all()).toEqual([]);
+  });
+  it.each(forms)(
+    'soft-discards the acknowledged $kind raw draft while preserving its form/header/native parent',
+    async (form) => {
+      await mount(form.element());
+      const screen = tree!.root.findByType(Screen);
+      const parent = tree!.root.findAllByType(Column).find((node) => node.props.collapsable === false)!;
+      const nativeParent = parent.findByType(View);
+      const clinical = databaseRows(t);
+      await type(form.text, 'Discard exact input');
+      await act(async () => {
+        expect(await mockFlush!()).toBe(true);
+        await settle();
+      });
+      const body = t.db.select().from(doctorFormDrafts).get()!.body;
+      mockFocused = false;
+      await press('حذف پیش‌نویس');
+      const confirm = jest
+        .mocked(Alert.alert)
+        .mock.calls.at(-1)![2]!
+        .find((b) => b.text === 'حذف پیش‌نویس')!.onPress!;
+      await act(async () => {
+        confirm();
+        await settle();
+      });
+      expect(t.db.select().from(doctorFormDrafts).get()).toMatchObject({ body, revision: 2, committedEntityId: null });
+      expect(t.db.select().from(doctorFormDrafts).get()?.deletedAt).not.toBeNull();
+      expect(databaseRows(t).doctors).toEqual(clinical.doctors);
+      expect(databaseRows(t).doctor_profiles).toEqual(clinical.doctor_profiles);
+      expect(databaseRows(t).doctor_ratings).toEqual(clinical.doctor_ratings);
+      expect(tree!.root.findByType(Screen)).toBe(screen);
+      expect(parent.findByType(View)).toBe(nativeParent);
+      expect(mockNavigation.setOptions).toHaveBeenCalledTimes(1);
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(input(form.text).props.value).toBe('Discard exact input');
+      mockFocused = true;
+      await press('بستن');
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    },
+  );
+  it('retains a competing raw branch and refuses a third write during a delayed keep-mine confirmation', async () => {
+    await mount(<DoctorFormScreen />);
+    await type('یادداشت', 'Local exact input');
+    const seed = doctorFormQuery('directory', doctorId).get()!;
+    const external = initialDoctorForm('directory', seed.doctor, seed.profile);
+    external.fields.notes = 'External raw input';
+    await saveDoctorFormDraft('external', 'directory', doctorId, external, 0);
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+      await settle();
+    });
+    expect(input('یادداشت').props.value).toBe('Local exact input');
+    await press('بررسی پیش‌نویس ذخیره‌شده');
+    await press('نگه‌داشتن نسخهٔ من');
+    const confirm = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((b) => b.text === 'نگه‌داشتن نسخهٔ من')!.onPress!;
+    external.fields.phone = '+12025550124';
+    await saveDoctorFormDraft('external', 'directory', doctorId, external, 1);
+    const before = databaseRows(t);
+    await act(async () => {
+      confirm();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('یادداشت').props.value).toBe('Local exact input');
+    await press('بررسی پیش‌نویس ذخیره‌شده');
+    await press('نگه‌داشتن نسخهٔ من');
+    const accept = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((b) => b.text === 'نگه‌داشتن نسخهٔ من')!.onPress!;
+    await act(async () => {
+      accept();
+      await settle();
+    });
+    expect(decodeDoctorForm(t.db.select().from(doctorFormDrafts).get()!.body).fields).toMatchObject({
+      notes: 'Local exact input',
+    });
+    expect((await doctorQuery(doctorId))[0]?.notes).toBe('Original');
+  });
+  it('loads only the reviewed saved branch and leaves clinical data unchanged', async () => {
+    await mount(<ProfileFormScreen />);
+    await type('یادداشت شخصی', 'Local profile');
+    const seed = doctorFormQuery('profile', doctorId).get()!;
+    const external = initialDoctorForm('profile', seed.doctor, seed.profile);
+    external.fields.personalNotes = 'Saved profile';
+    external.fields.birthDate = '۱۴۰۵/';
+    await saveDoctorFormDraft('external', 'profile', doctorId, external, 0);
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+      await settle();
+    });
+    await press('بررسی پیش‌نویس ذخیره‌شده');
+    await press('بارگذاری پیش‌نویس ذخیره‌شده');
+    const accept = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((b) => b.text === 'بارگذاری')!.onPress!;
+    await act(async () => {
+      accept();
+      await settle();
+    });
+    expect(input('یادداشت شخصی').props.value).toBe('Saved profile');
+    expect(input('تاریخ تولد').props.value).toBe('۱۴۰۵/');
+    expect(t.db.select().from(doctorProfiles).all()).toEqual([]);
+    await press('ذخیره');
+    expect(t.db.select().from(doctorProfiles).all()).toEqual([]);
+  });
+  it('does not replace unreadable saved raw bytes with a blank form', async () => {
+    const seed = doctorFormQuery('profile', doctorId).get()!;
+    await saveDoctorFormDraft(
+      'unreadable',
+      'profile',
+      doctorId,
+      initialDoctorForm('profile', seed.doctor, seed.profile),
+      0,
+    );
+    const body = '{"version":99,"private":"Synthetic private input"}';
+    t.db.update(doctorFormDrafts).set({ body }).run();
+    const before = databaseRows(t);
+    await mount(<ProfileFormScreen />);
+    expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+    expect(tree!.root.findAllByType(ErrorNotice).some((node) => node.props.error)).toBe(true);
+    await press('بستن');
+    expect(databaseRows(t)).toEqual(before);
+  });
+  it('refuses a delayed raw discard after dataset replacement and retains the visible old fields', async () => {
+    await mount(<RatingScreen />);
+    await type('دلیل و توضیح', 'Copy original raw opinion');
+    await act(async () => {
+      expect(await mockFlush!()).toBe(true);
+      await settle();
+    });
+    await press('حذف پیش‌نویس');
+    const accept = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((b) => b.text === 'حذف پیش‌نویس')!.onPress!;
+    await act(async () => {
+      snapshotDataset(t)();
+      await settle();
+    });
+    const before = databaseRows(t);
+    await act(async () => {
+      accept();
+      await settle();
+    });
+    expect(databaseRows(t)).toEqual(before);
+    expect(input('دلیل و توضیح').props.value).toBe('Copy original raw opinion');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
   it.each(forms)('publishes latest $kind input from its stable header and offers focused Close', async (form) => {
     await mount(form.element());
     const header = () => {
@@ -334,27 +589,12 @@ describe('remaining manual doctor forms with real SQLite and original intent', (
       new Promise<void>((resolve) => {
         release = resolve;
       });
-    if (form.kind === 'doctor') {
-      const original = queries.updateDoctor;
-      jest.spyOn(queries, 'updateDoctor').mockImplementationOnce(async (...args) => {
-        await original(...args);
-        await wait();
-      });
-    } else if (form.kind === 'profile') {
-      const original = ratingQueries.saveDoctorProfile;
-      jest.spyOn(ratingQueries, 'saveDoctorProfile').mockImplementationOnce(async (...args) => {
-        const id = await original(...args);
-        await wait();
-        return id;
-      });
-    } else {
-      const original = ratingQueries.addDoctorRating;
-      jest.spyOn(ratingQueries, 'addDoctorRating').mockImplementationOnce(async (...args) => {
-        const id = await original(...args);
-        await wait();
-        return id;
-      });
-    }
+    const original = draftQueries.commitDoctorFormDraft;
+    jest.spyOn(draftQueries, 'commitDoctorFormDraft').mockImplementationOnce(async (...args) => {
+      const id = await original(...args);
+      await wait();
+      return id;
+    });
     await mount(form.element());
     await type(form.text, 'Acknowledged input');
     const scroll = tree!.root.findByType(Screen);
@@ -391,12 +631,14 @@ describe('remaining manual doctor forms with real SQLite and original intent', (
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
   it('rejects a late directory seed after replacement during initial loading', async () => {
-    const seed = await doctorQuery(doctorId);
+    const seed = await doctorFormQuery('directory', doctorId);
     let release = () => {};
     const pending = new Promise<typeof seed>((resolve) => {
       release = () => resolve(seed);
     });
-    jest.spyOn(queries, 'doctorQuery').mockReturnValueOnce(pending as unknown as ReturnType<typeof doctorQuery>);
+    jest
+      .spyOn(draftQueries, 'doctorFormQuery')
+      .mockReturnValueOnce(pending as unknown as ReturnType<typeof doctorFormQuery>);
     await mount(<DoctorFormScreen />);
     await act(async () => {
       snapshotDataset(t)();
@@ -460,9 +702,12 @@ describe('remaining manual doctor forms with real SQLite and original intent', (
     await type('یادداشت شخصی', 'Local');
     await saveDoctorProfile(doctorId, { personalNotes: 'External' });
     await refresh('doctor_profiles');
-    const before = databaseRows(t);
+    const before = databaseRows(t).doctor_profiles;
     await press('ذخیره');
-    expect(databaseRows(t)).toEqual(before);
+    expect(databaseRows(t).doctor_profiles).toEqual(before);
+    expect(decodeDoctorForm(t.db.select().from(doctorFormDrafts).get()!.body).fields).toMatchObject({
+      personalNotes: 'Local',
+    });
     expect(input('یادداشت شخصی').props.value).toBe('Local');
     expect(input('یادداشت شخصی').props.editable).toBe(true);
     expect(alertError).toHaveBeenLastCalledWith('ذخیره نشد', expect.any(DoctorFormConflict));

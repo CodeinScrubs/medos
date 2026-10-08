@@ -36,6 +36,19 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.39 completes the software slice for directory/profile/rating, imaging and
+photo-caption raw recovery. Migration0025 adds strict versioned/CAS draft stores
+and a durable photo-batch journal. Whole-batch attachments, optional lab panel,
+capture kind and acknowledgment publish atomically; copied sources recover
+without expired picker access. Explicit recovery uses existing screens and retains
+partial copies. The backup screen's inventory is read-only, not a storage sweep.
+Unused non-journal photo storage is removed. Full check passes144 suites/1,957
+app tests and five workflows. No dependency, permission, route or formula added.
+Native/artifact acceptance is being recorded separately. The worker-exit warning
+under concurrent full native build is under investigation; do not silently label
+it a proven runtime or source defect. Vitals/other manual raw forms, appropriate
+clinical trash, measured large timelines, pressure and physical gates remain open.
+
 0.11.38 fixes two additional numerical-integrity defects: pasted explicit
 units no longer inherit another unit's reference range, and trend grouping
 does not case-fold SI prefixes. New fail-before/pass-after SQLite and chart

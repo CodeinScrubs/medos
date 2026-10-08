@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import { baseColumns, bool, jsonList } from './_shared';
@@ -111,6 +112,55 @@ export const attachments = sqliteTable(
 
 export type Attachment = typeof attachments.$inferSelect;
 export type NewAttachment = typeof attachments.$inferInsert;
+
+/** Reservation and recovery before copying; the complete batch publishes together. */
+export const photoImportBatches = sqliteTable(
+  'photo_import_batches',
+  {
+    ...baseColumns,
+    entityType: text('entity_type', { enum: ATTACHMENT_ENTITIES }).notNull(),
+    entityId: text('entity_id').notNull(),
+    patientId: text('patient_id'),
+    mode: text('mode', { enum: ['attachment', 'lab_panel'] })
+      .notNull()
+      .default('attachment'),
+    kind: text('kind', { enum: ATTACHMENT_KINDS }).notNull().default('photo'),
+    caption: text('caption'),
+    bodySite: text('body_site'),
+    encounterId: text('encounter_id'),
+    capturedAt: integer('captured_at', { mode: 'timestamp_ms' }).notNull(),
+    body: text('body').notNull(),
+    state: text('state', { enum: ['copying', 'ready', 'saved', 'discarded'] })
+      .notNull()
+      .default('copying'),
+    revision: integer('revision').notNull().default(0),
+  },
+  (t) => [
+    index('photo_import_batches_target_idx').on(t.entityType, t.entityId, t.state, t.deletedAt),
+    index('photo_import_batches_patient_idx').on(t.patientId, t.state, t.deletedAt),
+  ],
+);
+export type PhotoImportBatch = typeof photoImportBatches.$inferSelect;
+
+/** Caption input is recoverable separately from the published image metadata. */
+export const attachmentCaptionDrafts = sqliteTable(
+  'attachment_caption_drafts',
+  {
+    ...baseColumns,
+    attachmentId: text('attachment_id')
+      .notNull()
+      .references(() => attachments.id),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedAttachmentId: text('committed_attachment_id').references(() => attachments.id),
+  },
+  (t) => [
+    uniqueIndex('attachment_caption_drafts_open_target_idx')
+      .on(t.attachmentId)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type AttachmentCaptionDraft = typeof attachmentCaptionDrafts.$inferSelect;
 
 /** One stopped voice destined for an existing record; retry never creates a new job. */
 export const recordingJobs = sqliteTable(

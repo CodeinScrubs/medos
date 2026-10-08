@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNull, or, sql, type SQL } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { doctors, occasions, specialties, type Doctor, type NewDoctor } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -53,10 +53,10 @@ export function specialtiesQuery() {
 export type DoctorInput = Omit<NewDoctor, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'searchText'>;
 
 /** Every name a doctor's specialty and subspecialty go by, for the search index. */
-function specialtyWords(d: Partial<DoctorInput>): string[] {
+function specialtyWords(d: Partial<DoctorInput>, reader: Pick<typeof db, 'select'> = db): string[] {
   const ids = [d.specialtyId, d.subspecialtyId].filter((id): id is string => Boolean(id));
   if (ids.length === 0) return [];
-  const specs = db
+  const specs = reader
     .select()
     .from(specialties)
     .where(or(...ids.map((id) => eq(specialties.id, id))))
@@ -64,52 +64,65 @@ function specialtyWords(d: Partial<DoctorInput>): string[] {
   return specs.flatMap((s) => [s.nameFa, s.nameEn ?? '', ...(s.aliases ?? [])]);
 }
 
-export async function createDoctor(input: DoctorInput): Promise<string> {
+export function createDoctorInTransaction(tx: DbTransaction, input: DoctorInput): string {
   const id = newId();
-  await db.insert(doctors).values({
-    ...input,
-    id,
-    ...stamps(),
-    phone: input.phone ? normalizePhone(input.phone) : null,
-    searchText: doctorSearchText(input, specialtyWords(input)),
-  });
+  tx.insert(doctors)
+    .values({
+      ...input,
+      id,
+      ...stamps(),
+      phone: input.phone ? normalizePhone(input.phone) : null,
+      searchText: doctorSearchText(input, specialtyWords(input, tx)),
+    })
+    .run();
   return id;
 }
+export async function createDoctor(input: DoctorInput): Promise<string> {
+  return db.transaction((tx) => createDoctorInTransaction(tx, input));
+}
 
-export async function updateDoctor(id: string, input: Partial<DoctorInput>, basis?: Doctor): Promise<void> {
-  const renamed = db.transaction((tx) => {
-    const current = tx
-      .select()
-      .from(doctors)
-      .where(and(alive, eq(doctors.id, id)))
-      .get();
-    if (!current) throw new Error('پزشک پیدا نشد یا حذف شده است.');
-    if (basis && basis.id !== id) throw new DoctorFormConflict();
-    const normalized = {
-      ...input,
-      ...(input.phone !== undefined ? { phone: normalizePhone(input.phone ?? '') || null } : {}),
-    };
-    const patch = basis
-      ? checkedEditPatch(current, basis, normalized, [['specialtyId', 'subspecialtyId', 'specialtyText']])
-      : normalized;
-    if (Object.keys(patch).length === 0) return false;
-    const merged = { ...current, ...patch };
-    tx.update(doctors)
-      .set({
-        ...patch,
-        ...touch(),
-        searchText: doctorSearchText(merged, specialtyWords(merged)),
-      })
-      .where(and(alive, eq(doctors.id, id)))
+export function updateDoctorInTransaction(
+  tx: DbTransaction,
+  id: string,
+  input: Partial<DoctorInput>,
+  basis?: Pick<Doctor, 'id'> & Partial<Doctor>,
+): boolean {
+  const current = tx
+    .select()
+    .from(doctors)
+    .where(and(alive, eq(doctors.id, id)))
+    .get();
+  if (!current) throw new Error('پزشک پیدا نشد یا حذف شده است.');
+  if (basis && basis.id !== id) throw new DoctorFormConflict();
+  const normalized = {
+    ...input,
+    ...(input.phone !== undefined ? { phone: normalizePhone(input.phone ?? '') || null } : {}),
+  };
+  const patch = basis
+    ? checkedEditPatch(current, { ...current, ...basis }, normalized, [
+        ['specialtyId', 'subspecialtyId', 'specialtyText'],
+      ])
+    : normalized;
+  if (Object.keys(patch).length === 0) return false;
+  const merged = { ...current, ...patch };
+  tx.update(doctors)
+    .set({
+      ...patch,
+      ...touch(),
+      searchText: doctorSearchText(merged, specialtyWords(merged, tx)),
+    })
+    .where(and(alive, eq(doctors.id, id)))
+    .run();
+  const nameChanged = doctorDisplayName(current) !== doctorDisplayName(merged);
+  if (nameChanged)
+    tx.update(occasions)
+      .set({ reminderRevision: sql`${occasions.reminderRevision} + 1` })
+      .where(and(isNull(occasions.deletedAt), eq(occasions.doctorId, id)))
       .run();
-    const nameChanged = doctorDisplayName(current) !== doctorDisplayName(merged);
-    if (nameChanged)
-      tx.update(occasions)
-        .set({ reminderRevision: sql`${occasions.reminderRevision} + 1` })
-        .where(and(isNull(occasions.deletedAt), eq(occasions.doctorId, id)))
-        .run();
-    return nameChanged;
-  });
+  return nameChanged;
+}
+export async function updateDoctor(id: string, input: Partial<DoctorInput>, basis?: Doctor): Promise<void> {
+  const renamed = db.transaction((tx) => updateDoctorInTransaction(tx, id, input, basis));
   if (renamed) await repairOccasionReminders({ doctorId: id });
 }
 

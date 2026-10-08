@@ -24,7 +24,7 @@ import { EncounterFormScreen } from './encounters/encounter-form-screen';
 import { encounterFormQuery } from './encounters/form-draft-queries';
 import { openEncounter } from './encounters/queries';
 import { ImagingFormScreen } from './imaging/imaging-form-screen';
-import { imagingStudyQuery } from './imaging/queries';
+import { imagingFormQuery } from './imaging/form-draft-queries';
 import { OrderFormScreen } from './kardex/order-form-screen';
 import { orderQuery } from './kardex/queries';
 import { IdeaFormScreen } from './knowledge/idea-form-screen';
@@ -88,6 +88,7 @@ jest.mock('react-native-keyboard-controller', () => ({ KeyboardAwareScrollView: 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+  useNavigation: () => ({ isFocused: () => true }),
 }));
 jest.mock('expo-router/react-navigation', () => ({
   useNavigation: () => ({ isFocused: () => true }),
@@ -367,7 +368,7 @@ describe('editors survive database read failures', () => {
   it.each<[string, string, (id: string) => unknown, () => ReactElement]>([
     ['doctor', 'doctorId', doctorQuery, () => <DoctorFormScreen />],
     ['encounter', 'encounterId', (id) => encounterFormQuery('edit', patientId, id), () => <EncounterFormScreen />],
-    ['imaging', 'studyId', imagingStudyQuery, () => <ImagingFormScreen />],
+    ['imaging', 'studyId', (id) => imagingFormQuery(patientId, id), () => <ImagingFormScreen />],
     ['order', 'orderId', orderQuery, () => <OrderFormScreen />],
     ['idea', 'ideaId', ideaQuery, () => <IdeaFormScreen />],
     ['prescription', 'templateId', prescriptionQuery, () => <PrescriptionFormScreen />],

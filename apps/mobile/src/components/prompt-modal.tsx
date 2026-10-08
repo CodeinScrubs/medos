@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-import { Alert, Keyboard, KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Alert, Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { KeyboardController } from 'react-native-keyboard-controller';
 
 import { Button, Column, Input, Row, Text } from '@/components/ui';
@@ -25,6 +25,8 @@ export function PromptModal({
   onChangeText,
   onSubmit,
   onCancel,
+  retainOnClose = false,
+  footer,
 }: {
   visible: boolean;
   title: string;
@@ -46,6 +48,9 @@ export function PromptModal({
   /** Optional paired controlled input for a caller-owned durable raw draft. */
   onSubmit: (text: string) => void;
   onCancel: () => void;
+  /** A durable caller flushes on close instead of discarding its raw input. */
+  retainOnClose?: boolean;
+  footer?: ReactNode;
 } & ({ value?: never; onChangeText?: never } | { value: string; onChangeText: (text: string) => void })) {
   const { colors, radii, spacing, shadows } = useTheme();
   const [localText, setText] = useState(initialValue);
@@ -68,6 +73,10 @@ export function PromptModal({
   // the explicit «انصراف» button still cancels straight away.
   function dismiss() {
     if (busy) return;
+    if (retainOnClose) {
+      onCancel();
+      return;
+    }
     if (!latest.current.trim() || latest.current === initialValue) {
       onCancel();
       return;
@@ -102,54 +111,57 @@ export function PromptModal({
               { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.xl },
             ]}
           >
-            <Column gap="md">
-              <Text variant="heading">{title}</Text>
-              {message ? (
-                <Text variant="caption" color="textMuted">
-                  {message}
-                </Text>
-              ) : null}
-              <Input
-                maxLength={maxLength}
-                value={text}
-                editable={!busy}
-                onChangeText={(next) => {
-                  if (busy) return;
-                  latest.current = next;
-                  if (onChangeText) onChangeText(next);
-                  else setText(next);
-                }}
-                placeholder={placeholder}
-                multiline={multiline && !secret}
-                autoFocus
-                secureTextEntry={secret}
-                autoCapitalize={secret ? 'none' : undefined}
-                autoCorrect={!secret}
-                ltr={secret}
-              />
-              <Row gap="sm">
-                <View style={styles.flex}>
-                  <Button
-                    label={submitLabel}
-                    onPress={() => {
-                      if (!busy) onSubmit(secret ? latest.current : latest.current.trim());
-                    }}
-                    disabled={busy || (!optional && !text.trim())}
-                    loading={busy}
-                    full
-                  />
-                </View>
-                <Button
-                  label="انصراف"
-                  variant="ghost"
-                  onPress={() => {
-                    if (!busy) onCancel();
+            <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroll}>
+              <Column gap="md">
+                <Text variant="heading">{title}</Text>
+                {message ? (
+                  <Text variant="caption" color="textMuted">
+                    {message}
+                  </Text>
+                ) : null}
+                <Input
+                  maxLength={maxLength}
+                  value={text}
+                  editable={!busy}
+                  onChangeText={(next) => {
+                    if (busy) return;
+                    latest.current = next;
+                    if (onChangeText) onChangeText(next);
+                    else setText(next);
                   }}
-                  disabled={busy}
-                  haptic={false}
+                  placeholder={placeholder}
+                  multiline={multiline && !secret}
+                  autoFocus
+                  secureTextEntry={secret}
+                  autoCapitalize={secret ? 'none' : undefined}
+                  autoCorrect={!secret}
+                  ltr={secret}
                 />
-              </Row>
-            </Column>
+                <Row gap="sm">
+                  <View style={styles.flex}>
+                    <Button
+                      label={submitLabel}
+                      onPress={() => {
+                        if (!busy) onSubmit(secret ? latest.current : latest.current.trim());
+                      }}
+                      disabled={busy || (!optional && !text.trim())}
+                      loading={busy}
+                      full
+                    />
+                  </View>
+                  <Button
+                    label={retainOnClose ? 'بستن' : 'انصراف'}
+                    variant="ghost"
+                    onPress={() => {
+                      if (!busy) onCancel();
+                    }}
+                    disabled={busy}
+                    haptic={false}
+                  />
+                </Row>
+                {footer}
+              </Column>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -160,5 +172,6 @@ export function PromptModal({
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   backdrop: { flex: 1, justifyContent: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 480, alignSelf: 'center' },
+  scroll: { flexGrow: 0 },
+  card: { width: '100%', maxWidth: 480, maxHeight: '100%', alignSelf: 'center' },
 });

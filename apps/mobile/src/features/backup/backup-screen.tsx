@@ -24,6 +24,7 @@ import { useNow } from '@/components/use-now';
 import { writeSetting } from '@/db/settings';
 import { useLive } from '@/db/use-live';
 import { useSetting } from '@/db/use-setting';
+import { MediaInventoryReview } from '@/features/attachments/media-inventory-review';
 import { formatBytes } from '@/lib/format';
 import { formatJalaliDateTime, formatRelativeTime } from '@/lib/jalali';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
@@ -406,6 +407,8 @@ export function BackupScreen() {
             />
           </Column>
         </Card>
+
+        <MediaInventoryReview />
 
         {history && history.length > 0 && (
           <>

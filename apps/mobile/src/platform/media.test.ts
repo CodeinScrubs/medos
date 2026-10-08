@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { storeFile, storePhoto } from './media';
+import { copyPhotoImportFile, renderPhotoDerivative, storeFile } from './media';
 
 const mockBytes = new Map<string, Uint8Array>();
 let mockTruncate = false;
@@ -95,38 +95,30 @@ beforeEach(() => {
   mockImageRelease.mockClear();
 });
 
-describe('verified original and photo derivatives', () => {
-  it('preserves exact source bytes, their MIME and verified derivatives', async () => {
-    const result = await storePhoto(
-      { uri: source, width: 640, height: 480, mimeType: 'image/png' },
-      { keepOriginal: true },
-    );
-    expect(mockBytes.get(`file:///documents/${result.originalPath}`)).toEqual(mockBytes.get(source));
-    expect(result.originalMimeType).toBe('image/png');
-    expect(result.sizeBytes).toBe(4);
-    expect(result.checksum).toMatch(/^[a-f0-9]{64}$/);
+describe('journal-owned photo files and native derivatives', () => {
+  it('releases both native contexts after producing a working copy and thumbnail', async () => {
+    const asset = { uri: source, width: 640, height: 480 };
+    const full = await renderPhotoDerivative(asset, false);
+    const thumb = await renderPhotoDerivative(asset, true);
+    expect(full.uri).not.toBe(thumb.uri);
+    expect(mockBytes.get(source)).toEqual(new Uint8Array([1, 2, 3]));
     expect(mockContextRelease).toHaveBeenCalledTimes(2);
     expect(mockImageRelease).toHaveBeenCalledTimes(2);
   });
-  it('rejects a same-size changed original before rendering', async () => {
-    mockAlteredCopy = true;
-    await expect(storePhoto({ uri: source, width: 640, height: 480 }, { keepOriginal: true })).rejects.toThrow('یکسان');
-    expect(mockContextRelease).not.toHaveBeenCalled();
+  it('copies into a reserved path and refuses overwriting an existing destination', async () => {
+    const path =
+      'media/imports/photo-00000000-0000-4000-8000-000000000001-0-source-00000000-0000-4000-8000-000000000002.png';
+    await copyPhotoImportFile(source, path);
+    expect(mockBytes.get(`file:///documents/${path}`)).toEqual(mockBytes.get(source));
+    await expect(copyPhotoImportFile(source, path)).rejects.toThrow('قبلاً');
     expect(mockBytes.has(source)).toBe(true);
-  });
-  it('rejects missing or truncated nominal photo copies instead of publishing null size', async () => {
-    mockMissingCopy = true;
-    await expect(storePhoto({ uri: source, width: 640, height: 480 }, { keepOriginal: true })).rejects.toThrow();
-    mockMissingCopy = false;
-    mockTruncate = true;
-    await expect(storePhoto({ uri: source, width: 640, height: 480 }, { keepOriginal: true })).rejects.toThrow();
   });
   it('releases the native manipulation context even when renderAsync rejects', async () => {
     mockRenderFailure = true;
-    await expect(storePhoto({ uri: source, width: 640, height: 480 }, { keepOriginal: true })).rejects.toThrow();
+    await expect(renderPhotoDerivative({ uri: source, width: 640, height: 480 }, false)).rejects.toThrow();
     expect(mockContextRelease).toHaveBeenCalledTimes(1);
     expect(mockImageRelease).not.toHaveBeenCalled();
-    expect([...mockBytes.keys()].some((uri) => uri.startsWith('file:///documents/'))).toBe(true);
+    expect(mockBytes.has(source)).toBe(true);
   });
 });
 

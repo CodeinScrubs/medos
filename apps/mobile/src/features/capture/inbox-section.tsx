@@ -9,6 +9,7 @@ import { alertError } from '@/components/feedback';
 import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { Button, Column, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
+import { PhotoRecoveryNotice } from '@/features/attachments/photo-recovery';
 import { RecordingRecoveryNotice } from '@/features/attachments/recording-recovery';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
@@ -98,11 +99,17 @@ export function InboxSection() {
   }
 
   if (rows.length === 0 && failed.length === 0 && !ask)
-    return <RecordingRecoveryNotice onReview={() => router.push('/inbox')} />;
+    return (
+      <>
+        <RecordingRecoveryNotice onReview={() => router.push('/inbox')} />
+        <PhotoRecoveryNotice onReview={() => router.push('/inbox')} />
+      </>
+    );
 
   return (
     <>
       <RecordingRecoveryNotice onReview={() => router.push('/inbox')} />
+      <PhotoRecoveryNotice onReview={() => router.push('/inbox')} />
       <SectionHeader title="ورودی‌ها" count={total} />
       <ErrorNotice
         error={failed[0]?.query.error}

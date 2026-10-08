@@ -9,13 +9,15 @@ import { alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { Button, IconButton, Input } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
-import { attachments } from '@/db/schema';
+import { attachmentCaptionDrafts, attachments } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { createPatient } from '@/features/patients/queries';
 import { DatasetBusyError, DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
+import { decodeCaption } from './caption-draft';
+import * as captionQueries from './caption-queries';
 import { MediaViewerScreen } from './media-viewer-screen';
 import * as queries from './queries';
 
@@ -129,6 +131,66 @@ afterEach(async () => {
 });
 
 describe('media viewer mutation intent and actual caption prompt', () => {
+  it('flushes the exact unsubmitted caption on dialog close and recovers it on cold remount', async () => {
+    await render();
+    await edit('  Raw caption\nPending detail  ');
+    await invoke(() => prompt().props.onCancel());
+    expect(current()[0]!.caption).toBe('Source caption');
+    const row = t.db.select().from(attachmentCaptionDrafts).get()!;
+    expect(decodeCaption(row.body).text).toBe('  Raw caption\nPending detail  ');
+    expect(row.deletedAt).toBeNull();
+    await act(async () => tree!.unmount());
+    tree = undefined;
+    await render();
+    await invoke(() => icon('ویرایش توضیح').props.onPress());
+    expect(caption().props.value).toBe('  Raw caption\nPending detail  ');
+    await invoke(() => submit().props.onPress());
+    expect(current()[0]!.caption).toBe('Raw caption\nPending detail');
+    expect(t.db.select().from(attachmentCaptionDrafts).get()!.committedAttachmentId).toBe(mockParams.attachmentId);
+  });
+  it('continues autosaving after an explicit Keep mine rebase', async () => {
+    await render();
+    await edit('Local first');
+    await queries.updateAttachment(mockParams.attachmentId, { caption: 'Independent caption' });
+    await invoke(() => submit().props.onPress());
+    const button = (label: string) => tree!.root.findAllByType(Button).find((n) => n.props.label === label)!;
+    await invoke(() => button('بررسی نسخهٔ ذخیره‌شده').props.onPress());
+    await invoke(() => button('نگه‌داشتن نسخهٔ من').props.onPress());
+    const confirm = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((c) => c.text === 'نگه‌داشتن')!.onPress!;
+    await invoke(confirm);
+    await invoke(() => caption().props.onChangeText('Local later'));
+    await invoke(() => prompt().props.onCancel());
+    const row = t.db.select().from(attachmentCaptionDrafts).get()!;
+    expect(decodeCaption(row.body)).toMatchObject({ text: 'Local later', baseCaption: 'Independent caption' });
+    expect(current()[0]!.caption).toBe('Independent caption');
+    await invoke(() => icon('ویرایش توضیح').props.onPress());
+    await invoke(() => submit().props.onPress());
+    expect(current()[0]!.caption).toBe('Local later');
+  });
+  it('refuses a confirmed stale Close after its originating viewer unmounts', async () => {
+    const restore = snapshot();
+    await render();
+    await edit();
+    await act(async () => restore());
+    await invoke(() => icon('بستن').props.onPress());
+    const confirm = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((c) => c.text === 'بستن')!.onPress!;
+    await act(async () => tree!.unmount());
+    tree = undefined;
+    await invoke(confirm);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it('does not create a raw draft merely by opening and closing the caption dialog', async () => {
+    await render();
+    await invoke(() => icon('ویرایش توضیح').props.onPress());
+    await invoke(() => prompt().props.onCancel());
+    expect(t.db.select().from(attachmentCaptionDrafts).all()).toHaveLength(0);
+  });
   it('refuses a held deletion after a real same-ID replacement without navigating', async () => {
     const restore = snapshot();
     const before = current();
@@ -159,7 +221,9 @@ describe('media viewer mutation intent and actual caption prompt', () => {
   it('keeps typed input after SQL failure and publishes it on explicit retry', async () => {
     await render();
     await edit('Retry caption');
-    const write = jest.spyOn(queries, 'updateAttachment').mockRejectedValueOnce(new Error('Synthetic write failure'));
+    const write = jest
+      .spyOn(captionQueries, 'commitCaptionDraft')
+      .mockRejectedValueOnce(new Error('Synthetic write failure'));
     await invoke(() => submit().props.onPress());
     expect(prompt().props.visible).toBe(true);
     expect(caption().props.value).toBe('Retry caption');
@@ -183,11 +247,10 @@ describe('media viewer mutation intent and actual caption prompt', () => {
         </AutosaveScope>,
       ),
     );
-    await edit();
-    await invoke(() => submit().props.onPress());
+    // A child first mounted after replacement cannot load a new editable seed
+    // under its parent's old authority. A fresh route is required explicitly.
+    expect(tree!.root.findAllByType(IconButton).filter((n) => n.props.label === 'ویرایش توضیح')).toHaveLength(0);
     expect(current()).toEqual(before);
-    expect(prompt().props.visible).toBe(true);
-    expect(caption().props.value).toBe('Pending caption');
   });
   it('rejects an old share callback before calling native sharing', async () => {
     const restore = snapshot();
@@ -200,14 +263,15 @@ describe('media viewer mutation intent and actual caption prompt', () => {
     expect(alertError).toHaveBeenCalledWith('اشتراک‌گذاری انجام نشد', expect.any(DatasetChangedError));
   });
   it('locks prompt input and holds admission through actual SQL acknowledgment', async () => {
-    const actual = queries.updateAttachment;
+    const actual = captionQueries.commitCaptionDraft;
     let release!: () => void;
     const acknowledgment = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const write = jest.spyOn(queries, 'updateAttachment').mockImplementation(async (...args) => {
-      await actual(...args);
+    const write = jest.spyOn(captionQueries, 'commitCaptionDraft').mockImplementation(async (...args) => {
+      const result = await actual(...args);
       await acknowledgment;
+      return result;
     });
     await render();
     await edit('Acknowledged caption');

@@ -7,25 +7,19 @@ import { ErrorNotice } from '@/components/error-notice';
 import { notify } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
-import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Text, Toggle } from '@/components/ui';
-import type { Doctor, Specialty } from '@/db/schema';
+import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Toggle } from '@/components/ui';
+import { useNow } from '@/components/use-now';
+import type { Specialty } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { createPlace, placesQuery } from '@/features/places/queries';
 import { useTheme } from '@/theme';
 
-import { changedFormPatch } from './edit-basis';
+import type { DoctorFormRow } from './form-draft-queries';
 import { RELATIONSHIP_LABELS, RELATIONSHIP_ORDER } from './labels';
-import { ManualDoctorGate, useManualDoctorForm } from './manual-form';
-import { doctorQuery, createDoctor, specialtiesQuery, updateDoctor } from './queries';
+import { DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
+import { specialtiesQuery } from './queries';
 
 const RELATIONSHIP_OPTIONS = RELATIONSHIP_ORDER.map((r) => ({ value: r, label: RELATIONSHIP_LABELS[r] }));
-
-/** A comma-separated field as a list, and back. Empty entries are dropped. */
-const toList = (text: string) =>
-  text
-    .split(/[,،]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
 
 /** Add or edit a doctor. Param: optional `doctorId`. */
 export function DoctorFormScreen() {
@@ -37,57 +31,37 @@ export function DoctorFormScreen() {
 
 function DoctorFormGate({ doctorId }: { doctorId?: string }) {
   return (
-    <ManualDoctorGate query={doctorQuery(doctorId ?? '')} creating={!doctorId} what="پزشک">
-      {(doctor, readNotice, generation, unavailable) => (
-        <DoctorForm doctor={doctor} readNotice={readNotice} generation={generation} unavailable={unavailable} />
+    <ManualDoctorGate kind="directory" doctorId={doctorId ?? null} what="پزشک">
+      {(seed, readNotice, generation, unavailable, onReset) => (
+        <DoctorForm
+          seed={seed}
+          readNotice={readNotice}
+          generation={generation}
+          unavailable={unavailable}
+          onReset={onReset}
+        />
       )}
     </ManualDoctorGate>
   );
 }
 
 function DoctorForm({
-  doctor,
+  seed,
   readNotice,
   generation,
   unavailable,
+  onReset,
 }: {
+  onReset: (row: DoctorFormRow) => void;
   readNotice: ReactNode;
-  doctor: Doctor | null;
+  seed: DoctorFormRow;
   generation: number;
   unavailable: boolean;
 }) {
   const { spacing } = useTheme();
-  const editing = useManualDoctorForm(
-    {
-      title: doctor?.title ?? 'دکتر',
-      firstName: doctor?.firstName ?? '',
-      lastName: doctor?.lastName ?? '',
-      academicRank: doctor?.academicRank ?? '',
-      relationship: doctor?.relationship ?? 'colleague',
-      specialtyId: doctor?.specialtyId ?? null,
-      subspecialtyId: doctor?.subspecialtyId ?? null,
-      specialtyText: doctor?.specialtyText ?? '',
-      phone: doctor?.phone ?? '',
-      phoneAlt: doctor?.phoneAlt ?? '',
-      whatsapp: doctor?.whatsapp ?? '',
-      telegram: doctor?.telegram ?? '',
-      email: doctor?.email ?? '',
-      extension: doctor?.extension ?? '',
-      primaryPlaceId: doctor?.primaryPlaceId ?? null,
-      officeAddress: doctor?.officeAddress ?? '',
-      officeHours: doctor?.officeHours ?? '',
-      officePhone: doctor?.officePhone ?? '',
-      acceptsReferrals: doctor?.acceptsReferrals ?? false,
-      visitFee: doctor?.visitFee ?? '',
-      insurances: (doctor?.insurances ?? []).join('، '),
-      referralNotes: doctor?.referralNotes ?? '',
-      tags: (doctor?.tags ?? []).join('، '),
-      notes: doctor?.notes ?? '',
-      starred: doctor?.starred ?? false,
-    },
-    generation,
-    unavailable,
-  );
+  const doctor = seed.doctor;
+  const now = useNow();
+  const editing = useManualDoctorForm('directory', seed, generation, unavailable, onReset);
   const {
     title,
     firstName,
@@ -171,69 +145,13 @@ function DoctorForm({
   }
 
   async function save() {
-    await editing.submit(async (current) => {
-      const {
-        title,
-        firstName,
-        lastName,
-        academicRank,
-        relationship,
-        specialtyId,
-        subspecialtyId,
-        specialtyText,
-        phone,
-        phoneAlt,
-        whatsapp,
-        telegram,
-        email,
-        extension,
-        primaryPlaceId,
-        officeAddress,
-        officeHours,
-        officePhone,
-        acceptsReferrals,
-        visitFee,
-        insurances,
-        referralNotes,
-        tags,
-        notes,
-        starred,
-      } = current;
-      if (!firstName.trim() || !lastName.trim()) {
+    await editing.submit((current) => {
+      if (!current.firstName.trim() || !current.lastName.trim()) {
         notify('نام و نام خانوادگی لازم است');
         return false;
       }
-      const payload = {
-        title: title.trim() || null,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        academicRank: academicRank.trim() || null,
-        relationship,
-        specialtyId,
-        subspecialtyId,
-        specialtyText: specialtyText.trim() || describe(specialtyId, subspecialtyId) || null,
-        phone: phone.trim() || null,
-        phoneAlt: phoneAlt.trim() || null,
-        whatsapp: whatsapp.trim() || null,
-        telegram: telegram.trim() || null,
-        email: email.trim() || null,
-        extension: extension.trim() || null,
-        primaryPlaceId,
-        officeAddress: officeAddress.trim() || null,
-        officeHours: officeHours.trim() || null,
-        officePhone: officePhone.trim() || null,
-        acceptsReferrals,
-        visitFee: visitFee.trim() || null,
-        insurances: toList(insurances),
-        referralNotes: referralNotes.trim() || null,
-        tags: toList(tags),
-        notes: notes.trim() || null,
-        starred,
-      };
-      if (doctor) await updateDoctor(doctor.id, changedFormPatch(editing.basis, current, payload), doctor);
-      else await createDoctor(payload);
       return true;
-    });
+    }, new Date(now));
   }
 
   function finish() {
@@ -259,7 +177,7 @@ function DoctorForm({
       />
       <Column collapsable={false} gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
-        {editing.completed ? <Text>ذخیره شد؛ برای برگشت، «بستن» را بزنید.</Text> : null}
+        <DoctorDraftNotice editing={editing} recovered={!!seed.draft} />
         <Input editable={!locked} label="عنوان" value={title} onChangeText={setTitle} placeholder="دکتر" />
         <Input editable={!locked} label="نام" required value={firstName} onChangeText={setFirstName} />
         <Input editable={!locked} label="نام خانوادگی" required value={lastName} onChangeText={setLastName} />

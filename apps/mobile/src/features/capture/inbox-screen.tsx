@@ -10,6 +10,7 @@ import { PickerModal, type PickerItem } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, EmptyState, Input, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
+import { PhotoRecovery } from '@/features/attachments/photo-recovery';
 import { RecordingRecovery } from '@/features/attachments/recording-recovery';
 import { patientPickerSublabel } from '@/features/patients/logic';
 import { patientListQuery } from '@/features/patients/queries';
@@ -138,6 +139,7 @@ export function InboxScreen() {
 
         <Button label="ثبت سریع تازه" icon="add" onPress={() => router.push('/capture')} full />
         <RecordingRecovery generation={generation} />
+        <PhotoRecovery generation={generation} />
 
         {!error && openRows.length === 0 && open !== undefined ? (
           <EmptyState

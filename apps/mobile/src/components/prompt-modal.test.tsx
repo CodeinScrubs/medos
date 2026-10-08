@@ -48,6 +48,25 @@ afterEach(() => {
 });
 
 describe('prompt text survives Android Back', () => {
+  it('flushes a durable caller on Back without offering to throw away its raw text', () => {
+    act(() => {
+      tree = create(
+        <PromptModal
+          visible
+          title="Caption"
+          value=" Raw pending text "
+          onChangeText={jest.fn()}
+          onSubmit={submit}
+          onCancel={cancel}
+          retainOnClose
+        />,
+      );
+    });
+    back();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(input().props.value).toBe(' Raw pending text ');
+  });
   it('keeps controlled raw text with its owner and submits the latest same-event input', () => {
     const changed = jest.fn();
     act(() => {

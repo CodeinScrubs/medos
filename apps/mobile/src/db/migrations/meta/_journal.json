@@ -176,6 +176,13 @@
       "when": 1791463564200,
       "tag": "0024_happy_celestials",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1791481596879,
+      "tag": "0025_faithful_power_pack",
+      "breakpoints": true
     }
   ]
 }

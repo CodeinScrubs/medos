@@ -5,15 +5,15 @@ import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
 import { notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, Card, ChipSelect, Column, Input, Row, Screen, Text } from '@/components/ui';
-import { RATING_AXES, type Doctor } from '@/db/schema';
+import { useNow } from '@/components/use-now';
+import { RATING_AXES } from '@/db/schema';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
+import type { DoctorFormRow } from './form-draft-queries';
 import { RATING_STEP_LABELS } from './labels';
-import { doctorDisplayName, ratingAverage, type RatingScores } from './logic';
-import { ManualDoctorGate, useManualDoctorForm } from './manual-form';
-import { doctorQuery } from './queries';
-import { addDoctorRating } from './ratings-queries';
+import { doctorDisplayName, ratingAverage } from './logic';
+import { DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
 
 const STEPS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: toPersianDigits(n) }));
 
@@ -31,10 +31,16 @@ export function RatingScreen() {
   const { doctorId } = useLocalSearchParams<{ doctorId: string }>();
   const parent = useAutosaveScope();
   const form = (
-    <ManualDoctorGate key={doctorId} query={doctorQuery(doctorId ?? '')} what="پزشک">
-      {(doctor, notice, generation, unavailable) =>
-        doctor ? (
-          <RatingForm doctor={doctor} readNotice={notice} generation={generation} unavailable={unavailable} />
+    <ManualDoctorGate key={doctorId} kind="rating" doctorId={doctorId ?? ''} what="پزشک">
+      {(seed, notice, generation, unavailable, onReset) =>
+        seed.doctor ? (
+          <RatingForm
+            seed={seed}
+            onReset={onReset}
+            readNotice={notice}
+            generation={generation}
+            unavailable={unavailable}
+          />
         ) : null
       }
     </ManualDoctorGate>
@@ -43,32 +49,35 @@ export function RatingScreen() {
 }
 
 function RatingForm({
-  doctor,
+  seed,
+  onReset,
   readNotice,
   generation,
   unavailable,
 }: {
-  doctor: Doctor;
+  seed: DoctorFormRow;
+  onReset: (row: DoctorFormRow) => void;
   readNotice: ReactNode;
   generation: number;
   unavailable: boolean;
 }) {
   const { spacing } = useTheme();
-  const editing = useManualDoctorForm({ scores: {} as RatingScores, reasoning: '' }, generation, unavailable);
+  const doctor = seed.doctor;
+  const now = useNow();
+  const editing = useManualDoctorForm('rating', seed, generation, unavailable, onReset);
   const { scores, reasoning } = editing.fields;
   const { busy: saving, locked } = editing;
 
   const average = ratingAverage(scores);
 
   async function save() {
-    await editing.submit(async ({ scores, reasoning }) => {
+    await editing.submit(({ scores, reasoning }) => {
       if (Object.values(scores).every((v) => v == null) && !reasoning.trim()) {
         notify('چیزی ثبت نشده', 'حداقل یک معیار را امتیاز بدهید یا دلیلی بنویسید.');
         return false;
       }
-      await addDoctorRating(doctor.id, { ...scores, reasoning });
       return true;
-    });
+    }, new Date(now));
   }
 
   function finish() {
@@ -94,7 +103,7 @@ function RatingForm({
       />
       <Column collapsable={false} gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
-        {editing.completed ? <Text>ذخیره شد؛ برای برگشت، «بستن» را بزنید.</Text> : null}
+        <DoctorDraftNotice editing={editing} recovered={!!seed.draft} />
         {doctor ? <Text variant="subheading">{doctorDisplayName(doctor)}</Text> : null}
         <Text variant="tiny" color="textFaint">
           یادداشت شخصی خودتان است؛ هیچ‌جا نمایش داده یا فرستاده نمی‌شود. هر معیاری که نظری درباره‌اش ندارید را خالی

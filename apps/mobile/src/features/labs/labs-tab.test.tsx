@@ -6,13 +6,13 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { alertError } from '@/components/feedback';
 import { Button, Text } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
-import { attachments, labPanels } from '@/db/schema';
+import { attachments, labPanels, photoImportBatches } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { fileJobsActive, FileWorkBusyError, reserveFileMaintenance } from '@/lib/file-work';
-import type { storePhoto } from '@/platform/media';
 import { useTestDatabase } from '@/test/db-client';
+import { photoFiles, resetPhotoFiles } from '@/test/mocks/photo-files';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { LabsTab } from './labs-tab';
@@ -22,7 +22,6 @@ import { TrendScreen } from './trend-screen';
 let mockChoose: ((source: 'camera' | 'library') => void) | undefined;
 let mockTrendParams: { id: string; analyte: string };
 const mockPicker = jest.fn<(options: ImagePickerOptions) => Promise<ImagePickerResult>>();
-const mockStore = jest.fn<typeof storePhoto>();
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/db/use-live', () => ({ useLive: (query: { all(): unknown[] }) => ({ data: query.all() }) }));
@@ -50,10 +49,9 @@ jest.mock('@/components/ui', () => ({
   Screen: 'Screen',
   Divider: 'Divider',
 }));
-jest.mock('@/platform/media', () => ({
-  mediaUri: (value: string) => value,
-  storePhoto: (...args: Parameters<typeof storePhoto>) => mockStore(...args),
-}));
+jest.mock('expo-file-system', () => jest.requireActual('@/test/mocks/photo-files'));
+jest.mock('expo-image-manipulator', () => jest.requireActual('@/test/mocks/photo-files'));
+jest.mock('expo-file-system/legacy', () => ({ copyAsync: jest.fn() }));
 jest.mock('@/features/attachments/capture', () => ({
   ...jest.requireActual<object>('@/features/attachments/capture'),
   askPhotoSource: (choose: typeof mockChoose) => {
@@ -104,15 +102,8 @@ beforeEach(async () => {
   mockChoose = undefined;
   jest.mocked(alertError).mockClear();
   mockPicker.mockReset().mockResolvedValue(picked());
-  mockStore.mockReset().mockResolvedValue({
-    relativePath: 'media/synthetic/lab.jpg',
-    thumbnailPath: 'media/synthetic/thumb.jpg',
-    originalPath: 'media/synthetic/original.jpg',
-    mimeType: 'image/jpeg',
-    sizeBytes: 100,
-    width: 640,
-    height: 480,
-  });
+  resetPhotoFiles();
+  photoFiles.set('file:///synthetic-lab.jpg', new Uint8Array([1, 2, 3]));
   await act(async () => {
     tree = create(<LabsTab patientId={patientId} />);
   });
@@ -183,7 +174,7 @@ describe('lab photo callback', () => {
     await choose();
     expect(alertError).toHaveBeenCalledWith('ذخیره نشد', expect.any(DatasetChangedError));
     expect(mockPicker).not.toHaveBeenCalled();
-    expect(mockStore).not.toHaveBeenCalled();
+    expect(t.db.select().from(photoImportBatches).all()).toHaveLength(0);
     expect(t.db.select().from(labPanels).all()).toHaveLength(0);
     expect(t.db.select().from(attachments).all()).toHaveLength(0);
     expect(fileJobsActive()).toBe(false);
@@ -253,7 +244,7 @@ describe('lab photo callback', () => {
     mockPicker.mockResolvedValue({ canceled: true, assets: null });
     await choose();
     expect(t.db.select().from(labPanels).all()).toHaveLength(0);
-    expect(mockStore).not.toHaveBeenCalled();
+    expect(t.db.select().from(photoImportBatches).all()).toHaveLength(0);
     expect(alertError).not.toHaveBeenCalled();
     expect(fileJobsActive()).toBe(false);
   });

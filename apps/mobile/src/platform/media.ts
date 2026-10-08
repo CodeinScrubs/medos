@@ -3,9 +3,6 @@ import { copyAsync } from 'expo-file-system/legacy';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { newId } from '@/lib/ids';
-import { imageMimeFromPath } from '@/lib/image-edit';
-
-import { fingerprintFile, fingerprintSourceFile } from './file-integrity';
 
 /**
  * On-device storage for photos, voice notes and documents.
@@ -117,17 +114,6 @@ async function copyInto(source: File, sourceUri: string, dest: File): Promise<vo
   }
 }
 
-export type StoredPhoto = StoredFile & {
-  thumbnailPath: string;
-  /** The untouched file, when the setting asks for it to be kept. */
-  originalPath: string | null;
-  originalMimeType?: string | null;
-  checksum?: string;
-  width: number;
-  height: number;
-  mimeType: 'image/jpeg';
-};
-
 function fitWithin(width: number, height: number, maxEdge: number) {
   const longEdge = Math.max(width, height);
   if (!longEdge || longEdge <= maxEdge) return null;
@@ -150,49 +136,56 @@ async function renderJpeg(uri: string, width: number, height: number, maxEdge: n
   }
 }
 
-async function storeVerifiedPhotoFile(uri: string, extension: string, move = false) {
-  const source = await fingerprintSourceFile(uri);
-  const stored = await storeFile(uri, extension, { move, verifySize: true });
-  const copied = await fingerprintFile(() => mediaFile(stored.relativePath));
-  if (source.checksum !== copied.checksum || source.sizeBytes !== copied.sizeBytes)
-    throw new Error('کپی عکس با فایل اولیه یکسان نیست؛ عکس ثبت نشد.');
-  return { ...stored, checksum: copied.checksum };
+/** The journal records this derivative's fingerprint/destination before copying it. */
+export function renderPhotoDerivative(source: { uri: string; width: number; height: number }, thumbnail: boolean) {
+  return renderJpeg(
+    source.uri,
+    source.width,
+    source.height,
+    thumbnail ? THUMB_MAX_EDGE : PHOTO_MAX_EDGE,
+    thumbnail ? THUMB_QUALITY : PHOTO_QUALITY,
+  );
 }
 
-/**
- * Store a photo: a compressed full-size copy, a small thumbnail, and — when
- * asked — the file exactly as it arrived.
- *
- * A modern phone camera produces 4-12 MB per shot. Over a few years of
- * clinical photos that is tens of gigabytes; at 2400px / 85% JPEG the same
- * photos are roughly a tenth of that, which also keeps backups practical. That
- * trade is right for a photo of a lab sheet and wrong for a lesion being
- * followed over weeks or two ECGs being compared, so keeping the original is a
- * setting rather than a rule — and when it is on, the original is stored
- * first: an original that exists only until the re-encode succeeds is not a
- * preserved original.
- */
-export async function storePhoto(
-  source: { uri: string; width: number; height: number; mimeType?: string | null },
-  { keepOriginal = false }: { keepOriginal?: boolean } = {},
-): Promise<StoredPhoto> {
-  const original = keepOriginal ? await storeVerifiedPhotoFile(source.uri, extensionOf(source.uri, 'jpg')) : null;
+/** A fresh journal-owned destination only; failed partial copies are never overwritten. */
+export async function copyPhotoImportFile(sourceUri: string, relativePath: string): Promise<void> {
+  if (!/^media\/imports\/photo-[a-f0-9-]+-\d+-(source|full|thumb)-[a-f0-9-]+\.[a-z0-9]{1,5}$/.test(relativePath))
+    throw new Error('مسیر کپی عکس معتبر نیست.');
+  ensureFolder(`${MEDIA_ROOT}/imports`);
+  const destination = mediaFile(relativePath);
+  if (destination.exists) throw new Error('مسیر کپی عکس قبلاً استفاده شده است؛ فایل جایگزین نشد.');
+  try {
+    await copyInto(new File(sourceUri), sourceUri, destination);
+  } catch {
+    throw new Error('کپی عکس انجام نشد؛ فایل اولیه و کپی ناتمام حفظ شده‌اند.');
+  }
+}
 
-  const full = await renderJpeg(source.uri, source.width, source.height, PHOTO_MAX_EDGE, PHOTO_QUALITY);
-  const thumb = await renderJpeg(source.uri, source.width, source.height, THUMB_MAX_EDGE, THUMB_QUALITY);
+export type MediaInventoryFile = { path: string; sizeBytes: number | null };
 
-  const stored = await storeVerifiedPhotoFile(full.uri, 'jpg', true);
-  const storedThumb = await storeVerifiedPhotoFile(thumb.uri, 'jpg', true);
-
-  return {
-    ...stored,
-    thumbnailPath: storedThumb.relativePath,
-    originalPath: original?.relativePath ?? null,
-    originalMimeType: original ? (source.mimeType ?? imageMimeFromPath(source.uri) ?? null) : null,
-    width: full.width,
-    height: full.height,
-    mimeType: 'image/jpeg',
+/** Read-only inventory, including old/unreferenced bytes. Never reclaim files here. */
+export function listStoredMedia(): MediaInventoryFile[] {
+  const root = new Directory(Paths.document, MEDIA_ROOT);
+  if (!root.exists) return [];
+  const files: MediaInventoryFile[] = [];
+  const walk = (directory: Directory, prefix: string) => {
+    for (const entry of directory.list()) {
+      if (!entry.name || entry.name.includes('/') || entry.name === '.' || entry.name === '..')
+        throw new Error('فهرست فایل‌ها کامل خوانده نشد؛ هیچ فایلی تغییر نکرد.');
+      const path = `${prefix}/${entry.name}`;
+      if (entry instanceof Directory) walk(entry, path);
+      else {
+        const size = entry.size;
+        files.push({ path, sizeBytes: size != null && Number.isSafeInteger(size) && size >= 0 ? size : null });
+      }
+    }
   };
+  try {
+    walk(root, MEDIA_ROOT);
+    return files.sort((a, b) => a.path.localeCompare(b.path));
+  } catch {
+    throw new Error('فهرست فایل‌ها کامل خوانده نشد؛ هیچ فایلی تغییر نکرد.');
+  }
 }
 
 /** Total bytes under the media folder, for the storage line in settings. */

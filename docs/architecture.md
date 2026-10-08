@@ -1804,3 +1804,68 @@ The existing acknowledgment briefly counts ranges not applied; there is no new
 dialog workflow or automatic conversion. Raw recovery and atomic publication use
 the existing lab form contract. Legacy stored rows are not retrospectively
 corrected: their original units cannot be recovered by guessing.
+
+## Remaining doctor, imaging and caption raw forms (0.11.39)
+
+Migration0025 adds three raw form stores, separate from published records:
+`doctor_form_drafts` (directory/profile/rating), `imaging_form_drafts`, and
+`attachment_caption_drafts`. The versioned strict codecs retain exact text,
+including whitespace, incomplete Jalali dates and clocks. Unknown versions
+remain readable/copyable diagnostic bytes and cannot be replaced with a blank
+editor. Existing clinical records are not rewritten during migration.
+
+Each editor captures its dataset before loading, retains its first seed through
+read failures or deletion, and joins its parent's single AutosaveScope. Leaving
+or backgrounding flushes raw input. Database acknowledgment is the durability
+boundary; typing before that acknowledgment is not crash or power-loss evidence.
+Publication validates the live owner and original encounter, then commits the
+record and soft draft retirement in one synchronous transaction. Repeated
+acknowledgment uses the stored destination instead of creating another record.
+
+Directory/profile and imaging edits preserve untouched fields and exact legacy
+timestamps. Changed fields compare against the original basis. A conflict offers
+explicit review, Load or Keep mine; confirming either rechecks the shown raw and
+published version. The current writer keeps autosaving after a successful rebase.
+Delayed dialogs retain the original dataset and mounted route. A late successful
+publication cannot Back a newer screen. Headers, scroll hosts and native stacking
+parents stay mounted through completion. Caption recovery uses the existing
+viewer dialog, with a bounded scroll host for large fonts and failure controls.
+
+## Atomic recoverable photo batches (0.11.39)
+
+`photo_import_batches` is an operation journal, not a second clinical timeline.
+Before native copies, it records the selected inputs, immutable destination,
+capture time, source paths and original encounter for a photo-only lab panel.
+All selected sources are preserved before rendering derivatives. Every copy
+attempt owns a fresh path and records a SHA-256/length fingerprint before copying;
+same-size changed files are rejected, not treated as successful copies. Partial
+files, sources and prior attempts are retained on failure. Derivatives release
+their native manipulation objects even when rendering fails.
+
+After verifying all source/working/thumbnail bytes, one synchronous transaction
+publishes every attachment, its optional lab panel, capture kind and saved journal
+acknowledgment. There is no empty panel or partially published image batch.
+Retry verifies copied bytes and the immutable owner; it does not need an expired
+picker URI when its source copy is already valid. Saved replay verifies the
+existing attachments without resurrecting deleted records. Pending photo jobs
+also prevent capture filing, owner reassignment and empty-capture cleanup.
+
+Recovery appears only for unfinished jobs on the existing inbox/media/lab/imaging
+screens. It requires an explicit Retry or confirmed soft discard; startup does
+not publish photos automatically. The original dataset and file lease span the
+picker, copies, verification and acknowledgment. Old held confirmations cannot
+act after their originating recovery component unmounts.
+
+The existing backup screen offers an explicit read-only file inventory. It
+counts referenced, unknown/unreferenced and missing paths while retaining trash,
+draft voices, recording/call journals and every photo attempt. Unknown metadata
+fails closed. It neither deletes files nor claims that an attempted-but-not-yet-
+copied path is a lost clinical image. Originals copied for recovery remain
+protected even when the gallery's keep-original preference is off; safe storage
+reclamation is a separate policy, not an automatic sweep. Path ownership checks
+select only matching ids, avoiding loading large note/image bodies into JS for
+each copy. The obsolete non-journal photo-storage path is removed.
+
+No backup format, dependency, permission, route or clinical formula changes.
+Native/device acceptance and the remaining raw-form/product gates belong in the
+execution ledger and validation record; these source contracts do not close them.

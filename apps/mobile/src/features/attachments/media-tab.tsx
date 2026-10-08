@@ -6,6 +6,7 @@ import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, ChipSelect, Column, SectionHeader, Text } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import { VoiceNotePlayer } from '@/components/voice-note-player';
 import { VoiceRecorder } from '@/components/voice-recorder';
 import type { AttachmentKind } from '@/db/schema';
@@ -18,6 +19,7 @@ import { useTheme } from '@/theme';
 import { askPhotoSource, attachPhotos } from './capture';
 import { ImageThumbnail } from './image-thumbnail';
 import { ATTACHMENT_KIND_LABELS } from './labels';
+import { PhotoRecovery } from './photo-recovery';
 import { deleteAttachment, patientMediaQuery } from './queries';
 import { RecordingRecovery } from './recording-recovery';
 import { useRecordingHandoff } from './voice-notes';
@@ -42,6 +44,7 @@ const PHOTO_KINDS: AttachmentKind[] = ['photo', 'clinical_photo', 'radiology', '
  */
 export function MediaTab({ patientId }: { patientId: string }) {
   const { generation } = useDatasetIntent();
+  const now = useNow();
   const router = useRouter();
   const { radii, spacing } = useTheme();
   const { width } = useWindowDimensions();
@@ -71,6 +74,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
         await withDatasetWrite(generation, () =>
           attachPhotos({
             source,
+            now: new Date(now),
             entityType: 'patient',
             entityId: patientId,
             patientId,
@@ -91,6 +95,7 @@ export function MediaTab({ patientId }: { patientId: string }) {
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
       <ErrorNotice error={error} what="عکس‌ها و صداها" onRetry={retry} />
       <ChipSelect options={FILTERS} value={filter} onChange={(v) => setFilter(v ?? 'all')} />
+      <PhotoRecovery patientId={patientId} generation={generation} />
 
       <Button
         label={`افزودن ${ATTACHMENT_KIND_LABELS[addKind]}`}

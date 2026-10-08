@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { doctorProfiles, doctorRatings, doctors, type DoctorProfile } from '@/db/schema';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -34,30 +34,31 @@ export type RatingInput = RatingScores & { reasoning?: string | null; ratedAt?: 
  * years of working together is the interesting part, and overwriting it would
  * lose exactly that.
  */
-export async function addDoctorRating(doctorId: string, input: RatingInput): Promise<string> {
+export function addDoctorRatingInTransaction(tx: DbTransaction, doctorId: string, input: RatingInput): string {
   const id = newId();
   const { reasoning, ratedAt, ...scores } = input;
-  db.transaction((tx) => {
-    if (
-      !tx
-        .select({ id: doctors.id })
-        .from(doctors)
-        .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
-        .get()
-    )
-      throw new Error('پزشک پیدا نشد یا حذف شده است.');
-    tx.insert(doctorRatings)
-      .values({
-        id,
-        ...stamps(),
-        doctorId,
-        ...scores,
-        reasoning: reasoning?.trim() || null,
-        ratedAt: ratedAt ?? new Date(),
-      })
-      .run();
-  });
+  if (
+    !tx
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
+      .get()
+  )
+    throw new Error('پزشک پیدا نشد یا حذف شده است.');
+  tx.insert(doctorRatings)
+    .values({
+      id,
+      ...stamps(),
+      doctorId,
+      ...scores,
+      reasoning: reasoning?.trim() || null,
+      ratedAt: ratedAt ?? new Date(),
+    })
+    .run();
   return id;
+}
+export async function addDoctorRating(doctorId: string, input: RatingInput): Promise<string> {
+  return db.transaction((tx) => addDoctorRatingInTransaction(tx, doctorId, input));
 }
 
 export async function updateDoctorRating(id: string, input: RatingInput): Promise<void> {
@@ -102,59 +103,67 @@ export function doctorProfileFormQuery(doctorId: string) {
 export type ProfileInput = Partial<Omit<DoctorProfile, 'id' | 'doctorId' | 'createdAt' | 'updatedAt' | 'deletedAt'>>;
 
 /** One profile per doctor: written if it exists, created if it does not. */
+export function saveDoctorProfileInTransaction(
+  tx: DbTransaction,
+  doctorId: string,
+  input: ProfileInput,
+  basis?: (Pick<DoctorProfile, 'id'> & Partial<DoctorProfile>) | null,
+): string {
+  if (
+    !tx
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
+      .get()
+  )
+    throw new Error('پزشک پیدا نشد یا حذف شده است.');
+  const current = tx
+    .select()
+    .from(doctorProfiles)
+    .where(and(profileAlive, eq(doctorProfiles.doctorId, doctorId)))
+    .get();
+  if (basis && (!current || current.id !== basis.id)) throw new DoctorFormConflict();
+  if (current) {
+    const initial =
+      basis === null
+        ? {
+            ...current,
+            birthDate: null,
+            hometown: null,
+            almaMater: null,
+            graduationYear: null,
+            familyNotes: null,
+            interests: [],
+            favoriteTopics: null,
+            dislikes: null,
+            howWeMet: null,
+            memorableMoments: null,
+            communicationStyle: null,
+            personalNotes: null,
+          }
+        : basis
+          ? { ...current, ...basis }
+          : undefined;
+    const patch = initial ? checkedEditPatch(current, initial, input) : input;
+    if (Object.keys(patch).length)
+      tx.update(doctorProfiles)
+        .set({ ...patch, ...touch() })
+        .where(and(profileAlive, eq(doctorProfiles.id, current.id)))
+        .run();
+    return current.id;
+  }
+  const id = newId();
+  tx.insert(doctorProfiles)
+    .values({ id, ...stamps(), doctorId, ...input })
+    .run();
+  return id;
+}
 export async function saveDoctorProfile(
   doctorId: string,
   input: ProfileInput,
   basis?: DoctorProfile | null,
 ): Promise<string> {
-  return db.transaction((tx) => {
-    if (
-      !tx
-        .select({ id: doctors.id })
-        .from(doctors)
-        .where(and(eq(doctors.id, doctorId), isNull(doctors.deletedAt)))
-        .get()
-    )
-      throw new Error('پزشک پیدا نشد یا حذف شده است.');
-    const current = tx
-      .select()
-      .from(doctorProfiles)
-      .where(and(profileAlive, eq(doctorProfiles.doctorId, doctorId)))
-      .get();
-    if (basis && (!current || current.id !== basis.id)) throw new DoctorFormConflict();
-    if (current) {
-      const initial =
-        basis === null
-          ? {
-              ...current,
-              birthDate: null,
-              hometown: null,
-              almaMater: null,
-              graduationYear: null,
-              familyNotes: null,
-              interests: [],
-              favoriteTopics: null,
-              dislikes: null,
-              howWeMet: null,
-              memorableMoments: null,
-              communicationStyle: null,
-              personalNotes: null,
-            }
-          : basis;
-      const patch = initial ? checkedEditPatch(current, initial, input) : input;
-      if (Object.keys(patch).length)
-        tx.update(doctorProfiles)
-          .set({ ...patch, ...touch() })
-          .where(and(profileAlive, eq(doctorProfiles.id, current.id)))
-          .run();
-      return current.id;
-    }
-    const id = newId();
-    tx.insert(doctorProfiles)
-      .values({ id, ...stamps(), doctorId, ...input })
-      .run();
-    return id;
-  });
+  return db.transaction((tx) => saveDoctorProfileInTransaction(tx, doctorId, input, basis));
 }
 
 /**

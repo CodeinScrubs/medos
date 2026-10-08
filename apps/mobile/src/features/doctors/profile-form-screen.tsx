@@ -8,20 +8,11 @@ import { ScreenOptions } from '@/components/screen-options';
 import { Button, Column, Input, Screen, SectionHeader, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
-import type { DoctorProfile } from '@/db/schema';
-import { dateInputText, validateDateInput } from '@/lib/date-input';
-import { fromIsoDate } from '@/lib/jalali';
+import { validateDateInput } from '@/lib/date-input';
 import { useTheme } from '@/theme';
 
-import { changedFormPatch } from './edit-basis';
-import { ManualDoctorGate, useManualDoctorForm } from './manual-form';
-import { doctorProfileFormQuery, saveDoctorProfile } from './ratings-queries';
-
-const toList = (text: string) =>
-  text
-    .split(/[,،]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+import type { DoctorFormRow } from './form-draft-queries';
+import { DoctorDraftNotice, ManualDoctorGate, useManualDoctorForm } from './manual-form';
 
 /**
  * The social layer: where they are from, what they like, how we met.
@@ -37,12 +28,12 @@ export function ProfileFormScreen() {
   const { doctorId } = useLocalSearchParams<{ doctorId: string }>();
   const parent = useAutosaveScope();
   const form = (
-    <ManualDoctorGate key={doctorId} query={doctorProfileFormQuery(doctorId ?? '')} what="پروفایل پزشک">
-      {(row, notice, generation, unavailable) =>
+    <ManualDoctorGate key={doctorId} kind="profile" doctorId={doctorId ?? ''} what="پروفایل پزشک">
+      {(row, notice, generation, unavailable, onReset) =>
         row ? (
           <ProfileForm
-            doctorId={row.doctor.id}
-            profile={row.profile}
+            seed={row}
+            onReset={onReset}
             readNotice={notice}
             generation={generation}
             unavailable={unavailable}
@@ -55,39 +46,22 @@ export function ProfileFormScreen() {
 }
 
 function ProfileForm({
-  doctorId,
-  profile,
+  seed,
+  onReset,
   readNotice,
   generation,
   unavailable,
 }: {
-  doctorId: string;
-  profile: DoctorProfile | null;
+  seed: DoctorFormRow;
+  onReset: (row: DoctorFormRow) => void;
   readNotice: ReactNode;
   generation: number;
   unavailable: boolean;
 }) {
   const { spacing } = useTheme();
   const now = useNow();
-  const birth = fromIsoDate(profile?.birthDate);
-  const editing = useManualDoctorForm(
-    {
-      birthDate: birth ? dateInputText(birth) : '',
-      hometown: profile?.hometown ?? '',
-      almaMater: profile?.almaMater ?? '',
-      graduationYear: profile?.graduationYear ?? '',
-      familyNotes: profile?.familyNotes ?? '',
-      interests: (profile?.interests ?? []).join('، '),
-      favoriteTopics: profile?.favoriteTopics ?? '',
-      dislikes: profile?.dislikes ?? '',
-      howWeMet: profile?.howWeMet ?? '',
-      memorableMoments: profile?.memorableMoments ?? '',
-      communicationStyle: profile?.communicationStyle ?? '',
-      personalNotes: profile?.personalNotes ?? '',
-    },
-    generation,
-    unavailable,
-  );
+  const profile = seed.profile;
+  const editing = useManualDoctorForm('profile', seed, generation, unavailable, onReset);
   const {
     birthDate,
     hometown,
@@ -118,43 +92,14 @@ function ProfileForm({
   const dateValidation = useDateValidation();
 
   async function save() {
-    await editing.submit(async (current) => {
-      const {
-        birthDate,
-        hometown,
-        almaMater,
-        graduationYear,
-        familyNotes,
-        interests,
-        favoriteTopics,
-        dislikes,
-        howWeMet,
-        memorableMoments,
-        communicationStyle,
-        personalNotes,
-      } = current;
-      const date = validateDateInput(birthDate, { now: new Date(now), required: false, allowFuture: false });
+    await editing.submit((current) => {
+      const date = validateDateInput(current.birthDate, { now: new Date(now), required: false, allowFuture: false });
       if (!dateValidation.check() || !date.valid) {
         if (!date.valid) notify('تاریخ تولد معتبر نیست');
         return false;
       }
-      const payload = {
-        birthDate: date.iso,
-        hometown: hometown.trim() || null,
-        almaMater: almaMater.trim() || null,
-        graduationYear: graduationYear.trim() || null,
-        familyNotes: familyNotes.trim() || null,
-        interests: toList(interests),
-        favoriteTopics: favoriteTopics.trim() || null,
-        dislikes: dislikes.trim() || null,
-        howWeMet: howWeMet.trim() || null,
-        memorableMoments: memorableMoments.trim() || null,
-        communicationStyle: communicationStyle.trim() || null,
-        personalNotes: personalNotes.trim() || null,
-      };
-      await saveDoctorProfile(doctorId, changedFormPatch(editing.basis, current, payload), profile);
       return true;
-    });
+    }, new Date(now));
   }
 
   function finish() {
@@ -180,7 +125,7 @@ function ProfileForm({
       />
       <Column collapsable={false} gap="md" style={{ paddingTop: spacing.md }}>
         {readNotice}
-        {editing.completed ? <Text>ذخیره شد؛ برای برگشت، «بستن» را بزنید.</Text> : null}
+        <DoctorDraftNotice editing={editing} recovered={!!seed.draft} />
         <Text variant="tiny" color="textFaint">
           یادداشت خصوصی شماست. برای تبریک تولد، کافی است تاریخ تولد را بنویسید و بعد از ذخیره، مناسبت تولد را اضافه
           کنید.

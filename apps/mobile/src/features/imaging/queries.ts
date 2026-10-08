@@ -1,7 +1,8 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
-import { db } from '@/db/client';
-import { imagingStudies, type ImagingStudy } from '@/db/schema';
+import { audit } from '@/db/audit';
+import { db, type DbTransaction } from '@/db/client';
+import { encounters, imagingStudies, patients, type ImagingStudy } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -65,23 +66,86 @@ export type ImagingInput = {
 };
 
 export async function createImagingStudy(input: ImagingInput): Promise<string> {
+  return db.transaction((tx) => createImagingInTransaction(tx, input));
+}
+export function createImagingInTransaction(
+  tx: DbTransaction,
+  input: ImagingInput,
+  encounterId?: string | null,
+): string {
+  requirePatient(tx, input.patientId);
+  const capturedEncounter = encounterId === undefined ? resolveActiveEncounterId(input.patientId, tx) : encounterId;
+  if (capturedEncounter) {
+    const encounter = tx
+      .select()
+      .from(encounters)
+      .where(
+        and(
+          eq(encounters.id, capturedEncounter),
+          eq(encounters.patientId, input.patientId),
+          isNull(encounters.deletedAt),
+        ),
+      )
+      .get();
+    if (!encounter) throw new Error('نوبت تصویربرداری در دسترس نیست.');
+  }
+  if (input.studyDate && !Number.isFinite(input.studyDate.getTime())) throw new Error('تاریخ تصویربرداری معتبر نیست.');
   const id = newId();
-  await db.insert(imagingStudies).values({
-    ...input,
-    id,
-    ...stamps(),
-    encounterId: await resolveActiveEncounterId(input.patientId),
-  });
+  tx.insert(imagingStudies)
+    .values({
+      ...input,
+      id,
+      ...stamps(),
+      encounterId: capturedEncounter,
+    })
+    .run();
   return id;
 }
 
 export async function updateImagingStudy(id: string, patch: Partial<Omit<ImagingInput, 'patientId'>>): Promise<void> {
-  await db
-    .update(imagingStudies)
+  db.transaction((tx) => updateImagingInTransaction(tx, id, patch));
+}
+export function updateImagingInTransaction(
+  tx: DbTransaction,
+  id: string,
+  patch: Partial<Omit<ImagingInput, 'patientId'>>,
+): void {
+  const row = tx
+    .select()
+    .from(imagingStudies)
+    .where(and(alive, eq(imagingStudies.id, id)))
+    .get();
+  if (!row) throw new Error('تصویربرداری در دسترس نیست.');
+  requirePatient(tx, row.patientId);
+  if (patch.studyDate && !Number.isFinite(patch.studyDate.getTime())) throw new Error('تاریخ تصویربرداری معتبر نیست.');
+  if (!Object.keys(patch).length) return;
+  tx.update(imagingStudies)
     .set({ ...patch, ...touch() })
-    .where(and(alive, eq(imagingStudies.id, id)));
+    .where(eq(imagingStudies.id, id))
+    .run();
 }
 
 export async function deleteImagingStudy(id: string): Promise<void> {
-  await db.update(imagingStudies).set(softDelete()).where(eq(imagingStudies.id, id));
+  const changed = db.transaction((tx) => {
+    const row = tx
+      .select()
+      .from(imagingStudies)
+      .where(and(alive, eq(imagingStudies.id, id)))
+      .get();
+    if (!row) return false;
+    requirePatient(tx, row.patientId);
+    tx.update(imagingStudies).set(softDelete()).where(eq(imagingStudies.id, id)).run();
+    return true;
+  });
+  if (changed) await audit('imaging.deleted', { entityType: 'imaging_study', entityId: id });
+}
+function requirePatient(tx: DbTransaction, patientId: string) {
+  if (
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new Error('بیمار در دسترس نیست.');
 }

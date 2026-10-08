@@ -99,6 +99,7 @@ jest.mock('@/features/attachments/capture', () => ({
     mockSource = choose;
   },
   attachPhotos: () => mockPhotoWork(),
+  attachLabPhotoPanel: () => mockPhotoWork(),
 }));
 jest.mock('@/features/attachments/voice-notes', () => ({ useRecordingHandoff: () => ({ ownedId: undefined }) }));
 jest.mock('@/features/attachments/recording-recovery', () => ({ RecordingRecovery: 'RecordingRecovery' }));

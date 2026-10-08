@@ -6,6 +6,7 @@ import {
   captureInbox,
   notes,
   patients,
+  photoImportBatches,
   recordingJobs,
   shifts,
   tasks,
@@ -156,10 +157,10 @@ export async function updateCapture(
       .get();
     if (!current) throw new Error('ثبت سریع در دسترس نیست؛ تغییر ذخیره نشد.');
     const patientId = patch.patientId === undefined ? current.patientId : patch.patientId;
-    // Recovery compares the stopped recording's original owner. Moving its
+    // Recovery compares pending media's original owner. Moving its
     // parent before acknowledgment would strand that verified copy.
-    if (patientId !== current.patientId && hasPendingRecording(tx, id))
-      throw new Error('وویس این ثبت هنوز ذخیره نشده است؛ ابتدا ذخیره یا لغو وویس را کامل کنید.');
+    if (patientId !== current.patientId && hasPendingMedia(tx, id))
+      throw new Error('عکس یا وویس این ثبت هنوز ذخیره نشده است؛ ابتدا ذخیره یا لغو آن را کامل کنید.');
     if (current.filedAt && (patientId !== current.patientId || patch.kind !== undefined))
       throw new Error('این ثبت سریع قبلاً مرتب شده است؛ مقصد آن تغییر نکرد.');
     if (
@@ -248,8 +249,8 @@ function captureForFiling(tx: DbTransaction, id: string, patientId: string | nul
     .where(and(alive, eq(captureInbox.id, id)))
     .get();
   if (!capture) throw new Error('Capture not found');
-  if (hasPendingRecording(tx, id))
-    throw new Error('وویس این ثبت هنوز ذخیره نشده است؛ ابتدا از ورودی‌ها ذخیرهٔ وویس را کامل کنید.');
+  if (hasPendingMedia(tx, id))
+    throw new Error('عکس یا وویس این ثبت هنوز ذخیره نشده است؛ ابتدا از ورودی‌ها ذخیره را کامل کنید.');
   const target = patientId !== undefined ? patientId : capture.patientId;
   if (
     target &&
@@ -386,7 +387,7 @@ export async function discardCaptureIfEmpty(id: string): Promise<boolean> {
       .from(captureInbox)
       .where(and(alive, eq(captureInbox.id, id)))
       .get();
-    if (!capture || capture.filedAt || (capture.text ?? '').trim() || hasPendingRecording(tx, id)) return false;
+    if (!capture || capture.filedAt || (capture.text ?? '').trim() || hasPendingMedia(tx, id)) return false;
     if (
       tx
         .select({ id: attachments.id })
@@ -403,18 +404,32 @@ export async function discardCaptureIfEmpty(id: string): Promise<boolean> {
   });
 }
 
-function hasPendingRecording(tx: DbTransaction, captureId: string): boolean {
-  return !!tx
-    .select({ id: recordingJobs.id })
-    .from(recordingJobs)
-    .where(
-      and(
-        eq(recordingJobs.entityType, 'capture'),
-        eq(recordingJobs.entityId, captureId),
-        inArray(recordingJobs.state, ['copying', 'ready', 'discarding']),
-      ),
-    )
-    .get();
+function hasPendingMedia(tx: DbTransaction, captureId: string): boolean {
+  return (
+    !!tx
+      .select({ id: photoImportBatches.id })
+      .from(photoImportBatches)
+      .where(
+        and(
+          eq(photoImportBatches.entityType, 'capture'),
+          eq(photoImportBatches.entityId, captureId),
+          isNull(photoImportBatches.deletedAt),
+          inArray(photoImportBatches.state, ['copying', 'ready']),
+        ),
+      )
+      .get() ||
+    !!tx
+      .select({ id: recordingJobs.id })
+      .from(recordingJobs)
+      .where(
+        and(
+          eq(recordingJobs.entityType, 'capture'),
+          eq(recordingJobs.entityId, captureId),
+          inArray(recordingJobs.state, ['copying', 'ready', 'discarding']),
+        ),
+      )
+      .get()
+  );
 }
 
 /**

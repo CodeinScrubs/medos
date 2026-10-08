@@ -33,6 +33,58 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Durable remaining raw forms and atomic photo batches (0.11.39)
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh contributors for doctor forms
+and photo batches stopped at their usage limits. Primary reviewed, integrated,
+corrected and ran verification itself.
+**Commits:** this application checkpoint; native/artifact record follows.
+
+**Changed**
+- Migration0025 adds doctor directory/profile/rating, imaging and caption raw
+  draft stores plus a photo operation journal. Exact invalid/incomplete input
+  remains a draft; validated publication and retirement are atomic/replay-safe.
+- Original dataset, first loaded basis, live owner and original encounter remain
+  fenced. Compare/Load/Keep/discard recheck current versions. Late acknowledgment
+  cannot close a newer route; headers/native parents stay stable.
+- Every selected source is copied and fingerprinted before photo derivatives;
+  all attachments and an optional lab panel publish together. Explicit retry
+  works without picker grants once the source copy exists. Pending photos block
+  capture filing/reassignment/empty cleanup. Failed/retired media are retained.
+- Use existing dialogs/screens for recovery and one explicit read-only inventory
+  on Backup. Keep mine no longer stops caption autosave. Bounded prompt scrolling
+  keeps large-font/failure controls reachable. Remove unused direct photo storage.
+- Version0.11.39/code55. No dependency, permission, route or clinical formula.
+
+**Verified**
+- Full `npm run check`:144 suites/1,957 app tests and five workflow checks;
+  typecheck/lint/format pass. The concurrent native build coincided with one
+  worker-exit timeout warning; handle diagnostics are pending, not ignored.
+- New real-SQL/component checks cover raw cold remount, invalid input, independent
+  field correction, third writer, retirement rollback, duplicate submission,
+  actual dataset replacement, original navigation and continued autosave after
+  rebase. Photo checks include changed/truncated bytes, native/SQL failure,
+  whole-batch rollback, original-owner rejection, retry and old/current restore.
+- Regenerating migrations reports no schema change. Normal fetch shows0/0 with
+  `fc0b7fa`; all five previously reviewed PR heads remain unchanged/unmerged.
+
+**Not verified**
+- This entry does not yet assert completed APK/native acceptance, hosted CI,
+  phone hardware, acoustic output, power/full-space recovery or pressure closure.
+
+**Open threads**
+- Finish exact APK inspection/install and native IME/font/cold recovery, photo
+  import, compatible backup/restore and independent row/media comparisons.
+- Then vitals/other remaining manual raw forms, appropriate clinical trash,
+  bounded large-record timeline and full-shift/pressure gates. Physical phone
+  remains separate; do not report that it is the sole remaining work yet.
+
+**Gotchas**
+- Test stand-ins must exercise the journal path, not the removed `storePhoto`.
+- Keep all source/partial/trash files; inventory is not deletion authorization.
+- Do not edit application source after APK bundling; rebuild if a native check
+  finds a source correction. `prebuild` regenerated native output here.
+
 ## 2026-10-08 — Clipboard lab units and reference compatibility (0.11.38)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.

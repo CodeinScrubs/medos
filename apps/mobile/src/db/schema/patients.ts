@@ -582,6 +582,29 @@ export const imagingStudies = sqliteTable(
   (t) => [index('imaging_patient_idx').on(t.patientId, t.studyDate)],
 );
 
+/** Exact, unvalidated imaging input with the original encounter and editable basis. */
+export const imagingFormDrafts = sqliteTable(
+  'imaging_form_drafts',
+  {
+    ...baseColumns,
+    patientId: text('patient_id')
+      .notNull()
+      .references(() => patients.id),
+    studyId: text('study_id').references(() => imagingStudies.id),
+    scope: text('scope').notNull(),
+    encounterId: text('encounter_id').references(() => encounters.id),
+    body: text('body').notNull(),
+    revision: integer('revision').notNull().default(0),
+    committedStudyId: text('committed_study_id').references(() => imagingStudies.id),
+  },
+  (t) => [
+    uniqueIndex('imaging_form_drafts_open_scope_idx')
+      .on(t.patientId, t.scope)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+export type ImagingFormDraft = typeof imagingFormDrafts.$inferSelect;
+
 /* -------------------------------------------------------------------------- */
 /*  Follow-up                                                                   */
 /* -------------------------------------------------------------------------- */

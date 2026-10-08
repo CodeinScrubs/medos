@@ -4,10 +4,12 @@ import { Alert } from 'react-native';
 import { notify } from '@/components/feedback';
 import type { AttachmentEntity, AttachmentKind } from '@/db/schema';
 import { readSetting } from '@/db/settings';
+import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { withFileJob } from '@/lib/file-work';
-import { storePhoto } from '@/platform/media';
 
-import { addAttachment, checkAttachmentTarget } from './queries';
+import { persistPhotoImport } from './photo-import-queries';
+import { checkAttachmentTarget } from './queries';
 import { keepOriginalsMode, shouldKeepOriginal } from './settings';
 
 export type PhotoSource = 'camera' | 'library';
@@ -33,7 +35,7 @@ export async function pickPhotos(
 
   const options: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images'],
-    // Full quality in; storePhoto() does the one controlled compression pass.
+    // Full quality in; the durable import journal generates the working derivative.
     quality: 1,
     exif: false,
     allowsEditing: false,
@@ -60,39 +62,23 @@ export type AttachTarget = {
 };
 
 /** Compress, store and attach already-picked assets. Returns the new attachment ids. */
-export async function storeAndAttach(assets: ImagePicker.ImagePickerAsset[], target: AttachTarget): Promise<string[]> {
+export async function storeAndAttach(
+  assets: ImagePicker.ImagePickerAsset[],
+  target: AttachTarget,
+  now = new Date(),
+): Promise<string[]> {
   // Capture caller-owned values before yielding, and protect direct callers too.
   const captured = { ...target };
   const sources = assets.map(({ uri, width, height, mimeType }) => ({ uri, width, height, mimeType }));
-  return withFileJob(async () => {
-    checkAttachmentTarget(captured);
-    const ids: string[] = [];
-    const keepOriginal = shouldKeepOriginal(await readSetting(keepOriginalsMode), captured.kind);
-    for (const source of sources) {
+  const generation = datasetGeneration();
+  return withDatasetWrite(generation, () =>
+    withFileJob(async () => {
       checkAttachmentTarget(captured);
-      const stored = await storePhoto(source, { keepOriginal });
-      ids.push(
-        await addAttachment({
-          entityType: captured.entityType,
-          entityId: captured.entityId,
-          patientId: captured.patientId,
-          kind: captured.kind,
-          relativePath: stored.relativePath,
-          thumbnailPath: stored.thumbnailPath,
-          originalPath: stored.originalPath,
-          originalMimeType: stored.originalMimeType,
-          checksum: stored.checksum,
-          mimeType: stored.mimeType,
-          sizeBytes: stored.sizeBytes,
-          width: stored.width,
-          height: stored.height,
-          caption: captured.caption ?? null,
-          bodySite: captured.bodySite ?? null,
-        }),
-      );
-    }
-    return ids;
-  });
+      const keepOriginal = shouldKeepOriginal(await readSetting(keepOriginalsMode), captured.kind);
+      if (!sources.length) return [];
+      return persistPhotoImport(sources, captured, keepOriginal, now, generation);
+    }),
+  );
 }
 
 /** Pick or shoot photos and attach them to an existing entity in one step. */
@@ -100,15 +86,40 @@ export async function attachPhotos({
   source,
   crop = false,
   multiple = false,
+  now = new Date(),
   ...target
-}: AttachTarget & { source: PhotoSource; crop?: boolean; multiple?: boolean }): Promise<string[]> {
-  return withFileJob(async () => {
-    checkAttachmentTarget(target);
-    const assets = await pickPhotos(source, { crop, multiple });
-    if (!assets) return [];
-    // Nested file jobs are supported; this outer lease also owns the picker.
-    return storeAndAttach(assets, target);
-  });
+}: AttachTarget & { source: PhotoSource; crop?: boolean; multiple?: boolean; now?: Date }): Promise<string[]> {
+  const generation = datasetGeneration();
+  return withDatasetWrite(generation, () =>
+    withFileJob(async () => {
+      checkAttachmentTarget(target);
+      const assets = await pickPhotos(source, { crop, multiple });
+      if (!assets) return [];
+      // Nested file jobs are supported; this outer lease also owns the picker.
+      return storeAndAttach(assets, target, now);
+    }),
+  );
+}
+
+/** No empty clinical panel is created until every selected photo is verified. */
+export async function attachLabPhotoPanel(
+  source: PhotoSource,
+  patientId: string,
+  generation: number,
+  now = new Date(),
+): Promise<string[]> {
+  return withDatasetWrite(generation, () =>
+    withFileJob(async () => {
+      const target: AttachTarget = { entityType: 'patient', entityId: patientId, patientId, kind: 'lab_sheet' };
+      checkAttachmentTarget(target);
+      const encounterId = resolveActiveEncounterId(patientId);
+      const assets = await pickPhotos(source, { multiple: source === 'library' });
+      if (!assets) return [];
+      const keepOriginal = shouldKeepOriginal(await readSetting(keepOriginalsMode), 'lab_sheet');
+      const sources = assets.map(({ uri, width, height, mimeType }) => ({ uri, width, height, mimeType }));
+      return persistPhotoImport(sources, target, keepOriginal, now, generation, true, encounterId);
+    }),
+  );
 }
 
 /** "Camera or gallery?" — the question every photo button starts with. */
