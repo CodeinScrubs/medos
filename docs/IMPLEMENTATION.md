@@ -43,14 +43,19 @@ dataset intent stay captured, and delayed acknowledgment cannot Back a newer
 route. Existing value notes/source/sub-minute time survive editing. Compare
 exposes current clinical data and raw draft before explicit whole-panel rebase.
 Native parent/header stay stable; no dependency, route or formula was added.
-Software check passes 128 suites/1,699 app tests and three workflow checks.
-Exact-source artifact/CI/native upgrade and cold recovery gates are tracked in
-validation-0.11.35.md. Initial native upgrade/raw cold recovery pass; native QA
-also found footer-only publication was occluded by the keyboard. A compact,
-stable header uses the same publication path; rebuild/retest its final source
-before acceptance. Next implementation: companion/doctor raw recovery and
-remaining original-intent gates, then safe orphan accounting. Do not treat the
-software result as physical/power/performance or complete P0 acceptance.
+Final application source `d2bcbea` passes 128 suites/1,704 app tests, three workflow
+checks and exact-source CI. Native QA found keyboard-occluded footer publication;
+one stable header now uses the same publication path. Delayed clipboard retrieval
+preserves intervening row edits, including explicitly retyped original values.
+Final inspected/installed QA bytes pass in-place preservation, historical-panel
+raw cold recovery, invalid Save refusal, IME-open edit publication, soft draft
+discard and final cold comparison of all 4,057 rows/41 tables/25 media hashes.
+The signed/inspected owner arm64 APK is built; it has not been tested on the A52s.
+See validation-0.11.35.md for exact sources, artifacts and rejected attempts.
+Next implementation: companion/doctor raw recovery and remaining original-intent
+gates, then safe orphan accounting; custom lab unit entry and flagged-row Remove
+access also need focused UI corrections. Physical/power/pressure/performance and
+complete P0 acceptance remain separate.
 
 0.11.34: 0.11.33 retained the header but still failed the exact native Save
 reproduction. Both corresponding note form Columns now retain one native

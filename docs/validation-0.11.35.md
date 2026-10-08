@@ -1,5 +1,10 @@
 # 0.11.35 — recoverable raw manual lab entry
 
+Current application checkpoint: `d2bcbea7d5cdba0b01155935e8e12b831ec78d88`.
+Full checks/hosted CI and bounded native edit/discard/cold recovery pass on its
+inspected installed QA bytes. Earlier sections retain the intermediate probes
+and rejected setup attempts; final evidence and its limits follow below.
+
 ## Problem and implementation
 
 The previous manual lab form kept input only in component state. Navigating away
@@ -140,3 +145,83 @@ A further witness retypes the original value during retrieval. Equality alone
 overwrote that explicit input (one failure/two passes); comparing immutable row
 identity within the native wait preserves it too. No edit counters/schema or
 persistent keystroke history are added. Final checks follow this refinement.
+
+## Final source and bounded native acceptance
+
+Application source `d2bcbea7d5cdba0b01155935e8e12b831ec78d88` passes the normal
+pre-push `npm run check`: typecheck, lint, formatting, 128 suites/1,704 app tests
+and three workflow checks. Exact-source
+[CI37718940223](https://github.com/CodeinScrubs/medos/actions/runs/37718940223)
+completed successfully; its head SHA and conclusion were retrieved from GitHub.
+No dependency, backup/key format, permission or clinical formula changed.
+
+The final x86_64 QA APK is 54,583,262 bytes, version 0.11.35/code 51, target 36/min 24,
+SHA-256 `1410d6917b141d0d20dc0454f908372de5d04f27218f7f9b35f02ab2a406b066`.
+Signature verification, required native libraries and the single expected ABI
+pass. Its signer is unchanged. After in-place installation, the actual installed
+APK was pulled and independently hashed; bytes match this inspected artifact.
+It remains a private emulator artifact and must never be copied to `dist/`.
+
+Tests use only synthetic data on the API 36.1 x86_64 AVD, airplane mode enabled.
+The initial .34-to-.35 migration and new-form raw/header trials are recorded
+above under their exact intermediate sources. The following trials execute the
+final source; they do not retroactively accept a different source.
+
+| Trial | Observed native result | Independent database/media result |
+| --- | --- | --- |
+| Replace the earlier .35 probe in place | Installed APK hash matches final inspected bytes | All 4,052 rows/41 tables and 25 media hashes preserved; 23 migrations, integrity/FKs clean |
+| Edit a historical panel, enter ambiguous `12,5` and pending notes, then force-stop/cold reopen | Exact visible value and notes recover; header Save shows refusal | Exactly one raw draft added; no clinical or unrelated row/media changes |
+| Correct to `12.5`, focus notes, publish from header with actual IME shown | Observed header lies above IME; editor actually closes, same PID, no fatal for that PID | Original panel/source/closed encounter/time, units/ranges/per-value notes/order retained; old values soft-retained, replacement values and draft retirement correct |
+| Create a notes-only raw form, force-stop and explicitly discard after reopening | Exact notes recover; observed confirmation and native close pass, same PID | Only original draft revision/soft-delete changes; raw body retained, no published panel/value removed or added |
+| Force-stop and export once more | Cold startup/export succeeds offline | Every 4,057 row/41 table and 25 media hashes exactly match the preceding checkpoint; 23 migrations, integrity/FKs clean |
+
+The IME state came from native dumpsys, and taps used fresh hierarchy bounds.
+Editor-title absence confirms actual navigation, alongside PID/crash checks.
+Crash-buffer history is retained; no new MedOS fatal/ANR was observed during these
+bounded .35 trials. Final exit history shows the deliberate cold-test force-stops;
+the prior .33 pressure ANR remains unresolved, as recorded in validation-0.11.34.md.
+Checks were not run concurrently with a native build to claim pressure acceptance.
+
+Private synthetic evidence lives in `private/validation-0.11.35/`: artifact and
+installed-hash JSON, IME/window/hierarchy/process records, decrypted archive/SQL
+comparisons and retained failed attempts. Final cold archive SHA-256 is
+`0e3a86a01b292e1c93771fbf187f6152f4eca1ddc8cd36d728f5dc248f1b4cb2`.
+Comparisons examine all application rows and original media hashes, not just
+counts, success labels or a query against one edited panel.
+
+One initial automated numeric replace yielded `2,5` instead of the intended
+`12,5` and was rejected. A retry incorrectly expected an empty UI text node:
+Android exposes the empty input's `—` hint as text. After observing that cleared
+state, exact `12,5` entry was verified before cold recovery and publication
+refusal. These attempts do not prove the cause of the partial injection or
+certify rapid typing under load; they are not counted as successful trials.
+The clipboard race is covered by software witnesses, not native clipboard fault
+injection. Existing fixture value notes are null; non-null value notes,
+sub-minute timestamp preservation, photo-only panels and SQL failure rollback
+have separate software evidence rather than new native coverage here.
+
+Remaining gates: physical A52s microphone/speaker/IME/camera/SAF and OEM reminders,
+active/pre-journal recording interruption, power/low-space/native fault tests,
+pressure/24-hour performance, companion/doctor raw recovery, safe orphan
+accounting and complete product/clinical acceptance. These results accept the
+bounded lab recovery/edit/discard path, not the entire app or every long shift.
+
+## Owner APK and handoff
+
+`npm run apk` builds the final application's signed owner artifact at
+`dist/MedOS-0.11.35.apk` in 6m30s. Actual package inspection confirms only
+arm64-v8a, version 0.11.35/code 51, target 36/min 24 and required native libraries.
+Size: 52,974,935 bytes. SHA-256:
+`845445767c12e3fe0b425fc9d5e5e599730714517163541c1e0eed5463fe0a5f`.
+The unchanged certificate SHA-256 is
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+This APK was not installed on a physical phone. The QA APK is a different ABI;
+its successful native trials do not constitute physical acceptance of this file.
+Only documentation changes follow the application source above; no source edit
+was made after either bundle started. No owner .35 artifact existed during the
+earlier internal probes, whose filenames/hashes identify their distinct sources.
+
+A fresh GitHub open-PR inventory returns the same five head SHAs documented in
+`reviews/2026-10-07/README.md`. Prior dispositions remain; no new merge, approval
+or review comment was made during this slice. It is not a new review of changed
+PRs, nor proof that the broader product is complete.

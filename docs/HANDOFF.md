@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-08 — Verify raw lab recovery and deliver the signed owner APK
+
+**Agent:** GPT-6 via Codex; primary owns integration and native verification.
+**Commits:** application `d2bcbea` (following `1daa513`, `b10b4c2`, `c8f6749`);
+this commit records evidence only.
+
+**Changed**
+- Final .35 application: recoverable raw lab form, atomic/CAS publication, stable
+  header access with IME, and manual row edits protected from delayed clipboard.
+  No further application changes in this evidence commit. No new dependency.
+
+**Verified**
+- Normal source/pre-push check: 128 suites/1,704 app tests, three workflows;
+  exact-source CI37718940223 success. Final documentation push reruns checks.
+- Inspected/installed final QA bytes: offline upgrade preserves every row/file;
+  historical raw edit cold recovery, invalid Save refusal, keyboard-open edit
+  publication and soft draft discard pass. Actual routes close with one PID.
+  Final cold export matches all 4,057 rows/41 tables/25 media hashes exactly.
+- Signed/inspected owner `dist/MedOS-0.11.35.apk` (arm64, code51), SHA-256
+  `845445767c12e3fe0b425fc9d5e5e599730714517163541c1e0eed5463fe0a5f`.
+  Exact source/artifacts, earlier probes and limits: validation-0.11.35.md.
+- Five open PR heads remain identical to the 2026-10-07 review; none merged.
+
+**Not verified**
+- Physical A52s, native delayed-clipboard fault, rapid typing under load,
+  power/low-space/active recording, pressure/24-hour or full product acceptance.
+  The earlier .33 pressure ANR remains unresolved; later success does not erase it.
+
+**Open threads**
+- Next P0: companion/doctor raw recovery and original intent/navigation gates;
+  safe orphan inventory next, without deleting unreferenced media to hide issues.
+- Focused lab UI corrections: custom unit entry and Remove access on flagged/
+  invalid custom rows. Physical/pressure/clinical gates remain in IMPLEMENTATION.
+
+**Gotchas**
+- Numeric injection without acknowledged clearing once yielded `2,5`, not
+  `12,5`; rejected. UIAutomator reports the empty field's `—` hint as text.
+  Confirm exact input before counting a trial. The partial injection's cause
+  was not proved. Never tap a footer obscured by IME or run UI acceptance during
+  a native build. Preserve failed evidence in private/validation-0.11.35/.
+
 ## 2026-10-08 — Preserve manual values during delayed lab clipboard retrieval
 
 **Agent:** GPT-6 via Codex; narrow follow-up owned/reviewed by primary.
