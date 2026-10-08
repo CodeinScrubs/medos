@@ -4,9 +4,10 @@ import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import { encounters, patients, vitals, type Vital } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { isBloodSugarUnit, type BloodSugarUnit } from '@/lib/glucose-unit';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
-import { hasAnyVital, validateVitalNumbers, VITAL_NUMBER_KEYS } from './logic';
+import { hasAnyVital, validateBloodSugar, validateVitalNumbers, VITAL_NUMBER_KEYS } from './logic';
 
 /*
  * Observations, as they were taken.
@@ -47,6 +48,7 @@ export type VitalInput = {
   temperature?: number | null;
   spo2?: number | null;
   bloodSugar?: number | null;
+  bloodSugarUnit?: BloodSugarUnit | null;
   weightKg?: number | null;
   heightCm?: number | null;
   painScore?: number | null;
@@ -82,6 +84,7 @@ export async function recordVital(input: VitalInput, now = new Date()): Promise<
 /** Synchronous clinical write; another write may be composed within this transaction. */
 export function recordVitalInTransaction(tx: DbTransaction, input: VitalInput, now: Date): string {
   validateVitalNumbers(input);
+  validateBloodSugar(input.bloodSugar, input.bloodSugarUnit);
   if (!hasAnyVital(input)) throw new Error('At least one observation is required');
   if (input.measuredAt && !Number.isFinite(input.measuredAt.getTime())) throw new Error('Invalid observation time');
   // Undefined selects the active encounter in this same snapshot; null stays unattached.
@@ -103,6 +106,7 @@ export function recordVitalInTransaction(tx: DbTransaction, input: VitalInput, n
       temperature: input.temperature ?? null,
       spo2: input.spo2 ?? null,
       bloodSugar: input.bloodSugar ?? null,
+      bloodSugarUnit: input.bloodSugarUnit ?? null,
       weightKg: input.weightKg ?? null,
       heightCm: input.heightCm ?? null,
       painScore: input.painScore ?? null,
@@ -136,6 +140,7 @@ const PATCH_KEYS = [
   'systolic',
   'diastolic',
   ...VITAL_NUMBER_KEYS,
+  'bloodSugarUnit',
   'urineOutput',
   'notes',
 ] as const;
@@ -159,7 +164,16 @@ export function updateVitalInTransaction(
   if (Object.keys(patch).some((key) => !PATCH_KEYS.some((allowed) => allowed === key)))
     throw new Error('اطلاعات اصلاح اندازه‌گیری معتبر نیست.');
   validateVitalNumbers(patch);
-  const definedPatch = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const definedPatch: typeof patch = Object.fromEntries(
+    Object.entries(patch).filter(([, value]) => value !== undefined),
+  );
+  if (patch.bloodSugar === null && patch.bloodSugarUnit === undefined) definedPatch.bloodSugarUnit = null;
+  const merged = { ...current, ...definedPatch };
+  validateBloodSugar(
+    merged.bloodSugar,
+    merged.bloodSugarUnit,
+    merged.bloodSugar === current.bloodSugar && current.bloodSugarUnit === null && merged.bloodSugarUnit === null,
+  );
   if (!hasAnyVital({ ...current, ...definedPatch })) throw new Error('At least one observation is required');
   if (patch.measuredAt && !Number.isFinite(patch.measuredAt.getTime())) throw new Error('Invalid observation time');
   requireContext(tx, current.patientId, patch.encounterId === undefined ? current.encounterId : patch.encounterId);
@@ -172,13 +186,15 @@ export function updateVitalInTransaction(
       !sameField(expected.measuredAt, current.measuredAt) ||
       ((patch.systolic !== undefined || patch.diastolic !== undefined) &&
         (current.systolic !== expected.systolic || current.diastolic !== expected.diastolic)) ||
+      ((definedPatch.bloodSugar !== undefined || definedPatch.bloodSugarUnit !== undefined) &&
+        (current.bloodSugar !== expected.bloodSugar || current.bloodSugarUnit !== expected.bloodSugarUnit)) ||
       PATCH_KEYS.some((key) => patch[key] !== undefined && !sameField(current[key], expected[key])))
   )
     throw new Error('این اندازه‌گیری تغییر کرده است؛ نسخهٔ جدید را بررسی کنید. نوشتهٔ شما روی صفحه باقی مانده است.');
   if (Object.keys(definedPatch).length === 0) return false;
   tx.update(vitals)
     .set({
-      ...patch,
+      ...definedPatch,
       urineOutput: patch.urineOutput === undefined ? undefined : patch.urineOutput?.trim() || null,
       notes: patch.notes === undefined ? undefined : patch.notes?.trim() || null,
       ...touch(now),
@@ -213,9 +229,15 @@ export type VitalSeriesKey =
 export type VitalPoint = { at: Date; value: number };
 
 /** One measurement's history, skipping the readings where it was not taken. */
-export function vitalSeries(rows: readonly Vital[], key: VitalSeriesKey): VitalPoint[] {
+export function vitalSeries(
+  rows: readonly Vital[],
+  key: VitalSeriesKey,
+  bloodSugarUnit?: BloodSugarUnit,
+): VitalPoint[] {
   const points: VitalPoint[] = [];
+  if (key === 'bloodSugar' && !isBloodSugarUnit(bloodSugarUnit)) return points;
   for (const row of rows) {
+    if (key === 'bloodSugar' && row.bloodSugarUnit !== bloodSugarUnit) continue;
     const value = row[key];
     if (value == null) continue;
     points.push({ at: row.measuredAt, value });

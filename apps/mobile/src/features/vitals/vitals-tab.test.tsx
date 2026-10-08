@@ -7,7 +7,8 @@ import { AutosaveScope } from '@/components/autosave-scope';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
-import { Button, EmptyState, Input, SectionHeader } from '@/components/ui';
+import { TrendChart } from '@/components/trend-chart';
+import { Button, ChipSelect, EmptyState, Field, Input, SectionHeader } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
 import { tablesOf as mockTablesOf } from '@/db/query-tables';
 import { vitalFormDrafts, vitals } from '@/db/schema';
@@ -61,6 +62,7 @@ jest.mock('@/components/ui', () => ({
   ChipSelect: 'ChipSelect',
   Column: 'Column',
   EmptyState: 'EmptyState',
+  Field: 'Field',
   Input: 'Input',
   Row: 'Row',
   SectionHeader: 'SectionHeader',
@@ -137,6 +139,7 @@ async function save() {
     await settle();
   });
 }
+const glucoseUnits = () => tree!.root.findAllByType(ChipSelect).find((node) => node.props.options.includes('mg/dL'))!;
 
 beforeEach(async () => {
   jest.useFakeTimers().setSystemTime(new Date('2026-10-02T08:00:00Z'));
@@ -162,6 +165,71 @@ afterEach(async () => {
 });
 
 describe('real observation form handlers', () => {
+  it('requires a unit and cold-recovers the selected unit with its exact decimal input', async () => {
+    await render();
+    await startNew();
+    await type('قند', '2.5');
+    await save();
+    expect(await patientVitalsQuery(patientId)).toHaveLength(0);
+    expect(tree!.root.findAllByType(Field).find((node) => node.props.label === 'واحد قند')?.props.error).toBe(
+      'واحد قند را انتخاب کنید.',
+    );
+    expect(glucoseUnits().props.value).toBeNull();
+    await act(async () => {
+      glucoseUnits().props.onChange('mmol/L');
+    });
+    await act(async () => {
+      expect(await mockFlush!()).toBe(true);
+      tree!.unmount();
+      await settle();
+    });
+    tree = undefined;
+    await render();
+    await startNew();
+    expect(input('قند').props.value).toBe('2.5');
+    expect(glucoseUnits().props.value).toBe('mmol/L');
+    await save();
+    expect(await patientVitalsQuery(patientId)).toMatchObject([{ bloodSugar: 2.5, bloodSugarUnit: 'mmol/L' }]);
+  });
+  it('does not guess a legacy unit when a different observation is corrected', async () => {
+    const id = await recordVital({ patientId, heartRate: 80 });
+    t.db.update(vitals).set({ bloodSugar: 125.5, bloodSugarUnit: null }).where(eq(vitals.id, id)).run();
+    await render();
+    await startEdit();
+    expect(input('قند').props.value).toBe('125.5');
+    expect(glucoseUnits().props.value).toBeNull();
+    await type('نبض', '81');
+    await save();
+    expect((await vitalQuery(id))[0]).toMatchObject({ bloodSugar: 125.5, bloodSugarUnit: null, heartRate: 81 });
+  });
+  it('the actual chart selector sends only the chosen known unit to the chart', async () => {
+    const old = await recordVital({ patientId, heartRate: 80 });
+    t.db.update(vitals).set({ bloodSugar: 999, bloodSugarUnit: null }).where(eq(vitals.id, old)).run();
+    for (const [value, unit] of [
+      [100, 'mg/dL'],
+      [110, 'mg/dL'],
+      [2.5, 'mmol/L'],
+      [3.5, 'mmol/L'],
+    ] as const)
+      await recordVital({
+        patientId,
+        bloodSugar: value,
+        bloodSugarUnit: unit,
+        measuredAt: new Date(new Date('2026-10-01T08:00:00Z').getTime() + value * 1000),
+      });
+    await render();
+    expect(tree!.root.findByType(TrendChart).props.points.map((point: { value: number }) => point.value)).toEqual([
+      100, 110,
+    ]);
+    const choice = tree!.root.findByType(ChipSelect);
+    expect(choice.props.options.map((option: { label: string }) => option.label)).toEqual(['قند mg/dL', 'قند mmol/L']);
+    await act(async () => {
+      choice.props.onChange('glucose-mmol');
+    });
+    expect(tree!.root.findByType(TrendChart).props.points.map((point: { value: number }) => point.value)).toEqual([
+      2.5, 3.5,
+    ]);
+  });
   it('cold remount recovers exact invalid raw input without creating a reading', async () => {
     await render();
     await startNew();

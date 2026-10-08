@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type { Vital } from '@/db/schema';
 import { dateInputText, validateDateInput } from '@/lib/date-input';
+import { BLOOD_SUGAR_UNITS } from '@/lib/glucose-unit';
 import { fromIsoDate } from '@/lib/jalali';
 import { formatClock, parseClock } from '@/lib/time';
 
@@ -23,7 +24,8 @@ const textFields = z
   })
   .strict();
 const date = z.object({ dateText: z.string(), clockText: z.string(), customOpen: z.boolean() }).strict();
-const fields = textFields.extend({ date }).strict();
+const legacyFields = textFields.extend({ date }).strict();
+const fields = legacyFields.extend({ bloodSugarUnit: z.enum([...BLOOD_SUGAR_UNITS, '']) }).strict();
 const number = z.number().finite().nullable();
 const base = z
   .object({
@@ -45,16 +47,25 @@ const base = z
     notes: z.string().nullable(),
   })
   .strict();
-const schema = z
+const legacySchema = z
   .object({
     version: z.literal(1),
-    fields,
-    initial: fields,
+    fields: legacyFields,
+    initial: legacyFields,
     base: base.nullable(),
     initialDate: z.number().finite(),
     encounterId: z.string().nullable(),
   })
   .strict();
+const schema = legacySchema.extend({
+  version: z.literal(2),
+  fields,
+  initial: fields,
+  base: base
+    .extend({ bloodSugarUnit: z.enum(BLOOD_SUGAR_UNITS).nullable() })
+    .strict()
+    .nullable(),
+});
 export type VitalFormFields = z.infer<typeof fields>;
 export type VitalFormDocument = z.infer<typeof schema>;
 export class VitalFormConflict extends Error {
@@ -70,6 +81,7 @@ export const EMPTY_VITAL_FORM: VitalForm = {
   temperature: '',
   spo2: '',
   bloodSugar: '',
+  bloodSugarUnit: '',
   weightKg: '',
   heightCm: '',
   painScore: '',
@@ -88,6 +100,7 @@ export function vitalBase(row: Vital): NonNullable<VitalFormDocument['base']> {
     temperature,
     spo2,
     bloodSugar,
+    bloodSugarUnit,
     weightKg,
     heightCm,
     painScore,
@@ -106,6 +119,7 @@ export function vitalBase(row: Vital): NonNullable<VitalFormDocument['base']> {
     temperature,
     spo2,
     bloodSugar,
+    bloodSugarUnit,
     weightKg,
     heightCm,
     painScore,
@@ -120,7 +134,7 @@ export function initialVitalForm(row: Vital | null, encounterId: string | null, 
     date: { dateText: dateInputText(at), clockText: formatClock(at), customOpen: false },
   };
   return {
-    version: 1,
+    version: 2,
     fields: value,
     initial: { ...value, date: { ...value.date } },
     base: row ? vitalBase(row) : null,
@@ -130,7 +144,18 @@ export function initialVitalForm(row: Vital | null, encounterId: string | null, 
 }
 export function decodeVitalForm(body: string): VitalFormDocument {
   try {
-    return schema.parse(JSON.parse(body));
+    const raw: unknown = JSON.parse(body);
+    if (raw && typeof raw === 'object' && 'version' in raw && raw.version === 1) {
+      const old = legacySchema.parse(raw);
+      return schema.parse({
+        ...old,
+        version: 2,
+        fields: { ...old.fields, bloodSugarUnit: '' },
+        initial: { ...old.initial, bloodSugarUnit: '' },
+        base: old.base ? { ...old.base, bloodSugarUnit: null } : null,
+      });
+    }
+    return schema.parse(raw);
   } catch {
     throw new Error('پیش‌نویس اندازه‌گیری قابل خواندن نیست؛ داده تغییر نکرد.');
   }
@@ -149,13 +174,26 @@ export function vitalFormTime(document: VitalFormDocument, now: Date): Date {
 }
 export function vitalFormValues(document: VitalFormDocument, now: Date): VitalEditValues {
   const d = schema.parse(document);
-  const parsed = parseVitalForm(d.fields);
+  const parsed = parseVitalDocument(d);
   if (!parsed.ok) throw new Error('عدد اندازه‌گیری معتبر نیست؛ موارد مشخص‌شده را بررسی کنید.');
   return { ...parsed.values, measuredAt: vitalFormTime(d, now) };
 }
+/** A legacy value may stay unknown only while its exact input and unit remain untouched. */
+export function parseVitalDocument(document: VitalFormDocument) {
+  return parseVitalForm(document.fields, {
+    allowUnknownBloodSugar:
+      document.base?.bloodSugar != null &&
+      document.base.bloodSugarUnit === null &&
+      document.fields.bloodSugar === document.initial.bloodSugar &&
+      document.fields.bloodSugarUnit === '' &&
+      document.initial.bloodSugarUnit === '',
+  });
+}
 const changedDate = (d: VitalFormDocument) =>
   d.fields.date.dateText !== d.initial.date.dateText || d.fields.date.clockText !== d.initial.date.clockText;
-/** BP is one observation. Never merge one locally changed half with a different writer's half. */
+const changedGlucose = (d: VitalFormDocument) =>
+  d.fields.bloodSugar !== d.initial.bloodSugar || d.fields.bloodSugarUnit !== d.initial.bloodSugarUnit;
+/** BP and glucose/unit are pairs; never combine locally changed and remotely changed halves. */
 export function vitalFormPatch(document: VitalFormDocument, current: Vital, now: Date): Partial<VitalEditValues> {
   const original = document.base;
   if (
@@ -177,8 +215,24 @@ export function vitalFormPatch(document: VitalFormDocument, current: Vital, now:
     patch.systolic = values.systolic;
     patch.diastolic = values.diastolic;
   }
+  if (changedGlucose(document)) {
+    if (
+      (current.bloodSugar !== original.bloodSugar || current.bloodSugarUnit !== original.bloodSugarUnit) &&
+      (current.bloodSugar !== values.bloodSugar || current.bloodSugarUnit !== values.bloodSugarUnit)
+    )
+      throw new VitalFormConflict();
+    patch.bloodSugar = values.bloodSugar;
+    patch.bloodSugarUnit = values.bloodSugarUnit;
+  }
   for (const key of Object.keys(document.initial) as (keyof VitalFormFields)[]) {
-    if (key === 'bp' || key === 'date' || document.fields[key] === document.initial[key]) continue;
+    if (
+      key === 'bp' ||
+      key === 'date' ||
+      key === 'bloodSugar' ||
+      key === 'bloodSugarUnit' ||
+      document.fields[key] === document.initial[key]
+    )
+      continue;
     if (current[key] !== original[key] && current[key] !== values[key]) throw new VitalFormConflict();
     Object.assign(patch, { [key]: values[key] });
   }
@@ -195,12 +249,18 @@ export function rebaseVitalForm(document: VitalFormDocument, current: Vital, now
   )
     throw new VitalFormConflict();
   const fresh = initialVitalForm(current, document.encounterId, now);
+  if (changedGlucose(document)) {
+    // An explicit Keep mine keeps the whole observation, never another writer's number.
+    fresh.fields.bloodSugar = document.fields.bloodSugar;
+    fresh.fields.bloodSugarUnit = document.fields.bloodSugarUnit;
+  }
   for (const key of Object.keys(document.fields) as (keyof VitalFormFields)[]) {
     if (key === 'date') {
       if (changedDate(document)) fresh.fields.date = { ...document.fields.date };
       else fresh.fields.date.customOpen = document.fields.date.customOpen;
       continue;
     }
+    if (key === 'bloodSugar' || key === 'bloodSugarUnit') continue;
     const changed = document.fields[key] !== document.initial[key];
     if (changed) Object.assign(fresh.fields, { [key]: document.fields[key] });
   }

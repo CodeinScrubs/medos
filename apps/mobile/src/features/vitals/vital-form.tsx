@@ -3,14 +3,15 @@ import { View } from 'react-native';
 
 import { notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
-import { Button, Card, Column, Input, Row, Text } from '@/components/ui';
+import { Button, Card, ChipSelect, Column, Field, Input, Row, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
+import { BLOOD_SUGAR_UNITS } from '@/lib/glucose-unit';
 import { formatJalaliDateTime } from '@/lib/jalali';
 
-import { decodeVitalForm, vitalFormTime, type VitalFormFields } from './form-draft';
+import { decodeVitalForm, parseVitalDocument, vitalFormTime, type VitalFormFields } from './form-draft';
 import type { VitalFormRow } from './form-draft-queries';
-import { hasAnyVital, parseVitalForm, vitalChips, type VitalForm as VitalRawForm } from './logic';
+import { hasAnyVital, vitalChips, type VitalForm as VitalRawForm } from './logic';
 import { useVitalForm } from './use-form-draft';
 
 const LABELS: Record<keyof VitalRawForm, string> = {
@@ -20,6 +21,7 @@ const LABELS: Record<keyof VitalRawForm, string> = {
   temperature: 'دما (°C)',
   spo2: 'اشباع اکسیژن',
   bloodSugar: 'قند',
+  bloodSugarUnit: 'واحد قند',
   weightKg: 'وزن (kg)',
   heightCm: 'قد (cm)',
   painScore: 'درد (0 تا 10)',
@@ -58,7 +60,7 @@ export function VitalForm({
     }
     void editing.save((document) => {
       if (!dateValidation.check()) return false;
-      const parsed = parseVitalForm(document.fields);
+      const parsed = parseVitalDocument(document);
       setErrors(parsed.ok ? {} : parsed.errors);
       if (!parsed.ok) return false;
       try {
@@ -80,7 +82,7 @@ export function VitalForm({
   } catch {
     /* Do not replace unreadable input. */
   }
-  function input(key: keyof VitalRawForm, placeholder?: string) {
+  function input(key: Exclude<keyof VitalRawForm, 'bloodSugarUnit'>, placeholder?: string) {
     const free = key === 'bp' || key === 'urineOutput' || key === 'notes';
     return (
       <Input
@@ -150,8 +152,25 @@ export function VitalForm({
           <View style={{ flex: 1 }}>{input('spo2')}</View>
           <View style={{ flex: 1 }}>{input('respRate')}</View>
         </Row>
-        <Row gap="sm">
+        <Row gap="sm" align="flex-start">
           <View style={{ flex: 1 }}>{input('bloodSugar')}</View>
+          <Field label="واحد قند" error={errors.bloodSugarUnit} style={{ flex: 1 }}>
+            <ChipSelect
+              options={BLOOD_SUGAR_UNITS}
+              value={form.bloodSugarUnit || null}
+              onChange={(unit) => editing.change({ bloodSugarUnit: unit ?? '' })}
+              disabled={locked}
+              layout="wrap"
+              ltr
+            />
+            {form.bloodSugar && !form.bloodSugarUnit ? (
+              <Text variant="tiny" color="textMuted">
+                واحد ثبت نشده
+              </Text>
+            ) : null}
+          </Field>
+        </Row>
+        <Row gap="sm">
           <View style={{ flex: 1 }}>{input('weightKg')}</View>
           <View style={{ flex: 1 }}>{input('heightCm')}</View>
         </Row>
@@ -195,10 +214,10 @@ export function VitalForm({
                     {stored.date.dateText} · {stored.date.clockText}
                   </Text>
                   {(Object.keys(LABELS) as (keyof VitalRawForm)[])
-                    .filter((key) => stored![key] !== '')
+                    .filter((key) => stored![key] !== '' || (key === 'bloodSugarUnit' && stored!.bloodSugar !== ''))
                     .map((key) => (
                       <Text key={key} selectable>
-                        {LABELS[key]}: {stored![key]}
+                        {LABELS[key]}: {stored![key] || 'ثبت نشده'}
                       </Text>
                     ))}
                 </>

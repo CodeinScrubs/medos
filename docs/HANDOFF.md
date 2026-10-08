@@ -33,6 +33,69 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Explicit glucose units and backward raw compatibility (0.11.42 source)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; previous timeline checkpoint `760fc67`.
+
+**Changed**
+- Migration0027 adds a nullable glucose unit. Existing values stay unknown; new
+  values select mg/dL/mmol/L inline. Separate known-unit charts, labelled unknown
+  records, fractional storage, no inferred unit/conversion/clinical range.
+- Raw codec2 reads codec1 without changing exact input. Untouched historic
+  glucose keeps its unknown unit during unrelated corrections. Changed glucose
+  requires explicit unit; three-way publication/rebase preserves the whole pair.
+- Canonicalize codec shapes before original-basis comparison. Sequential input
+  acknowledgment remains valid despite object key order. Remove the unused old
+  patch builder; keep one persisted edit path. Version0.11.42/code58.
+- Bound generic chart tick generation when floating-point addition stops
+  advancing; preserve fractional/small axis labels. Invalid/nonfinite dates,
+  values/references or an overflowing/collapsed domain show unavailable instead
+  of invalid SVG geometry. No physiological threshold is inferred.
+- Record exact .41 artifact/native/cold archive evidence, separate from this
+  later source. No dependency, permission, route or backup-format change.
+
+**Verified**
+- Full `npm run check`:148 suites/2,039 app tests and five workflows, with
+  typecheck/lint/format green. SQL and actual form callbacks cover two units,
+  fractions/zero, unknown legacy edits, old raw documents, missing/invalid units,
+  pair conflicts/rebase, sequential acknowledgment and chart separation.
+  The expanded numeric/chart slice passes115 focused tests, including bounded
+  ticks, distinct fractional labels and invalid geometry rejection.
+- .41 signed x86_64 APK is byte-identical to the installed base. Native invalid
+  BP/pulse survive cold reopen, refuse publication, then publish one corrected
+  reading; direct imaging event/Back and visible kind filters/empty result work.
+  Independent archives preserve4,104 rows/34 media exactly; cold export adds
+  only two vitals/three drafts, including an exact open version1 `12,5` glucose
+  draft for the new unit migration witness. Native fractional storage is REAL.
+  Actual .39/.41-current restores retain4,104/4,109 rows and34 media exactly,
+  including cold reopen after the current restore; integrity/FKs pass.
+- Exact `760fc67` hosted CI passes; fresh fetch is0/0 with origin/main.
+
+**Not verified**
+- This .42 source in an APK or on a phone; .41 evidence is not .42 acceptance.
+- Native timeline pagination/every record kind, large-font/IME/pressure/full-shift,
+  audio/power/Doze/provider/low-storage and the earlier .33 focus/pressure ANR.
+
+**Open threads**
+- Freeze/build/inspect/accept .42
+  units, unchanged unknown-value editing, version1 raw recovery and charts.
+- Fix trash read failures falsely claiming empty, original dataset ownership and
+  stale/live-owner restore checks. Continue seven remaining manual raw forms,
+  appropriate clinical trash, visual rich text, shift context/follow-up stages
+  and full-shift/physical gates. These are software gaps, not only a phone gate.
+
+**Gotchas**
+- The first full .42 check stopped on JSON formatting of app.json after a scoped
+  version edit; formatter repair and the final full check pass. The initial unit
+  integration exposed five original-basis/handler failures; canonical comparison
+  fixes the actual issue without weakening revision or dataset fencing.
+- A bounded arithmetic probe confirms the old tick loop does not advance for
+  adjacent values near1e20. This is source/math evidence, not a native ANR
+  reproduction or closure. Nine rendered stand-in tests cover the new behavior.
+- Do not backfill units from magnitudes, nationality or a chart's selected unit.
+  Existing SQL affinity retains fractions; do not edit the old numeric migration.
+
 ## 2026-10-09 — Bounded clinical timeline and direct record access (0.11.41 source)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.

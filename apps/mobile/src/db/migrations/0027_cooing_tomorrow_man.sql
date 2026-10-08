@@ -1,0 +1,1 @@
+ALTER TABLE `vitals` ADD `blood_sugar_unit` text;

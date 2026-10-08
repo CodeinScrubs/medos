@@ -116,6 +116,7 @@ describe('recording observations', () => {
       respRate: '',
       spo2: '',
       bloodSugar: '',
+      bloodSugarUnit: '',
       weightKg: '',
       heightCm: '',
       painScore: '',
@@ -142,13 +143,14 @@ describe('recording observations', () => {
    * stored without comment.
    */
   it('refuses a value that cannot be a measurement', () => {
-    const blank = {
+    const blank: VitalForm = {
       bp: '',
       heartRate: '',
       respRate: '',
       temperature: '',
       spo2: '',
       bloodSugar: '',
+      bloodSugarUnit: '',
       weightKg: '',
       heightCm: '',
       painScore: '',

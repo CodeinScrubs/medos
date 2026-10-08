@@ -11,6 +11,7 @@ import { Button, Card, ChipSelect, Column, EmptyState, Row, SectionHeader, Text 
 import { useNow } from '@/components/use-now';
 import { useLive } from '@/db/use-live';
 import { withDatasetWrite } from '@/lib/dataset-write';
+import type { BloodSugarUnit } from '@/lib/glucose-unit';
 import { formatJalali, formatJalaliDateTime } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -20,14 +21,16 @@ import { vitalChips } from './logic';
 import { deleteVital, patientVitalsQuery, vitalSeries, type VitalSeriesKey } from './queries';
 import { VitalForm } from './vital-form';
 
-const SERIES: { value: VitalSeriesKey; label: string }[] = [
-  { value: 'systolic', label: 'فشار سیستول' },
-  { value: 'diastolic', label: 'فشار دیاستول' },
-  { value: 'heartRate', label: 'نبض' },
-  { value: 'temperature', label: 'دما' },
-  { value: 'spo2', label: 'اشباع اکسیژن' },
-  { value: 'respRate', label: 'تنفس' },
-  { value: 'bloodSugar', label: 'قند' },
+type ChartKey = Exclude<VitalSeriesKey, 'bloodSugar'> | 'glucose-mgdl' | 'glucose-mmol';
+const SERIES: { value: ChartKey; key: VitalSeriesKey; unit?: BloodSugarUnit; label: string }[] = [
+  { value: 'systolic', key: 'systolic', label: 'فشار سیستول' },
+  { value: 'diastolic', key: 'diastolic', label: 'فشار دیاستول' },
+  { value: 'heartRate', key: 'heartRate', label: 'نبض' },
+  { value: 'temperature', key: 'temperature', label: 'دما' },
+  { value: 'spo2', key: 'spo2', label: 'اشباع اکسیژن' },
+  { value: 'respRate', key: 'respRate', label: 'تنفس' },
+  { value: 'glucose-mgdl', key: 'bloodSugar', unit: 'mg/dL', label: 'قند mg/dL' },
+  { value: 'glucose-mmol', key: 'bloodSugar', unit: 'mmol/L', label: 'قند mmol/L' },
 ];
 
 /** Raw input is independent of clinical readings; switching editors never silently discards it. */
@@ -45,7 +48,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
   const starting = useRef(false);
   const [readError, setReadError] = useState<Error>();
   const lastRequested = useRef<string | null>(null);
-  const [series, setSeries] = useState<VitalSeriesKey>('systolic');
+  const [series, setSeries] = useState<ChartKey>('systolic');
 
   async function begin(vitalId: string | null) {
     if (starting.current) return;
@@ -74,9 +77,9 @@ export function VitalsTab({ patientId }: { patientId: string }) {
   } catch (e) {
     malformed = e as Error;
   }
-  const availableSeries = SERIES.filter((s) => vitalSeries(rows, s.value).length > 1);
-  const selectedSeries = availableSeries.find((s) => s.value === series)?.value ?? availableSeries[0]?.value ?? series;
-  const points = vitalSeries(rows, selectedSeries);
+  const availableSeries = SERIES.filter((s) => vitalSeries(rows, s.key, s.unit).length > 1);
+  const selectedSeries = availableSeries.find((s) => s.value === series) ?? availableSeries[0];
+  const points = selectedSeries ? vitalSeries(rows, selectedSeries.key, selectedSeries.unit) : [];
   const pendingNew = drafts.data?.some((row) => row.vitalId === null);
 
   return (
@@ -159,7 +162,7 @@ export function VitalsTab({ patientId }: { patientId: string }) {
           <SectionHeader title="نمودار" />
           <ChipSelect
             options={availableSeries}
-            value={selectedSeries}
+            value={selectedSeries?.value}
             onChange={(value) => value && setSeries(value)}
           />
           <Card>

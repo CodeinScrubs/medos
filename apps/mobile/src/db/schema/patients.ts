@@ -1,6 +1,8 @@
 import { relations, sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+import { BLOOD_SUGAR_UNITS } from '@/lib/glucose-unit';
+
 import { baseColumns, bool, isoDate, jsonList } from './_shared';
 import { doctors } from './people';
 import { places } from './places';
@@ -462,6 +464,8 @@ export const vitals = sqliteTable(
     temperature: real('temperature'),
     spo2: integer('spo2'),
     bloodSugar: integer('blood_sugar'),
+    /** Null means the original unit was not recorded; never infer it from the value. */
+    bloodSugarUnit: text('blood_sugar_unit', { enum: BLOOD_SUGAR_UNITS }),
     weightKg: real('weight_kg'),
     heightCm: real('height_cm'),
     painScore: integer('pain_score'),

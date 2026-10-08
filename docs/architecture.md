@@ -1925,3 +1925,31 @@ projection aliases are excluded; a real table with the same name remains watched
 The Drizzle metadata contract is pinned by tests. SQLite/component checks with
 2,000 long notes and360 tied events establish bounds/order/handlers, not native
 phone throughput, power recovery or whole-shift clinical acceptance.
+
+## Recorded glucose units (0.11.42)
+
+Migration0027 adds nullable `vitals.blood_sugar_unit`; existing values remain
+unknown. The existing numeric column is untouched. SQLite retains fractional
+observations, pinned against the real query and independent native .41 archive.
+New glucose entries require an explicit mg/dL or mmol/L selection in the same
+inline editor. There is no inferred default, conversion or clinical range.
+Known units form separate charts; unknown/invalid units stay visible on records
+and are never joined into a glucose line.
+
+Raw document version2 includes the selected unit. Version1 decodes without
+guessing or changing exact number/date/text input; stored bodies are not eagerly
+rewritten. An unchanged legacy value keeps its unknown unit during unrelated
+edits. Editing that raw value requires explicit unit confirmation. Glucose/unit
+is one observation for three-way conflict detection and explicit Keep mine;
+neither operation combines another writer's number with the local unit.
+Canonical codec shapes, not insertion order of object keys, define the original
+draft basis. The unused older patch builder is removed; the persisted publisher
+remains the sole edit path. Backup format and passphrase schemes are unchanged.
+
+Generic chart ticks also have a bounded generation/progress check: floating-point
+addition can stop advancing even for finite values. Axis labels retain the tick's
+fraction instead of rounding nearby values to identical integers or zeroes.
+Invalid dates/values/reference bounds and a nonfinite/collapsed drawing domain
+render an unavailable caption without emitting invalid SVG coordinates. Recorded
+observations remain intact. Source/rendered tests do not establish native device
+throughput or close the earlier unrelated pressure ANR.

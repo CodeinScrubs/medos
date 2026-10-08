@@ -1,3 +1,4 @@
+import { isBloodSugarUnit, type BloodSugarUnit } from '@/lib/glucose-unit';
 import { parseDecimal } from '@/lib/persian';
 
 /*
@@ -40,7 +41,7 @@ export function formatBloodPressureInput(
   return `${systolic ?? ''}/${diastolic ?? ''}`;
 }
 
-export type VitalFields = {
+type VitalNumericFields = {
   systolic: number | null;
   diastolic: number | null;
   heartRate: number | null;
@@ -52,6 +53,7 @@ export type VitalFields = {
   heightCm: number | null;
   painScore: number | null;
 };
+export type VitalFields = VitalNumericFields & { bloodSugarUnit: BloodSugarUnit | null };
 
 export const VITAL_NUMBER_KEYS = [
   'heartRate',
@@ -64,7 +66,9 @@ export const VITAL_NUMBER_KEYS = [
   'painScore',
 ] as const;
 type VitalNumberKey = (typeof VITAL_NUMBER_KEYS)[number];
-export type VitalForm = Record<VitalNumberKey | 'bp' | 'urineOutput' | 'notes', string>;
+export type VitalForm = Record<VitalNumberKey | 'bp' | 'urineOutput' | 'notes', string> & {
+  bloodSugarUnit: BloodSugarUnit | '';
+};
 export type VitalEditValues = VitalFields & { measuredAt: Date; urineOutput: string | null; notes: string | null };
 
 /** Preserve the exact initial text when deciding which fields the user changed. */
@@ -72,35 +76,16 @@ export function vitalFormOf(row: VitalEditValues): VitalForm {
   return {
     bp: formatBloodPressureInput(row.systolic, row.diastolic),
     ...Object.fromEntries(VITAL_NUMBER_KEYS.map((key) => [key, row[key]?.toString() ?? ''])),
+    bloodSugarUnit: row.bloodSugarUnit ?? '',
     urineOutput: row.urineOutput ?? '',
     notes: row.notes ?? '',
   } as VitalForm;
 }
 
-/** Unchanged inputs must not overwrite another editor or normalize an untouched note. */
-export function vitalEditPatch(
-  original: VitalEditValues,
-  form: VitalForm,
-  values: VitalEditValues,
-): Partial<VitalEditValues> {
-  const initial = vitalFormOf(original);
-  const patch: Partial<VitalEditValues> = {};
-  if (form.bp !== initial.bp) {
-    if (values.systolic !== original.systolic) patch.systolic = values.systolic;
-    if (values.diastolic !== original.diastolic) patch.diastolic = values.diastolic;
-  }
-  for (const key of VITAL_NUMBER_KEYS) {
-    if (form[key] !== initial[key] && values[key] !== original[key]) patch[key] = values[key];
-  }
-  if (form.urineOutput !== initial.urineOutput) patch.urineOutput = values.urineOutput;
-  if (form.notes !== initial.notes) patch.notes = values.notes;
-  if (values.measuredAt.getTime() !== original.measuredAt.getTime()) patch.measuredAt = values.measuredAt;
-  return patch;
-}
-
 /** Reject nonempty invalid input as a whole; it must never become a blank measurement. */
 export function parseVitalForm(
   form: VitalForm,
+  { allowUnknownBloodSugar = false }: { allowUnknownBloodSugar?: boolean } = {},
 ):
   | { ok: true; values: VitalFields & { urineOutput: string | null; notes: string | null } }
   | { ok: false; errors: Partial<Record<keyof VitalForm, string>> } {
@@ -115,6 +100,7 @@ export function parseVitalForm(
     temperature: null,
     spo2: null,
     bloodSugar: null,
+    bloodSugarUnit: null,
     weightKg: null,
     heightCm: null,
     painScore: null,
@@ -122,7 +108,16 @@ export function parseVitalForm(
   for (const key of VITAL_NUMBER_KEYS) {
     values[key] = parseDecimal(form[key]);
     if (form[key].trim() && values[key] == null) errors[key] = 'عدد خوانده نشد؛ اعشار را با نقطه بنویسید.';
-    else if (!possible(key, values[key])) errors[key] = outOfBounds(key);
+    else if (key === 'bloodSugar') {
+      // A unit-free physiological cutoff cannot validate both supported units.
+      // Preserve any finite nonnegative observation; this is not a clinical range.
+      if (values[key] != null && values[key] < 0) errors[key] = 'قند را با عدد صفر یا مثبت بنویسید.';
+    } else if (!possible(key, values[key])) errors[key] = outOfBounds(key);
+  }
+  if (form.bloodSugarUnit && !isBloodSugarUnit(form.bloodSugarUnit)) errors.bloodSugarUnit = 'واحد قند معتبر نیست.';
+  if (values.bloodSugar != null) {
+    values.bloodSugarUnit = isBloodSugarUnit(form.bloodSugarUnit) ? form.bloodSugarUnit : null;
+    if (!values.bloodSugarUnit && !allowUnknownBloodSugar) errors.bloodSugarUnit = 'واحد قند را انتخاب کنید.';
   }
   if (!errors.bp) {
     if (!possible('systolic', values.systolic) || !possible('diastolic', values.diastolic))
@@ -142,26 +137,25 @@ export function parseVitalForm(
  * 150, a temperature of 385, a pain score of 12 — not a normal range: every
  * value inside these limits is stored without comment, as the header says.
  */
-const POSSIBLE: Record<keyof VitalFields, readonly [number, number]> = {
+const POSSIBLE: Record<Exclude<keyof VitalNumericFields, 'bloodSugar'>, readonly [number, number]> = {
   systolic: [20, 300],
   diastolic: [5, 250],
   heartRate: [0, 350],
   respRate: [0, 100],
   temperature: [20, 45],
   spo2: [0, 100],
-  bloodSugar: [5, 3000],
   weightKg: [0.2, 500],
   heightCm: [20, 260],
   painScore: [0, 10],
 };
 
-function possible(key: keyof VitalFields, value: number | null): boolean {
+function possible(key: keyof typeof POSSIBLE, value: number | null): boolean {
   if (value == null) return true;
   const [min, max] = POSSIBLE[key];
   return value >= min && value <= max;
 }
 
-function outOfBounds(key: keyof VitalFields): string {
+function outOfBounds(key: keyof typeof POSSIBLE): string {
   const [min, max] = POSSIBLE[key];
   return `این عدد ممکن نیست (${min} تا ${max}). اشتباه تایپی؟`;
 }
@@ -172,6 +166,21 @@ export function validateVitalNumbers(values: Partial<VitalFields>): void {
     const value = values[key];
     if (value != null && !Number.isFinite(value)) throw new Error(`Invalid numeric field: ${key}`);
   }
+}
+
+/** Unknown is retained only for an existing, unchanged legacy observation. */
+export function validateBloodSugar(
+  value: number | null | undefined,
+  unit: BloodSugarUnit | null | undefined,
+  allowUnknown = false,
+): void {
+  if (unit != null && !isBloodSugarUnit(unit)) throw new Error('واحد قند معتبر نیست.');
+  if (value == null) {
+    if (unit != null) throw new Error('واحد قند بدون مقدار ثبت نمی‌شود.');
+    return;
+  }
+  if (!Number.isFinite(value) || value < 0) throw new Error('قند را با عدد صفر یا مثبت بنویسید.');
+  if (!unit && !allowUnknown) throw new Error('واحد قند را انتخاب کنید.');
 }
 
 /** Did anything at all get measured? An empty set of vitals is not a reading. */
@@ -221,7 +230,16 @@ export function vitalChips(v: Partial<VitalFields> & { urineOutput?: string | nu
   push('rr', 'تنفس', v.respRate);
   push('t', 'دما', v.temperature, '°');
   push('spo2', 'اشباع', v.spo2, '%');
-  push('bs', 'قند', v.bloodSugar);
+  push(
+    'bs',
+    v.bloodSugarUnit == null
+      ? 'قند · واحد ثبت نشده'
+      : isBloodSugarUnit(v.bloodSugarUnit)
+        ? 'قند'
+        : 'قند · واحد نامعتبر',
+    v.bloodSugar,
+    isBloodSugarUnit(v.bloodSugarUnit) ? ` ${v.bloodSugarUnit}` : '',
+  );
   push('wt', 'وزن', v.weightKg, ' kg');
   push('ht', 'قد', v.heightCm, ' cm');
   push('pain', 'درد', v.painScore);

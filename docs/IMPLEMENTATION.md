@@ -36,6 +36,24 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.42 adds explicit recorded glucose units through nullable migration0027.
+New entries choose mg/dL or mmol/L inline. Historic values remain unknown;
+unrelated corrections do not guess a unit. Raw codec2 reads codec1 without
+changing exact input. Glucose/unit is a conflict pair, including explicit Keep
+mine. Only values with the selected known unit share a chart; unknown/invalid
+units remain labelled on records. No conversion, inferred default or clinical
+range is added. Remove the unused parallel patch builder and canonicalize the
+raw basis before comparing, so successive edits cannot fail because of object
+key order. Full check passes148 suites/2,039 app tests and five workflows.
+The numeric chart slice additionally bounds non-advancing ticks, retains
+fractional axis labels and refuses invalid SVG geometry with a visible caption;
+The expanded numeric/chart slice passes115 focused tests; the full check above
+includes these final changes.
+Native .42 unit selection/old raw migration/charts/restores and physical gates
+remain open. Next fix the trash's false empty-on-read-error, original dataset
+ownership and stale/owner checks, then remaining manual raw forms and product
+gates. Do not call the phone the sole remaining task.
+
 0.11.41 bounds the clinical timeline to40 displayed events. Each source reads
 at most41 short candidates after the selected kind/keyset boundary; only visible
 panels hydrate at most six values each, retaining units and explicit preview
@@ -46,9 +64,11 @@ skipping an incomplete page. The same native scroll/header parent stays mounted.
 Full check passes147 suites/2,006 app tests and five workflows, including2,000
 long notes and360 tied mixed events. Table subscriptions now include nested
 projections/predicates/unions, with pinned SQL contract tests. No dependency,
-permission, migration, route or clinical formula added. Exact APK acceptance of
-this source (also including .40 vitals) is pending; large-phone/pressure/full-shift
-gates remain distinct. Then finish manual raw forms, appropriate clinical trash
+permission, migration, route or clinical formula added. Exact .41 APK now has
+bounded raw-vitals/cold-publication/direct-imaging/filter/independent archive
+evidence in [validation-0.11.41.md](validation-0.11.41.md); this is not native
+pagination or full-shift acceptance. Large-phone/pressure/full-shift gates remain
+distinct. Then finish manual raw forms, appropriate clinical trash
 and visual rich text; do not call the physical phone the only remaining work.
 
 0.11.40 completes the software slice for raw vitals through additive
@@ -59,11 +79,12 @@ the acknowledged draft; Compare/Load/Keep/discard keep the original dataset and
 recheck the shown versions. One existing patient AutosaveScope owns the inline
 editor; publication is above the long form, without another route. Doctor draft
 discard moves below the fields to avoid a layout jump on first acknowledgment.
-Full check passes145 suites/1,986 app tests and five workflows. These source
-changes are not yet accepted in a new APK. Exact 0.11.39 native/artifact/cold/
+Full check passes145 suites/1,986 app tests and five workflows. The raw-vitals
+paths have bounded native evidence in .41; other .40 paths and the
+physical phone are not implied by it. Exact 0.11.39 native/artifact/cold/
 old-current restore evidence is complete in [validation-0.11.39.md](validation-0.11.39.md).
 No new dependency, permission, route or clinical formula. Remaining: other seven
-manual raw forms, appropriate clinical trash, bounded timelines, visual rich text,
+manual raw forms, appropriate clinical trash, remaining timeline acceptance, visual rich text,
 pressure/full-shift and physical gates. The baseline and new full checks exit
 cleanly without the previous worker-exit warning; this does not prove its cause.
 

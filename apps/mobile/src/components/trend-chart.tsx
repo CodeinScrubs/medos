@@ -5,6 +5,8 @@ import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg
 import { chartDateIndices } from '@/lib/chart-dates';
 import { useTheme } from '@/theme';
 
+import { Text } from './ui/text';
+
 export type TrendPoint = {
   at: Date;
   value: number;
@@ -29,16 +31,24 @@ function niceTicks(min: number, max: number, count = 4): number[] {
   const err = (count * step) / span;
   const mult = err <= 0.15 ? 10 : err <= 0.35 ? 5 : err <= 0.75 ? 2 : 1;
   const nice = step * mult;
+  if (!Number.isFinite(nice) || nice <= 0) return [min, max];
   const start = Math.ceil(min / nice) * nice;
   const ticks: number[] = [];
-  for (let v = start; v <= max + nice * 1e-9; v += nice) ticks.push(Number(v.toPrecision(12)));
+  let previous = -Infinity;
+  // A small step can be below the floating-point spacing of a large value.
+  // Never run an additive loop that can stop advancing on the JS thread.
+  for (let i = 0; i <= count * 2 + 2; i++) {
+    const v = start + i * nice;
+    if (!Number.isFinite(v) || v > max + nice * 1e-9 || v <= previous) break;
+    const tick = Number(v.toPrecision(12));
+    if (ticks.at(-1) !== tick) ticks.push(tick);
+    previous = v;
+  }
   return ticks;
 }
 
 function formatTick(v: number): string {
-  if (Math.abs(v) >= 100) return String(Math.round(v));
-  if (Math.abs(v) >= 10) return String(Number(v.toFixed(1)));
-  return String(Number(v.toFixed(2)));
+  return String(v);
 }
 
 /**
@@ -71,12 +81,26 @@ export function TrendChart({
 
   if (points.length === 0) return <View style={{ height }} onLayout={onLayout} />;
 
-  const values = points.map((p) => p.value);
-  const lo = Math.min(...values, refLow ?? Infinity);
-  const hi = Math.max(...values, refHigh ?? -Infinity);
+  const unavailable = (
+    <View style={{ height }} onLayout={onLayout}>
+      <Text variant="caption" color="textMuted">
+        این مقادیر قابل رسم نیستند.
+      </Text>
+    </View>
+  );
+  if (
+    points.some((p) => !Number.isFinite(p.value) || !(p.at instanceof Date) || !Number.isFinite(p.at.getTime())) ||
+    (refLow != null && !Number.isFinite(refLow)) ||
+    (refHigh != null && !Number.isFinite(refHigh))
+  )
+    return unavailable;
+  const lo = points.reduce((value, p) => Math.min(value, p.value), refLow ?? Infinity);
+  const hi = points.reduce((value, p) => Math.max(value, p.value), refHigh ?? -Infinity);
   const margin = (hi - lo || Math.abs(hi) || 1) * 0.12;
   const yMin = lo - margin;
   const yMax = hi + margin;
+  if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || !Number.isFinite(yMax - yMin) || yMax <= yMin)
+    return unavailable;
 
   const plotW = Math.max(width - PAD.left - PAD.right, 1);
   const plotH = height - PAD.top - PAD.bottom;

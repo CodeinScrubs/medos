@@ -110,7 +110,8 @@ export async function saveVitalFormDraft(
         current.committedVitalId ||
         current.revision !== revision ||
         current.encounterId !== document.encounterId ||
-        !sameBasis(decodeVitalForm(current.body), document)
+        // Compare the codec's canonical shape; object key order is not an edit.
+        !sameBasis(decodeVitalForm(current.body), decodeVitalForm(body))
       )
         throw new VitalFormConflict();
       if (current.body === body) return revision;
