@@ -1,13 +1,23 @@
-import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, isNotNull, isNull } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { audit, auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { encounters, noteDrafts, noteVersions, notes, patients, type Note, type NoteType } from '@/db/schema';
+import {
+  encounters,
+  noteDrafts,
+  noteVersions,
+  notes,
+  patients,
+  type Note,
+  type NoteType,
+  type NoteVersion,
+} from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { withDatasetWrite } from '@/lib/dataset-write';
 import { requireDeletedRecord } from '@/lib/deleted-record';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
-import { noteSearchText } from './logic';
+import { noteSearchText, sameNoteSnapshot } from './logic';
 import { writeNoteVersion } from './version-queries';
 
 const alive = isNull(notes.deletedAt);
@@ -30,11 +40,12 @@ export function latestPatientNoteQuery(patientId: string) {
     .limit(1);
 }
 
-export function noteQuery(id: string) {
+export function noteQuery(id: string, patientId: string) {
   return db
-    .select()
+    .select(getTableColumns(notes))
     .from(notes)
-    .where(and(isNull(notes.deletedAt), eq(notes.id, id)))
+    .innerJoin(patients, eq(patients.id, notes.patientId))
+    .where(and(alive, isNull(patients.deletedAt), eq(notes.id, id), eq(notes.patientId, patientId)))
     .limit(1);
 }
 
@@ -120,56 +131,90 @@ export function updateNoteInTransaction(tx: DbTransaction, id: string, input: Pa
  * restore adds another one on top saying where it came from. Nothing in this
  * table is ever removed, so "undo the restore" is just another restore.
  */
-export async function restoreNoteVersion(versionId: string): Promise<void> {
-  db.transaction((tx) => {
-    const version = tx
-      .select()
-      .from(noteVersions)
-      .where(and(isNull(noteVersions.deletedAt), eq(noteVersions.id, versionId)))
-      .get();
-    if (!version) throw new Error(`Note version ${versionId} not found`);
-    const current = tx
-      .select()
-      .from(notes)
-      .where(and(alive, eq(notes.id, version.noteId)))
-      .get();
-    if (!current) throw new Error(`Note ${version.noteId} not found`);
+export async function restoreNoteVersion(expected: NoteVersion, basis: Note, generation: number): Promise<void> {
+  await withDatasetWrite(generation, async () =>
+    db.transaction((tx) => {
+      const version = tx
+        .select()
+        .from(noteVersions)
+        .where(and(isNull(noteVersions.deletedAt), eq(noteVersions.id, expected.id)))
+        .get();
+      if (!version || !sameNoteSnapshot(version, expected))
+        throw new Error('نسخهٔ انتخاب‌شده تغییر کرده یا در دسترس نیست.');
+      const current = tx
+        .select()
+        .from(notes)
+        .where(and(alive, eq(notes.id, version.noteId)))
+        .get();
+      if (!current || !sameNoteSnapshot(current, basis) || version.patientId !== current.patientId)
+        throw new Error('این نوت تغییر کرده یا متعلق به این پرونده نیست؛ دوباره آن را بررسی کنید.');
+      if (
+        !tx
+          .select({ id: patients.id })
+          .from(patients)
+          .where(and(eq(patients.id, current.patientId), isNull(patients.deletedAt)))
+          .get()
+      )
+        throw new Error('پروندهٔ بیمار در دسترس نیست.');
+      if (
+        current.encounterId &&
+        !tx
+          .select({ id: encounters.id })
+          .from(encounters)
+          .where(
+            and(
+              eq(encounters.id, current.encounterId),
+              eq(encounters.patientId, current.patientId),
+              isNull(encounters.deletedAt),
+            ),
+          )
+          .get()
+      )
+        throw new Error('نوبت مراجعهٔ این نوت در دسترس نیست.');
 
-    const fields = {
-      type: version.type,
-      title: version.title,
-      body: version.body,
-      subjective: version.subjective,
-      objective: version.objective,
-      assessment: version.assessment,
-      plan: version.plan,
-      noteDate: version.noteDate ?? current.noteDate,
-      doctorId: version.doctorId,
-      specialty: version.specialty,
-      isPinned: version.isPinned ?? current.isPinned,
-      isDraft: version.isDraft ?? current.isDraft,
-    };
+      const fields = {
+        type: version.type,
+        title: version.title,
+        body: version.body,
+        subjective: version.subjective,
+        objective: version.objective,
+        assessment: version.assessment,
+        plan: version.plan,
+        noteDate: version.noteDate ?? current.noteDate,
+        doctorId: version.doctorId,
+        specialty: version.specialty,
+        isPinned: version.isPinned ?? current.isPinned,
+        isDraft: version.isDraft ?? current.isDraft,
+      };
 
-    tx.update(notes)
-      .set({ ...fields, ...touch(), searchText: noteSearchText(fields) })
-      .where(and(alive, eq(notes.id, version.noteId)))
-      .run();
+      tx.update(notes)
+        .set({ ...fields, ...touch(), searchText: noteSearchText(fields) })
+        .where(and(alive, eq(notes.id, version.noteId)))
+        .run();
 
-    /*
-     * Any unsaved edit of this note is now older than what the note says, and
-     * the editor reads the draft first — reopening it would show the text the
-     * restore was meant to replace, and saving would put it back. The restored
-     * text is in the history either way, but showing someone the opposite of
-     * what they just asked for is its own kind of wrong.
-     */
-    tx.update(noteDrafts)
-      .set(softDelete())
-      .where(and(isNull(noteDrafts.deletedAt), eq(noteDrafts.noteId, version.noteId)))
-      .run();
+      /*
+       * Any unsaved edit of this note is now older than what the note says, and
+       * the editor reads the draft first — reopening it would show the text the
+       * restore was meant to replace, and saving would put it back. The restored
+       * text is in the history either way, but showing someone the opposite of
+       * what they just asked for is its own kind of wrong.
+       */
+      tx.update(noteDrafts)
+        .set(softDelete())
+        .where(
+          and(
+            isNull(noteDrafts.deletedAt),
+            eq(noteDrafts.noteId, version.noteId),
+            eq(noteDrafts.patientId, current.patientId),
+          ),
+        )
+        .run();
 
-    const restored = tx.select().from(notes).where(eq(notes.id, version.noteId)).get()!;
-    writeNoteVersion(tx, restored, 'restored', versionId);
-  });
+      const restored = tx.select().from(notes).where(eq(notes.id, version.noteId)).get()!;
+      writeNoteVersion(tx, restored, 'restored', version.id);
+      auditInTransaction(tx, 'note.versionRestored', { entityType: 'note', entityId: current.id }, new Date());
+    }),
+  );
 }
 
 export async function setNotePinned(id: string, isPinned: boolean): Promise<void> {

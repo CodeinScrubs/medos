@@ -5,6 +5,42 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Note editing and history belong to one chart (0.11.49)
+
+The single-note and version readers require the route's patient ID and join the
+live patient; version rows also match that patient themselves. An ID alone must
+not seed another chart's editor or expose its history. Joined tables remain
+observable by `useLive`. Tombstoned records and their history stay in storage.
+
+The editor keeps its original patient/note/type and AutosaveScope across route
+reuse. Loaded input remains mounted through deletion, read failure, replacement
+and concurrent record changes. Publication carries that loaded Note as an exact
+transactional basis, including fields whose timestamp did not change. A conflict
+retains the raw draft. This basis protects the mounted editor; it is not a
+persisted origin snapshot for an older recovered draft. New-note encounter
+ownership still needs an explicit persisted original context, including null.
+
+Version restoration requires the shown NoteVersion, current Note and original
+dataset token. The synchronous transaction validates both complete rows and
+their live patient/encounter, restores fields/search, retires only that patient's
+obsolete draft, appends history and writes an id-only audit. Failure rolls back
+all of them. The history screen owns one confirmation attempt; unmount, route
+reuse, read failure, focus loss, cancellation and replacement invalidate it.
+Repeated confirmation cannot publish twice or release another in-flight attempt.
+
+Success returns to the patient workspace using `dismissTo`, rather than revealing
+the underlying editor's retained pre-restore input as though it were current.
+Late acknowledgment cannot dismiss another focused page. Header parents and the
+existing always-on removal guard remain mounted while editors close.
+
+**Rejected: keyed editor remounts, ID-only restore and timestamp-only equality.**
+They can lose the sole mounted input or let an old confirmation alter a restored
+same-ID record. No route, dependency, schema or backup-format change is needed
+for this correction. Native .49 acceptance and broader recovery remain separate
+from the source checks; .48 evidence is recorded in `validation-0.11.48.md`.
+
+---
+
 ## Delayed removal belongs to its original navigator (0.11.48)
 
 `useSaveBeforeLeave` remains enabled throughout a route's life. Each removal

@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { noteVersions, notes, type Note, type NoteVersion } from '@/db/schema';
+import { noteVersions, notes, patients, type Note, type NoteVersion } from '@/db/schema';
 import { defineSetting, readSetting, writeSetting } from '@/db/settings';
 import { newId, stamps } from '@/lib/ids';
 
@@ -74,11 +74,22 @@ const fieldsOf = (note: VersionSnapshot): VersionSnapshot => ({
 });
 
 /** Every version of one note, newest first. */
-export function noteVersionsQuery(noteId: string) {
+export function noteVersionsQuery(noteId: string, patientId: string) {
   return db
-    .select()
+    .select(getTableColumns(noteVersions))
     .from(noteVersions)
-    .where(and(isNull(noteVersions.deletedAt), eq(noteVersions.noteId, noteId)))
+    .innerJoin(notes, eq(notes.id, noteVersions.noteId))
+    .innerJoin(patients, eq(patients.id, notes.patientId))
+    .where(
+      and(
+        isNull(noteVersions.deletedAt),
+        isNull(notes.deletedAt),
+        isNull(patients.deletedAt),
+        eq(noteVersions.noteId, noteId),
+        eq(noteVersions.patientId, patientId),
+        eq(notes.patientId, patientId),
+      ),
+    )
     .orderBy(desc(noteVersions.createdAt));
 }
 

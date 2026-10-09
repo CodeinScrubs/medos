@@ -1,18 +1,22 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Badge, Button, Card, Column, Divider, EmptyState, Row, Screen, Text } from '@/components/ui';
 import type { NoteVersion } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { datasetGeneration } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
-import { restoreNoteVersion } from './queries';
+import { sameNoteSnapshot } from './logic';
+import { noteQuery, restoreNoteVersion } from './queries';
 import { noteVersionsQuery } from './version-queries';
 
 const REASON_LABEL: Record<NoteVersion['reason'], string> = {
@@ -33,37 +37,117 @@ const REASON_LABEL: Record<NoteVersion['reason'], string> = {
  * Params: `id` (patient), `noteId`.
  */
 export function NoteHistoryScreen() {
-  const { noteId } = useLocalSearchParams<{ id: string; noteId: string }>();
+  const { id: patientId, noteId } = useLocalSearchParams<{ id: string; noteId: string }>();
+  const [context] = useState(() => ({ patientId: patientId ?? '', noteId: noteId ?? '' }));
+  const contextChanged = context.patientId !== (patientId ?? '') || context.noteId !== (noteId ?? '');
+  const { generation, stale } = useDatasetIntent();
   const router = useRouter();
+  const navigation = useNavigation();
   const { spacing, colors } = useTheme();
-  const { data, error } = useLive(noteVersionsQuery(noteId ?? ''), [noteId]);
+  const { data, error, retry } = useLive(noteVersionsQuery(context.noteId, context.patientId), [
+    context.noteId,
+    context.patientId,
+  ]);
+  const {
+    data: noteRows,
+    error: noteError,
+    retry: retryNote,
+  } = useLive(noteQuery(context.noteId, context.patientId), [context.noteId, context.patientId]);
   const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  const attempt = useRef<symbol | null>(null);
+  const readable = !contextChanged && !stale && !error && !noteError && data !== undefined && Boolean(noteRows?.[0]);
+  const read = useRef({ readable, versions: data, note: noteRows?.[0] });
+  useLayoutEffect(() => {
+    read.current = { readable, versions: data, note: noteRows?.[0] };
+  }, [readable, data, noteRows]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      attempt.current = null;
+    };
+  }, []);
 
   const versions = data ?? [];
 
   function restore(version: NoteVersion) {
-    Alert.alert('برگرداندن این نسخه؟', 'متن فعلی هم در تاریخچه می‌ماند و هر وقت خواستید برمی‌گردد.', [
-      { text: 'انصراف', style: 'cancel' },
-      {
-        text: 'برگردان',
-        onPress: () => {
-          setBusy(true);
-          void restoreNoteVersion(version.id)
-            .then(() => router.back())
-            .catch((e: unknown) => alertError('برنگشت', e))
-            .finally(() => setBusy(false));
+    const basis = read.current.note;
+    if (!mounted.current || attempt.current || !navigation.isFocused() || !read.current.readable || !basis) return;
+    const token = Symbol('note version restore');
+    attempt.current = token;
+    let used = false;
+    const release = () => {
+      if (attempt.current === token) attempt.current = null;
+    };
+    const owns = () =>
+      mounted.current &&
+      attempt.current === token &&
+      navigation.isFocused() &&
+      generation === datasetGeneration() &&
+      read.current.readable;
+    Alert.alert(
+      'برگرداندن این نسخه؟',
+      'متن فعلی هم در تاریخچه می‌ماند و هر وقت خواستید برمی‌گردد.',
+      [
+        { text: 'انصراف', style: 'cancel', onPress: release },
+        {
+          text: 'برگردان',
+          onPress: () => {
+            if (used) return;
+            if (!owns()) {
+              release();
+              return;
+            }
+            used = true;
+            if (
+              !read.current.note ||
+              !sameNoteSnapshot(read.current.note, basis) ||
+              !read.current.versions?.some((row) => sameNoteSnapshot(row, version))
+            ) {
+              release();
+              retry();
+              retryNote();
+              notify('نوت تغییر کرده', 'تاریخچه دوباره خوانده می‌شود؛ نسخهٔ جدید را بررسی کنید.');
+              return;
+            }
+            setBusy(true);
+            void restoreNoteVersion(version, basis, generation)
+              .then(() => {
+                // The underlying editor owns its old text; do not reopen it as the restored note.
+                if (owns()) router.dismissTo({ pathname: '/patient/[id]', params: { id: context.patientId } });
+              })
+              .catch((e: unknown) => {
+                if (mounted.current && navigation.isFocused()) alertError('برنگشت', e);
+              })
+              .finally(() => {
+                release();
+                if (mounted.current) setBusy(false);
+              });
+          },
         },
-      },
-    ]);
+      ],
+      { cancelable: true, onDismiss: release },
+    );
   }
 
   return (
     <Screen scroll>
       <ScreenOptions options={{ title: 'تاریخچه‌ی نوت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error} what="تاریخچه" />
+        <ErrorNotice error={error} what="تاریخچه" onRetry={retry} />
+        <ErrorNotice error={noteError} what="نوت" onRetry={retryNote} />
+        {stale || contextChanged ? (
+          <Text color="danger">پرونده یا داده‌ها تغییر کرده؛ این تاریخچه فقط برای مرور است.</Text>
+        ) : null}
+        {!error && !noteError && (data === undefined || noteRows === undefined) ? (
+          <Text color="textMuted">در حال خواندن…</Text>
+        ) : null}
+        {noteRows !== undefined && !noteRows[0] && !noteError ? (
+          <Text color="danger">نوت یا پرونده در دسترس نیست.</Text>
+        ) : null}
 
-        {versions.length === 0 && data !== undefined ? (
+        {versions.length === 0 && data !== undefined && readable ? (
           <EmptyState
             icon="time-outline"
             title="هنوز نسخه‌ای ثبت نشده"
@@ -106,6 +190,7 @@ export function NoteHistoryScreen() {
                     variant="secondary"
                     size="sm"
                     loading={busy}
+                    disabled={busy || !readable}
                     onPress={() => restore(version)}
                   />
                 </View>

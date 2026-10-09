@@ -1,5 +1,16 @@
-import type { Note, NoteType } from '@/db/schema';
+import type { Note, NoteType, NoteVersion } from '@/db/schema';
 import { buildSearchText } from '@/lib/persian';
+
+/** Exact shown-row equality, including clinical fields and Date milliseconds. */
+export function sameNoteSnapshot<T extends Note | NoteVersion>(current: T, expected: T): boolean {
+  return (Object.keys(current) as (keyof T)[]).every((key) => {
+    const a = current[key],
+      b = expected[key];
+    return a instanceof Date || b instanceof Date
+      ? a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+      : a === b;
+  });
+}
 
 /** Note types written in SOAP form; everything else is a single free-text body. */
 export const SOAP_NOTE_TYPES: readonly NoteType[] = ['admission', 'progress', 'outpatient_visit', 'consult_reply'];

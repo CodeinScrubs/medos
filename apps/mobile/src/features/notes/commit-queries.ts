@@ -1,16 +1,21 @@
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { attachments, noteDrafts, notes, patients } from '@/db/schema';
+import { attachments, noteDrafts, notes, patients, type Note } from '@/db/schema';
 import { addAttachmentInTransaction } from '@/features/attachments/queries';
 import { assertDatasetWrite, datasetGeneration } from '@/lib/dataset-write';
 import { softDelete, touch } from '@/lib/ids';
 
 import { draftHasContent, draftVoiceRowsInTransaction, requireNoPendingDraftRecording } from './draft-queries';
+import { sameNoteSnapshot } from './logic';
 import { createNoteInTransaction, updateNoteInTransaction } from './queries';
 
 /** Publish the persisted draft, its history and voice metadata as one operation. */
-export async function commitNoteDraft(draftId: string, generation = datasetGeneration()): Promise<string> {
+export async function commitNoteDraft(
+  draftId: string,
+  generation = datasetGeneration(),
+  expected?: Note,
+): Promise<string> {
   assertDatasetWrite(generation);
   return db.transaction((tx) => {
     const draft = tx
@@ -65,13 +70,16 @@ export async function commitNoteDraft(draftId: string, generation = datasetGener
     let noteId = draft.noteId;
     if (noteId) {
       const current = tx
-        .select({ patientId: notes.patientId })
+        .select()
         .from(notes)
         .where(and(eq(notes.id, noteId), isNull(notes.deletedAt)))
         .get();
       if (!current || current.patientId !== draft.patientId) throw new Error('Draft target does not match the note');
+      if (expected && !sameNoteSnapshot(current, expected))
+        throw new Error('این نوت تغییر کرده است؛ پیش‌نویس شما باقی مانده و نسخهٔ جدید جایگزین نشد.');
       updateNoteInTransaction(tx, noteId, fields);
     } else {
+      if (expected) throw new Error('مقصد پیش‌نویس با نوتِ اولیه یکسان نیست.');
       noteId = createNoteInTransaction(tx, { patientId: draft.patientId, ...fields });
     }
     for (const voice of draft.voices ?? []) {

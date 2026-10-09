@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useNavigation } from 'expo-router/react-navigation';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 
 import { AutosaveScope, useAutosaveScope } from '@/components/autosave-scope';
@@ -15,6 +15,7 @@ import {
   Button,
   ChipSelect,
   Column,
+  EmptyState,
   IconButton,
   Input,
   Row,
@@ -31,8 +32,9 @@ import { useLive } from '@/db/use-live';
 import { VoiceNotesSection } from '@/features/attachments/voice-notes';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor } from '@/features/doctors/queries';
+import { patientQuery } from '@/features/patients/queries';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
-import { DatasetChangedError, withDatasetWrite } from '@/lib/dataset-write';
+import { DatasetChangedError, datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId } from '@/lib/ids';
 import { mediaUri } from '@/platform/media';
 import { useTheme } from '@/theme';
@@ -47,7 +49,7 @@ import {
   type NoteDraftFields,
 } from './draft-queries';
 import { NOTE_TYPE_LABELS } from './labels';
-import { CONSULT_NOTE_TYPES, SOAP_NOTE_TYPES } from './logic';
+import { CONSULT_NOTE_TYPES, SOAP_NOTE_TYPES, sameNoteSnapshot } from './logic';
 import { latestPatientNoteQuery, noteQuery } from './queries';
 
 /**
@@ -67,27 +69,81 @@ const TYPE_OPTIONS = NOTE_TYPES.map((t) => ({ value: t, label: NOTE_TYPE_LABELS[
 /** Create or edit a note. Params: `id` (patient), optional `noteId`, optional `type`. */
 export function NoteEditorScreen() {
   const { id: patientId, noteId, type } = useLocalSearchParams<{ id: string; noteId?: string; type?: string }>();
+  const [context] = useState(() => ({ patientId: patientId ?? '', noteId, type }));
+  const contextChanged = context.patientId !== (patientId ?? '') || context.noteId !== noteId;
   return (
-    <AutosaveScope key={`${patientId}:${noteId ?? 'new'}`}>
-      <NoteGate patientId={patientId} noteId={noteId} type={type} />
+    <AutosaveScope>
+      <NoteGate {...context} contextChanged={contextChanged} />
     </AutosaveScope>
   );
 }
 
-function NoteGate({ patientId, noteId, type }: { patientId: string; noteId?: string; type?: string }) {
-  const { data, error, retry } = useLive(noteQuery(noteId ?? ''), [noteId]);
+function NoteGate({
+  patientId,
+  noteId,
+  type,
+  contextChanged,
+}: {
+  patientId: string;
+  noteId?: string;
+  type?: string;
+  contextChanged: boolean;
+}) {
+  const { data, error, retry } = useLive(noteQuery(noteId ?? '', patientId), [noteId, patientId]);
+  const { data: parentRows, error: parentError, retry: retryParent } = useLive(patientQuery(patientId), [patientId]);
+  const { stale } = useDatasetIntent();
+  const { colors, spacing } = useTheme();
+  const [seed, setSeed] = useState<Note | undefined>(() => data?.[0]);
+  const [hasParent, setHasParent] = useState(() => Boolean(parentRows?.[0]));
+  if (!stale && !hasParent && parentRows?.[0]) setHasParent(true);
+  if (!stale && seed === undefined && data?.[0]) setSeed(data[0]);
+  const unavailable =
+    parentRows === undefined ||
+    !parentRows[0] ||
+    Boolean(parentError || error) ||
+    (Boolean(noteId) && (data === undefined || !data[0] || Boolean(seed && !sameNoteSnapshot(data[0], seed))));
+  if (!hasParent && unavailable && !noteId) {
+    return (
+      <Screen>
+        {parentError ? (
+          <ErrorNotice error={parentError} what="پرونده" onRetry={retryParent} />
+        ) : parentRows === undefined ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.huge }} />
+        ) : (
+          <EmptyState title="پرونده در دسترس نیست" icon="alert-circle-outline" />
+        )}
+      </Screen>
+    );
+  }
   // The type comes from the URL, so it is checked rather than trusted.
   const initialType = NOTE_TYPES.find((t) => t === type) ?? 'progress';
   return (
-    <EditGate editing={Boolean(noteId)} rows={data} error={error} onRetry={retry} what="نوت" fenceDataset>
+    <EditGate
+      editing={Boolean(noteId)}
+      rows={seed ? [seed] : data}
+      error={error}
+      onRetry={retry}
+      what="نوت"
+      fenceDataset
+    >
       {(note, readNotice, generation) => (
         <DraftGate
           patientId={patientId}
           note={note}
           initialType={initialType}
-          retryNote={retry}
+          retryNote={() => {
+            retry();
+            retryParent();
+          }}
           generation={generation}
-          readNotice={readNotice}
+          readNotice={
+            <>
+              {readNotice}
+              <ErrorNotice error={parentError} what="پرونده" onRetry={retryParent} />
+            </>
+          }
+          contextChanged={contextChanged}
+          unavailable={unavailable}
         />
       )}
     </EditGate>
@@ -108,6 +164,8 @@ function DraftGate({
   retryNote,
   generation,
   readNotice,
+  contextChanged,
+  unavailable,
 }: {
   patientId: string;
   note: Note | null;
@@ -115,6 +173,8 @@ function DraftGate({
   retryNote: () => void;
   generation: number;
   readNotice: ReactNode;
+  contextChanged: boolean;
+  unavailable: boolean;
 }) {
   const { colors, spacing } = useTheme();
   const { data, error, retry } = useLive(noteDraftQuery(patientId, note?.id ?? null), [patientId, note?.id]);
@@ -145,6 +205,8 @@ function DraftGate({
       }}
       generation={generation}
       readNotice={readNotice}
+      contextChanged={contextChanged}
+      unavailable={unavailable}
     />
   );
 }
@@ -177,6 +239,8 @@ function NoteEditor({
   retryRead,
   generation,
   readNotice,
+  contextChanged,
+  unavailable,
 }: {
   patientId: string;
   note: Note | null;
@@ -186,6 +250,8 @@ function NoteEditor({
   retryRead: () => void;
   generation: number;
   readNotice: ReactNode;
+  contextChanged: boolean;
+  unavailable: boolean;
 }) {
   const router = useRouter();
   const navigation = useNavigation();
@@ -208,6 +274,22 @@ function NoteEditor({
   const completedRef = useRef(false);
   const committing = useRef(false);
   const dateValidation = useDateValidation();
+  const mounted = useRef(true);
+  const contextValid = useRef(!contextChanged && !unavailable && !readError);
+  useLayoutEffect(() => {
+    contextValid.current = !contextChanged && !unavailable && !readError;
+  }, [contextChanged, unavailable, readError]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const locked = saving || stale || contextChanged || unavailable || Boolean(readError);
+  function requireContext() {
+    if (!mounted.current || !contextValid.current)
+      throw new Error('نوت یا مسیر پرونده تغییر کرده است؛ نوشتهٔ این فرم باقی مانده.');
+  }
 
   const saver = useMemo(
     () =>
@@ -223,7 +305,14 @@ function NoteEditor({
   useEffect(() => scope.group.register(saver), [scope, saver]);
 
   function update(patch: Partial<NoteDraftFields>) {
-    if (completedRef.current || committing.current) return;
+    if (
+      completedRef.current ||
+      committing.current ||
+      !mounted.current ||
+      !contextValid.current ||
+      generation !== datasetGeneration()
+    )
+      return;
     const next = { ...latest.current, ...patch };
     latest.current = next;
     setFields(next);
@@ -265,6 +354,7 @@ function NoteEditor({
     // The recorder's original dataset admission encloses both calls. Never
     // recursively flush the group here: it contains this recorder's handoff.
     if (completedRef.current) throw new Error('این پیش‌نویس بسته شده است؛ وویس جدید ثبت نشد.');
+    requireContext();
     saver.change(latest.current);
     if (!(await saver.flush())) throw new Error('متن پیش‌نویس هنوز ذخیره نشده است.');
   }
@@ -279,6 +369,7 @@ function NoteEditor({
     setSaving(true);
     try {
       await withDatasetWrite(generation, async () => {
+        requireContext();
         if (!(await scope.group.flush())) {
           notify('ذخیره نشد', 'متن یا وویس روی صفحه باقی مانده؛ دوباره تلاش کنید.');
           return;
@@ -294,7 +385,8 @@ function NoteEditor({
           notify('ذخیره نشد', 'نوشته روی صفحه باقی مانده؛ دوباره تلاش کنید.');
           return;
         }
-        await commitNoteDraft(draftId, generation);
+        requireContext();
+        await commitNoteDraft(draftId, generation, note ?? undefined);
         completedRef.current = true;
         saver.cancel();
         setCompleted(true);
@@ -314,11 +406,13 @@ function NoteEditor({
     setSaving(true);
     try {
       await withDatasetWrite(generation, async () => {
+        requireContext();
         // Wait for in-flight writes before retiring the draft; failed deletion stays visible.
         if (!(await scope.group.flush())) {
           notify('پیش‌نویس حذف نشد', 'متن یا وویس هنوز ذخیره نشده است؛ دوباره تلاش کنید.');
           return;
         }
+        requireContext();
         await discardNoteDraft(draftId, generation);
         completedRef.current = true;
         saver.cancel();
@@ -431,14 +525,16 @@ function NoteEditor({
                 <IconButton
                   icon="time-outline"
                   label="تاریخچه"
-                  disabled={saving}
+                  disabled={locked}
                   onPress={() =>
-                    void scope.perform(() =>
+                    void scope.perform(() => {
+                      requireContext();
+                      if (!navigation.isFocused()) return;
                       router.push({
                         pathname: '/patient/[id]/note-history',
                         params: { id: patientId, noteId: note!.id },
-                      }),
-                    )
+                      });
+                    })
                   }
                 />
               ) : null}
@@ -447,7 +543,7 @@ function NoteEditor({
                 variant="secondary"
                 size="sm"
                 loading={saving}
-                disabled={stale}
+                disabled={locked}
                 onPress={() => void save()}
               />
             </Row>
@@ -458,6 +554,9 @@ function NoteEditor({
       <Column collapsable={false} gap="md" pointerEvents={saving ? 'none' : 'auto'} style={{ paddingTop: spacing.md }}>
         {readNotice}
         <ErrorNotice error={readError} what="نوت و پیش‌نویس" onRetry={retryRead} />
+        {contextChanged || unavailable ? (
+          <Text color="danger">نوت یا مسیر پرونده تغییر کرده؛ نوشتهٔ این فرم برای مرور و کپی باقی مانده است.</Text>
+        ) : null}
         {recovered ? (
           <Text variant="caption" color="textMuted">
             پیش‌نویس قبلی بازیابی شد.
@@ -466,7 +565,7 @@ function NoteEditor({
 
         <ChipSelect
           label="نوع نوت"
-          disabled={saving}
+          disabled={locked}
           options={TYPE_OPTIONS}
           value={fields.type}
           onChange={(v) => v && update({ type: v })}
@@ -474,7 +573,7 @@ function NoteEditor({
 
         <Input
           label={fields.type === 'event' ? 'چه اتفاقی افتاد؟' : 'عنوان'}
-          editable={!saving}
+          editable={!locked}
           value={fields.title ?? ''}
           onChangeText={(v) => update({ title: v })}
           placeholder={fields.type === 'event' ? 'مثلاً Intubated / انتقال به ICU' : 'اختیاری'}
@@ -484,7 +583,7 @@ function NoteEditor({
           <>
             <SelectField
               label={fields.type === 'consult_request' ? 'کانسالت از' : 'پاسخ‌دهنده'}
-              disabled={saving}
+              disabled={locked}
               icon="person-outline"
               value={doctorLabel}
               placeholder="انتخاب یا افزودن پزشک"
@@ -493,7 +592,7 @@ function NoteEditor({
             />
             <Input
               label="سرویس"
-              editable={!saving}
+              editable={!locked}
               value={fields.specialty ?? ''}
               onChangeText={(v) => update({ specialty: v })}
               placeholder="مثلاً قلب / عفونی"
@@ -508,7 +607,7 @@ function NoteEditor({
               // Copied only on request, into empty fields, and fully editable.
               <Button
                 label="ادامه از نوت قبلی (Assessment و Plan)"
-                disabled={saving}
+                disabled={locked}
                 icon="copy-outline"
                 variant="ghost"
                 size="sm"
@@ -517,28 +616,28 @@ function NoteEditor({
             ) : null}
             <Input
               label="Subjective"
-              editable={!saving}
+              editable={!locked}
               value={fields.subjective ?? ''}
               onChangeText={(v) => update({ subjective: v })}
               multiline
             />
             <Input
               label="Objective"
-              editable={!saving}
+              editable={!locked}
               value={fields.objective ?? ''}
               onChangeText={(v) => update({ objective: v })}
               multiline
             />
             <Input
               label="Assessment"
-              editable={!saving}
+              editable={!locked}
               value={fields.assessment ?? ''}
               onChangeText={(v) => update({ assessment: v })}
               multiline
             />
             <Input
               label="Plan"
-              editable={!saving}
+              editable={!locked}
               value={fields.plan ?? ''}
               onChangeText={(v) => update({ plan: v })}
               multiline
@@ -546,7 +645,7 @@ function NoteEditor({
             {fields.body ? (
               <Input
                 label="متن آزاد"
-                editable={!saving}
+                editable={!locked}
                 value={fields.body}
                 onChangeText={(v) => update({ body: v })}
                 multiline
@@ -556,7 +655,7 @@ function NoteEditor({
         ) : (
           <Input
             label={fields.type === 'event' ? 'جزئیات' : 'متن نوت'}
-            editable={!saving}
+            editable={!locked}
             value={fields.body ?? ''}
             onChangeText={(v) => update({ body: v })}
             multiline
@@ -567,7 +666,7 @@ function NoteEditor({
         <QuickDateField
           onValidityChange={dateValidation.setValid}
           label="زمان"
-          disabled={saving}
+          disabled={locked}
           value={fields.noteDate ?? new Date()}
           onChange={(v) => update({ noteDate: v })}
           direction="past"
@@ -576,7 +675,13 @@ function NoteEditor({
 
         <SectionHeader title="وویس" />
         {note ? (
-          <VoiceNotesSection entityType="note" entityId={note.id} patientId={patientId} generation={generation} />
+          <VoiceNotesSection
+            entityType="note"
+            entityId={note.id}
+            patientId={patientId}
+            generation={generation}
+            beforePersist={async () => requireContext()}
+          />
         ) : (
           <Column gap="sm">
             {fields.voices.map((v, i) => (
@@ -601,14 +706,14 @@ function NoteEditor({
 
         <Toggle
           label="سنجاق در خلاصه‌ی پرونده"
-          disabled={saving}
+          disabled={locked}
           description="نوت‌های سنجاق‌شده و رویدادهای مهم در صفحه‌ی اول پرونده دیده می‌شوند"
           value={fields.isPinned}
           onChange={(v) => update({ isPinned: v })}
         />
         <Toggle
           label="پیش‌نویس"
-          disabled={saving}
+          disabled={locked}
           description="برای وقتی که بعداً کاملش می‌کنید"
           value={fields.isDraft}
           onChange={(v) => update({ isDraft: v })}
@@ -621,7 +726,7 @@ function NoteEditor({
               icon="checkmark"
               onPress={() => void save()}
               loading={saving}
-              disabled={stale}
+              disabled={locked}
               full
             />
           </View>
@@ -644,7 +749,12 @@ function NoteEditor({
           update({ doctorId: item.id });
           setPickingDoctor(false);
         }}
-        onCreate={(text) => withDatasetWrite(generation, () => quickCreateDoctor(text))}
+        onCreate={(text) =>
+          withDatasetWrite(generation, async () => {
+            requireContext();
+            return quickCreateDoctor(text);
+          })
+        }
         createLabel="افزودن پزشک"
       />
     </Screen>

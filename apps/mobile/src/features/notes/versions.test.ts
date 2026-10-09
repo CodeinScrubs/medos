@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { noteVersions, notes } from '@/db/schema';
+import { datasetGeneration } from '@/lib/dataset-write';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -45,7 +46,7 @@ describe('note versions', () => {
   it('keeps a version when identical words move to a different SOAP section', async () => {
     const id = await createNote({ patientId, type: 'progress', subjective: 'pain' });
     await updateNote(id, { subjective: null, plan: 'pain' });
-    const versions = await noteVersionsQuery(id);
+    const versions = await noteVersionsQuery(id, patientId);
     expect(versions).toHaveLength(2);
     expect(versions[0]?.subjective).toBeNull();
     expect(versions[0]?.plan).toBe('pain');
@@ -54,13 +55,13 @@ describe('note versions', () => {
 
   it('compares exact snapshots even when stored hashes are old or collide', async () => {
     const id = await createNote({ patientId, type: 'progress', body: 'First' });
-    const note = (await noteQuery(id))[0]!;
+    const note = (await noteQuery(id, patientId))[0]!;
     await t.db.update(noteVersions).set({ contentHash: contentHashOf({ ...note, body: 'first' }) });
     await updateNote(id, { body: 'first' });
-    expect(await noteVersionsQuery(id)).toHaveLength(2);
+    expect(await noteVersionsQuery(id, patientId)).toHaveLength(2);
     await t.db.update(noteVersions).set({ contentHash: 'legacy-format' });
     await updateNote(id, { body: 'first' });
-    expect(await noteVersionsQuery(id)).toHaveLength(2);
+    expect(await noteVersionsQuery(id, patientId)).toHaveLength(2);
   });
 
   it('includes the doctor and field boundaries in the fingerprint', () => {
@@ -76,7 +77,7 @@ describe('note versions', () => {
       const id = await createNote({ patientId, type: 'progress', body: 'one' });
       await updateNote(id, { body: 'two' });
       await updateNote(id, { body: 'three' });
-      expect((await noteVersionsQuery(id)).map((v) => v.body)).toEqual(['three', 'two', 'one']);
+      expect((await noteVersionsQuery(id, patientId)).map((v) => v.body)).toEqual(['three', 'two', 'one']);
     } finally {
       clock.mockRestore();
     }
@@ -85,14 +86,14 @@ describe('note versions', () => {
   it('records a pin change through the same versioned write path', async () => {
     const id = await createNote({ patientId, type: 'general', body: 'review' });
     await setNotePinned(id, true);
-    expect((await noteVersionsQuery(id)).map((v) => v.isPinned)).toEqual([true, false]);
+    expect((await noteVersionsQuery(id, patientId)).map((v) => v.isPinned)).toEqual([true, false]);
   });
   it('keeps what the note said at each save', async () => {
     const id = await createNote({ patientId, type: 'progress', subjective: 'fever' });
     await updateNote(id, { subjective: 'fever, now settled' });
     await updateNote(id, { plan: 'discharge tomorrow' });
 
-    const versions = await noteVersionsQuery(id);
+    const versions = await noteVersionsQuery(id, patientId);
     expect(versions.map((v) => v.reason)).toEqual(['edited', 'edited', 'created']);
     expect(versions.at(-1)?.subjective).toBe('fever');
     expect(versions[0]?.plan).toBe('discharge tomorrow');
@@ -103,19 +104,19 @@ describe('note versions', () => {
     await updateNote(id, { subjective: 'fever' });
     await updateNote(id, {});
 
-    expect(await noteVersionsQuery(id)).toHaveLength(1);
+    expect(await noteVersionsQuery(id, patientId)).toHaveLength(1);
   });
 
   it('restores an older version without losing the newer one', async () => {
     const id = await createNote({ patientId, type: 'progress', subjective: 'first' });
     await updateNote(id, { subjective: 'second' });
-    const versions = await noteVersionsQuery(id);
+    const versions = await noteVersionsQuery(id, patientId);
     const first = versions.at(-1)!;
 
-    await restoreNoteVersion(first.id);
+    await restoreNoteVersion(first, (await noteQuery(id, patientId))[0]!, datasetGeneration());
 
-    expect((await noteQuery(id))[0]?.subjective).toBe('first');
-    const after = await noteVersionsQuery(id);
+    expect((await noteQuery(id, patientId))[0]?.subjective).toBe('first');
+    const after = await noteVersionsQuery(id, patientId);
     // created, edited, restored — the "second" text is still in the history.
     expect(after).toHaveLength(3);
     expect(after[0]?.reason).toBe('restored');
@@ -140,11 +141,11 @@ describe('note versions', () => {
     await backfillNoteVersionsIfNeeded();
     await backfillNoteVersionsIfNeeded();
 
-    const versions = await noteVersionsQuery(id);
+    const versions = await noteVersionsQuery(id, patientId);
     expect(versions).toHaveLength(1);
     expect(versions[0]?.reason).toBe('baseline');
     // Stamped when the note was written, not when the backfill ran.
-    expect(versions[0]?.createdAt).toEqual((await noteQuery(id))[0]?.createdAt);
+    expect(versions[0]?.createdAt).toEqual((await noteQuery(id, patientId))[0]?.createdAt);
   });
 
   it('reads the same text as the same version', () => {
@@ -189,20 +190,22 @@ describe('atomic note writes', () => {
     const id = await createNote({ patientId, type: 'general', body: 'before' });
     failVersions();
     await expect(updateNote(id, { body: 'after' })).rejects.toThrow();
-    expect((await noteQuery(id))[0]?.body).toBe('before');
-    expect(await noteVersionsQuery(id)).toHaveLength(1);
+    expect((await noteQuery(id, patientId))[0]?.body).toBe('before');
+    expect(await noteVersionsQuery(id, patientId)).toHaveLength(1);
   });
 
   it('keeps the newer note and recoverable draft when a restore fails', async () => {
     const id = await createNote({ patientId, type: 'general', body: 'first' });
-    const first = (await noteVersionsQuery(id))[0]!;
+    const first = (await noteVersionsQuery(id, patientId))[0]!;
     await updateNote(id, { body: 'second' });
     await writeNoteDraft('restore-draft', { patientId, noteId: id }, { ...blankDraft, body: 'unfinished' });
     failVersions();
-    await expect(restoreNoteVersion(first.id)).rejects.toThrow();
-    expect((await noteQuery(id))[0]?.body).toBe('second');
+    await expect(
+      restoreNoteVersion(first, (await noteQuery(id, patientId))[0]!, datasetGeneration()),
+    ).rejects.toThrow();
+    expect((await noteQuery(id, patientId))[0]?.body).toBe('second');
     expect((await noteDraftQuery(patientId, id))[0]?.body).toBe('unfinished');
-    expect(await noteVersionsQuery(id)).toHaveLength(2);
+    expect(await noteVersionsQuery(id, patientId)).toHaveLength(2);
   });
 });
 
@@ -216,11 +219,11 @@ describe('restoring while an unsaved edit exists', () => {
     const id = await createNote({ patientId, type: 'progress', subjective: 'first' });
     await updateNote(id, { subjective: 'second' });
     await writeNoteDraft('d-1', { patientId, noteId: id }, { ...blankDraft, subjective: 'half-typed third' });
-    const first = (await noteVersionsQuery(id)).at(-1)!;
+    const first = (await noteVersionsQuery(id, patientId)).at(-1)!;
 
-    await restoreNoteVersion(first.id);
+    await restoreNoteVersion(first, (await noteQuery(id, patientId))[0]!, datasetGeneration());
 
     expect(await noteDraftQuery(patientId, id)).toHaveLength(0);
-    expect((await noteQuery(id))[0]?.subjective).toBe('first');
+    expect((await noteQuery(id, patientId))[0]?.subjective).toBe('first');
   });
 });

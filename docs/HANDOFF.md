@@ -33,6 +33,65 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Scope note readers and fence version restoration (0.11.49 source)
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint; preceding `ac4d335`.
+
+**Changed**
+- Note/history reads require their live patient and reject foreign routes or
+  malformed version ownership. The editor retains original route identity,
+  scope and typed input through route reuse, deletion and read/concurrent changes.
+  Publication compares the exact loaded Note in its synchronous transaction.
+- History restore owns the shown version/current row, original dataset, live
+  patient/encounter and one mounted/focused confirmation. Field/search update,
+  obsolete-draft retirement, new version and id-only audit commit together.
+  Successful navigation returns to the patient workspace without reopening the
+  retained old editor. Late/repeated/cancelled confirmations cannot close a
+  newer page or replace a restored same-ID record.
+- Version0.11.49/code65; no dependency, route, schema, permission, clinical formula
+  or backup-format change. Record .48 native evidence and refresh the ledger.
+
+**Verified**
+- On frozen .48 native source, a foreign patient route exposes the exact note
+  body below the fold; no typing/saving occurs. A proper delayed history test
+  on migrated SQLite changes a same-ID imported note before the fix. Foreign
+  editing and keyed route-reuse input loss also reproduce before correction.
+- New context and actual-editor/history tests pass44 cases, covering original
+  ownership, same-timestamp changes, live-parent refusal, SQL-trigger rollback,
+  retained drafts/input, real same-ID import, unmount/focus/route changes and
+  double/late confirmation. Other existing note/form checks pass.
+- Final `npm run check` passes158 suites/2,194 application tests and five workflow
+  checks; typecheck/lint/both formatting checks pass without warnings.
+- Exact `ac4d335` hosted CI passes. Inspected .48 native install bytes match;
+  upgrade, old/fresh exits, refused/live extension writes and independent whole
+  archives pass their bounded witnesses. Cold base retains4,117 rows/34 media
+  exactly. See `validation-0.11.48.md` for hashes, exclusions and rejected runs.
+
+**Not verified**
+- .49 native, owner arm64 and physical acceptance are pending at this source
+  checkpoint. No crash-freedom, full-shift timing or solved pressure/boot ANR.
+- The mounted Note basis is not persisted conflict recovery for older restored
+  drafts, original new-note encounter ownership or the eight manual raw forms.
+
+**Open threads**
+- Build/inspect/install frozen .49; accept foreign-note/history refusal and
+  actual history restore/return with independent full archives and cold cleanup.
+- Complete persisted note-draft origin/conflict handling and original new-note
+  encounter context. Pilot shared idea/topic raw recovery, then the remaining
+  manual forms. Continue history/trash, rich text, shift/follow-up and native
+  heavy-shift/IME/large-font/physical gates in `IMPLEMENTATION.md`.
+
+**Gotchas**
+- A test invoking an unmount/route confirmation inside the same React `act`
+  has not observed the committed change. Split those phases before judging a
+  stale callback; the valid same-ID SQL-import regression remains separate.
+- Early negative probes passed a proposed object signature into the old
+  ID-only API and hit binding errors; they are not restore-defect evidence.
+  The actual old history screen/confirmation test proves the dangerous write.
+- Native body fields may be below the initial viewport. Fresh bounded scrolling,
+  not the first hierarchy alone, established the foreign-note body finding.
+
 ## 2026-10-09 — Navigator ownership and live extension parents (0.11.48 source)
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.

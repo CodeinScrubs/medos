@@ -378,7 +378,7 @@ describe('editors survive database read failures', () => {
     ['extension', 'extensionId', extensionQuery, () => <ExtensionFormScreen />],
     ['credential', 'credentialId', credentialQuery, () => <CredentialFormScreen />],
     ['lab form snapshot', 'panelId', (id: string) => labFormQuery(patientId, id), () => <LabEntryScreen />],
-    ['note', 'noteId', noteQuery, () => <NoteEditorScreen />],
+    ['note', 'noteId', (id) => noteQuery(id, patientId), () => <NoteEditorScreen />],
     ['occasion', 'occasionId', (id) => occasionFormQuery('example', id), () => <OccasionFormScreen />],
     ['task', 'taskId', taskQuery, () => <TaskScreen />],
     ['consult answer', 'consultId', consultQuery, () => <ConsultAnswerScreen />],

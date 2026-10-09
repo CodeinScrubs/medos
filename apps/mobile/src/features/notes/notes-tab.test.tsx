@@ -297,7 +297,10 @@ describe('mounted note card mutations retain their dataset identity', () => {
         const row = t.db.select().from(notes).get()!;
         if (action === 'pin') {
           expect(row.isPinned).toBe(true);
-          expect((await noteVersionsQuery(noteId)).map((version) => version.isPinned)).toEqual([true, false]);
+          expect((await noteVersionsQuery(noteId, patientId)).map((version) => version.isPinned)).toEqual([
+            true,
+            false,
+          ]);
         } else {
           expect(row.deletedAt).not.toBeNull();
           expect(
@@ -323,13 +326,17 @@ describe('mounted note card mutations retain their dataset identity', () => {
     await render();
     await menu();
     await invoke(confirmation('سنجاق کردن'));
-    expect(queries.noteQuery(noteId).get()?.isPinned).toBe(true);
+    expect(queries.noteQuery(noteId, patientId).get()?.isPinned).toBe(true);
 
     await render();
     await menu();
     await invoke(confirmation('برداشتن سنجاق'));
 
-    expect((await noteVersionsQuery(noteId)).map((version) => version.isPinned)).toEqual([false, true, false]);
+    expect((await noteVersionsQuery(noteId, patientId)).map((version) => version.isPinned)).toEqual([
+      false,
+      true,
+      false,
+    ]);
     const after = tracked();
     expect(after.notes[0]).toEqual({ ...before.notes[0], updatedAt: expect.any(Date) });
     expect(after.drafts).toEqual(before.drafts);

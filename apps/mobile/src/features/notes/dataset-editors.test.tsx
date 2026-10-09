@@ -20,14 +20,17 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { writeNoteDraft, type NoteDraftFields } from './draft-queries';
 import { NoteEditorScreen } from './note-editor-screen';
-import { createNote } from './queries';
+import { NoteHistoryScreen } from './note-history-screen';
+import { createNote, updateNote } from './queries';
+import * as noteQueries from './queries';
 
 let mockParams: { id: string; noteId?: string; orderId?: string };
 const mockBack = jest.fn();
+const mockDismissTo = jest.fn();
 let mockFocused = true;
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
-  useRouter: () => ({ back: mockBack, push: jest.fn() }),
+  useRouter: () => ({ back: mockBack, push: jest.fn(), dismissTo: mockDismissTo }),
 }));
 jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
 jest.mock('react-native', () => {
@@ -50,9 +53,12 @@ jest.mock('@/components/voice-recorder', () => ({ VoiceRecorder: 'VoiceRecorder'
 jest.mock('@/features/attachments/voice-notes', () => ({ VoiceNotesSection: 'VoiceNotesSection' }));
 jest.mock('@/features/patients/patient-header', () => ({ AllergyBanner: 'AllergyBanner' }));
 jest.mock('@/components/ui', () => ({
+  Badge: 'Badge',
   Button: 'Button',
+  Card: 'Card',
   ChipSelect: 'ChipSelect',
   Column: 'Column',
+  Divider: 'Divider',
   EmptyState: 'EmptyState',
   IconButton: 'IconButton',
   Input: 'Input',
@@ -119,6 +125,7 @@ beforeEach(async () => {
   mockParams = { id: patientId };
   mockFocused = true;
   mockBack.mockClear();
+  mockDismissTo.mockClear();
   jest.mocked(alertError).mockClear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.useFakeTimers();
@@ -460,6 +467,192 @@ afterEach(async () => {
   tree = undefined;
   jest.useRealTimers();
   jest.restoreAllMocks();
+});
+
+describe('note route ownership and delayed history confirmations', () => {
+  async function history() {
+    const id = await createNote({ patientId, type: 'general', body: 'First history text' });
+    await updateNote(id, { body: 'Current history text' });
+    mockParams.noteId = id;
+    await act(async () => {
+      tree = create(<NoteHistoryScreen />);
+      await settle();
+    });
+    await act(async () => button('برگرداندن این نسخه').props.onPress());
+    const dialog = jest.mocked(Alert.alert).mock.calls.at(-1)!;
+    return { id, dialog, confirm: dialog[2]!.find((item) => item.text === 'برگردان')!.onPress! };
+  }
+
+  it.each(['note', 'patient'] as const)('retains typed note input when the %s is deleted', async (kind) => {
+    const noteId = await createNote({ patientId, type: 'general', body: 'Original note' });
+    mockParams.noteId = noteId;
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    await act(async () => input('متن نوت').props.onChangeText('Only local copy'));
+    const save = button('ثبت در پرونده').props.onPress;
+    if (kind === 'note') t.db.update(notes).set(softDelete()).where(eq(notes.id, noteId)).run();
+    else t.db.update(patients).set(softDelete()).where(eq(patients.id, patientId)).run();
+    const before = t.db.select().from(notes).all();
+    await act(async () => {
+      tree!.update(<NoteEditorScreen />);
+      await settle();
+      save();
+      await settle();
+    });
+    expect(input('متن نوت').props.value).toBe('Only local copy');
+    expect(button('ثبت در پرونده').props.disabled).toBe(true);
+    expect(t.db.select().from(notes).all()).toEqual(before);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('retains a new-note editor when its patient is deleted after typing', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    await act(async () => input('Subjective').props.onChangeText('Only new-note copy'));
+    t.db.update(patients).set(softDelete()).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      tree!.update(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(input('Subjective').props.value).toBe('Only new-note copy');
+    expect(button('ثبت در پرونده').props.disabled).toBe(true);
+  });
+
+  it.each(['unmount', 'focus', 'route'] as const)(
+    'a delayed history confirmation refuses after %s changes',
+    async (kind) => {
+      const { id, confirm } = await history();
+      if (kind === 'focus') mockFocused = false;
+      await act(async () => {
+        if (kind === 'unmount') {
+          tree!.unmount();
+          tree = undefined;
+        }
+        if (kind === 'route') {
+          mockParams = { id: 'other-route' };
+          tree!.update(<NoteHistoryScreen />);
+        }
+        await settle();
+      });
+      await act(async () => {
+        confirm();
+        await settle();
+      });
+      expect(t.db.select().from(notes).where(eq(notes.id, id)).get()!.body).toBe('Current history text');
+      expect(mockDismissTo).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a repeated confirmation writes once and dismisses to the original patient after success', async () => {
+    const { id, confirm } = await history();
+    const actual = noteQueries.restoreNoteVersion;
+    let acknowledge!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    const write = jest.spyOn(noteQueries, 'restoreNoteVersion').mockImplementation(async (...args) => {
+      await actual(...args);
+      await pending;
+    });
+    await act(async () => {
+      confirm();
+      confirm();
+      await settle();
+    });
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(t.db.select().from(notes).where(eq(notes.id, id)).get()!.body).toBe('First history text');
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    await act(async () => {
+      acknowledge();
+      await settle();
+    });
+    expect(mockDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockDismissTo).toHaveBeenCalledWith({ pathname: '/patient/[id]', params: { id: patientId } });
+  });
+
+  it('a successful late restore does not dismiss a newer focused screen', async () => {
+    const { id, confirm } = await history();
+    const actual = noteQueries.restoreNoteVersion;
+    let acknowledge!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    jest.spyOn(noteQueries, 'restoreNoteVersion').mockImplementation(async (...args) => {
+      await actual(...args);
+      await pending;
+    });
+    await act(async () => {
+      confirm();
+      await settle();
+      mockFocused = false;
+      acknowledge();
+      await settle();
+    });
+    expect(t.db.select().from(notes).where(eq(notes.id, id)).get()!.body).toBe('First history text');
+    expect(mockDismissTo).not.toHaveBeenCalled();
+  });
+  it('a foreign note route cannot seed editable fields', async () => {
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other chart' });
+    mockParams.noteId = await createNote({ patientId: other, type: 'general', body: 'Other chart text' });
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+    expect(tree!.root.findAllByType(EmptyState)).toHaveLength(1);
+  });
+
+  it('route reuse preserves original typed input instead of remounting under another patient', async () => {
+    mockParams.noteId = await createNote({ patientId, type: 'general', body: 'Original note' });
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    await act(async () => input('متن نوت').props.onChangeText('Only mounted original words'));
+    mockParams = { id: await createPatient({ firstName: 'Synthetic', lastName: 'Reused route' }) };
+    await act(async () => {
+      tree!.update(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(input('متن نوت').props.value).toBe('Only mounted original words');
+    expect(button('ثبت در پرونده').props.disabled).toBe(true);
+  });
+
+  it('a history confirmation cannot restore into a same-ID replacement database', async () => {
+    const noteId = await createNote({ patientId, type: 'general', body: 'First version' });
+    await updateNote(noteId, { body: 'Restored current version' });
+    snapshot();
+    await updateNote(noteId, { body: 'Current before replacement' });
+    mockParams.noteId = noteId;
+    await act(async () => {
+      tree = create(<NoteHistoryScreen />);
+      await settle();
+    });
+    await act(async () => {
+      tree!.root
+        .findAllByType(Button)
+        .filter((node) => node.props.label === 'برگرداندن این نسخه')
+        .at(-1)!
+        .props.onPress();
+    });
+    const confirm = jest
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)![2]!
+      .find((item) => item.text === 'برگردان')!.onPress!;
+    await act(async () => {
+      replace();
+      await settle();
+      confirm();
+      await settle();
+    });
+    expect(t.db.select().from(notes).where(eq(notes.id, noteId)).get()!.body).toBe('Restored current version');
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+  });
 });
 
 describe('mounted note and order intents across real same-ID SQL import', () => {
