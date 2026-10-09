@@ -36,6 +36,18 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.44 distinguishes initial/failed note reads from a successfully empty list.
+Primary and voice reads offer retry while retaining loaded note cards; failed
+voice reads withhold stale counts. The first-note admission template is only
+chosen after a successful empty read. Five original witnesses fail against old
+source; final focused checks pass16 tests and full source check passes151 suites/
+2,064 app tests plus five workflows. No dependency/schema/route/permission change.
+This does not bound the full notes/body read or prove .44 native performance.
+Exact .43 trash delete/refusal/parent/child/cold and independent4,117-row/34-file
+preservation evidence is in [validation-0.11.43.md](validation-0.11.43.md).
+Remaining manual raw forms, further clinical trash, rich text, product/native/
+physical gates below are open. The phone is not the sole remaining task.
+
 0.11.43 repairs the existing trash: loading and failed reads no longer assert
 empty/current counts, cached rows retain an explicit retry notice, and the
 silent50-item cutoff gets an explicit More action. Initial patient reads are
@@ -67,7 +79,7 @@ and independent old/current restores pass in
 [validation-0.11.42.md](validation-0.11.42.md). Physical and broader native gates
 remain distinct. The .43 source addresses trash ownership/read failures;
 remaining manual raw forms, appropriate clinical trash and product gates remain.
-NotesTab also needs truthful initial/failed empty handling and read/media retry.
+The .44 source above repairs NotesTab initial/failed empty handling and read/media retry.
 Do not call the phone the sole remaining task.
 
 0.11.41 bounds the clinical timeline to40 displayed events. Each source reads

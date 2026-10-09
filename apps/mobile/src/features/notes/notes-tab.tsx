@@ -26,15 +26,20 @@ export function NotesTab({ patientId }: { patientId: string }) {
   const { spacing } = useTheme();
   const [filter, setFilter] = useState<Filter>('all');
 
-  const { data, error } = useLive(patientNotesQuery(patientId), [patientId]);
-  const { data: media } = useLive(patientMediaQuery(patientId, ['voice']), [patientId]);
+  const { data, error, retry, loading } = useLive(patientNotesQuery(patientId), [patientId]);
+  const {
+    data: media,
+    error: mediaError,
+    retry: retryMedia,
+  } = useLive(patientMediaQuery(patientId, ['voice']), [patientId]);
   const notes = data ?? [];
 
   const voiceCount = useMemo(() => {
     const m = new Map<string, number>();
-    for (const a of media ?? []) if (a.entityType === 'note') m.set(a.entityId, (m.get(a.entityId) ?? 0) + 1);
+    if (!mediaError)
+      for (const a of media ?? []) if (a.entityType === 'note') m.set(a.entityId, (m.get(a.entityId) ?? 0) + 1);
     return m;
-  }, [media]);
+  }, [media, mediaError]);
 
   // Only offer filters for note types this patient actually has.
   const presentTypes = [...new Set(notes.map((n) => n.type))];
@@ -46,7 +51,13 @@ export function NotesTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
-      <ErrorNotice error={error} what="نوت‌ها" />
+      <ErrorNotice error={error} what="نوت‌ها" onRetry={retry} />
+      <ErrorNotice error={mediaError} what="وویس‌های نوت" onRetry={retryMedia} />
+      {loading ? (
+        <Text variant="caption" color="textMuted">
+          در حال خواندن…
+        </Text>
+      ) : null}
       <Button
         label="نوت جدید"
         icon="add"
@@ -56,17 +67,22 @@ export function NotesTab({ patientId }: { patientId: string }) {
           router.push({
             pathname: '/patient/[id]/note',
             // A patient's first note is almost always the history; after that, a progress note.
-            params: { id: patientId, ...(data !== undefined && notes.length === 0 ? { type: 'admission' } : {}) },
+            params: {
+              id: patientId,
+              ...(data !== undefined && !error && notes.length === 0 ? { type: 'admission' } : {}),
+            },
           })
         }
       />
 
       {notes.length === 0 ? (
-        <EmptyState
-          icon="document-text-outline"
-          title="هنوز نوتی ثبت نشده"
-          description="شرح حال، پراگرس، کانسالت، رویدادهای مهم و خلاصه‌ی ترخیص — با تایپ یا وویس."
-        />
+        data !== undefined && !error ? (
+          <EmptyState
+            icon="document-text-outline"
+            title="هنوز نوتی ثبت نشده"
+            description="شرح حال، پراگرس، کانسالت، رویدادهای مهم و خلاصه‌ی ترخیص — با تایپ یا وویس."
+          />
+        ) : null
       ) : (
         <>
           {presentTypes.length > 1 && (

@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Retryable notes reads and native trash acceptance (0.11.44 source)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; preceding trash checkpoint `9e7f083`.
+
+**Changed**
+- NotesTab distinguishes initial loading/read failure from a successful empty
+  result, retains cached notes and offers primary/media retry. Failed voice
+  reads withhold stale counts; a failed empty read no longer chooses the first
+  admission template. No new screen/dependency/schema/permission/backup format.
+- Record exact .43 artifact/upgrade/delete/refusal/parent/child/cold evidence in
+  `validation-0.11.43.md`. Version0.11.44/code60 is source only for now.
+
+**Verified**
+- Five new read witnesses fail against the old source; final focused checks
+  pass16 tests in two suites. Full source check passes151 suites/2,064 app tests
+  and five workflows, with typecheck/lint/both formatting checks green.
+- Exact `9e7f083` hosted CI and normal pre-push check pass. Its inspected signed
+  x86_64 APK installs byte-identically. Independent upgrade export preserves
+  all4,117 application rows/49 tables/34 media exactly. Actual native child-first
+  restore is refused; parent restoration leaves the separately deleted note;
+  explicit child restoration survives force-stop/reopen with text/voice intact.
+  All three archive checks preserve every unrelated row and original context,
+  record only intended audits and pass integrity/FKs. Final crash buffer empty.
+
+**Not verified**
+- No .44 native artifact/UI or .40-.44 owner arm64/physical-phone acceptance.
+- No native fault injection, trash overflow/performance, full-shift/pressure,
+  physical audible playback or power/Doze/low-storage sign-off. Old ANR open.
+
+**Open threads**
+- Finish seven manual raw forms (topic/idea/specialty/prescription/place/
+  extension/credential), appropriate clinical trash, visual rich text, optional
+  shift context/follow-up stages and broader native/physical acceptance.
+- NotesTab's full note/body read and rendering remain unbounded; this read-error
+  fix does not claim performance acceptance. The phone is not the sole remaining work.
+- Idea areas lookup still drops a rejection; its live read/retry belongs with
+  the remaining raw-form work. Freeze/build .44 after its source checkpoint.
+
+**Gotchas**
+- Fabric flattens layout-only trash rows. A private helper refused before any
+  tap; fresh observed anchor/button overlap with a uniqueness check works.
+  .44 test-authoring initially nested a new test; it was corrected before the
+  passing focused/full checks. Neither rejected trial demonstrates an app bug.
+
 ## 2026-10-09 — Truthful trash reads and original restore ownership (0.11.43 source)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.
