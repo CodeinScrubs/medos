@@ -47,6 +47,30 @@ beforeEach(async () => {
 });
 
 describe('note drafts', () => {
+  it('walks tied recovery pages without duplicates even when the cursor row is retired', async () => {
+    const at = new Date('2026-01-01T12:00:00Z');
+    for (let i = 0; i < 41; i++)
+      await writeNoteDraft(
+        `paged-${String(i).padStart(2, '0')}`,
+        { patientId, noteId: null },
+        { ...blank, body: 'Raw words' },
+      );
+    t.db.update(noteDrafts).set({ updatedAt: at }).run();
+    const first = await openNoteDraftsQuery(20);
+    expect(first.map((row) => row.draft.id)).toEqual(Array.from({ length: 20 }, (_, i) => `paged-${40 - i}`));
+    const last = first.at(-1)!.draft;
+    t.db.update(noteDrafts).set({ deletedAt: new Date() }).where(eq(noteDrafts.id, last.id)).run();
+    const second = await openNoteDraftsQuery(20, { at: last.updatedAt.getTime(), id: last.id });
+    expect(second.map((row) => row.draft.id)).toEqual(
+      Array.from({ length: 20 }, (_, i) => `paged-${String(20 - i).padStart(2, '0')}`),
+    );
+    const secondLast = second.at(-1)!.draft;
+    expect(
+      (await openNoteDraftsQuery(20, { at: secondLast.updatedAt.getTime(), id: secondLast.id })).map(
+        (row) => row.draft.id,
+      ),
+    ).toEqual(['paged-00']);
+  });
   it('previews meaningful SOAP fields through whitespace without modifying original body text', () => {
     expect(notePreview({ ...blank, body: ' \t\n', subjective: ' \n', plan: 'Follow consult' })).toBe('Follow consult');
     expect(notePreview({ ...blank, body: ' \nOriginal body \n', plan: 'Other field' })).toBe(' \nOriginal body \n');

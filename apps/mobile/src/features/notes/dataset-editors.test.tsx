@@ -137,6 +137,76 @@ beforeEach(async () => {
 });
 
 describe('exact unfinished note selection', () => {
+  it('reaches all 41 tied drafts through bounded pages and opens the last exact draft', async () => {
+    for (let i = 0; i < 41; i++)
+      await writeNoteDraft(`paged-${String(i).padStart(2, '0')}`, { patientId, noteId: null }, fields);
+    t.db
+      .update(noteDrafts)
+      .set({ updatedAt: new Date('2026-01-01T12:00:00Z') })
+      .run();
+    await act(async () => {
+      tree = create(<UnfinishedNotes />);
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(20);
+    expect(button('نوت‌های قدیمی‌تر')).toBeDefined();
+    await act(async () => {
+      button('نوت‌های قدیمی‌تر').props.onPress();
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(20);
+    await act(async () => {
+      button('نوت‌های قدیمی‌تر').props.onPress();
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(1);
+    expect(button('نوت‌های قدیمی‌تر')).toBeUndefined();
+    tree!.root.findByType(Pressable).props.onPress();
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/patient/[id]/note',
+      params: { id: patientId, draftId: 'paged-00', type: 'general' },
+    });
+    await act(async () => {
+      button('نوت‌های جدیدتر').props.onPress();
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(20);
+    await act(async () => {
+      button('نوت‌های جدیدتر').props.onPress();
+      await settle();
+    });
+    expect(button('نوت‌های جدیدتر')).toBeUndefined();
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(20);
+  });
+  it('keeps a way back when every row on the older page is retired', async () => {
+    for (let i = 0; i < 21; i++)
+      await writeNoteDraft(`retired-page-${String(i).padStart(2, '0')}`, { patientId, noteId: null }, fields);
+    t.db
+      .update(noteDrafts)
+      .set({ updatedAt: new Date('2026-01-01T12:00:00Z') })
+      .run();
+    await act(async () => {
+      tree = create(<UnfinishedNotes />);
+      await settle();
+    });
+    expect(button('نوت‌های قدیمی‌تر')).toBeDefined();
+    await act(async () => {
+      button('نوت‌های قدیمی‌تر').props.onPress();
+      await settle();
+    });
+    t.db.update(noteDrafts).set(softDelete()).where(eq(noteDrafts.id, 'retired-page-00')).run();
+    await act(async () => {
+      tree!.update(<UnfinishedNotes />);
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);
+    expect(button('نوت‌های جدیدتر')).toBeDefined();
+    await act(async () => {
+      button('نوت‌های جدیدتر').props.onPress();
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(20);
+  });
   it('shows the actual voice-only recovery card after canonical media acknowledgment', async () => {
     await writeNoteDraft('voice-selection', { patientId, noteId: null }, { ...fields, body: null });
     t.db

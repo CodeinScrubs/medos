@@ -87,7 +87,9 @@ export function noteDraftQuery(patientId: string, noteId: string | null, draftId
  * sit on Today for ever, and a card with no name on it makes the owner open
  * each one to find out whose it is.
  */
-export function openNoteDraftsQuery(limit = 20) {
+export type OpenNoteDraftCursor = { at: number; id: string };
+
+export function openNoteDraftsQuery(limit = 20, cursor?: OpenNoteDraftCursor) {
   const voiceCount = sql<number>`(SELECT count(*) FROM ${attachments}
     WHERE ${attachments.entityType} = 'note_draft' AND ${attachments.entityId} = ${noteDrafts.id}
     AND ${attachments.patientId} = ${noteDrafts.patientId} AND ${attachments.kind} = 'voice'
@@ -111,8 +113,18 @@ export function openNoteDraftsQuery(limit = 20) {
     .select({ draft: noteDrafts, patient: patients, voiceCount })
     .from(noteDrafts)
     .innerJoin(patients, eq(noteDrafts.patientId, patients.id))
-    .where(and(alive, isNull(patients.deletedAt), meaningful))
-    .orderBy(desc(noteDrafts.updatedAt))
+    .where(
+      and(
+        alive,
+        isNull(patients.deletedAt),
+        meaningful,
+        cursor
+          ? sql`(${noteDrafts.updatedAt} < ${cursor.at} OR
+              (${noteDrafts.updatedAt} = ${cursor.at} AND ${noteDrafts.id} < ${cursor.id}))`
+          : undefined,
+      ),
+    )
+    .orderBy(desc(noteDrafts.updatedAt), desc(noteDrafts.id))
     .limit(limit);
 }
 

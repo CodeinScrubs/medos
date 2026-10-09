@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { Card, Column, Row, SectionHeader, Text } from '@/components/ui';
+import { Button, Card, Column, Row, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
 
-import { openNoteDraftsQuery } from './draft-queries';
+import { openNoteDraftsQuery, type OpenNoteDraftCursor } from './draft-queries';
 import { notePreview } from './logic';
 
 /**
@@ -18,16 +19,74 @@ import { notePreview } from './logic';
  * 3 a.m. between two admissions is exactly the one nobody thinks to reopen.
  */
 export function UnfinishedNotes() {
-  const router = useRouter();
-  const { data, error, retry } = useLive(openNoteDraftsQuery());
-  const drafts = data ?? [];
+  const [history, setHistory] = useState<OpenNoteDraftCursor[]>([]);
+  const cursor = history.at(-1);
+  return (
+    <UnfinishedNotesPage
+      key={`${cursor?.at ?? ''}:${cursor?.id ?? ''}`}
+      cursor={cursor}
+      onOlder={(next) => setHistory([...history, next])}
+      onNewer={history.length ? () => setHistory(history.slice(0, -1)) : undefined}
+    />
+  );
+}
 
-  if (drafts.length === 0 && !error) return null;
+const PAGE_SIZE = 20;
+
+function UnfinishedNotesPage({
+  cursor,
+  onOlder,
+  onNewer,
+}: {
+  cursor?: OpenNoteDraftCursor;
+  onOlder: (cursor: OpenNoteDraftCursor) => void;
+  onNewer?: () => void;
+}) {
+  const router = useRouter();
+  // Only this read remounts on page change; Today and its native header stay mounted.
+  const { data, error, retry, loading } = useLive(openNoteDraftsQuery(PAGE_SIZE + 1, cursor), [cursor]);
+  const drafts = (data ?? []).slice(0, PAGE_SIZE);
+  const hasMore = data !== undefined && data.length > PAGE_SIZE;
+
+  if (drafts.length === 0 && !error && !loading && !onNewer) return null;
 
   return (
     <>
-      <SectionHeader title="نوت‌های ناتمام" count={error ? undefined : drafts.length} />
+      <SectionHeader title="نوت‌های ناتمام" />
       <ErrorNotice error={error} what="نوت‌های ناتمام" onRetry={retry} />
+      {hasMore || onNewer ? (
+        <Row>
+          {onNewer ? (
+            <Button
+              label="نوت‌های جدیدتر"
+              variant="secondary"
+              disabled={!!error || loading}
+              onPress={onNewer}
+              style={{ flex: 1 }}
+            />
+          ) : null}
+          {hasMore ? (
+            <Button
+              label="نوت‌های قدیمی‌تر"
+              variant="secondary"
+              disabled={!!error || loading}
+              style={{ flex: 1 }}
+              onPress={() => {
+                const last = drafts.at(-1);
+                if (last) onOlder({ at: last.draft.updatedAt.getTime(), id: last.draft.id });
+              }}
+            />
+          ) : null}
+        </Row>
+      ) : null}
+      {loading ? (
+        <Text variant="caption" color="textMuted">
+          در حال خواندن…
+        </Text>
+      ) : null}
+      {data !== undefined && !error && drafts.length === 0 && onNewer ? (
+        <Text color="textMuted">در این صفحه نوت ناتمامی نیست.</Text>
+      ) : null}
       <Column gap="sm">
         {drafts.map(({ draft, patient, voiceCount }) => (
           <Pressable

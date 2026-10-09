@@ -15,6 +15,12 @@ refreshes the live result. Deleted/foreign parent metadata is not counted.
 The existing recovery card displays saved voice or a title when no narrative
 preview exists, and retains its exact draft ID. Whitespace-only body/sections
 do not hide meaningful SOAP fields; original stored body text is unchanged.
+Recovery reads21 rows and displays20 per replaceable page, with a stable
+updated-time/ID cursor. Newer/older controls remain in the existing section;
+retiring the cursor row does not break the next page. An empty older page keeps
+its way back. Only the read page remounts, never Today or its native header;
+read errors retain their notice and disable pagination. The visible row count
+is not presented as a complete total.
 
 **Rejected: filtering only legacy JSON after LIMIT.** New stopped voices belong
 to canonical attachment rows and would be invisible to that filter. No new

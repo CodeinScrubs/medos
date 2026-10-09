@@ -42,6 +42,9 @@ publication remains separate. Recovery cards select their own scoped draft ID.
 The original dataset and loaded/completed native parents remain intact.
 Recovery includes acknowledged canonical voice and filters empty recorder rows
 before its limit; the selected draft and its meaningful preview stay visible.
+Older recovery drafts are reachable in20-card replaceable pages, with stable
+time/ID cursors and a way back after an older page empties. The paging correction
+passes63 focused cases; its final full source check is still pending.
 Full source checks pass159 suites/2,248 application tests and five workflows;
 the final import-order correction also passes focused lint without warnings.
 Old/current import compatibility passes. Exact preceding source`65ffa0d` hosted

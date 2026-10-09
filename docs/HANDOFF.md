@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Make older unfinished drafts reachable without growing Today
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint; preceding `a674921`.
+
+**Changed**
+- Reproduced the20-draft discovery ceiling in the actual mounted component.
+  Recovery now has20-card replaceable pages in its existing section. Stable
+  updated-time/ID cursors handle tied times and retired anchors; an emptied
+  older page retains its Newer action. No new route or dependency.
+- Only the read page remounts. Today/native headers and editing scopes remain
+  intact. Read failures disable paging, and page size is not a claimed total.
+
+**Verified**
+- Before the fix, both older-page regressions fail at the missing action.
+  After correction,63 migrated-SQLite/mounted-component cases pass, including
+  all41 tied drafts across three bounded pages, exact final-draft selection,
+  return navigation and retired cursor/empty-page recovery.
+- Current typecheck and focused lint pass without warnings; changed files
+  pass root formatting and `git diff --check`.
+- Preceding `a674921` full pre-push checks pass159 suites/2,248 application
+  tests and five workflows without warnings. The new source needs its final
+  full check and hosted CI; the focused total is not a substitute.
+
+**Not verified**
+- This pagination and .50 native acceptance are pending at this checkpoint.
+  No owner arm64 APK/phone, full-shift timing, pressure/power/provider or
+  second-device recovery acceptance. `dist/` remains .39.
+
+**Open threads**
+- Freeze/build/inspect the current x86 candidate, then finish the .50 native
+  upgrade, conflict-adoption/publication, outpatient/date/voice recovery and
+  acknowledged base restore/cold export with independent whole-archive checks.
+- Run the final full check, record exact artifacts/CI and push all checkpoints.
+  Follow the remaining product gates in `IMPLEMENTATION.md`.
+
+---
+
 ## 2026-10-10 — Keep acknowledged voice visible in unfinished notes
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.
