@@ -75,8 +75,8 @@ export function encounterHistoryQuery(patientId: string) {
  * most recent if the patient is not admitted. Null for a patient who has never
  * had an encounter, whose orders and notes stand on their own.
  */
-export function currentEncounterQuery(patientId: string) {
-  return db
+export function currentEncounterQuery(patientId: string, reader: Pick<Database, 'select'> = db) {
+  return reader
     .select()
     .from(encounters)
     .where(and(alive, eq(encounters.patientId, patientId)))

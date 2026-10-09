@@ -1,16 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, SectionHeader, Text } from '@/components/ui';
+import { useNow } from '@/components/use-now';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { withDatasetWrite } from '@/lib/dataset-write';
+import { datasetGeneration } from '@/lib/dataset-write';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -26,6 +28,9 @@ import { deleteOrder, patientCurrentOrdersQuery, setOrderStatus } from './querie
  */
 export function KardexTab({ patientId }: { patientId: string }) {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { generation, stale } = useDatasetIntent();
+  const now = useNow();
   const { spacing } = useTheme();
   const [showStopped, setShowStopped] = useState(false);
 
@@ -33,12 +38,16 @@ export function KardexTab({ patientId }: { patientId: string }) {
   const all = data ?? [];
   const current = all.filter(isRunning);
   const stopped = all.filter((o) => !isRunning(o));
+  const readReady = data !== undefined && !error;
 
-  const openNew = () => router.push({ pathname: '/patient/[id]/order', params: { id: patientId } });
+  const openNew = () => {
+    if (generation !== datasetGeneration() || !readReady || !navigation.isFocused()) return;
+    router.push({ pathname: '/patient/[id]/order', params: { id: patientId } });
+  };
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
-      <Button label="دستور جدید" icon="add" variant="secondary" full onPress={openNew} />
+      <Button label="دستور جدید" icon="add" variant="secondary" full disabled={stale || !readReady} onPress={openNew} />
       <ErrorNotice error={error} what="کاردکس" onRetry={retry} />
       {loading ? (
         <Text variant="caption" color="textMuted">
@@ -66,7 +75,7 @@ export function KardexTab({ patientId }: { patientId: string }) {
               </Card>
             ) : null
           ) : (
-            current.map((o) => <OrderCard key={o.id} order={o} patientId={patientId} />)
+            current.map((o) => <OrderCard key={o.id} order={o} patientId={patientId} readReady={readReady} now={now} />)
           )}
 
           {stopped.length > 0 && (
@@ -82,7 +91,10 @@ export function KardexTab({ patientId }: { patientId: string }) {
                   }
                 />
               </Pressable>
-              {showStopped && stopped.map((o) => <OrderCard key={o.id} order={o} patientId={patientId} />)}
+              {showStopped &&
+                stopped.map((o) => (
+                  <OrderCard key={o.id} order={o} patientId={patientId} readReady={readReady} now={now} />
+                ))}
             </>
           )}
         </>
@@ -91,32 +103,80 @@ export function KardexTab({ patientId }: { patientId: string }) {
   );
 }
 
-function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
+function OrderCard({
+  order,
+  patientId,
+  readReady,
+  now,
+}: {
+  order: Order;
+  patientId: string;
+  readReady: boolean;
+  now: number;
+}) {
   const router = useRouter();
-  const { generation } = useDatasetIntent();
+  const navigation = useNavigation();
+  const { generation, stale } = useDatasetIntent();
   const { colors, radii, spacing } = useTheme();
+  const mounted = useRef(true);
+  const acting = useRef(false);
+  const ready = useRef(readReady);
+  const [busy, setBusy] = useState(false);
+  useLayoutEffect(() => {
+    ready.current = readReady;
+  }, [readReady]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const locked = busy || stale || !readReady;
 
-  const day = therapyDay(order);
+  const day = therapyDay(order, new Date(now));
   const sig = orderSig(order);
   const stopped = order.status === 'discontinued' || order.status === 'completed';
   const held = order.status === 'held';
   const showDay = (order.kind === 'drug' || order.kind === 'fluid') && day != null;
 
+  function canAct() {
+    return mounted.current && ready.current && !acting.current && navigation.isFocused();
+  }
+
+  async function actOnShownOrder(work: () => Promise<void>, title: string) {
+    if (!canAct()) return;
+    acting.current = true;
+    setBusy(true);
+    try {
+      await work();
+      if (mounted.current && navigation.isFocused()) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+    } catch (e) {
+      if (mounted.current && navigation.isFocused()) alertError(title, e);
+    } finally {
+      acting.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  }
+
   function change(status: Order['status']) {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    void withDatasetWrite(generation, () => setOrderStatus(order.id, status)).catch((e) =>
-      alertError('تغییر ثبت نشد', e),
+    return actOnShownOrder(
+      () => setOrderStatus(order.id, status, { expected: order, currentPatientId: patientId, generation }),
+      'تغییر ثبت نشد',
     );
   }
 
   function confirmDiscontinue() {
+    if (!canAct() || generation !== datasetGeneration()) return;
     Alert.alert('قطع دستور', `${order.name} قطع شود؟`, [
       { text: 'انصراف', style: 'cancel' },
-      { text: 'قطع', style: 'destructive', onPress: () => change('discontinued') },
+      { text: 'قطع', style: 'destructive', onPress: () => void change('discontinued') },
     ]);
   }
 
   function confirmDelete() {
+    if (!canAct() || generation !== datasetGeneration()) return;
     Alert.alert(
       'حذف از کاردکس',
       'اگر این دستور اشتباه ثبت شده حذفش کنید. اگر فقط قطع شده، «قطع» بهتر است تا در سابقه بماند.',
@@ -126,7 +186,10 @@ function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
           text: 'حذف',
           style: 'destructive',
           onPress: () =>
-            void withDatasetWrite(generation, () => deleteOrder(order.id)).catch((e) => alertError('حذف نشد', e)),
+            void actOnShownOrder(
+              () => deleteOrder(order.id, { expected: order, currentPatientId: patientId, generation }),
+              'حذف نشد',
+            ),
         },
       ],
     );
@@ -134,7 +197,14 @@ function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
 
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/patient/[id]/order', params: { id: patientId, orderId: order.id } })}
+      disabled={locked}
+      accessibilityRole="button"
+      accessibilityLabel={order.name}
+      accessibilityState={{ disabled: locked, busy }}
+      onPress={() => {
+        if (!canAct() || generation !== datasetGeneration()) return;
+        router.push({ pathname: '/patient/[id]/order', params: { id: patientId, orderId: order.id } });
+      }}
       onLongPress={confirmDelete}
       style={({ pressed }) => [pressed && styles.pressed]}
     >
@@ -194,15 +264,21 @@ function OrderCard({ order, patientId }: { order: Order; patientId: string }) {
               <QuickAction
                 icon={held ? 'play' : 'pause'}
                 label={held ? 'ادامه' : 'توقف موقت'}
-                onPress={() => change(held ? 'active' : 'held')}
+                disabled={locked}
+                onPress={() => void change(held ? 'active' : 'held')}
               />
-              <QuickAction icon="close" label="قطع" tone="danger" onPress={confirmDiscontinue} />
-              <QuickAction icon="checkmark-done" label="تمام شد" onPress={() => change('completed')} />
+              <QuickAction icon="close" label="قطع" tone="danger" disabled={locked} onPress={confirmDiscontinue} />
+              <QuickAction
+                icon="checkmark-done"
+                label="تمام شد"
+                disabled={locked}
+                onPress={() => void change('completed')}
+              />
             </Row>
           )}
           {stopped && (
             <Row gap="sm" style={{ marginTop: spacing.xs }}>
-              <QuickAction icon="refresh" label="شروع دوباره" onPress={() => change('active')} />
+              <QuickAction icon="refresh" label="شروع دوباره" disabled={locked} onPress={() => void change('active')} />
             </Row>
           )}
         </Column>
@@ -215,11 +291,13 @@ function QuickAction({
   icon,
   label,
   onPress,
+  disabled,
   tone = 'neutral',
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
+  disabled: boolean;
   tone?: 'neutral' | 'danger';
 }) {
   const { colors, radii, spacing } = useTheme();
@@ -228,6 +306,8 @@ function QuickAction({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       hitSlop={6}
       style={({ pressed }) => [

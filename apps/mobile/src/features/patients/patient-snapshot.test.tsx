@@ -4,7 +4,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 
 import { Text } from '@/components/ui';
 import { tablesOf } from '@/db/query-tables';
-import { encounters } from '@/db/schema';
+import { encounters, patients } from '@/db/schema';
 import { openEncounter } from '@/features/encounters/queries';
 import { createOrder, patientCurrentOrdersQuery, setOrderStatus } from '@/features/kardex/queries';
 import { createLabPanel } from '@/features/labs/queries';
@@ -129,7 +129,24 @@ describe('patient at a glance', () => {
     });
     expect(rowTexts()[0]).toContain('Synthetic current episode');
     expect(rowTexts()[0]).not.toContain('Synthetic prior episode');
-    expect(tablesOf(patientCurrentOrdersQuery(patientId))).toEqual(['orders', 'encounters']);
+    expect(tablesOf(patientCurrentOrdersQuery(patientId))).toEqual(['orders', 'patients', 'encounters']);
+  });
+
+  it('removes current and standing orders after a patient deletion event without an order event', async () => {
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic standing order' });
+    await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(2) });
+    await createOrder({ patientId, kind: 'drug', name: 'Synthetic current episode' });
+    await render();
+    expect(rowTexts()[0]).toContain('Synthetic standing order');
+    expect(rowTexts()[0]).toContain('Synthetic current episode');
+
+    database.db.update(patients).set({ deletedAt: new Date() }).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      mockListeners.forEach((listener) => listener({ tableName: 'patients' }));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    expect(tree!.toJSON()).toBeNull();
   });
 
   it('shows the recorded unit beside a flagged laboratory value', async () => {

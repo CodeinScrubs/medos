@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, getTableColumns, inArray, isNull, or, sql } from 'drizzle-orm';
 
-import { db } from '@/db/client';
-import { encounters, orders, type Order } from '@/db/schema';
+import { auditInTransaction } from '@/db/audit';
+import { db, type Database } from '@/db/client';
+import { encounters, orders, patients, type Order } from '@/db/schema';
 import { startsWith } from '@/db/search';
 import { currentEncounterQuery, resolveActiveEncounterId } from '@/features/encounters/queries';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
@@ -42,10 +43,12 @@ export function patientCurrentOrdersQuery(patientId: string) {
   return db
     .select(getTableColumns(orders))
     .from(orders)
+    .innerJoin(patients, eq(patients.id, orders.patientId))
     .leftJoin(encounters, inArray(encounters.id, currentId))
     .where(
       and(
         alive,
+        isNull(patients.deletedAt),
         eq(orders.patientId, patientId),
         or(eq(orders.encounterId, encounters.id), isNull(orders.encounterId)),
       ),
@@ -53,11 +56,19 @@ export function patientCurrentOrdersQuery(patientId: string) {
     .orderBy(asc(orders.sortOrder), desc(orders.startAt));
 }
 
-export function orderQuery(id: string) {
+export function orderQuery(id: string, patientId?: string) {
   return db
-    .select()
+    .select(getTableColumns(orders))
     .from(orders)
-    .where(and(alive, eq(orders.id, id)))
+    .innerJoin(patients, eq(patients.id, orders.patientId))
+    .where(
+      and(
+        alive,
+        isNull(patients.deletedAt),
+        eq(orders.id, id),
+        patientId !== undefined ? eq(orders.patientId, patientId) : undefined,
+      ),
+    )
     .limit(1);
 }
 
@@ -80,28 +91,34 @@ export type OrderInput = {
 
 export async function createOrder(input: OrderInput, generation = datasetGeneration()): Promise<string> {
   return withDatasetWrite(generation, async () => {
-    const id = newId();
-    await db.insert(orders).values({
-      id,
-      ...stamps(),
-      patientId: input.patientId,
-      encounterId: await resolveActiveEncounterId(input.patientId),
-      kind: input.kind,
-      name: input.name.trim(),
-      brandName: input.brandName ?? null,
-      dose: input.dose ?? null,
-      route: input.route ?? null,
-      frequency: input.frequency ?? null,
-      rate: input.rate ?? null,
-      duration: input.duration ?? null,
-      isPrn: input.isPrn ?? false,
-      prnCondition: input.prnCondition ?? null,
-      startAt: input.startAt ?? new Date(),
-      indication: input.indication ?? null,
-      notes: input.notes ?? null,
-      status: 'active',
+    return db.transaction((tx) => {
+      requireOrderPatient(tx, input.patientId);
+      const id = newId(),
+        now = new Date();
+      tx.insert(orders)
+        .values({
+          id,
+          ...stamps(now),
+          patientId: input.patientId,
+          encounterId: resolveActiveEncounterId(input.patientId, tx),
+          kind: input.kind,
+          name: input.name.trim(),
+          brandName: input.brandName ?? null,
+          dose: input.dose ?? null,
+          route: input.route ?? null,
+          frequency: input.frequency ?? null,
+          rate: input.rate ?? null,
+          duration: input.duration ?? null,
+          isPrn: input.isPrn ?? false,
+          prnCondition: input.prnCondition ?? null,
+          startAt: input.startAt === undefined ? now : input.startAt,
+          indication: input.indication ?? null,
+          notes: input.notes ?? null,
+          status: 'active',
+        })
+        .run();
+      return id;
     });
-    return id;
   });
 }
 
@@ -109,28 +126,113 @@ export async function updateOrder(
   id: string,
   patch: Partial<Omit<OrderInput, 'patientId'>>,
   generation = datasetGeneration(),
+  expected?: Order,
 ): Promise<void> {
   await withDatasetWrite(generation, async () => {
-    await db
-      .update(orders)
-      .set({ ...patch, ...touch() })
-      .where(and(alive, eq(orders.id, id)));
+    db.transaction((tx) => {
+      const current = requireOrderBasis(tx.select().from(orders).where(eq(orders.id, id)).get(), expected);
+      if (current.deletedAt) throw new Error('این دستور حذف شده است.');
+      requireOrderContext(tx, current);
+      tx.update(orders)
+        .set({ ...patch, ...touch() })
+        .where(eq(orders.id, id))
+        .run();
+    });
   });
 }
 
-/**
- * Change status. Discontinuing or completing stamps `endAt` so the day count
- * freezes at the last day given; resuming clears it.
- */
-export async function setOrderStatus(id: string, status: Order['status']): Promise<void> {
-  await db
-    .update(orders)
-    .set({ status, endAt: endAtForStatus(status), ...touch() })
-    .where(eq(orders.id, id));
+export type OrderMutationOptions = {
+  /** Exact row shown when the action or confirmation was opened. */
+  expected?: Order;
+  /** Current-card actions also verify the episode, even before useLive refreshes. */
+  currentPatientId?: string;
+  generation?: number;
+  now?: Date;
+};
+
+function requireOrderBasis(current: Order | undefined, expected?: Order): Order {
+  if (!current) throw new Error('این دستور در دسترس نیست.');
+  if (
+    expected &&
+    (Object.keys(current) as (keyof Order)[]).some((key) => {
+      const a = current[key],
+        b = expected[key];
+      return a instanceof Date || b instanceof Date
+        ? !(a instanceof Date && b instanceof Date && a.getTime() === b.getTime())
+        : a !== b;
+    })
+  )
+    throw new Error('این دستور تغییر کرده است؛ کاردکس را دوباره بخوانید و نسخهٔ جدید را بررسی کنید.');
+  return current;
 }
 
-export async function deleteOrder(id: string): Promise<void> {
-  await db.update(orders).set(softDelete()).where(eq(orders.id, id));
+function requireOrderPatient(reader: Pick<Database, 'select'>, patientId: string): void {
+  const patient = reader
+    .select({ id: patients.id })
+    .from(patients)
+    .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+    .get();
+  if (!patient) throw new Error('پروندهٔ بیمار در دسترس نیست.');
+}
+
+function requireOrderContext(reader: Pick<Database, 'select'>, order: Order, currentPatientId?: string): void {
+  requireOrderPatient(reader, order.patientId);
+  if (order.encounterId) {
+    const encounter = reader
+      .select({ id: encounters.id })
+      .from(encounters)
+      .where(
+        and(
+          eq(encounters.id, order.encounterId),
+          eq(encounters.patientId, order.patientId),
+          isNull(encounters.deletedAt),
+        ),
+      )
+      .get();
+    if (!encounter) throw new Error('نوبت مربوط به این دستور در دسترس نیست.');
+  }
+  if (
+    currentPatientId !== undefined &&
+    (order.patientId !== currentPatientId ||
+      (order.encounterId !== null && currentEncounterQuery(currentPatientId, reader).get()?.id !== order.encounterId))
+  )
+    throw new Error('نوبت جاری تغییر کرده است؛ کاردکس را دوباره بخوانید.');
+}
+
+/** Freeze the therapy count once, after validating the original row and episode. */
+export async function setOrderStatus(
+  id: string,
+  status: Order['status'],
+  options: OrderMutationOptions = {},
+): Promise<void> {
+  await withDatasetWrite(options.generation ?? datasetGeneration(), async () =>
+    db.transaction((tx) => {
+      const current = requireOrderBasis(tx.select().from(orders).where(eq(orders.id, id)).get(), options.expected);
+      if (current.deletedAt) throw new Error('این دستور حذف شده است.');
+      requireOrderContext(tx, current, options.currentPatientId);
+      if (current.status === status) return;
+      const now = options.now ?? new Date();
+      tx.update(orders)
+        .set({ status, endAt: endAtForStatus(status, now), ...touch(now) })
+        .where(eq(orders.id, id))
+        .run();
+      auditInTransaction(tx, 'order.statusChanged', { entityType: 'order', entityId: id }, now);
+    }),
+  );
+}
+
+export async function deleteOrder(id: string, options: OrderMutationOptions = {}): Promise<void> {
+  await withDatasetWrite(options.generation ?? datasetGeneration(), async () =>
+    db.transaction((tx) => {
+      const current = requireOrderBasis(tx.select().from(orders).where(eq(orders.id, id)).get(), options.expected);
+      // A direct replay is harmless. A held confirmation first compares its live basis.
+      if (current.deletedAt) return;
+      requireOrderContext(tx, current, options.currentPatientId);
+      const now = options.now ?? new Date();
+      tx.update(orders).set(softDelete(now)).where(eq(orders.id, id)).run();
+      auditInTransaction(tx, 'order.deleted', { entityType: 'order', entityId: id }, now);
+    }),
+  );
 }
 
 /**

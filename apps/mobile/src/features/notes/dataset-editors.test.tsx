@@ -1,17 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
-import { Alert } from 'react-native';
+import { Alert, Pressable } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
-import { Button, Input } from '@/components/ui';
+import { Button, EmptyState, Input, Text } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
-import { noteDrafts, notes, orders } from '@/db/schema';
+import { noteDrafts, notes, orders, patients } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { OrderFormScreen } from '@/features/kardex/order-form-screen';
 import { createOrder } from '@/features/kardex/queries';
+import * as orderQueries from '@/features/kardex/queries';
 import { createPatient } from '@/features/patients/queries';
 import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
+import { softDelete } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -21,11 +24,16 @@ import { createNote } from './queries';
 
 let mockParams: { id: string; noteId?: string; orderId?: string };
 const mockBack = jest.fn();
+let mockFocused = true;
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: mockBack, push: jest.fn() }),
 }));
-jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
+jest.mock('react-native', () => {
+  const native = jest.requireActual<typeof import('react-native')>('react-native');
+  return new Proxy(native, { get: (target, key) => (key === 'Pressable' ? 'Pressable' : Reflect.get(target, key)) });
+});
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[] }) => ({ data: query.all(), retry: jest.fn() }),
@@ -109,10 +117,340 @@ beforeEach(async () => {
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Intent' });
   mockParams = { id: patientId };
+  mockFocused = true;
   mockBack.mockClear();
   jest.mocked(alertError).mockClear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.useFakeTimers();
+});
+
+describe('actual manual order form identity, pending publication and optional suggestions', () => {
+  it('an initial mismatched deep link cannot seed the other patient’s order', async () => {
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Foreign route' });
+    const id = await createOrder({ patientId: other, kind: 'drug', name: 'Synthetic foreign order' });
+    mockParams.orderId = id;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+    expect(tree!.root.findAllByType(EmptyState)).toHaveLength(1);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('route reuse retains original input and allergy context but refuses an old Save handler', async () => {
+    const id = await createOrder({ patientId, kind: 'drug', name: 'Synthetic original', dose: '1 g' });
+    mockParams.orderId = id;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('دوز').props.onChangeText('2 g'));
+    const old = button('ذخیره').props.onPress;
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'New route' });
+    mockParams = { id: other };
+    await act(async () => {
+      tree!.update(<OrderFormScreen />);
+      await settle();
+    });
+    expect(input('دوز').props.value).toBe('2 g');
+    expect(input('دوز').props.editable).toBe(false);
+    expect(button('ذخیره').props.disabled).toBe(true);
+    await act(async () => {
+      old();
+      await settle();
+    });
+    expect(t.db.select().from(orders).where(eq(orders.id, id)).get()!.dose).toBe('1 g');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('refuses to overwrite a concurrent same-timestamp dose correction', async () => {
+    const id = await createOrder({ patientId, kind: 'drug', name: 'Synthetic concurrent', dose: '1 g' });
+    mockParams.orderId = id;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('یادداشت').props.onChangeText('Synthetic new note'));
+    t.db.update(orders).set({ dose: '3 g' }).where(eq(orders.id, id)).run();
+    await act(async () => {
+      button('ذخیره').props.onPress();
+      await settle();
+    });
+    const current = t.db.select().from(orders).where(eq(orders.id, id)).get()!;
+    expect(current).toMatchObject({ dose: '3 g', notes: null });
+    expect(input('یادداشت').props.value).toBe('Synthetic new note');
+    expect(alertError).toHaveBeenCalledWith('ذخیره نشد', expect.any(Error));
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('pending publication locks callbacks and closes only the originating focused route', async () => {
+    const id = await createOrder({ patientId, kind: 'drug', name: 'Synthetic pending', dose: '1 g' });
+    mockParams.orderId = id;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('دوز').props.onChangeText('2 g'));
+    let acknowledge!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    const update = orderQueries.updateOrder;
+    const writes = jest.spyOn(orderQueries, 'updateOrder').mockImplementation(async (...args) => {
+      await pending;
+      await update(...args);
+    });
+    const save = button('ذخیره').props.onPress;
+    const cancel = button('انصراف').props.onPress;
+    const oldDose = input('دوز').props.onChangeText;
+    await act(async () => {
+      save();
+      save();
+      cancel();
+      oldDose('99 g');
+      await settle();
+    });
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(input('دوز').props.value).toBe('2 g');
+    expect(input('دوز').props.editable).toBe(false);
+    expect(button('انصراف').props.disabled).toBe(true);
+    mockFocused = false;
+    await act(async () => {
+      acknowledge();
+      await settle();
+    });
+    expect(t.db.select().from(orders).where(eq(orders.id, id)).get()!.dose).toBe('2 g');
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(input('دوز').props.editable).toBe(false);
+    expect(button('بستن')).toBeDefined();
+    await act(async () => button('بستن').props.onPress());
+    expect(mockBack).not.toHaveBeenCalled();
+    mockFocused = true;
+    await act(async () => button('بستن').props.onPress());
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not invent a start time on an unrelated edit to a legacy unknown-start order', async () => {
+    const id = await createOrder({ patientId, kind: 'drug', name: 'Synthetic unknown', startAt: null });
+    mockParams.orderId = id;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Text).some((node) => node.props.children === 'زمان شروع ثبت نشده است.')).toBe(true);
+    await act(async () => input('یادداشت').props.onChangeText('Synthetic unrelated edit'));
+    await act(async () => {
+      button('ذخیره').props.onPress();
+      await settle();
+    });
+    expect(t.db.select().from(orders).where(eq(orders.id, id)).get()!).toMatchObject({
+      startAt: null,
+      notes: 'Synthetic unrelated edit',
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('optional suggestions report read failure and retry without losing typed input', async () => {
+    const suggestions = jest
+      .spyOn(orderQueries, 'suggestOrderNames')
+      .mockRejectedValue(new Error('Synthetic lookup failure'));
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => {
+      input('نام دارو').props.onChangeText('Synthetic typed');
+      await settle();
+    });
+    const notice = tree!.root.findAllByType(ErrorNotice).find((node) => node.props.what === 'پیشنهادهای کاردکس')!;
+    expect(notice.props.error).toBeInstanceOf(Error);
+    expect(input('نام دارو').props.value).toBe('Synthetic typed');
+    suggestions.mockResolvedValue([]);
+    await act(async () => {
+      notice.props.onRetry();
+      await settle();
+    });
+    expect(
+      tree!.root.findAllByType(ErrorNotice).find((node) => node.props.what === 'پیشنهادهای کاردکس')!.props.error,
+    ).toBeUndefined();
+    expect(input('نام دارو').props.value).toBe('Synthetic typed');
+  });
+
+  it.each(['dose', 'name'] as const)('a delayed suggestion cannot overwrite a later manual %s edit', async (field) => {
+    const candidate = await createOrder({
+      patientId,
+      kind: 'fluid',
+      name: 'Synthetic candidate',
+      dose: '1000 cc',
+      route: 'IV',
+      rate: '40 cc/h',
+    });
+    const previous = t.db.select().from(orders).where(eq(orders.id, candidate)).get()!;
+    jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([previous.name]);
+    let release!: (value: typeof previous) => void;
+    const pending = new Promise<typeof previous>((resolve) => {
+      release = resolve;
+    });
+    jest.spyOn(orderQueries, 'lastOrderNamed').mockReturnValue(pending);
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    const picked = tree!.root
+      .findAllByType(Pressable)
+      .find((node) => node.findAllByType(Text).some((text) => text.props.children === previous.name))!;
+    await act(async () => {
+      picked.props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      if (field === 'dose') input('دوز').props.onChangeText('125 mg');
+      else input('نام دارو').props.onChangeText('Synthetic newer name');
+      release(previous);
+      await settle();
+    });
+    expect(input('نام دارو').props.value).toBe(field === 'dose' ? previous.name : 'Synthetic newer name');
+    expect(input('دوز').props.value).toBe(field === 'dose' ? '125 mg' : '');
+    expect(tree!.root.findAllByType(Input).some((node) => node.props.label === 'سرعت')).toBe(false);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('only the latest of two deferred selections may prefill the draft', async () => {
+    const first = await createOrder({ patientId, kind: 'drug', name: 'Synthetic first', dose: '1 g' });
+    const second = await createOrder({ patientId, kind: 'drug', name: 'Synthetic second', dose: '2 g' });
+    const firstRow = t.db.select().from(orders).where(eq(orders.id, first)).get()!;
+    const secondRow = t.db.select().from(orders).where(eq(orders.id, second)).get()!;
+    jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([firstRow.name, secondRow.name]);
+    let releaseFirst!: (value: typeof firstRow) => void, releaseSecond!: (value: typeof secondRow) => void;
+    const p1 = new Promise<typeof firstRow>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const p2 = new Promise<typeof secondRow>((resolve) => {
+      releaseSecond = resolve;
+    });
+    jest.spyOn(orderQueries, 'lastOrderNamed').mockImplementation((name) => (name === firstRow.name ? p1 : p2));
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    const pick = (name: string) =>
+      tree!.root
+        .findAllByType(Pressable)
+        .find((node) => node.findAllByType(Text).some((text) => text.props.children === name))!;
+    await act(async () => {
+      pick(firstRow.name).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      pick(secondRow.name).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      releaseSecond(secondRow);
+      await settle();
+      releaseFirst(firstRow);
+      await settle();
+    });
+    expect(input('نام دارو').props.value).toBe(secondRow.name);
+    expect(input('دوز').props.value).toBe('2 g');
+  });
+
+  it('a deferred suggestion cannot change a draft after same-ID dataset replacement', async () => {
+    const candidate = await createOrder({ patientId, kind: 'drug', name: 'Synthetic late source', dose: '5 g' });
+    const previous = t.db.select().from(orders).where(eq(orders.id, candidate)).get()!;
+    snapshot();
+    jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([previous.name]);
+    let release!: (value: typeof previous) => void;
+    jest.spyOn(orderQueries, 'lastOrderNamed').mockReturnValue(
+      new Promise<typeof previous>((resolve) => {
+        release = resolve;
+      }),
+    );
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    const picked = tree!.root
+      .findAllByType(Pressable)
+      .find((node) => node.findAllByType(Text).some((text) => text.props.children === previous.name))!;
+    await act(async () => {
+      picked.props.onPress();
+      await settle();
+      replace();
+      release(previous);
+      await settle();
+    });
+    expect(input('دوز').props.value).toBe('');
+    expect(button('افزودن به کاردکس').props.disabled).toBe(true);
+    expect(t.db.select().from(orders).all()).toEqual([previous]);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it.each(['order', 'patient'] as const)('keeps local input when the %s is deleted during editing', async (kind) => {
+    const id = await createOrder({ patientId, kind: 'drug', name: 'Synthetic removed parent', dose: '1 g' });
+    mockParams.orderId = id;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('یادداشت').props.onChangeText('Only unsaved local words'));
+    const oldSave = button('ذخیره').props.onPress;
+    if (kind === 'order') t.db.update(orders).set(softDelete()).where(eq(orders.id, id)).run();
+    else {
+      t.db.update(patients).set(softDelete()).where(eq(patients.id, patientId)).run();
+    }
+    const before = t.db.select().from(orders).all();
+    await act(async () => {
+      tree!.update(<OrderFormScreen />);
+      await settle();
+    });
+    expect(input('یادداشت').props.value).toBe('Only unsaved local words');
+    expect(button('ذخیره').props.disabled).toBe(true);
+    await act(async () => {
+      oldSave();
+      await settle();
+    });
+    expect(t.db.select().from(orders).all()).toEqual(before);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('failed prefill remains separate from a successful prefix read and retries the same request', async () => {
+    const candidate = await createOrder({ patientId, kind: 'drug', name: 'Synthetic retry detail', dose: '2 g' });
+    const previous = t.db.select().from(orders).where(eq(orders.id, candidate)).get()!;
+    jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([previous.name]);
+    const read = jest
+      .spyOn(orderQueries, 'lastOrderNamed')
+      .mockRejectedValueOnce(new Error('Synthetic detail failure'))
+      .mockResolvedValue(previous);
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    const picked = tree!.root
+      .findAllByType(Pressable)
+      .find((node) => node.findAllByType(Text).some((text) => text.props.children === previous.name))!;
+    await act(async () => {
+      picked.props.onPress();
+      await settle();
+    });
+    const detail = tree!.root.findAllByType(ErrorNotice).find((node) => node.props.what === 'دستور قبلی')!;
+    expect(detail.props.error).toBeInstanceOf(Error);
+    expect(
+      tree!.root.findAllByType(ErrorNotice).find((node) => node.props.what === 'پیشنهادهای کاردکس')!.props.error,
+    ).toBeUndefined();
+    await act(async () => {
+      detail.props.onRetry();
+      await settle();
+    });
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenLastCalledWith(previous.name);
+    expect(input('دوز').props.value).toBe('2 g');
+    expect(
+      tree!.root.findAllByType(ErrorNotice).find((node) => node.props.what === 'دستور قبلی')!.props.error,
+    ).toBeUndefined();
+  });
 });
 afterEach(async () => {
   await act(async () => {

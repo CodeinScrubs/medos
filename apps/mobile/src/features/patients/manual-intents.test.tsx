@@ -48,6 +48,7 @@ jest.mock('react-native', () => {
   });
 });
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('expo-haptics', () => ({
   impactAsync: () => Promise.resolve(),

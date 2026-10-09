@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
+import * as Haptics from 'expo-haptics';
+import { Alert, Pressable } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
-import { EmptyState, SectionHeader, Text } from '@/components/ui';
-import { encounters, orders } from '@/db/schema';
+import { alertError } from '@/components/feedback';
+import { Button, EmptyState, SectionHeader, Text } from '@/components/ui';
+import { auditLog, encounters, orders } from '@/db/schema';
 import { KardexTab } from '@/features/kardex/kardex-tab';
 import * as queries from '@/features/kardex/queries';
 import { createPatient } from '@/features/patients/queries';
@@ -13,6 +16,8 @@ import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 const mockListeners = new Set<(event: { tableName: string }) => void>();
+let mockFocused = true;
+const mockPush = jest.fn();
 jest.mock('expo-sqlite', () => ({
   addDatabaseChangeListener: (listener: (event: { tableName: string }) => void) => {
     mockListeners.add(listener);
@@ -26,7 +31,12 @@ jest.mock('react-native', () => {
   });
 });
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicon');
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light' },
+}));
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
@@ -56,6 +66,38 @@ async function render() {
 }
 const text = () => tree!.root.findAllByType(Text).map((n) => [n.props.children].flat().join(''));
 const error = () => tree!.root.findAllByType(ErrorNotice).find((n) => n.props.what === 'کاردکس')!;
+const pressable = (label: string) =>
+  tree!.root.findAllByType(Pressable).find((n) => n.props.accessibilityLabel === label)!;
+const add = () => tree!.root.findAllByType(Button).find((n) => n.props.label === 'دستور جدید')!;
+const orderRow = (id: string) => t.db.select().from(orders).where(eq(orders.id, id)).get()!;
+const tracked = () => ({
+  rows: t.db.select().from(orders).all(),
+  audits: t.db
+    .select()
+    .from(auditLog)
+    .all()
+    .filter((item) => item.entityType === 'order'),
+});
+async function invoke(work: () => unknown) {
+  await act(async () => {
+    await work();
+    await settle();
+  });
+}
+function confirmation(label: string) {
+  const onPress = jest
+    .mocked(Alert.alert)
+    .mock.calls.at(-1)?.[2]
+    ?.find((item) => item.text === label)?.onPress;
+  expect(onPress).toBeDefined();
+  return onPress!;
+}
+async function openConfirmation(label: 'قطع' | 'حذف') {
+  await invoke(() =>
+    label === 'قطع' ? pressable('قطع').props.onPress() : pressable('Synthetic current drug').props.onLongPress(),
+  );
+  return confirmation(label);
+}
 async function changed() {
   await act(async () => {
     for (const listener of mockListeners) listener({ tableName: 'encounters' });
@@ -84,9 +126,11 @@ function fixture() {
 }
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockFocused = true;
   mockListeners.clear();
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Kardex reads' });
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 afterEach(async () => {
   await act(async () => {
@@ -177,5 +221,124 @@ describe('current kardex reads retain their episode and report incomplete inform
     expect(text()).toContain('Synthetic standing drug');
     expect(text()).not.toContain('Synthetic current drug');
     expect(text()).not.toContain('Synthetic historical drug');
+  });
+});
+
+describe('actual kardex handlers retain the shown row, read acknowledgment and route ownership', () => {
+  it.each(['قطع', 'حذف'] as const)('refuses a held %s after a same-timestamp dose change', async (label) => {
+    fixture();
+    await render();
+    const old = await openConfirmation(label);
+    t.db.update(orders).set({ dose: '2 g' }).where(eq(orders.id, 'synthetic-current-order')).run();
+    const before = tracked();
+    await invoke(old);
+    expect(tracked()).toEqual(before);
+    expect(alertError).toHaveBeenCalledWith(label === 'قطع' ? 'تغییر ثبت نشد' : 'حذف نشد', expect.any(Error));
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  it.each(['قطع', 'حذف'] as const)('does not run held %s after the tab unmounts', async (label) => {
+    fixture();
+    await render();
+    const old = await openConfirmation(label);
+    const before = tracked();
+    await act(async () => tree!.unmount());
+    tree = undefined;
+    await invoke(old);
+    expect(tracked()).toEqual(before);
+    expect(alertError).not.toHaveBeenCalled();
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['قطع', 'حذف'] as const)('does not run held %s on another focused route', async (label) => {
+    fixture();
+    await render();
+    const old = await openConfirmation(label);
+    const before = tracked();
+    mockFocused = false;
+    await invoke(old);
+    expect(tracked()).toEqual(before);
+    expect(alertError).not.toHaveBeenCalled();
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  it('blocks retained actions after a failed live refresh, and permits them again after retry', async () => {
+    fixture();
+    await render();
+    const old = await openConfirmation('حذف');
+    const prepare = t.sqlite.prepare.bind(t.sqlite);
+    let broken = true;
+    jest.spyOn(t.sqlite, 'prepare').mockImplementation((sql, params) => {
+      if (broken && sql.startsWith('select') && sql.includes('"encounters"')) throw new Error('Synthetic cached read');
+      return prepare(sql, params);
+    });
+    await changed();
+    expect(pressable('Synthetic current drug').props.disabled).toBe(true);
+    expect(pressable('تمام شد').props.disabled).toBe(true);
+    expect(add().props.disabled).toBe(true);
+    const before = tracked();
+    await invoke(old);
+    await invoke(() => pressable('قطع').props.onPress());
+    await invoke(() => add().props.onPress());
+    expect(tracked()).toEqual(before);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+    expect(alertError).not.toHaveBeenCalled();
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+    broken = false;
+    await invoke(error().props.onRetry);
+    expect(pressable('تمام شد').props.disabled).toBe(false);
+    await invoke(() => pressable('تمام شد').props.onPress());
+    expect(orderRow('synthetic-current-order').status).toBe('completed');
+    expect(tracked().audits).toHaveLength(1);
+  });
+
+  it('a fresh initial read error blocks new-order navigation without asserting absence', async () => {
+    const prepare = t.sqlite.prepare.bind(t.sqlite);
+    jest.spyOn(t.sqlite, 'prepare').mockImplementation((sql, params) => {
+      if (sql.startsWith('select') && sql.includes('"encounters"')) throw new Error('Synthetic initial read');
+      return prepare(sql, params);
+    });
+    await render();
+    expect(add().props.disabled).toBe(true);
+    await invoke(() => add().props.onPress());
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(tree!.root.findAllByType(EmptyState)).toHaveLength(0);
+  });
+
+  it('admits only one immediate action from two presses in the same turn', async () => {
+    fixture();
+    await render();
+    const press = pressable('تمام شد').props.onPress;
+    await act(async () => {
+      press();
+      press();
+      await settle();
+    });
+    expect(orderRow('synthetic-current-order').status).toBe('completed');
+    expect(tracked().audits).toHaveLength(1);
+    expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
+    expect(alertError).not.toHaveBeenCalled();
+  });
+
+  it('refuses an unchanged stopped order after another episode opens before refresh', async () => {
+    fixture();
+    await queries.setOrderStatus('synthetic-current-order', 'completed', { now: at });
+    await render();
+    const stoppedToggle = tree!.root
+      .findAllByType(Pressable)
+      .find((n) => n.findAllByType(SectionHeader).some((header) => header.props.title === 'قطع‌شده'))!;
+    await invoke(stoppedToggle.props.onPress);
+    const old = await openConfirmation('حذف');
+    const expected = orderRow('synthetic-current-order');
+    t.db.update(encounters).set({ isActive: false }).where(eq(encounters.id, 'synthetic-current')).run();
+    addEpisode('synthetic-new', new Date('2025-01-02T12:00:00Z'), true);
+    expect(orderRow('synthetic-current-order')).toEqual(expected);
+    const before = tracked();
+    await invoke(old);
+    expect(tracked()).toEqual(before);
+    expect(alertError).toHaveBeenCalledWith('حذف نشد', expect.any(Error));
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
   });
 });

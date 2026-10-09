@@ -33,27 +33,29 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Source0.11.46/code62 adds bounded note/highlight previews,40-card cursor pages
-and visible-note voice aggregates. Full documents/history are unchanged. A
-display-only backup progress gate reduces callback-driven state updates without
-changing crypto or acknowledgment. Full source checks pass155 suites/2,095 app
-tests and five workflows, with typecheck/lint/both formatting checks green.
+Source0.11.47/code63 makes current-card Kardex status/delete acknowledgments
+transactional: exact shown row, live parent/episode, original dataset and atomic
+id-only audit. Retained read failures cannot authorize actions. The manual order
+form retains its original identity/input through route reuse, deletion and read
+failure, locks duplicate publication, and prevents delayed suggestions or closing
+another screen. Unknown start remains unknown. This is not raw draft recovery,
+permanent correction history or implemented order-trash restore.
 
-The preceding0.11.45/code61 (`94e5d6c`) shares one current-encounter fallback across
-status, location, detail, publication and raw lab/imaging/vital/follow-up reads.
-Tied/unknown timestamps no longer select different episodes. Existing raw and
-published associations remain unchanged; duplicates are retained, not resolved.
-Patient locations rank only live active episodes and return one per patient.
-Kardex and notes distinguish read failure/loading from successful absence and
-offer retry while retaining cached cards without unreliable counts.
+The preceding .45 shares a deterministic current-encounter fallback; duplicate
+episodes remain intact. .46 adds40-card note cursor pages, bounded highlights,
+visible-note voice counts and display-only backup progress updates. Full source
+documents/history/crypto are unchanged. .47 full source checks pass156 suites/
+2,143 application tests and five workflows, with typecheck/lint/both formatting
+checks green. Its native acceptance must be tracked separately.
 
-Software at .45:153 suites/2,079 application tests and five workflow tests pass,
-with typecheck/lint/formatting; normal push and exact-source hosted CI pass.
-
-Native .45 notes/current-location/kardex and tied-episode witnesses pass. Its
-actual UI restoration and cold export retain4,117 rows/49 tables/34 media exactly.
-See [validation-0.11.45.md](validation-0.11.45.md). The .46 artifact is not built
-yet. Patient/note delete/refusal/restore is recorded in
+Native .46 upgrade, all90 long-note titles across three pages, whole-record
+operation filter and full32,036-character editor witnesses pass. Its actual
+post-witness archive matches4,212 rows/49 tables/34 media exactly; acknowledged
+base restore/cold export matches the original4,117 rows/34 media. Interrupted
+automation and the System UI boot ANR are explicitly retained in
+[validation-0.11.46.md](validation-0.11.46.md). .47 native acceptance is pending.
+Native tied-episode Kardex is recorded in
+[validation-0.11.45.md](validation-0.11.45.md). Patient/note delete/refusal/restore is recorded in
 [validation-0.11.43.md](validation-0.11.43.md).
 Raw vitals/context/timeline have bounded native evidence in
 [validation-0.11.41.md](validation-0.11.41.md); explicit glucose units, separate
@@ -69,10 +71,10 @@ These do not prove full-shift performance, every failure path or phone acceptanc
 | D02 | Atomic note/version/draft acknowledgment | Implemented software and bounded native evidence. Preserve the original dataset and native header/parent through any editor changes; general interruption/power acceptance remains open. |
 | D03 | Durable stopped voice publication | Existing record, draft-note and capture journals support verified-copy retry and atomic metadata acknowledgment. Active/pre-journal recording loss and physical recorder/audio behavior are separate gates. |
 | D04 | Atomic quick capture filing | Software preserves selected context, same-operation retry and one destination. Copied photo batches have a journal. Picker/pre-journal interruption and provider-loss/native failures still need acceptance. |
-| D05 | Recover every manual form | Patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital raw recovery exist. Remaining: topic, idea, specialty profile, prescription, place, extension, credential. Use the same original intent, strict raw codec/CAS, explicit publication and recovery; do not copy an entire engine seven times. |
+| D05 | Recover every manual form | Patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital raw recovery exist. Eight remain: Kardex order, topic, idea, specialty profile, prescription, place, extension, credential. Use bounded shared draft lifecycle with feature-owned versioned codecs/publishers; pilot idea/topic without modifying existing draft stores. Preserve invalid raw dates, exact credential whitespace and partial prescription lines. Order intent must capture its original patient/encounter including null, compare its shown clinical basis, and retain explicit conflict recovery. Never copy a500-line engine eight times or reuse doctor drafts for unrelated entities. |
 | D06 | Consult reply ownership | Software keeps replies with their original consultation and preserves failed input. Verify full native request/answer/follow-up workflow. |
 | D07 | Numerical integrity | Blank differs from invalid; paired BP conflicts cannot be half-merged; observation time/context stay explicit. Glucose units are recorded, never guessed/converted, and charts separate units. Broader chart/device and clinical applicability review remain open. |
-| D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. Labs, imaging, vitals, orders, consults, diagnoses and encounters need appropriate restore/audit paths. Lab/order deletion still needs audit. Never infer a deleted encounter's former active state. |
+| D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. Labs, imaging, vitals, orders, consults, diagnoses and encounters need appropriate restore/audit paths. Order status/delete audit now commits atomically; order restore and permanent correction history remain. Lab deletion still needs audit. Never infer a deleted encounter's former active state. |
 | D09 | Consistent rounds and active episode | New memberships validate live ownership, preserve reorder/handoff and use latest published clinical note independent of pins. .45 makes encounter readers consistent. Imported duplicate memberships/episodes are preserved; clinical duplicate resolution and broader native rounds acceptance remain open. |
 | D10 | Compatible verified backup/restore | Format/KDF remain frozen; verified destination strength governs pruning. Restore excludes admitted writers/file jobs and preserves original ownership of old forms. Independent old/current restore exists in versioned reports. Critical swap/commit interruption, low disk, provider grants and second-device recovery remain open. |
 | D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. Actual alarm/reboot/Doze behavior and the complete received/reviewed/action/closed product flow remain open. |
@@ -93,8 +95,8 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 | W05 | Clinical history | Separate encounters, timeline filters/bounded previews/keyset pages and direct record access exist. Accept native pagination/every kind/pressure and finish appropriate correction/restore. |
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
 | W07 | Trash and correction | Extend appropriate original-context restore beyond current record kinds. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
-| W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. Note cards/highlights/media-count retrieval is bounded in .46 source; complete native pagination/performance acceptance. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
-| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. Complete remaining raw forms and actual edit/search acceptance. Handle idea-area read rejection/retry. |
+| W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
+| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. Complete remaining raw forms and actual edit/search acceptance. Handle idea-area read rejection/retry. Extension creation must reject a deleted place in the same transaction; current creation can insert an invisible child after its parent disappears. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |
 
 ## Priority2: validated clinical tools and future AI

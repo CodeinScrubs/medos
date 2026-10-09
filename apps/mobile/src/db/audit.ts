@@ -1,6 +1,6 @@
 import { newId, stamps } from '@/lib/ids';
 
-import { db, type Database } from './client';
+import { db, type Database, type DbTransaction } from './client';
 import { auditLog } from './schema';
 
 /**
@@ -30,6 +30,8 @@ export type AuditAction =
   | 'vital.draftDiscarded'
   | 'diagnosis.updated'
   | 'diagnosis.deleted'
+  | 'order.statusChanged'
+  | 'order.deleted'
   | 'encounter.discharged'
   | 'encounter.deleted'
   | 'encounter.draftDiscarded'
@@ -73,28 +75,36 @@ export type AuditAction =
   | 'vault.deleted'
   | 'vault.rekeyed';
 
-export async function audit(
-  action: AuditAction,
-  details: {
-    entityType?: string;
-    entityId?: string;
-    summary?: string;
-    detail?: Record<string, unknown>;
-  } = {},
-  database: Database = db,
-): Promise<void> {
-  const now = new Date();
+type AuditDetails = {
+  entityType?: string;
+  entityId?: string;
+  summary?: string;
+  detail?: Record<string, unknown>;
+};
+
+function auditValues(action: AuditAction, details: AuditDetails, now: Date) {
+  return {
+    id: newId(),
+    ...stamps(now),
+    at: now,
+    action,
+    entityType: details.entityType ?? null,
+    entityId: details.entityId ?? null,
+    summary: details.summary ?? null,
+    detail: details.detail ?? null,
+  };
+}
+
+/** The caller's synchronous transaction rolls back if this record cannot be written. */
+export function auditInTransaction(tx: DbTransaction, action: AuditAction, details: AuditDetails, now: Date): void {
+  tx.insert(auditLog)
+    .values(auditValues(action, details, now))
+    .run();
+}
+
+export async function audit(action: AuditAction, details: AuditDetails = {}, database: Database = db): Promise<void> {
   try {
-    await database.insert(auditLog).values({
-      id: newId(),
-      ...stamps(now),
-      at: now,
-      action,
-      entityType: details.entityType ?? null,
-      entityId: details.entityId ?? null,
-      summary: details.summary ?? null,
-      detail: details.detail ?? null,
-    });
+    await database.insert(auditLog).values(auditValues(action, details, new Date()));
   } catch {
     // Auditing must never break the action it is recording.
   }

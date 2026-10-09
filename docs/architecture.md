@@ -2025,3 +2025,44 @@ capture retains its original patient and live filed destination; restoring it
 never creates or revives a note/task. No files are moved or rewritten. Separately
 deleted children remain deleted. Successful actions use the existing audit path;
 native reminder repair remains a subsequent step under the same write admission.
+
+## Kardex action ownership (0.11.47)
+
+A current-card status change or deletion acknowledges the exact Order shown when
+the button or confirmation opened. Comparing only `updatedAt` is insufficient:
+another edit can have the same timestamp. All scalar columns and Date milliseconds
+must match, before even an identical target status is treated as a no-op.
+The synchronous transaction also requires a live patient and a live matching
+encounter. Current cards pass their patient scope: an old episode's unchanged
+stopped order cannot be deleted after a new episode opens, even before the60ms
+live-query refresh. Standing orders retain null encounter ownership. An explicit
+historical correction does not implicitly require the active episode.
+
+The original dataset token encloses the action. Same-turn presses use a ref lock;
+held callbacks check mount, focus and the latest read acknowledgment. Cached cards
+stay readable after read failure with retry, but cannot authorize a mutation.
+Status/deletion and their id-only audit commit together with `auditInTransaction`.
+Failure to insert that audit rolls back the mutation. The older asynchronous
+best-effort `audit()` contract is unchanged; never call it inside a synchronous
+transaction. Neither id-only audit nor soft deletion is permanent clinical
+correction history or an implemented order-trash restore.
+
+The manual order editor retains its original route context and first order seed,
+including when a live parent/order read becomes unavailable. It never pairs a
+cached foreign order with a new patient's allergy banner. Edit publication compares
+the original full order and refuses missing/deleted parents or orders. Current
+fields use a synchronous latest-value ref; pending publication locks both field
+callbacks and Cancel. A delayed acknowledgment closes only its focused originating
+route, otherwise leaving an explicit completed Close. Native scroll/stacking
+parents remain stable. An unknown start remains null during unrelated edits.
+
+Prefix suggestions and prior-order prefilling have separate failure/retry paths.
+Each selection keeps its own token: a later manual edit, newer selection, restore,
+unmount, loss of context or focus makes the response inapplicable. Suggestions
+are optional user-owned history, not dose validation or treatment advice.
+
+This editor still needs raw draft/CAS recovery, explicit original new-encounter
+capture, conflict resolution and permanent correction history. The synchronous
+create query validates its live patient and resolves the active episode atomically
+at publication; this does not establish an encounter chosen when editing began.
+Do not call the manual editor autosave or process-death recovery.

@@ -33,6 +33,67 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Kardex mutation ownership and .46 long-note acceptance (0.11.47 source)
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers.
+**Commits:** this source checkpoint; preceding `8d9de14`.
+
+**Changed**
+- Current-card status/delete acknowledges the exact shown row and live
+  patient/episode in one synchronous transaction with an id-only audit. Original
+  dataset, latest read acknowledgment, mount/focus and same-turn locks guard
+  actions. Audit insertion failure rolls back the mutation. Standing/historical
+  ownership and repeated terminal timestamps are preserved.
+- The manual order editor retains original route identity and loaded input
+  through parent/order loss or read failure; edit publication compares its full
+  original basis. Guard pending field/Cancel callbacks, duplicate save and late
+  close; preserve stable native parents and unknown start. Prefix suggestions
+  and prior-order prefill have separate real retries and response ownership.
+- Version0.11.47/code63; no dependency, schema, permission, clinical formula or
+  new route. Correct the remaining raw-form inventory to eight, including order.
+
+**Verified**
+- Focused migrated-SQLite/UI-handler checks cover same-timestamp corrections,
+  changed/deleted parents/episodes, held callbacks, refresh rejection/retry,
+  audit-trigger rollback, idempotence, same-ID restore, route reuse, retained
+  input, duplicate/pending saves, unknown start and late suggestion responses.
+  A full run exposed a stale patient-table watch expectation; updating it plus
+  a real patient-deletion event test passes11 snapshot tests.
+- Final `npm run check` passes156 suites/2,143 application tests and five
+  workflow checks, with typecheck/lint/both formatting checks green.
+- Exact `8d9de14` hosted CI passes. Its frozen .46 QA APK passes inspection,
+  in-place installation and byte identity. Actual three-page/filter/full-note
+  native witnesses plus independent all-row/media archives and cold base
+  restoration pass. See `validation-0.11.46.md`, including interruptions.
+- GitHub refresh confirms all five open PR heads still match the exact reviewed
+  heads in `project-audit-2026-10-07.md`; no PR is merged or approved here.
+
+**Not verified**
+- .47 native, owner arm64 and physical phone acceptance remain pending. No
+  claim of crash freedom, full-shift timing or resolved pressure/boot ANR.
+- The order form remains manual: no raw/CAS/crash recovery, original new-episode
+  seed, full correction history or order-trash restore is implied by these fixes.
+
+**Open threads**
+- Complete .47 native editor/status/delete/upgrade witnesses from frozen source.
+- Pilot bounded shared raw drafts for idea/topic, then finish all eight manual
+  kinds; order needs original episode/basis and explicit conflict handling.
+  Preserve exact credentials and partial prescriptions. Existing draft stores
+  stay intact; do not repurpose doctor drafts or duplicate their entire engine.
+- Fix extension creation after deleted place; then further clinical restore,
+  permanent correction history, rich text, shift context and follow-up stages.
+  Native long shift/IME/large-font/pressure and physical gates remain open.
+
+**Gotchas**
+- The two read-only reviewers ran no tests/builds or device drivers; their
+  findings were integrated and exercised by the primary. Do not count review
+  prose as executed evidence.
+- The .46 native fixture is removed by actual UI restore/cold archive, not
+  direct database manipulation. Rejected idle/completion observations and an
+  interrupted emulator session are not successful operation witnesses.
+
+---
+
 ## 2026-10-09 — Bounded long-chart note reads and .45 native acceptance (0.11.46 source)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.
