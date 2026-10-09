@@ -53,10 +53,17 @@ The combined recovery/deck corrections pass81 focused cases. Final full checks
 pass160 suites/2,255 application tests and five workflows, with typecheck/lint/
 both formatting checks clean and no warnings. Regeneration reports no schema
 changes. Preceding `a674921` exact-head hosted CI succeeds; current CI is pending.
-Frozen `5cea420` x86 upgrade preserves all4,117 original rows/34 media with
-only the additive raw-draft defaults. Two explicit native adoption stages pass
-independent whole-row comparisons. This APK predates the Today fix; final
-voice-only publication, whole-archive comparison and cold cleanup remain open.
+Frozen `1915ee5` x86 native acceptance includes explicit adoption before
+publication, original outpatient null association, invalid raw date/clock and
+voice-only recovery. Independent final exports preserve the intended4,136
+rows/34 media. Three native recovery pages select the oldest of41 tied drafts;
+their export preserves all4,178 rows/34 media. The ten-task preview opens the
+matching40-row full list. Acknowledged original-base restore/cold export
+preserves all4,117 rows/34 media with only the three additive draft defaults.
+The same frozen source produces an inspected, owner-signed .50/code66 arm64
+candidate in `dist/`. See [validation-0.11.50.md](validation-0.11.50.md).
+No phone acceptance has run. Restore latency and nonfatal native modal/audio
+warnings remain open; bounded correctness is not a performance budget.
 
 Preceding .49 scopes note/history readers to the live patient and validates
 version/current-row/parent/dataset ownership in atomic history restoration.
@@ -114,14 +121,15 @@ Raw vitals/context/timeline have bounded native evidence in
 [validation-0.11.41.md](validation-0.11.41.md); explicit glucose units, separate
 charts and old/current restore in [validation-0.11.42.md](validation-0.11.42.md).
 These do not prove full-shift performance, every failure path or phone acceptance.
-`dist/` is still the .39 owner artifact; a source checkpoint is not a new APK.
+`dist/` now includes the inspected .50 owner candidate; an APK is not phone
+acceptance or completion of the remaining product gates.
 
 ## Priority0: finish integrity and recovery
 
 | ID | Contract | Current boundary and next work |
 |---|---|---|
 | D01 | Exact history | Note history retains SOAP boundaries, metadata, text and deterministic rapid-save ordering. Visual rich text needs a versioned codec and backward-compatible plain export/search. Permanent patient-field and other clinical correction history is not proved by note versions, soft deletion, id-only audit or retained raw drafts; complete and expose that owner requirement separately. Do not prune history. |
-| D02 | Atomic note/version/draft acknowledgment | .50 persists original Note/encounter basis, including null, and raw date/clock/revision. Legacy or conflicting recovered drafts require exact shown-row adoption before separate publication; scoped recovery selects the intended draft. Software conflict, audit rollback, lifecycle and old/current import checks pass; .50 native acceptance is pending. .49 version restore has bounded native evidence. Preserve original dataset/native parents; general interruption/power acceptance remains open. |
+| D02 | Atomic note/version/draft acknowledgment | .50 persists original Note/encounter basis, including null, and raw date/clock/revision. Legacy or conflicting recovered drafts require exact shown-row adoption before separate publication; scoped recovery selects the intended draft. Software conflict, audit rollback, lifecycle and old/current import checks pass. Bounded native adoption/publication, outpatient/date/voice recovery, pages and whole archives pass in validation-0.11.50. .49 version restore has bounded native evidence. Preserve original dataset/native parents; general interruption/power acceptance remains open. |
 | D03 | Durable stopped voice publication | Existing record, draft-note and capture journals support verified-copy retry and atomic metadata acknowledgment. Active/pre-journal recording loss and physical recorder/audio behavior are separate gates. |
 | D04 | Atomic quick capture filing | Software preserves selected context, same-operation retry and one destination. Copied photo batches have a journal. Picker/pre-journal interruption and provider-loss/native failures still need acceptance. |
 | D05 | Recover every manual form | Patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital raw recovery exist. Eight remain: Kardex order, topic, idea, specialty profile, prescription, place, extension, credential. Use bounded shared draft lifecycle with feature-owned versioned codecs/publishers; pilot idea/topic without modifying existing draft stores. Preserve invalid raw dates, exact credential whitespace and partial prescription lines. Order intent must capture its original patient/encounter including null, compare its shown clinical basis, and retain explicit conflict recovery. Never copy a500-line engine eight times or reuse doctor drafts for unrelated entities. |
@@ -169,6 +177,11 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
 
 - Reproduce the older .33 focus/pressure ANR with event-time scheduling/stack
   evidence; the recovered matching late stack does not establish its cause.
+- Measure restore/key-derivation phases and target-device cost; .50 synthetic
+  cleanup takes about465 observer-inclusive seconds. Retain frozen parameters,
+  normalization schemes, golden keys and independent compatibility. Native
+  keyboard-controller modal soft exceptions and audio dead-handler warnings
+  remain diagnostic/acceptance work; retained processes do not prove harmlessness.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.

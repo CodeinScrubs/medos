@@ -33,6 +33,57 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Validate .50 recovery/deck and inspect the owner APK
+
+**Agent:** GPT-6 via Codex; primary native validation and integration.
+**Commits:** application `1915ee5`, preceding `5cea420`; this evidence checkpoint.
+
+**Changed**
+- Record actual .50 note recovery, short Today previews, recovery pages,
+  independent whole-archive comparisons and acknowledged cold cleanup in
+  validation-0.11.50. Update current gates without rewriting earlier evidence.
+- Build the same frozen source as the owner-signed arm64 .50/code66 candidate
+  in `dist/`. The x86 QA packages remain private. No new dependency or permission.
+
+**Verified**
+- Exact application source passes160 suites/2,255 app tests plus five workflows;
+  typecheck/lint/formatting are clean, regeneration has no schema changes.
+- Actual x86 install matches inspected bytes. Adoption does not publish until
+  separate Save; outpatient null, invalid raw date and acknowledged voice survive.
+  Independent final exports match4,136 intended rows/34 media across49 tables.
+- Native three-preview/three-page/oldest-editor/collapse witness preserves all
+  4,178 fixture rows/34 media. Ten due previews open the actual matching40-row
+  scope. Acknowledged base restore, then explicit stop/cold export, preserves
+  the original4,117 rows/34 media with only three additive draft defaults.
+- Owner APK build and actual ABI/package/version/certificate/essential-library
+  inspection pass. Exact hashes and native warnings are in the validation report.
+  Fresh PR inventory finds1–5 unchanged. Exact final-head CI is pending here.
+
+**Not verified**
+- No physical-phone installation, audible recording/playback, camera, alarms/
+  Doze/reboot or second-device recovery. No full40-patient timing/pressure or
+  interrupted swap/power/provider/low-space acceptance; product gates remain.
+
+**Open threads**
+- Push normally and inspect exact-head hosted CI; retain its source boundary.
+- Continue D05: eight raw forms remain. Pilot a bounded shared lifecycle for
+  idea/topic with feature-owned codecs/publishers; preserve invalid raw fields,
+  original context, CAS/conflict review, dataset and navigation ownership.
+- Complete permanent clinical correction history, appropriate trash, rich text,
+  follow-up/shift flow and validated clinical tools in IMPLEMENTATION.
+- Measure restore/KDF phases and target-device costs before optimizing frozen
+  crypto; cleanup takes465 observer-inclusive seconds. Investigate modal/audio
+  nonfatal warnings and the remaining native/phone acceptance gates.
+
+**Gotchas**
+- Deep links retain Today scroll; use fresh reverse scrolling to find recovery.
+  Long restore exceeds the initial observer; wait for actual completion and tap
+  its acknowledgment before stopping/reinstalling. Do not guess cached bounds.
+- Full checks, native builds and UI acceptance were serialized. Completed owned
+  QA AVD is closed after acknowledged cleanup; do not drive unrelated emulators.
+
+---
+
 ## 2026-10-10 — Keep Today recovery and due work reachable during long shifts
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.
