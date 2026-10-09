@@ -44,6 +44,7 @@ import {
 import { WrongPassphraseError } from './format';
 import { checkBackupPassphrase, hasBackupKey, setBackupPassphrase } from './keys';
 import { backupFreshness, deliveryStrength } from './logic';
+import { createProgressReporter } from './progress';
 import {
   backupAutoEnabled,
   backupAutoIncludeMedia,
@@ -147,12 +148,13 @@ export function BackupScreen() {
   const busy = progress != null && progress.phase !== 'done';
 
   async function runBackup(includeMedia: boolean, share: boolean) {
-    setProgress({ phase: 'snapshot', fraction: 0 });
+    const reportProgress = createProgressReporter(setProgress);
+    reportProgress({ phase: 'snapshot', fraction: 0 });
     try {
       const result = await createBackup({
         includeMedia,
         trigger: 'manual',
-        onProgress: (p: BackupProgress) => setProgress(p),
+        onProgress: (p: BackupProgress) => reportProgress(p),
       });
       if (share && (await Sharing.isAvailableAsync())) {
         await Sharing.shareAsync(result.file.uri, {
@@ -202,12 +204,13 @@ export function BackupScreen() {
     const uri = restoreUri;
     setRestoreUri(null);
     if (!uri) return;
-    setProgress({ phase: 'key', fraction: 0 });
+    const reportProgress = createProgressReporter(setProgress);
+    reportProgress({ phase: 'key', fraction: 0 });
     try {
       const result = await restoreBackup({
         fileUri: uri,
         passphrase,
-        onProgress: (p: RestoreProgress) => setProgress(p),
+        onProgress: (p: RestoreProgress) => reportProgress(p),
       });
       recheckKey();
       const summary =

@@ -276,7 +276,9 @@ function PatientRecord({ id, initialTab }: { id: string; initialTab?: Tab }) {
           {tab === 'timeline' && (
             <TimelineTab patientId={id} onPageChange={() => scrollRef.current?.scrollTo({ y: 0, animated: false })} />
           )}
-          {tab === 'notes' && <NotesTab patientId={id} />}
+          {tab === 'notes' && (
+            <NotesTab patientId={id} onPageChange={() => scrollRef.current?.scrollTo({ y: 0, animated: false })} />
+          )}
           {tab === 'kardex' && <KardexTab patientId={id} />}
           {tab === 'vitals' && <VitalsTab patientId={id} />}
           {tab === 'labs' && <LabsTab patientId={id} />}

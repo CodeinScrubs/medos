@@ -33,6 +33,69 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Bounded long-chart note reads and .45 native acceptance (0.11.46 source)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; preceding `94e5d6c`.
+
+**Changed**
+- Replace all-body/all-voice reads in the notes tab with40-card keyset pages,
+  short SQL projections, whole-record type filters and visible-note voice counts.
+  Keep pins/date ordering with a stable ID tie-break. Page changes retain the
+  patient's scroll/header/AutosaveScope; cached data cannot pose as a new filter.
+  Existing text/read/voice failures remain separate and retryable. Relative note
+  times use one updating page clock. Cards open the actual full note by ID.
+- Read only eight short highlights on the overview; each opens its source note.
+  Editor/history/export/search text is untouched. Backup/restore display reports
+  phase/whole-percent changes instead of every KDF callback; crypto, completion
+  and archive compatibility are unchanged. Version0.11.46/code62, no dependency,
+  schema, permission, clinical formula or extra route.
+- Replace chronological material in `IMPLEMENTATION.md` with a short current
+  ledger retaining D01–D12/W01–W10/C01–C05 and open gates. History remains in
+  handoffs, reports and Git. Explicitly retain the permanent patient/other
+  clinical correction-history requirement, not just note versions.
+
+**Verified**
+- Focused47 checks across five suites cover2,000 long documents, bounds,
+  pin/date/ID ties, filters beyond the first page, real SQL/component pagination,
+  unchanged source text, independent read retries, retained dataset mutations
+  and progress-callback cadence. Full `npm run check` passes155 suites/2,095 app
+  tests plus five workflows, with typecheck/lint/both formatting green.
+- Exact `94e5d6c` hosted CI passes. The cumulative .45 QA APK is inspected,
+  installed in place and verified byte-identical. Actual notes, deterministic
+  current location and tied-encounter kardex pass on native Expo SQLite.
+  Independent actual UI archives prove all original4,117 rows/49 tables/34
+  media hashes intact, plus exactly eight fixture rows during the witness.
+  Actual base restore/cold export removes that fixture with exact original rows
+  and media. See `validation-0.11.45.md`, including rejected automation trials.
+
+**Not verified**
+- .46 native/owner arm64/physical-phone acceptance has not run. A private
+  independently decoded95-row/90-long-note fixture is staged for .46; it has
+  not been restored. No measured phone latency gain or full-shift guarantee.
+- The slow .45 emulator key phase/soft exception does not establish its cause
+  or close the earlier pressure ANR. A rejected cleanup passphrase attempt is
+  not a successful restore; only the later successful cold archive counts.
+
+**Open threads**
+- Freeze/build/inspect/install the .46 QA APK after normal pre-push checks,
+  verify upgrade preservation and native multi-page/filter/full-note/voice-count
+  navigation. Keep fixture cleanup and independent archived preservation in
+  acceptance. Do not overlap full Jest with native building.
+- Seven manual raw forms, permanent clinical correction history, further clinical
+  trash/audit, visual rich text, optional shift context and follow-up stages
+  remain. Native full-shift/pressure/IME/image and physical audio/power/Doze/
+  provider/low-storage gates are separate; the phone is not the sole remaining work.
+
+**Gotchas**
+- Bare `jest.fn()` progress spies infer unknown arguments; type their callback.
+  The first WIP typecheck was corrected, not accepted as green.
+- Use `npm run test --workspace=@medos/mobile -- --runInBand …` for focused
+  sequential Jest. Passing `--runInBand` through the root npm wrapper is consumed
+  as an npm option. Do not change test timeouts or skip hooks to mask host load.
+
+---
+
 ## 2026-10-09 — Coherent current encounter and kardex reads (0.11.45 source)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.

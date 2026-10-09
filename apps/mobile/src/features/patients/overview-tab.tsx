@@ -17,8 +17,7 @@ import { admissionElapsed, formatAdmissionElapsed, isInpatient } from '@/feature
 import { activeEncounterDetailQuery } from '@/features/encounters/queries';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { patientFollowUpsQuery } from '@/features/followups/queries';
-import { isHighlighted } from '@/features/notes/logic';
-import { patientNotesQuery } from '@/features/notes/queries';
+import { patientHighlightedNotesQuery } from '@/features/notes/list-queries';
 import { TasksSection } from '@/features/tasks/tasks-section';
 import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali, formatJalaliDateTime, formatJalaliLong, formatRelative } from '@/lib/jalali';
@@ -30,7 +29,7 @@ import { PatientSnapshot } from './patient-snapshot';
 import { deletePatientContact, patientContactsQuery } from './queries';
 
 export function OverviewTab({ patient }: { patient: Patient }) {
-  const { generation } = useDatasetIntent();
+  const { generation, stale } = useDatasetIntent();
   const router = useRouter();
   const { colors } = useTheme();
   const patientId = patient.id;
@@ -45,10 +44,14 @@ export function OverviewTab({ patient }: { patient: Patient }) {
     error: followUpsError,
     retry: retryFollowUps,
   } = useLive(patientFollowUpsQuery(patientId), [patientId]);
-  const { data: notes, error: notesError, retry: retryNotes } = useLive(patientNotesQuery(patientId), [patientId]);
+  const {
+    data: notes,
+    error: notesError,
+    retry: retryNotes,
+  } = useLive(patientHighlightedNotesQuery(patientId), [patientId]);
 
   const pendingFollowUps = (followUps ?? []).filter((f) => f.status === 'pending');
-  const events = (notes ?? []).filter(isHighlighted).slice(0, 8);
+  const events = notes ?? [];
 
   const historyFields = [
     { label: 'سابقه بیماری', value: patient.pastMedicalHistory },
@@ -105,7 +108,15 @@ export function OverviewTab({ patient }: { patient: Patient }) {
           {events.length > 0 ? (
             <Card>
               {events.map((n, i) => (
-                <View key={n.id}>
+                <Pressable
+                  key={n.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${n.title || 'نوت'}، ${formatJalaliDateTime(n.noteDate)}`}
+                  disabled={stale}
+                  onPress={() =>
+                    router.push({ pathname: '/patient/[id]/note', params: { id: patientId, noteId: n.id } })
+                  }
+                >
                   {i > 0 && <Divider />}
                   <Row gap="sm" align="flex-start" style={{ paddingVertical: 8 }}>
                     <Ionicons
@@ -115,10 +126,12 @@ export function OverviewTab({ patient }: { patient: Patient }) {
                       style={{ marginTop: 5 }}
                     />
                     <Column gap="xxs" style={styles.grow}>
-                      <Text variant="bodyStrong">{n.title || n.body || n.assessment || '—'}</Text>
-                      {n.title && n.body ? (
+                      <Text variant="bodyStrong" numberOfLines={2}>
+                        {n.title || n.preview || '—'}
+                      </Text>
+                      {n.title && n.preview ? (
                         <Text variant="caption" color="textMuted" numberOfLines={2}>
-                          {n.body}
+                          {n.preview}
                         </Text>
                       ) : null}
                       <Text variant="tiny" color="textFaint">
@@ -126,7 +139,7 @@ export function OverviewTab({ patient }: { patient: Patient }) {
                       </Text>
                     </Column>
                   </Row>
-                </View>
+                </Pressable>
               ))}
             </Card>
           ) : null}

@@ -5,6 +5,41 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Bounded note cards are projections, not editable documents (0.11.46)
+
+The patient notes tab reads one40-card keyset page plus a sentinel. Its ordering
+retains pins first, then clinical note time, with an ascending ID tie-break.
+Filtering happens before the page bound; a separate grouped type read exposes
+types in older pages. Page/filter transitions replace the read subtree, keeping
+the patient's scroll host, native header and original AutosaveScope mounted.
+This prevents retained `useLive` data from posing as a different page/filter.
+
+SQLite returns bounded title/specialty/preview fields, never the full body,
+SOAP fields, search text or note-version history to this list. Voice reads
+aggregate counts for only the visible IDs; their failure/retry remains independent
+of the text read. The overview reads at most eight short pinned/event highlights.
+A card opens the actual note by ID; previews are never editor state, restore
+snapshots or search/export replacements. Full text and history remain untouched.
+
+Read failure is not successful absence. Existing cards survive a failed refresh,
+voice counts are withheld when their read fails, and the first-note admission
+template requires confirmed unfiltered absence and a successful type read.
+Older-page navigation is disabled during primary read failure; returning to a
+newer page remains possible. Current pins can change while browsing; this is a
+live cursor view, not a frozen historical snapshot.
+
+**Rejected: increasing the visible limit on every tap or fetching all bodies and
+clipping them in React.** Both grow transfer/render costs with chart length.
+No extra route, native dependency, schema or clinical-data rewrite is needed.
+The software bound is not a measured phone latency claim.
+
+Backup/restore progress reporting also gates UI updates by phase and whole
+percent, with fresh state per operation. The underlying KDF, callbacks, archive
+format and final completion acknowledgment remain unchanged. Reducing submitted
+display updates does not alone explain or close a native scheduling delay/ANR.
+
+---
+
 ## Keep the existing Expo SDK 57 / React Native application
 
 Android installation is the current locked target; web remains later work. No
