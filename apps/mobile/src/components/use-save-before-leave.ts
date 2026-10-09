@@ -1,5 +1,5 @@
 import { useNavigation, usePreventRemove } from 'expo-router/react-navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { datasetGeneration, DatasetChangedError } from '@/lib/dataset-write';
@@ -22,11 +22,45 @@ import { alertError, notify } from './feedback';
 export function useSaveBeforeLeave(flush: () => Promise<boolean>, abandoned: () => boolean = () => false): void {
   const navigation = useNavigation();
   const [generation] = useState(datasetGeneration);
-  const checking = useRef(false);
+  const checking = useRef<symbol | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      checking.current = null;
+    };
+  }, []);
   usePreventRemove(true, ({ data }) => {
-    if (checking.current) return;
+    if (checking.current || !mounted.current) return;
+    const intent = Symbol();
+    checking.current = intent;
+    const state = navigation.getState();
+    if (!state) {
+      checking.current = null;
+      return;
+    }
+    const routeKeys = state.routes.map((route) => route.key);
+    const focused = navigation.isFocused();
+    // Root/system GO_BACK can be targetless. Adding source on redispatch does
+    // not pin its destination: StackRouter otherwise pops the new top route.
+    // Retain background reset/removal when the originating stack is unchanged.
+    const ownsRemoval = () => {
+      if (!mounted.current || checking.current !== intent || (focused && !navigation.isFocused())) return false;
+      const current = navigation.getState();
+      return (
+        current !== undefined &&
+        current.key === state.key &&
+        current.index === state.index &&
+        current.routes.length === routeKeys.length &&
+        current.routes.every((route, index) => route.key === routeKeys[index])
+      );
+    };
+    const finish = () => {
+      if (checking.current === intent) checking.current = null;
+    };
     if (generation !== datasetGeneration() && !abandoned()) {
-      checking.current = true;
+      const shownGeneration = datasetGeneration();
       Alert.alert(
         'بستن فرم قبلی',
         'اطلاعات از بکاپ جایگزین شده است. نوشتهٔ این صفحه را پیش از بستن مرور یا کپی کنید؛ بستن آن اطلاعات بازگردانی‌شده را تغییر نمی‌دهد.',
@@ -34,36 +68,35 @@ export function useSaveBeforeLeave(flush: () => Promise<boolean>, abandoned: () 
           {
             text: 'ادامهٔ مرور',
             style: 'cancel',
-            onPress: () => {
-              checking.current = false;
-            },
+            onPress: finish,
           },
           {
             text: 'بستن فرم',
             style: 'destructive',
             onPress: () => {
               try {
-                navigation.dispatch(data.action);
+                if (ownsRemoval() && shownGeneration === datasetGeneration()) navigation.dispatch(data.action);
               } finally {
-                checking.current = false;
+                finish();
               }
             },
           },
         ],
+        { cancelable: true, onDismiss: finish },
       );
       return;
     }
-    checking.current = true;
     void saveBeforeLeave(flush, () => {
+      if (!ownsRemoval()) return;
       if (generation !== datasetGeneration() && !abandoned()) throw new DatasetChangedError();
       navigation.dispatch(data.action);
     })
       .then((saved) => {
-        if (!saved) notify('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');
+        if (!saved && ownsRemoval()) notify('هنوز ذخیره نشد', 'نوشته روی صفحه باقی مانده است. دوباره تلاش کنید.');
       })
-      .catch((e) => alertError('ذخیره نشد', e))
-      .finally(() => {
-        checking.current = false;
-      });
+      .catch((e) => {
+        if (ownsRemoval()) alertError('ذخیره نشد', e);
+      })
+      .finally(finish);
   });
 }

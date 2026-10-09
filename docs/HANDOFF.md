@@ -33,6 +33,65 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Navigator ownership and live extension parents (0.11.48 source)
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint; preceding `b8f44a8`.
+
+**Changed**
+- The always-on removal guard owns one attempt and its original navigator
+  key/index/ordered route keys. Superseded/unmounted/focus-lost callbacks and
+  stale confirmation/dismissal cannot pop a newer route, unlock another attempt
+  or display its save failure there. Unchanged background removal still works.
+- Extension creation/edit and place rename read live parents/current search
+  basis inside synchronous transactions. Refuse invisible children, retain
+  unrelated fields, and roll back a rename when a child index write fails.
+  Ignore undefined patch fields consistently with SQL while honoring null;
+  otherwise stored names/departments can silently disappear from search.
+- Version0.11.48/code64. No dependency, schema, route, permission, clinical
+  formula or backup-format change. Add .47 native evidence and refresh the ledger.
+
+**Verified**
+- Actual installed StackRouter control demonstrates targetless system Back can
+  pop a newly pushed route while a targeted header POP retains it. The guard's
+  16 focused tests pass, including delayed acknowledgment, focus lag, legitimate
+  background removal, unmount, failure/retry and superseded/double confirmation.
+- Original committed extension creation reproduces the deleted-parent bug.
+  Eleven new migrated-SQLite checks and34 existing record tests pass, including
+  full-row preservation and a real SQL-trigger rollback of parent/child writes.
+  Two undefined-field search regressions are reproduced before correction;
+  the final focused run passes61 tests across three suites.
+- Final `npm run check` passes157 suites/2,168 application tests and five
+  workflow checks; typecheck/lint/both formatting checks pass without warnings.
+- Exact `b8f44a8` hosted CI passes. Frozen .47 QA APK/install bytes match.
+  Actual Kardex hold/resume/discontinue/delete/edit/refusal and independent
+  archives pass; the cold-cleaned base retains4,117 rows/34 media exactly.
+  See `validation-0.11.47.md` for hashes, exclusions and rejected automation.
+- GitHub refresh finds the same five reviewed open PR heads; none merged or
+  approved. Their attachments and recorded blocking findings remain intact.
+
+**Not verified**
+- .48 native, owner arm64 and physical acceptance remain pending at this source
+  checkpoint; do not substitute .47 native or source checks for them.
+- No full-shift timings, crash-freedom claim or resolved pressure/boot ANR.
+  Neither fix supplies durable recovery for the eight remaining manual forms.
+
+**Open threads**
+- Build .48 from frozen source, inspect/install and verify upgrade/exit and
+  live-parent refusal on native SQLite; preserve/cold-restore the QA base.
+- Pilot bounded shared idea/topic raw drafts, then remaining manual kinds with
+  original dataset/context, CAS, replay and explicit conflict handling. Complete
+  clinical history/trash, rich text, shift context and follow-up stages.
+  Broad native heavy-shift/IME/large-font and physical gates remain open.
+
+**Gotchas**
+- To pass Jest flags, use `npm run test --workspace=@medos/mobile -- <args>`.
+  The root wrapper swallowed `--testNamePattern` during the first regression
+  probe; repeat the intended single negative witness with explicit workspace.
+- A guard cannot require every removed editor to be focused: reset/stack
+  cleanup legitimately removes background routes. Stable stack ownership is
+  separate from focus and dataset ownership; keep the native guard always on.
+
 ## 2026-10-09 — Kardex mutation ownership and .46 long-note acceptance (0.11.47 source)
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh read-only reviewers.

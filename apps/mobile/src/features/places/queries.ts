@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { extensions, places, type NewPlace, type Place } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -9,6 +9,11 @@ import { extensionSearchText, placeSearchText } from './logic';
 
 const alivePlace = isNull(places.deletedAt);
 const aliveExt = isNull(extensions.deletedAt);
+
+/** Drizzle skips undefined updates; the merged search basis must skip them too. */
+function definedPatch<T extends object>(input: T): T {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as T;
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Places                                                                      */
@@ -42,22 +47,20 @@ export async function createPlace(input: PlaceInput): Promise<string> {
 }
 
 export async function updatePlace(id: string, input: Partial<PlaceInput>): Promise<void> {
-  const current = (await placeQuery(id))[0];
-  if (!current) throw new Error(`Place ${id} not found`);
-
-  // Extensions index their hospital's name; a rename must reach them too, or
-  // "<new name> سونو" would find nothing. Both writes land together.
-  const renamed = input.name !== undefined && input.name !== current.name;
-  const exts = renamed ? await db.select().from(extensions).where(eq(extensions.placeId, id)) : [];
-
+  const patch = definedPatch(input);
   db.transaction((tx) => {
+    const current = requireLivePlace(tx, id);
+    // Read children in this transaction too: a concurrent creation or edit
+    // must not be skipped or rebuilt from an earlier search snapshot.
+    const renamed = patch.name !== undefined && patch.name !== current.name;
+    const exts = renamed ? tx.select().from(extensions).where(eq(extensions.placeId, id)).all() : [];
     tx.update(places)
-      .set({ ...input, ...touch(), searchText: placeSearchText({ ...current, ...input }) })
+      .set({ ...patch, ...touch(), searchText: placeSearchText({ ...current, ...patch }) })
       .where(and(alivePlace, eq(places.id, id)))
       .run();
     for (const e of exts) {
       tx.update(extensions)
-        .set({ searchText: extensionSearchText(e, input.name) })
+        .set({ searchText: extensionSearchText(e, patch.name) })
         .where(eq(extensions.id, e.id))
         .run();
     }
@@ -107,39 +110,44 @@ export type ExtensionInput = {
   notes?: string | null;
 };
 
-async function placeName(placeId: string | undefined): Promise<string | null> {
-  if (!placeId) return null;
-  return (await placeQuery(placeId))[0]?.name ?? null;
+function requireLivePlace(tx: DbTransaction, placeId: string): Place {
+  const current = tx
+    .select()
+    .from(places)
+    .where(and(alivePlace, eq(places.id, placeId)))
+    .get();
+  if (!current) throw new Error('مکان در دسترس نیست؛ ممکن است حذف شده باشد.');
+  return current;
 }
 
 export async function createExtension(input: ExtensionInput): Promise<string> {
-  const id = newId();
-  await db.insert(extensions).values({
-    ...input,
-    id,
-    ...stamps(),
-    searchText: extensionSearchText(input, await placeName(input.placeId)),
+  return db.transaction((tx) => {
+    const place = requireLivePlace(tx, input.placeId);
+    const id = newId();
+    tx.insert(extensions)
+      .values({ ...input, id, ...stamps(), searchText: extensionSearchText(input, place.name) })
+      .run();
+    return id;
   });
-  return id;
 }
 
 export async function updateExtension(id: string, input: Partial<ExtensionInput>): Promise<void> {
-  const current = (
-    await db
+  const patch = definedPatch(input);
+  db.transaction((tx) => {
+    const current = tx
       .select()
       .from(extensions)
       .where(and(aliveExt, eq(extensions.id, id)))
-      .limit(1)
-  )[0];
-  if (!current) throw new Error(`Extension ${id} not found`);
-  await db
-    .update(extensions)
-    .set({
-      ...input,
-      ...touch(),
-      searchText: extensionSearchText({ ...current, ...input }, await placeName(input.placeId ?? current.placeId)),
-    })
-    .where(and(aliveExt, eq(extensions.id, id)));
+      .get();
+    if (!current) throw new Error('داخلی در دسترس نیست؛ ممکن است حذف شده باشد.');
+    requireLivePlace(tx, current.placeId);
+    const merged = { ...current, ...patch };
+    const place = requireLivePlace(tx, merged.placeId);
+    tx.update(extensions)
+      .set({ ...patch, ...touch(), searchText: extensionSearchText(merged, place.name) })
+      .where(and(aliveExt, eq(extensions.id, id)))
+      .run();
+  });
 }
 
 /** Bumped on every call or copy, so the list learns what is actually used. */

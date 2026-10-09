@@ -33,7 +33,17 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Source0.11.47/code63 makes current-card Kardex status/delete acknowledgments
+Source0.11.48/code64 binds delayed removal/old-dataset confirmation to the
+original mounted navigator and one removal attempt. A new route supersedes an
+old Back without a normal-path prompt; unchanged background stack cleanup still
+works. Extension creation/editing validates the live place in its synchronous
+write transaction; place rename and child search indexes commit together.
+The manual place/extension editors still need raw recovery and original-intent
+fencing. Final .48 source checks pass157 suites/2,168 application tests and five
+workflows with typecheck/lint/both formatting checks green and no warnings.
+Native .48 acceptance remains pending at this source checkpoint.
+
+The preceding .47 makes current-card Kardex status/delete acknowledgments
 transactional: exact shown row, live parent/episode, original dataset and atomic
 id-only audit. Retained read failures cannot authorize actions. The manual order
 form retains its original identity/input through route reuse, deletion and read
@@ -46,14 +56,18 @@ episodes remain intact. .46 adds40-card note cursor pages, bounded highlights,
 visible-note voice counts and display-only backup progress updates. Full source
 documents/history/crypto are unchanged. .47 full source checks pass156 suites/
 2,143 application tests and five workflows, with typecheck/lint/both formatting
-checks green. Its native acceptance must be tracked separately.
+checks green. Source checks and native acceptance are tracked separately.
 
 Native .46 upgrade, all90 long-note titles across three pages, whole-record
 operation filter and full32,036-character editor witnesses pass. Its actual
 post-witness archive matches4,212 rows/49 tables/34 media exactly; acknowledged
 base restore/cold export matches the original4,117 rows/34 media. Interrupted
 automation and the System UI boot ANR are explicitly retained in
-[validation-0.11.46.md](validation-0.11.46.md). .47 native acceptance is pending.
+[validation-0.11.46.md](validation-0.11.46.md). .47 native current/standing
+Kardex actions, unknown-start edit and foreign-route refusal pass. Independent
+archives match all4,128 rows after exactly three intended changes and34 media
+hashes; acknowledged base restore/cold export matches the original4,117 rows.
+See [validation-0.11.47.md](validation-0.11.47.md).
 Native tied-episode Kardex is recorded in
 [validation-0.11.45.md](validation-0.11.45.md). Patient/note delete/refusal/restore is recorded in
 [validation-0.11.43.md](validation-0.11.43.md).
@@ -96,7 +110,7 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
 | W07 | Trash and correction | Extend appropriate original-context restore beyond current record kinds. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
 | W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
-| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. Complete remaining raw forms and actual edit/search acceptance. Handle idea-area read rejection/retry. Extension creation must reject a deleted place in the same transaction; current creation can insert an invisible child after its parent disappears. |
+| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. Complete remaining raw forms and actual edit/search acceptance. Handle idea-area read rejection/retry. Extension creation/editing now rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. These software checks do not finish raw recovery, intent fencing, deleted-place recovery/move or native acceptance. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |
 
 ## Priority2: validated clinical tools and future AI

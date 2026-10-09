@@ -5,6 +5,38 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Delayed removal belongs to its original navigator (0.11.48)
+
+`useSaveBeforeLeave` remains enabled throughout a route's life. Each removal
+attempt owns one intent token and the originating navigator key, active index
+and ordered route keys. A delayed flush or old-dataset confirmation may dispatch
+only while that snapshot and the mounted owner remain valid. A focused owner
+must also remain focused. Errors from superseded attempts do not open dialogs
+over a newer route. Dismissal and completion release only their own token.
+
+The installed Expo Router's StackRouter ignores a `GO_BACK` source when its
+target is absent; redispatching a system Back after a notification pushes another
+screen can therefore pop that new screen. The test uses the actual bundled
+router to demonstrate this distinction from a targeted header POP.
+
+**Rejected: unconditional focus-only checks or changing the removal guard.**
+Stack cleanup/reset may legitimately remove an already-background editor. An
+unchanged originating stack still permits this operation. Keeping the native
+guard permanently mounted avoids the known header/removal crash; snapshots and
+intent tokens add no new route, confirmation on the normal path or data write.
+Native interruption/notification behavior remains an acceptance gate.
+
+Place renames and extension creation/editing also read their live parents and
+search basis inside their own synchronous write transaction. Deleted/missing
+parents cannot accept invisible new children. A failed child-index write rolls
+back the parent rename. Undefined patch fields are omitted consistently with
+Drizzle's SQL update; explicit null clears remain real changes. Rebuilt search
+uses those defined changes merged with the live row. This is not raw-form
+recovery, conflict resolution or an explicit recovery/move from a deleted place;
+those remain separate work.
+
+---
+
 ## Bounded note cards are projections, not editable documents (0.11.46)
 
 The patient notes tab reads one40-card keyset page plus a sentinel. Its ordering
