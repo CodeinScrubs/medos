@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
+import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import {
   attachments,
@@ -18,6 +19,7 @@ import { matchesSearch } from '@/db/search';
 import { addAttachmentInTransaction, type AttachmentInput } from '@/features/attachments/queries';
 import { createNoteInTransaction } from '@/features/notes/queries';
 import { createTaskInTransaction } from '@/features/tasks/queries';
+import { requireDeletedRecord } from '@/lib/deleted-record';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText } from '@/lib/persian';
 
@@ -360,16 +362,43 @@ export function deletedCapturesQuery(limit = 50) {
     .select()
     .from(captureInbox)
     .where(isNotNull(captureInbox.deletedAt))
-    .orderBy(desc(captureInbox.deletedAt))
+    .orderBy(desc(captureInbox.deletedAt), desc(captureInbox.id))
     .limit(limit);
 }
 
 /** Put a discarded capture back where it was: the inbox, if it was never filed. */
-export async function restoreCapture(id: string): Promise<void> {
-  await db
-    .update(captureInbox)
-    .set({ deletedAt: null, ...touch() })
-    .where(eq(captureInbox.id, id));
+export async function restoreCapture(id: string, expected?: Capture): Promise<void> {
+  const now = new Date();
+  db.transaction((tx) => {
+    const current = requireDeletedRecord(tx.select().from(captureInbox).where(eq(captureInbox.id, id)).get(), expected);
+    if (
+      current.patientId &&
+      !tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, current.patientId), isNull(patients.deletedAt)))
+        .get()
+    )
+      throw new Error('ابتدا پروندهٔ بیمار این ثبت را برگردانید.');
+    if (current.filedAt) {
+      const table = current.filedAs === 'note' ? notes : current.filedAs === 'task' ? tasks : null;
+      const target =
+        table && current.filedId
+          ? tx
+              .select({ patientId: table.patientId })
+              .from(table)
+              .where(and(eq(table.id, current.filedId), isNull(table.deletedAt)))
+              .get()
+          : undefined;
+      if (!target || target.patientId !== current.patientId)
+        throw new Error('مقصد مرتب‌شدهٔ این ثبت در دسترس نیست؛ ابتدا مقصد را برگردانید.');
+    }
+    tx.update(captureInbox)
+      .set({ deletedAt: null, ...touch(now) })
+      .where(and(eq(captureInbox.id, id), isNotNull(captureInbox.deletedAt)))
+      .run();
+  });
+  await audit('capture.restored', { entityType: 'capture', entityId: id });
 }
 
 /**

@@ -4,9 +4,10 @@ import { audit } from '@/db/audit';
 import { db, type Database, type DbTransaction } from '@/db/client';
 import { patientContacts, patients, type NewPatient, type Patient, type PatientStatus } from '@/db/schema';
 import { contains, matchesSearch } from '@/db/search';
-import { activeEncounterQuery, reconcilePatientStatus, statusFor } from '@/features/encounters/status';
+import { activeEncounterQuery, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
 import { repairTaskReminders } from '@/features/tasks/reminder-queries';
+import { requireDeletedRecord } from '@/lib/deleted-record';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
 
@@ -63,8 +64,13 @@ export function patientQuery(id: string) {
 }
 
 /** The trash: deleted patients, most recently deleted first. */
-export function deletedPatientsQuery() {
-  return db.select().from(patients).where(isNotNull(patients.deletedAt)).orderBy(desc(patients.deletedAt));
+export function deletedPatientsQuery(limit = 50) {
+  return db
+    .select()
+    .from(patients)
+    .where(isNotNull(patients.deletedAt))
+    .orderBy(desc(patients.deletedAt), desc(patients.id))
+    .limit(limit);
 }
 
 export function patientContactsQuery(patientId: string) {
@@ -182,17 +188,24 @@ export async function deletePatient(id: string): Promise<void> {
   await audit('patient.deleted', { entityType: 'patient', entityId: id });
 }
 
-export async function restorePatient(id: string): Promise<void> {
-  await db
-    .update(patients)
-    .set({ deletedAt: null, ...touch() })
-    .where(eq(patients.id, id));
-  // Back from the trash with whatever status it had when it went in, which may
-  // no longer match its episodes — and only the episodes can say.
-  await reconcilePatientStatus(id);
+export async function restorePatient(id: string, expected?: Patient): Promise<void> {
+  const now = new Date();
+  db.transaction((tx) => {
+    const current = requireDeletedRecord(tx.select().from(patients).where(eq(patients.id, id)).get(), expected);
+    // Revival and the current episode's authoritative status commit together.
+    // Never expose an admitted patient if reconciliation itself fails.
+    tx.update(patients)
+      .set({
+        deletedAt: null,
+        status: statusFor(activeEncounterQuery(id, tx).get() ?? null, current.status),
+        ...touch(now),
+      })
+      .where(and(eq(patients.id, id), isNotNull(patients.deletedAt)))
+      .run();
+  });
+  await audit('patient.restored', { entityType: 'patient', entityId: id });
   await rescheduleReminders({ patientId: id });
   await repairTaskReminders({ patientId: id });
-  await audit('patient.restored', { entityType: 'patient', entityId: id });
 }
 
 /* -------------------------------------------------------------------------- */

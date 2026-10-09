@@ -33,6 +33,63 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Truthful trash reads and original restore ownership (0.11.43 source)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; preceding glucose checkpoint `15f7c24`.
+
+**Changed**
+- Trash reports loading/read failures with retry, retains cached rows without
+  current counts/actions on failed reads, and offers further rows beyond the
+  former silent50 cutoff. Patient reads also start bounded; ties use stable ids.
+- Original dataset admission covers the entire restore, including asynchronous
+  audit/reminder work. Same-turn presses serialize; stale intents have one
+  explicit current-view action. No success modal interrupts a restored list.
+- Exact shown tombstones are checked in synchronous restore transactions.
+  Patient revival/status reconcile together; notes require their original live
+  patient/encounter. Captures retain their live original patient/filed destination
+  and do not revive or duplicate it. Add capture restore audit. Version0.11.43/code59.
+- No schema, dependency, route, permission or backup-format change.
+
+**Verified**
+- New witnesses fail against old source. After the fixes,59 focused SQL checks
+  and eight actual trash callback/read tests pass; typecheck and scoped lint pass.
+  Final full check passes150 suites/2,058 app tests and five workflow checks,
+  with typecheck, lint and both formatting checks green.
+- Exact `15f7c24` CI and normal pre-push full check pass148 suites/2,039 app
+  tests and five workflows. Its signed x86_64 APK passes actual identity/JNI and
+  installs in place byte-identically. Independent upgrade archive preserves4,109
+  rows/49 application tables/34 media, with historic glucose units still null;
+  integrity/FKs pass. Old invalid raw glucose recovers on the actual .42 UI.
+  Explicit units, separate fractional/native charts and cold publication pass;
+  the independent4,117-row archive has only eight intended additions and two
+  intended existing changes, with original time/context and34 media preserved.
+  Historic glucose remains unit-unknown after an unrelated caption correction.
+  Actual SAF old/current restores and the latter's cold export preserve all
+  original rows/media exactly. See `validation-0.11.42.md` for hashes/limits.
+
+**Not verified**
+- This .43 source in a built APK or on a phone. The completed .42 native witnesses
+  apply to its exact artifact; do not conflate the versions.
+- Timeline full pagination/every record kind, large-font/IME/pressure/full-shift,
+  audio/power/Doze/provider/low-storage and the older .33 pressure ANR.
+
+**Open threads**
+- Freeze/build/accept .43 trash restores. Finish remaining seven manual raw forms,
+  appropriate clinical trash, visual rich text, shift context/follow-up stages
+  and full-shift/physical gates. The phone is not the sole remaining work.
+- NotesTab still lacks a retry on its primary/media reads and asserts an empty
+  result during initial/read failure; repair it with actual read-error witnesses.
+
+**Gotchas**
+- A normal push check overlapped the .42 native build and timed out in timeline/
+  Today tests; it was rejected. The serial retry passes without timeout edits or
+  skipped hooks. Do not start native builds alongside full checks.
+- Trash only revives the chosen row, not separately deleted children. A deleted
+  encounter/destination remains unavailable until its own recovery path is used.
+- The first trash typecheck caught an incorrectly inferred test release callback;
+  its explicit void type fixes the test, without changing production behavior.
+
 ## 2026-10-09 — Explicit glucose units and backward raw compatibility (0.11.42 source)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.

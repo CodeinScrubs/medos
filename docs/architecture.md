@@ -1953,3 +1953,26 @@ Invalid dates/values/reference bounds and a nonfinite/collapsed drawing domain
 render an unavailable caption without emitting invalid SVG coordinates. Recorded
 observations remain intact. Source/rendered tests do not establish native device
 throughput or close the earlier unrelated pressure ANR.
+
+## Trash restores (0.11.43)
+
+The trash keeps the existing patient/note/capture sections. Each initial query
+reads51 candidates and displays50, ordered by deletion time and binary id. More
+explicitly widens only that section; it is not proof of native performance for
+an arbitrarily expanded list. Read failure retains cached rows with retry but
+cannot assert emptiness/current counts or authorize restore. Initial loading
+is distinct from an empty result. No second trash data model or new route exists.
+
+The screen's original dataset intent holds write admission through SQL, audit
+and reminder acknowledgment. A ref blocks same-turn duplicate presses. A restored
+dataset requires an explicit current view, never implicit rebasing. Read-only
+cached rows remain visible; late failures do not open dialogs over another route.
+
+Restore queries read and compare the exact shown deleted row in one synchronous
+transaction. They refuse a missing/alive/changed row, including changed fields
+with an unchanged timestamp. Patient revival and authoritative episode status
+commit together. A note retains its original live patient and encounter. A
+capture retains its original patient and live filed destination; restoring it
+never creates or revives a note/task. No files are moved or rewritten. Separately
+deleted children remain deleted. Successful actions use the existing audit path;
+native reminder repair remains a subsequent step under the same write admission.

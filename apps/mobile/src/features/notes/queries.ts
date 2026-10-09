@@ -2,8 +2,9 @@ import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { noteDrafts, noteVersions, notes, patients, type NoteType } from '@/db/schema';
+import { encounters, noteDrafts, noteVersions, notes, patients, type Note, type NoteType } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { requireDeletedRecord } from '@/lib/deleted-record';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { noteSearchText } from './logic';
@@ -187,16 +188,41 @@ export function deletedNotesQuery(limit = 50) {
     .from(notes)
     .leftJoin(patients, eq(patients.id, notes.patientId))
     .where(isNotNull(notes.deletedAt))
-    .orderBy(desc(notes.deletedAt))
+    .orderBy(desc(notes.deletedAt), desc(notes.id))
     .limit(limit);
 }
 
 /** Put a deleted note back in its record, exactly as it was. */
-export async function restoreNote(id: string): Promise<void> {
-  await db
-    .update(notes)
-    .set({ deletedAt: null, ...touch() })
-    .where(eq(notes.id, id));
+export async function restoreNote(id: string, expected?: Note): Promise<void> {
+  const now = new Date();
+  db.transaction((tx) => {
+    const current = requireDeletedRecord(tx.select().from(notes).where(eq(notes.id, id)).get(), expected);
+    const patient = tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, current.patientId), isNull(patients.deletedAt)))
+      .get();
+    if (!patient) throw new Error('ابتدا پروندهٔ بیمار این نوت را برگردانید.');
+    if (
+      current.encounterId &&
+      !tx
+        .select({ id: encounters.id })
+        .from(encounters)
+        .where(
+          and(
+            eq(encounters.id, current.encounterId),
+            eq(encounters.patientId, current.patientId),
+            isNull(encounters.deletedAt),
+          ),
+        )
+        .get()
+    )
+      throw new Error('نوبت مربوط به این نوت در دسترس نیست؛ ارتباط نوت تغییر نکرد.');
+    tx.update(notes)
+      .set({ deletedAt: null, ...touch(now) })
+      .where(and(eq(notes.id, id), isNotNull(notes.deletedAt)))
+      .run();
+  });
   await audit('note.restored', { entityType: 'note', entityId: id });
 }
 

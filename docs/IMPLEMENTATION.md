@@ -36,6 +36,19 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.43 repairs the existing trash: loading and failed reads no longer assert
+empty/current counts, cached rows retain an explicit retry notice, and the
+silent50-item cutoff gets an explicit More action. Initial patient reads are
+also bounded. Original dataset admission and same-turn serialization protect
+the entire restore. Synchronous queries compare the exact displayed tombstone
+and refuse missing/alive/stale records. Patient revival/status are atomic;
+notes/captures retain their live original context and filed destinations.
+Restoring a parent does not revive separately deleted children. Final full
+check passes150 suites/2,058 app tests and five workflows, including actual
+callback/read and SQL rollback witnesses. No dependency/migration/route/
+backup-format change. Native .43 and
+appropriate recovery for further clinical record kinds remain open.
+
 0.11.42 adds explicit recorded glucose units through nullable migration0027.
 New entries choose mg/dL or mmol/L inline. Historic values remain unknown;
 unrelated corrections do not guess a unit. Raw codec2 reads codec1 without
@@ -49,10 +62,13 @@ The numeric chart slice additionally bounds non-advancing ticks, retains
 fractional axis labels and refuses invalid SVG geometry with a visible caption;
 The expanded numeric/chart slice passes115 focused tests; the full check above
 includes these final changes.
-Native .42 unit selection/old raw migration/charts/restores and physical gates
-remain open. Next fix the trash's false empty-on-read-error, original dataset
-ownership and stale/owner checks, then remaining manual raw forms and product
-gates. Do not call the phone the sole remaining task.
+Exact .42 native unit selection/old raw migration/separate charts/publication
+and independent old/current restores pass in
+[validation-0.11.42.md](validation-0.11.42.md). Physical and broader native gates
+remain distinct. The .43 source addresses trash ownership/read failures;
+remaining manual raw forms, appropriate clinical trash and product gates remain.
+NotesTab also needs truthful initial/failed empty handling and read/media retry.
+Do not call the phone the sole remaining task.
 
 0.11.41 bounds the clinical timeline to40 displayed events. Each source reads
 at most41 short candidates after the selected kind/keyset boundary; only visible

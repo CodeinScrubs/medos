@@ -11,6 +11,7 @@ import { auditLog } from './schema';
 export type AuditAction =
   | 'patient.deleted'
   | 'patient.restored'
+  | 'capture.restored'
   | 'patient.draftDiscarded'
   | 'contact.draftDiscarded'
   | 'call.importDiscarded'
