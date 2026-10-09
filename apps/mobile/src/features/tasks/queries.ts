@@ -37,6 +37,8 @@ export type TaskFilter = {
   deleted?: boolean;
   /** Only tasks that are due, or overdue, at this moment. */
   dueBy?: Date;
+  /** Scheduled work for live patients only; excludes undated/global tasks. */
+  patientDueBy?: Date;
 };
 
 function taskConditions(filter: TaskFilter) {
@@ -50,24 +52,25 @@ function taskConditions(filter: TaskFilter) {
   if (filter.status) clauses.push(eq(tasks.status, filter.status));
   // A task with no due date is always "now": it is not waiting for anything.
   if (filter.dueBy) clauses.push(or(isNull(tasks.dueAt), lte(tasks.dueAt, filter.dueBy)));
+  if (filter.patientDueBy)
+    clauses.push(isNotNull(patients.id), isNotNull(tasks.dueAt), lte(tasks.dueAt, filter.patientDueBy));
   clauses.push(...matchesSearch(tasks.searchText, filter.search));
   return and(...clauses);
 }
 
 /**
- * Patients' open tasks that are due by `until`, overdue first — for Today.
+ * Patients' open scheduled tasks due by `until`, explicit priority then time.
  *
  * Today listed only tasks without a patient, so a "repeat troponin at 09:00"
  * lived only inside that patient's record. A task without a due time is not
  * here: it is waiting for nothing, and the record already shows it.
  */
-export function duePatientTasksQuery(until: Date) {
-  return db
-    .select({ task: tasks, patient: patients })
-    .from(tasks)
-    .innerJoin(patients, and(eq(tasks.patientId, patients.id), isNull(patients.deletedAt)))
-    .where(and(alive, eq(tasks.status, 'open'), isNotNull(tasks.dueAt), lte(tasks.dueAt, until)))
-    .orderBy(asc(tasks.dueAt), desc(tasks.id));
+export function duePatientTasksQuery(until: Date, limit?: number) {
+  return tasksQuery({ status: 'open', patientDueBy: until }, limit);
+}
+
+export function duePatientTaskCountQuery(until: Date) {
+  return taskCountQuery({ status: 'open', patientDueBy: until });
 }
 
 export function tasksQuery(filter: TaskFilter = {}, limit?: number) {
@@ -94,7 +97,12 @@ export function tasksQuery(filter: TaskFilter = {}, limit?: number) {
 }
 
 export function taskCountQuery(filter: TaskFilter = {}) {
-  return db.select({ total: count() }).from(tasks).where(taskConditions(filter));
+  const query = db.select({ total: count() }).from(tasks);
+  return filter.patientDueBy
+    ? query
+        .innerJoin(patients, and(eq(tasks.patientId, patients.id), isNull(patients.deletedAt)))
+        .where(taskConditions(filter))
+    : query.where(taskConditions(filter));
 }
 
 export function taskQuery(id: string, includeDeleted = false) {

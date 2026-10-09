@@ -137,7 +137,7 @@ beforeEach(async () => {
 });
 
 describe('exact unfinished note selection', () => {
-  it('reaches all 41 tied drafts through bounded pages and opens the last exact draft', async () => {
+  it('keeps Today short, reaches all 41 tied drafts and returns to the latest preview', async () => {
     for (let i = 0; i < 41; i++)
       await writeNoteDraft(`paged-${String(i).padStart(2, '0')}`, { patientId, noteId: null }, fields);
     t.db
@@ -146,6 +146,11 @@ describe('exact unfinished note selection', () => {
       .run();
     await act(async () => {
       tree = create(<UnfinishedNotes />);
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(3);
+    await act(async () => {
+      button('همهٔ نوت‌های ناتمام').props.onPress();
       await settle();
     });
     expect(tree!.root.findAllByType(Pressable)).toHaveLength(20);
@@ -167,6 +172,22 @@ describe('exact unfinished note selection', () => {
       params: { id: patientId, draftId: 'paged-00', type: 'general' },
     });
     await act(async () => {
+      button('نمایش کمتر').props.onPress();
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(3);
+    expect(button('نوت‌های جدیدتر')).toBeUndefined();
+    tree!.root.findAllByType(Pressable)[0]!.props.onPress();
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/patient/[id]/note',
+      params: { id: patientId, draftId: 'paged-40', type: 'general' },
+    });
+    for (const label of ['همهٔ نوت‌های ناتمام', 'نوت‌های قدیمی‌تر', 'نوت‌های قدیمی‌تر'])
+      await act(async () => {
+        button(label).props.onPress();
+        await settle();
+      });
+    await act(async () => {
       button('نوت‌های جدیدتر').props.onPress();
       await settle();
     });
@@ -187,6 +208,10 @@ describe('exact unfinished note selection', () => {
       .run();
     await act(async () => {
       tree = create(<UnfinishedNotes />);
+      await settle();
+    });
+    await act(async () => {
+      button('همهٔ نوت‌های ناتمام').props.onPress();
       await settle();
     });
     expect(button('نوت‌های قدیمی‌تر')).toBeDefined();

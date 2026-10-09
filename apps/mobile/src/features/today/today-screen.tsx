@@ -117,6 +117,8 @@ export function TodayScreen() {
             />
           </Row>
 
+          <UnfinishedNotes />
+
           {dueRows.length > 0 && (
             <>
               <SectionHeader
@@ -181,8 +183,6 @@ export function TodayScreen() {
           <TasksSection patientId={null} title="کارهای بدون بیمار" />
 
           <OpenConsults />
-
-          <UnfinishedNotes />
 
           <UpcomingOccasions now={now} />
 

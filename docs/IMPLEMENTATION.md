@@ -43,13 +43,20 @@ The original dataset and loaded/completed native parents remain intact.
 Recovery includes acknowledged canonical voice and filters empty recorder rows
 before its limit; the selected draft and its meaningful preview stay visible.
 Older recovery drafts are reachable in20-card replaceable pages, with stable
-time/ID cursors and a way back after an older page empties. The paging correction
-passes63 focused cases; its final full source check is still pending.
-Full source checks pass159 suites/2,248 application tests and five workflows;
-the final import-order correction also passes focused lint without warnings.
-Old/current import compatibility passes. Exact preceding source`65ffa0d` hosted
-CI succeeds; the current recovery-index fix and .50 native acceptance still need
-their exact-source CI/package witnesses.
+time/ID cursors and a way back after an older page empties. Recovery follows the
+Today summary tiles with three previews and in-place access to the 20-card
+pages; scheduled patient work has a ten-row preview, exact total and matching
+full-list scope. Shared predicates and priority ordering prevent
+the preview/count/destination from disagreeing. Filter changes replace only
+read results, retaining the screen and native header parents.
+The combined recovery/deck corrections pass81 focused cases. Final full checks
+pass160 suites/2,255 application tests and five workflows, with typecheck/lint/
+both formatting checks clean and no warnings. Regeneration reports no schema
+changes. Preceding `a674921` exact-head hosted CI succeeds; current CI is pending.
+Frozen `5cea420` x86 upgrade preserves all4,117 original rows/34 media with
+only the additive raw-draft defaults. Two explicit native adoption stages pass
+independent whole-row comparisons. This APK predates the Today fix; final
+voice-only publication, whole-archive comparison and cold cleanup remain open.
 
 Preceding .49 scopes note/history readers to the live patient and validates
 version/current-row/parent/dataset ownership in atomic history restoration.

@@ -7,6 +7,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 import {
   createTask,
   deleteTask,
+  duePatientTaskCountQuery,
   duePatientTasksQuery,
   restoreTask,
   setTaskStatus,
@@ -124,6 +125,22 @@ describe('retrieving and correcting tasks', () => {
 });
 
 describe("patients' tasks on Today", () => {
+  it('shares preview, full-list and count predicates with explicit priority and an inclusive deadline boundary', async () => {
+    const patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Due boundary' });
+    const until = new Date('2026-09-26T20:29:59.999Z');
+    const older = await createTask({ patientId, title: 'Older normal task', dueAt: new Date(until.getTime() - 1000) });
+    const high = await createTask({ patientId, title: 'Explicit high priority', priority: 'high', dueAt: until });
+    await createTask({ patientId, title: 'After the boundary', dueAt: new Date(until.getTime() + 1) });
+    await createTask({ patientId, title: 'Undated' });
+    await createTask({ title: 'Global scheduled', dueAt: until });
+    const removed = await createTask({ patientId, title: 'Deleted scheduled', dueAt: until });
+    await deleteTask(removed);
+    const full = await tasksQuery({ status: 'open', patientDueBy: until });
+    expect(full.map((row) => row.task.id)).toEqual([high, older]);
+    expect((await duePatientTasksQuery(until, 1)).map((row) => row.task.id)).toEqual([high]);
+    expect((await duePatientTaskCountQuery(until))[0]?.total).toBe(2);
+    expect((await taskCountQuery({ status: 'open', patientDueBy: until }))[0]?.total).toBe(2);
+  });
   /*
    * A "repeat troponin" due at 09:00 for an admitted patient appeared nowhere on
    * Today, which listed only tasks without a patient.
@@ -144,5 +161,6 @@ describe("patients' tasks on Today", () => {
 
     const rows = await duePatientTasksQuery(endOfToday);
     expect(rows.map((r) => r.task.title)).toEqual(['yesterday', 'repeat troponin']);
+    expect((await duePatientTaskCountQuery(endOfToday))[0]?.total).toBe(2);
   });
 });

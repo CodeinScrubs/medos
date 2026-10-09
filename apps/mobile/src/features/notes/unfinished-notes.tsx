@@ -19,34 +19,46 @@ import { notePreview } from './logic';
  * 3 a.m. between two admissions is exactly the one nobody thinks to reopen.
  */
 export function UnfinishedNotes() {
+  const [expanded, setExpanded] = useState(false);
   const [history, setHistory] = useState<OpenNoteDraftCursor[]>([]);
   const cursor = history.at(-1);
   return (
     <UnfinishedNotesPage
-      key={`${cursor?.at ?? ''}:${cursor?.id ?? ''}`}
+      key={`${expanded}:${cursor?.at ?? ''}:${cursor?.id ?? ''}`}
       cursor={cursor}
+      expanded={expanded}
+      onExpand={() => setExpanded(true)}
+      onCollapse={() => {
+        setHistory([]);
+        setExpanded(false);
+      }}
       onOlder={(next) => setHistory([...history, next])}
       onNewer={history.length ? () => setHistory(history.slice(0, -1)) : undefined}
     />
   );
 }
 
-const PAGE_SIZE = 20;
-
 function UnfinishedNotesPage({
   cursor,
+  expanded,
+  onExpand,
+  onCollapse,
   onOlder,
   onNewer,
 }: {
   cursor?: OpenNoteDraftCursor;
+  expanded: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
   onOlder: (cursor: OpenNoteDraftCursor) => void;
   onNewer?: () => void;
 }) {
   const router = useRouter();
+  const pageSize = expanded ? 20 : 3;
   // Only this read remounts on page change; Today and its native header stay mounted.
-  const { data, error, retry, loading } = useLive(openNoteDraftsQuery(PAGE_SIZE + 1, cursor), [cursor]);
-  const drafts = (data ?? []).slice(0, PAGE_SIZE);
-  const hasMore = data !== undefined && data.length > PAGE_SIZE;
+  const { data, error, retry, loading } = useLive(openNoteDraftsQuery(pageSize + 1, cursor), [cursor, pageSize]);
+  const drafts = (data ?? []).slice(0, pageSize);
+  const hasMore = data !== undefined && data.length > pageSize;
 
   if (drafts.length === 0 && !error && !loading && !onNewer) return null;
 
@@ -54,9 +66,16 @@ function UnfinishedNotesPage({
     <>
       <SectionHeader title="نوت‌های ناتمام" />
       <ErrorNotice error={error} what="نوت‌های ناتمام" onRetry={retry} />
-      {hasMore || onNewer ? (
+      {expanded || hasMore ? (
         <Row>
-          {onNewer ? (
+          <Button
+            label={expanded ? 'نمایش کمتر' : 'همهٔ نوت‌های ناتمام'}
+            variant="ghost"
+            disabled={!expanded && (!!error || loading)}
+            onPress={expanded ? onCollapse : onExpand}
+            style={{ flex: 1 }}
+          />
+          {expanded && onNewer ? (
             <Button
               label="نوت‌های جدیدتر"
               variant="secondary"
@@ -65,7 +84,7 @@ function UnfinishedNotesPage({
               style={{ flex: 1 }}
             />
           ) : null}
-          {hasMore ? (
+          {expanded && hasMore ? (
             <Button
               label="نوت‌های قدیمی‌تر"
               variant="secondary"

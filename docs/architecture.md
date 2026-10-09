@@ -5,6 +5,30 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Today previews do not bury unfinished work (0.11.50)
+
+An actual synthetic shift showed 40 scheduled patient tasks above unfinished
+notes. Recovery now follows the summary tiles with three previews and an
+in-place action for its existing 20-card pages. Collapsing an older page returns
+to the newest preview. Due work shows ten rows, its whole matching count and a
+link to the existing task list's due scope.
+The row/count/full-list queries share one predicate: scheduled work through
+day end for live patients, excluding global, undated and deleted-parent work.
+The shared task ordering respects explicit priority before deadline.
+
+The existing list retains search, status and loading more; choosing global/all
+explicitly clears the due scope. A changed filter remounts only its read result,
+so old checkboxes never appear under a new scope. Same-scope refresh failures
+retain readable rows, show retry and withhold unreliable totals. The screen,
+native header and controls remain mounted. No additional route or dependency.
+
+**Rejected: unbounded home previews and a full-list link with a different
+filter.** The former hides recovery during a busy shift; the latter makes the
+count and destination disagree. This is a bounded presentation change, not a
+claim that every shift workflow or native performance gate is complete.
+
+---
+
 ## Unfinished recovery includes acknowledged voice (0.11.50)
 
 `openNoteDraftsQuery` counts live canonical voice metadata under the exact
@@ -15,8 +39,8 @@ refreshes the live result. Deleted/foreign parent metadata is not counted.
 The existing recovery card displays saved voice or a title when no narrative
 preview exists, and retains its exact draft ID. Whitespace-only body/sections
 do not hide meaningful SOAP fields; original stored body text is unchanged.
-Recovery reads21 rows and displays20 per replaceable page, with a stable
-updated-time/ID cursor. Newer/older controls remain in the existing section;
+Recovery previews three rows by default; expanded pages read21 and display20,
+with a stable updated-time/ID cursor. Controls remain in the existing section;
 retiring the cursor row does not break the next page. An empty older page keeps
 its way back. Only the read page remounts, never Today or its native header;
 read errors retain their notice and disable pagination. The visible row count

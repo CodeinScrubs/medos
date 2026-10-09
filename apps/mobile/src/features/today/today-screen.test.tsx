@@ -6,9 +6,11 @@ import { followUps } from '@/db/schema';
 import { openEncounter } from '@/features/encounters/queries';
 import { FollowUpCard } from '@/features/followups/follow-up-card';
 import { createFollowUp } from '@/features/followups/queries';
+import { UnfinishedNotes } from '@/features/notes/unfinished-notes';
 import { PatientCard } from '@/features/patients/patient-card';
 import { createPatient } from '@/features/patients/queries';
 import { ShiftCard } from '@/features/shifts/shift-card';
+import { DueTasksSection } from '@/features/tasks/due-tasks-section';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -73,6 +75,14 @@ afterEach(async () => {
 });
 
 describe('Today direct destinations and truthful previews', () => {
+  it('keeps unfinished recovery before work previews instead of below a long shift', async () => {
+    await render();
+    expect(
+      tree!.root
+        .findAll((node) => node.type === UnfinishedNotes || node.type === DueTasksSection)
+        .map((node) => (node.type === UnfinishedNotes ? 'recovery' : 'work')),
+    ).toEqual(['recovery', 'work']);
+  });
   it('opens admitted and all-starred scopes without clinical writes', async () => {
     await render();
     for (const [label, params] of [

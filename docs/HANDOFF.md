@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Keep Today recovery and due work reachable during long shifts
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint; preceding `5cea420`.
+
+**Changed**
+- Native .50 testing exposed all 40 scheduled patient tasks above unfinished
+  recovery. Today now shows ten due tasks with the exact matching total and a
+  link to the existing task list; unfinished recovery follows the summary tiles
+  with three previews and one in-place action for the existing 20-card pages.
+- Preview, full-list scope and count share one predicate: open scheduled work
+  due by day end for live patients. Explicit priority precedes deadline. The
+  existing list supports search, status, global/all/due scope and loading more.
+- Filter changes replace only the read results, preventing stale checkboxes
+  from claiming a new scope. Native screen/header parents remain mounted.
+  No dependency, schema, new route or version bump; this remains .50/code66.
+
+**Verified**
+- Four mounted-component regressions fail before their fixes. After correction,
+  81 focused cases pass, including migrated SQLite, inclusive deadline,
+  priority, preview/count equality, full-list paging, scope switching, search
+  and collapsing an older recovery page back to the newest three cards.
+- Final `npm run check` passes 160 suites/2,255 application tests and five
+  workflows, with typecheck/lint/both formatting checks clean and no warnings.
+  Regeneration reports no schema changes. Exact-source native/hosted witnesses
+  are pending at this checkpoint.
+- Prior `a674921` hosted CI succeeds. Frozen `5cea420` x86 package builds,
+  passes native inspection and is installed in place with matching pulled bytes.
+  Independent .49-to-.50 export preserves 4,117 original rows/34 media, with
+  only the three additive raw-draft defaults. Two native adoption stages
+  independently preserve the clinical row until separate publication.
+
+**Not verified**
+- The Today fix is not in that prior QA APK. Final voice recovery, whole post-
+  action archive and acknowledged restore/cold cleanup remain pending.
+- No owner arm64 APK/phone, complete shift timing, pressure/power/provider or
+  second-device acceptance. `dist/` remains .39; other product gates remain open.
+
+**Open threads**
+- Freeze/build/inspect this source, compare actual exports before/after its
+  install, finish the voice-only card/publication and restore/cold cleanup.
+- Record exact artifacts and full checks in validation-0.11.50, push normally
+  and inspect exact-head CI. Continue the remaining IMPLEMENTATION gates.
+
+---
+
 ## 2026-10-10 — Make older unfinished drafts reachable without growing Today
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.
