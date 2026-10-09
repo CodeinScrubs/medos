@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 
-import { noteDrafts, notes } from '@/db/schema';
+import { tablesOf } from '@/db/query-tables';
+import { attachments, noteDrafts, notes } from '@/db/schema';
+import { stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -12,6 +15,7 @@ import {
   retargetNoteDraft,
   writeNoteDraft,
 } from './draft-queries';
+import { notePreview } from './logic';
 import { createNote } from './queries';
 import { createPatient, deletePatient } from '../patients/queries';
 
@@ -43,6 +47,49 @@ beforeEach(async () => {
 });
 
 describe('note drafts', () => {
+  it('previews meaningful SOAP fields through whitespace without modifying original body text', () => {
+    expect(notePreview({ ...blank, body: ' \t\n', subjective: ' \n', plan: 'Follow consult' })).toBe('Follow consult');
+    expect(notePreview({ ...blank, body: ' \nOriginal body \n', plan: 'Other field' })).toBe(' \nOriginal body \n');
+  });
+  it('filters empty and Unicode-whitespace drafts before the recovery limit and watches canonical media', async () => {
+    await writeNoteDraft('older-useful', { patientId, noteId: null }, { ...blank, title: 'Earlier useful title' });
+    t.db
+      .update(noteDrafts)
+      .set({ updatedAt: new Date('2025-01-01T12:00:00Z') })
+      .where(eq(noteDrafts.id, 'older-useful'))
+      .run();
+    for (let i = 0; i < 22; i++)
+      await writeNoteDraft(`empty-${i}`, { patientId, noteId: null }, { ...blank, body: ' \t\n\u00a0\u3000\ufeff' });
+    const query = openNoteDraftsQuery(1);
+    expect((await query)[0]?.draft.id).toBe('older-useful');
+    expect(tablesOf(query)).toEqual(expect.arrayContaining(['note_drafts', 'patients', 'attachments']));
+    expect(await openNoteDraftsQuery()).toHaveLength(1);
+  });
+  it('counts only live voice metadata under the exact draft and patient', async () => {
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Foreign voice' });
+    for (const id of ['saved', 'wrong-patient', 'deleted-voice', 'wrong-parent'])
+      await writeNoteDraft(id, { patientId, noteId: null }, blank);
+    for (const id of ['saved', 'wrong-patient', 'deleted-voice', 'wrong-parent'])
+      t.db
+        .insert(attachments)
+        .values({
+          id: `voice-${id}`,
+          ...stamps(),
+          entityType: id === 'wrong-parent' ? 'note' : 'note_draft',
+          entityId: id,
+          patientId: id === 'wrong-patient' ? other : patientId,
+          kind: 'voice',
+          relativePath: `media/${id}.m4a`,
+          durationMs: 1000,
+          sizeBytes: 100,
+          checksum: 'a'.repeat(64),
+          deletedAt: id === 'deleted-voice' ? new Date() : null,
+        })
+        .run();
+    expect(await openNoteDraftsQuery()).toEqual([
+      expect.objectContaining({ draft: expect.objectContaining({ id: 'saved' }), voiceCount: 1 }),
+    ]);
+  });
   it('selects one exact recovery draft without falling back across patient, note or retired scope', async () => {
     await writeNoteDraft('selected-older', { patientId, noteId: null }, { ...blank, body: 'Older selected draft' });
     await writeNoteDraft('selected-newer', { patientId, noteId: null }, { ...blank, body: 'Newer draft' });

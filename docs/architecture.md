@@ -5,6 +5,24 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Unfinished recovery includes acknowledged voice (0.11.50)
+
+`openNoteDraftsQuery` counts live canonical voice metadata under the exact
+draft/patient, alongside legacy voice JSON. It filters meaningful text/voice
+before its result limit; recent empty recorder rows cannot hide older work.
+Its SQL tree includes `attachments`, so metadata acknowledgment/deletion also
+refreshes the live result. Deleted/foreign parent metadata is not counted.
+The existing recovery card displays saved voice or a title when no narrative
+preview exists, and retains its exact draft ID. Whitespace-only body/sections
+do not hide meaningful SOAP fields; original stored body text is unchanged.
+
+**Rejected: filtering only legacy JSON after LIMIT.** New stopped voices belong
+to canonical attachment rows and would be invisible to that filter. No new
+route, schema, dependency or clinically inferred content is required. Metadata
+visibility is not proof of playable audio or active-recorder durability.
+
+---
+
 ## A recovered note retains its original basis (0.11.50)
 
 Migration0028 adds three columns to `note_drafts`: nullable versioned `origin`,

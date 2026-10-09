@@ -20,7 +20,9 @@ export const CONSULT_NOTE_TYPES: readonly NoteType[] = ['consult_request', 'cons
 
 /** Preview line for a note card: whichever body field actually has content. */
 export function notePreview(note: Pick<Note, 'body' | 'subjective' | 'objective' | 'assessment' | 'plan'>): string {
-  return note.body || [note.subjective, note.objective, note.assessment, note.plan].filter(Boolean).join(' — ');
+  return note.body?.trim()
+    ? note.body
+    : [note.subjective, note.objective, note.assessment, note.plan].filter((value) => value?.trim()).join(' — ');
 }
 
 export function noteSearchText(

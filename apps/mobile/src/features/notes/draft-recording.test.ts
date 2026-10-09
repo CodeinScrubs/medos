@@ -14,6 +14,7 @@ import { commitNoteDraft } from './commit-queries';
 import {
   discardNoteDraft,
   noteDraftQuery,
+  openNoteDraftsQuery,
   retargetNoteDraft,
   writeNoteDraft,
   type NoteDraftFields,
@@ -86,6 +87,15 @@ beforeEach(async () => {
   mockFiles.clear();
   mockFiles.set(recording().uri, { ...fingerprint });
   mockCopy.mockClear();
+});
+
+it('keeps an acknowledged voice-only draft visible in unfinished recovery without legacy JSON voices', async () => {
+  await writeNoteDraft(draftId, { patientId, noteId: null }, { ...fields, body: null });
+  await persistRecording(recording(), target(), now);
+  expect(t.db.select().from(noteDrafts).get()?.voices).toEqual([]);
+  expect(await openNoteDraftsQuery()).toEqual([
+    expect.objectContaining({ draft: expect.objectContaining({ id: draftId, body: null }), voiceCount: 1 }),
+  ]);
 });
 function seedPending(state: 'copying' | 'ready' | 'discarding') {
   t.db

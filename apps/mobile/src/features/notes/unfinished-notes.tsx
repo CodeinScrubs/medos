@@ -7,7 +7,7 @@ import { useLive } from '@/db/use-live';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
 
-import { draftHasContent, openNoteDraftsQuery } from './draft-queries';
+import { openNoteDraftsQuery } from './draft-queries';
 import { notePreview } from './logic';
 
 /**
@@ -20,7 +20,7 @@ import { notePreview } from './logic';
 export function UnfinishedNotes() {
   const router = useRouter();
   const { data, error, retry } = useLive(openNoteDraftsQuery());
-  const drafts = (data ?? []).filter((row) => draftHasContent(row.draft));
+  const drafts = data ?? [];
 
   if (drafts.length === 0 && !error) return null;
 
@@ -29,7 +29,7 @@ export function UnfinishedNotes() {
       <SectionHeader title="نوت‌های ناتمام" count={error ? undefined : drafts.length} />
       <ErrorNotice error={error} what="نوت‌های ناتمام" onRetry={retry} />
       <Column gap="sm">
-        {drafts.map(({ draft, patient }) => (
+        {drafts.map(({ draft, patient, voiceCount }) => (
           <Pressable
             key={draft.id}
             accessibilityRole="button"
@@ -57,7 +57,9 @@ export function UnfinishedNotes() {
                   </Text>
                 </Row>
                 <Text variant="caption" color="textMuted" numberOfLines={1}>
-                  {notePreview(draft) || 'بدون متن'}
+                  {notePreview(draft).trim() ||
+                    draft.title?.trim() ||
+                    (voiceCount > 0 || draft.voices?.length ? 'وویس ذخیره‌شده' : 'بدون متن')}
                 </Text>
               </Column>
             </Card>

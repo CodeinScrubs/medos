@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Keep acknowledged voice visible in unfinished notes
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint; preceding `65ffa0d`.
+
+**Changed**
+- Reproduced a voice-only draft disappearing from unfinished notes: stopped
+  voice belongs to canonical attachment metadata, not legacy draft JSON.
+  Recovery now counts only live voice metadata for the exact draft/patient.
+- Filter meaningful content before the query limit so empty recorder drafts
+  cannot hide older work. Title/voice previews and meaningful SOAP sections
+  remain visible. Recovery still selects the exact scoped draft ID.
+- No new schema, dependency, permission, route or version bump. This is the
+  same unreleased .50/code66 candidate; the earlier source65 QA APK is private.
+
+**Verified**
+- Full `npm run check`:159 suites/2,248 application tests and five workflows.
+  A subsequent focused lint pass verifies the corrected import order without
+  warnings. Migrated SQLite, recording acknowledgment and actual recovery-card
+  regressions run; regeneration reports no schema changes.
+- Exact `65ffa0d` hosted CI succeeds. Fresh .49 emulator export independently
+  retains all4,117 original rows/49 tables/34 media before the .50 upgrade.
+
+**Not verified**
+- This recovery-index fix has not yet run in native .50. The source65 x86 APK
+  builds and passes native package inspection but is neither installed nor the
+  final candidate. Owner arm64/phone acceptance remains open; `dist/` is .39.
+
+**Open threads**
+- Build the frozen current source incrementally, then test .49-to-.50 upgrade,
+  raw-only conflict adoption, separate publication, exact selected outpatient
+  draft, incomplete dates and the real voice-only recovery card. Independently
+  verify full archives and acknowledged restore/cold cleanup.
+- The remaining product gates in `IMPLEMENTATION.md` remain open; native smoke
+  tests do not finish the eight manual forms or clinical/shift/device acceptance.
+
+**Gotchas**
+- `persistRecording` requires `(recording, target, now)`. Test setup failures
+  from reversed arguments/missing time are not app failures.
+- The owned5556 AVD cold boot showed a System UI dialog. Actual retained app
+  UI/export worked after Wait; startup ANRs belong to other packages. Keep this
+  observer anomaly separate from app acceptance and do not drive unrelated5570.
+
+---
+
 ## 2026-10-09 — Persist note origin and exact raw recovery (0.11.50 source)
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.

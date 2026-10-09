@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne, or } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne, or, sql } from 'drizzle-orm';
 
 import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
@@ -88,11 +88,30 @@ export function noteDraftQuery(patientId: string, noteId: string | null, draftId
  * each one to find out whose it is.
  */
 export function openNoteDraftsQuery(limit = 20) {
+  const voiceCount = sql<number>`(SELECT count(*) FROM ${attachments}
+    WHERE ${attachments.entityType} = 'note_draft' AND ${attachments.entityId} = ${noteDrafts.id}
+    AND ${attachments.patientId} = ${noteDrafts.patientId} AND ${attachments.kind} = 'voice'
+    AND ${attachments.deletedAt} IS NULL)`;
+  // Match String.trim(): filtering after LIMIT lets empty recorder drafts hide real work.
+  const whitespace =
+    ' \t\n\v\f\r\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff';
+  const meaningful = or(
+    ...[
+      noteDrafts.title,
+      noteDrafts.body,
+      noteDrafts.subjective,
+      noteDrafts.objective,
+      noteDrafts.assessment,
+      noteDrafts.plan,
+    ].map((column) => sql`length(trim(coalesce(${column}, ''), ${whitespace})) > 0`),
+    sql`coalesce(json_array_length(${noteDrafts.voices}), 0) > 0`,
+    sql`${voiceCount} > 0`,
+  );
   return db
-    .select({ draft: noteDrafts, patient: patients })
+    .select({ draft: noteDrafts, patient: patients, voiceCount })
     .from(noteDrafts)
     .innerJoin(patients, eq(noteDrafts.patientId, patients.id))
-    .where(and(alive, isNull(patients.deletedAt)))
+    .where(and(alive, isNull(patients.deletedAt), meaningful))
     .orderBy(desc(noteDrafts.updatedAt))
     .limit(limit);
 }

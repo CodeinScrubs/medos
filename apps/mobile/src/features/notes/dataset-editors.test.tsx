@@ -8,7 +8,7 @@ import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, EmptyState, Input, Text } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
-import { noteDrafts, notes, orders, patients } from '@/db/schema';
+import { attachments, noteDrafts, notes, orders, patients } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { openEncounter } from '@/features/encounters/queries';
 import { OrderFormScreen } from '@/features/kardex/order-form-screen';
@@ -16,7 +16,7 @@ import { createOrder } from '@/features/kardex/queries';
 import * as orderQueries from '@/features/kardex/queries';
 import { createPatient } from '@/features/patients/queries';
 import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
-import { softDelete } from '@/lib/ids';
+import { softDelete, stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -137,6 +137,36 @@ beforeEach(async () => {
 });
 
 describe('exact unfinished note selection', () => {
+  it('shows the actual voice-only recovery card after canonical media acknowledgment', async () => {
+    await writeNoteDraft('voice-selection', { patientId, noteId: null }, { ...fields, body: null });
+    t.db
+      .insert(attachments)
+      .values({
+        id: 'acknowledged-voice',
+        ...stamps(),
+        entityType: 'note_draft',
+        entityId: 'voice-selection',
+        patientId,
+        kind: 'voice',
+        relativePath: 'media/synthetic-voice.m4a',
+        durationMs: 1000,
+        sizeBytes: 100,
+        checksum: 'a'.repeat(64),
+        capturedAt: new Date('2026-01-01T12:00:00Z'),
+      })
+      .run();
+    await act(async () => {
+      tree = create(<UnfinishedNotes />);
+      await settle();
+    });
+    expect(tree!.root.findAllByType(Pressable)).toHaveLength(1);
+    expect(tree!.root.findAllByType(Text).some((node) => node.props.children === 'وویس ذخیره‌شده')).toBe(true);
+    tree!.root.findByType(Pressable).props.onPress();
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/patient/[id]/note',
+      params: { id: patientId, draftId: 'voice-selection', type: 'general' },
+    });
+  });
   it('each card opens its own draft, including an older draft for the same patient', async () => {
     await writeNoteDraft('older-selection', { patientId, noteId: null }, { ...fields, body: 'Older selected words' });
     await writeNoteDraft('newer-selection', { patientId, noteId: null }, { ...fields, body: 'Newer selected words' });

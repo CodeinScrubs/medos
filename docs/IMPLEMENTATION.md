@@ -39,10 +39,14 @@ correction or attach itself to a later admission. Invalid dates remain raw and
 cannot publish their older parsed timestamp. Legacy/conflicting drafts require
 exact shown-row review/adoption, which changes only the raw draft; clinical
 publication remains separate. Recovery cards select their own scoped draft ID.
-The original dataset and loaded/completed native parents remain intact. Full
-source checks pass159 suites/2,243 application tests and five workflows, with
-typecheck/lint/both formatting checks green and no warnings. Old/current import
-compatibility passes; .50 native/hosted CI remain pending at this source checkpoint.
+The original dataset and loaded/completed native parents remain intact.
+Recovery includes acknowledged canonical voice and filters empty recorder rows
+before its limit; the selected draft and its meaningful preview stay visible.
+Full source checks pass159 suites/2,248 application tests and five workflows;
+the final import-order correction also passes focused lint without warnings.
+Old/current import compatibility passes. Exact preceding source`65ffa0d` hosted
+CI succeeds; the current recovery-index fix and .50 native acceptance still need
+their exact-source CI/package witnesses.
 
 Preceding .49 scopes note/history readers to the live patient and validates
 version/current-row/parent/dataset ownership in atomic history restoration.
