@@ -30,7 +30,10 @@ jest.mock('expo-device', () => ({ modelName: 'Synthetic' }));
 jest.mock('@/platform/media', () => ({ MEDIA_ROOT: 'media' }));
 jest.mock('@/platform/error-log', () => ({ logError: jest.fn() }));
 jest.mock('@/db/seed', () => ({ runSeeds: async () => {} }));
-jest.mock('@/features/encounters/status', () => ({ reconcileAllPatientStatuses: async () => {} }));
+jest.mock('@/features/encounters/status', () => ({
+  ...jest.requireActual<typeof import('@/features/encounters/status')>('@/features/encounters/status'),
+  reconcileAllPatientStatuses: async () => {},
+}));
 jest.mock('@/features/labs/reflag', () => ({ reflagLabValuesIfNeeded: async () => {} }));
 jest.mock('@/features/notes/version-queries', () => ({ backfillNoteVersionsIfNeeded: async () => {} }));
 jest.mock('@/features/search/reindex', () => ({ reindexSearchIfNeeded: async () => {} }));

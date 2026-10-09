@@ -33,6 +33,61 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Coherent current encounter and kardex reads (0.11.45 source)
+
+**Agent:** GPT-6 via Codex; primary only, no further delegation.
+**Commits:** this source checkpoint; preceding notes checkpoint `a286024`.
+
+**Changed**
+- Use one admission-time-descending/id-ascending fallback across status, detail,
+  current episode, default publication and lab/imaging/vital/follow-up raw reads.
+  Equal or unknown times no longer send those readers to different episodes.
+  Stored associations and already captured raw drafts are not reassigned;
+  duplicate episodes are retained, not silently resolved or closed.
+- Patient list locations rank only live active episodes in one short SQL read,
+  returning one matching location per patient. Nested subscriptions retain the
+  real encounter table. No per-patient read loop or arbitrary Map winner.
+- KardexTab uses the existing coherent episode/order projection instead of two
+  dependent reads. Initial/failed reads do not claim empty or complete counts;
+  cached orders remain visible with retry. Version0.11.45/code61.
+- No dependency, schema, route, permission, backup format or clinical formula change.
+
+**Verified**
+- Four tied-episode witnesses and four actual kardex read witnesses fail against
+  preceding source. After correction, focused migrated-SQLite/component checks
+  pass127 tests across nine suites, including preserved raw publication context,
+  new clinical publication and the existing record/draft/query paths.
+- Exact `a286024` hosted CI and normal pre-push check pass151 suites/2,064 app
+  tests and five workflows. The separate .43 native acceptance remains bounded
+  as recorded in `validation-0.11.43.md`.
+- Final full `npm run check` passes153 suites/2,079 app tests and five workflows,
+  with typecheck/lint/both formatting checks green. The backup orchestration
+  mock now preserves actual encounter readers while bypassing only startup
+  reconciliation; its focused41 tests also pass with the selection witnesses.
+
+**Not verified**
+- No .44 intermediate native build is planned: accept the cumulative .45 APK.
+  No .45 native/owner arm64/physical-phone acceptance yet. The tie fallback is
+  deterministic, not a clinical resolution of imported duplicate episodes.
+- Broader pressure/full-shift/pagination/IME/audio/power/provider/low-storage
+  gates and the earlier focus ANR remain open.
+
+**Open threads**
+- Freeze/build/inspect the cumulative .45 QA APK,
+  install in place and accept native notes/kardex/location plus exact data/media
+  preservation. Do not mix full Jest and the native build.
+- Seven manual raw forms, further clinical trash, visual rich text, shift context,
+  follow-up stages, bounded notes and broader native/physical gates remain.
+  The phone is not the sole remaining work.
+
+**Gotchas**
+- A private Jest probe did not load the mobile SQL-inline transform. Only the
+  witnesses run using the repository's actual Jest configuration count. Fixture
+  API name/required status were corrected before final source verification.
+- The first full check exposed a stale whole-module backup test mock, not a
+  production missing export. Correct the partial mock; never bypass the write
+  refusal witness or accept the failed full run as a passing checkpoint.
+
 ## 2026-10-09 — Retryable notes reads and native trash acceptance (0.11.44 source)
 
 **Agent:** GPT-6 via Codex; primary only, no further delegation.

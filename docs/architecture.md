@@ -130,6 +130,20 @@ One coherent projection removes that dependency without remounting the patient
 workspace. Failure feedback is still required; software fault injection is not
 proof of native power-loss recovery.
 
+The current kardex tab also consumes that coherent projection (0.11.45). A failed
+episode read cannot masquerade as a valid standing-only scope. Cached orders
+remain readable with retry, without an empty/current-count claim on failure.
+
+Current encounter selection shares one recorded-admission-time descending,
+id ascending ordering across status, detail, current/historical fallback,
+publication and new raw forms. Imported duplicates with tied or unknown times
+previously produced different contexts between those readers. The id is a stable
+fallback, not evidence of clinical precedence. Existing associations/draft
+contexts are not changed and duplicates are not silently closed. Patient-list
+locations use a window over only live active episodes, retaining one consistent
+location per patient in one SQL read. This avoids arbitrary Map winners and
+lookups for each archived patient; nested subscriptions watch the real table.
+
 Today and timeline expose failed sources and retry, withhold unreliable totals
 and empty/success claims, and retain available rows. `ErrorNotice` keeps technical
 diagnostics behind an explicit details action; displayed details remain redacted.

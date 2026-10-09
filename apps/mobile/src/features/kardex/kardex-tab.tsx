@@ -10,14 +10,13 @@ import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, SectionHeader, Text } from '@/components/ui';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { currentEncounterQuery } from '@/features/encounters/queries';
 import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
 import { ORDER_KIND_LABELS, ORDER_STATUS_LABELS } from './labels';
 import { isRunning, orderSig, therapyDay } from './logic';
-import { deleteOrder, patientOrdersQuery, setOrderStatus } from './queries';
+import { deleteOrder, patientCurrentOrdersQuery, setOrderStatus } from './queries';
 
 /**
  * The kardex: what the patient is on right now, and what was stopped.
@@ -30,9 +29,7 @@ export function KardexTab({ patientId }: { patientId: string }) {
   const { spacing } = useTheme();
   const [showStopped, setShowStopped] = useState(false);
 
-  const { data: encounters } = useLive(currentEncounterQuery(patientId), [patientId]);
-  const encounterId = encounters?.[0]?.id ?? null;
-  const { data, error } = useLive(patientOrdersQuery(patientId, encounterId), [patientId, encounterId]);
+  const { data, error, retry, loading } = useLive(patientCurrentOrdersQuery(patientId), [patientId]);
   const all = data ?? [];
   const current = all.filter(isRunning);
   const stopped = all.filter((o) => !isRunning(o));
@@ -42,23 +39,32 @@ export function KardexTab({ patientId }: { patientId: string }) {
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
       <Button label="دستور جدید" icon="add" variant="secondary" full onPress={openNew} />
-      <ErrorNotice error={error} what="کاردکس" />
+      <ErrorNotice error={error} what="کاردکس" onRetry={retry} />
+      {loading ? (
+        <Text variant="caption" color="textMuted">
+          در حال خواندن…
+        </Text>
+      ) : null}
 
       {all.length === 0 ? (
-        <EmptyState
-          icon="medical-outline"
-          title="کاردکس خالی است"
-          description="داروها، سرم‌ها، رژیم غذایی و دستورات پرستاری را اینجا ثبت کنید."
-        />
+        data !== undefined && !error ? (
+          <EmptyState
+            icon="medical-outline"
+            title="کاردکس خالی است"
+            description="داروها، سرم‌ها، رژیم غذایی و دستورات پرستاری را اینجا ثبت کنید."
+          />
+        ) : null
       ) : (
         <>
-          <SectionHeader title="در جریان" count={current.length} />
+          <SectionHeader title="در جریان" count={error ? undefined : current.length} />
           {current.length === 0 ? (
-            <Card tone="alt">
-              <Text variant="caption" color="textFaint">
-                دستور فعالی نیست.
-              </Text>
-            </Card>
+            !error ? (
+              <Card tone="alt">
+                <Text variant="caption" color="textFaint">
+                  دستور فعالی نیست.
+                </Text>
+              </Card>
+            ) : null
           ) : (
             current.map((o) => <OrderCard key={o.id} order={o} patientId={patientId} />)
           )}
@@ -68,7 +74,7 @@ export function KardexTab({ patientId }: { patientId: string }) {
               <Pressable onPress={() => setShowStopped((v) => !v)} accessibilityRole="button">
                 <SectionHeader
                   title="قطع‌شده"
-                  count={stopped.length}
+                  count={error ? undefined : stopped.length}
                   action={
                     <Text variant="caption" color="primary">
                       {showStopped ? 'بستن' : 'نمایش'}

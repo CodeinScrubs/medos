@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import { db, type Database } from '@/db/client';
 import { encounters, patients, type PatientStatus } from '@/db/schema';
@@ -36,13 +36,28 @@ export function isChoosableStatus(status: PatientStatus): boolean {
   return CHOOSABLE_STATUSES.includes(status);
 }
 
+/** Equal/unknown admission times use one stable fallback; ids do not decide clinical truth. */
+export function encounterRecencyOrder() {
+  return [desc(encounters.admittedAt), asc(encounters.id)];
+}
+
+/** The same single-column context is used by publication and new raw forms. */
+export function activeEncounterIdQuery(patientId: string, handle: Pick<Database, 'select'> = db) {
+  return handle
+    .select({ id: encounters.id })
+    .from(encounters)
+    .where(and(isNull(encounters.deletedAt), eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
+    .orderBy(...encounterRecencyOrder())
+    .limit(1);
+}
+
 /** The live episode a patient is in, if any. */
 export function activeEncounterQuery(patientId: string, handle: Pick<Database, 'select'> = db) {
   return handle
     .select()
     .from(encounters)
     .where(and(isNull(encounters.deletedAt), eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
-    .orderBy(desc(encounters.admittedAt))
+    .orderBy(...encounterRecencyOrder())
     .limit(1);
 }
 
@@ -131,15 +146,30 @@ export async function reconcileAllPatientStatuses(): Promise<number> {
  * would be one query per row; this is one for the screen.
  */
 export function activeLocationsQuery() {
-  return db
+  // Rank only live active episodes, rather than looking up every archived patient
+  // or leaving a Map's last duplicate to decide which bed is shown.
+  const selected = db
     .select({
       patientId: encounters.patientId,
       ward: encounters.ward,
       bed: encounters.bed,
       kind: encounters.kind,
+      rank: sql<number>`row_number() over (partition by ${encounters.patientId} order by ${sql.join(encounterRecencyOrder(), sql`, `)})`.as(
+        'location_rank',
+      ),
     })
     .from(encounters)
-    .where(and(isNull(encounters.deletedAt), eq(encounters.isActive, true)));
+    .where(and(isNull(encounters.deletedAt), eq(encounters.isActive, true)))
+    .as('selected_active_locations');
+  return db
+    .select({
+      patientId: selected.patientId,
+      ward: selected.ward,
+      bed: selected.bed,
+      kind: selected.kind,
+    })
+    .from(selected)
+    .where(eq(selected.rank, 1));
 }
 
 export type ActiveLocation = { ward: string | null; bed: string | null };

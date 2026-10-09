@@ -1,8 +1,9 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import { encounters, followUpFormDrafts, followUps, patients, type FollowUpFormDraft } from '@/db/schema';
+import { encounterRecencyOrder } from '@/features/encounters/status';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
 import {
@@ -46,7 +47,7 @@ export function followUpFormQuery(patientId: string) {
       and(eq(encounters.patientId, patients.id), isNull(encounters.deletedAt), eq(encounters.isActive, true)),
     )
     .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
-    .orderBy(desc(encounters.admittedAt), desc(encounters.id))
+    .orderBy(...encounterRecencyOrder())
     .limit(1);
 }
 export type FollowUpFormRow = Awaited<ReturnType<typeof followUpFormQuery>>[number];

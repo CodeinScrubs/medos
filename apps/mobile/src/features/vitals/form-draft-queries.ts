@@ -3,6 +3,7 @@ import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { audit } from '@/db/audit';
 import { db } from '@/db/client';
 import { encounters, patients, vitalFormDrafts, vitals, type VitalFormDraft } from '@/db/schema';
+import { activeEncounterIdQuery } from '@/features/encounters/status';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
@@ -26,12 +27,7 @@ const open = (patientId: string, vitalId: string | null) =>
   );
 /** One snapshot supplies the raw draft, clinical basis and original admission. */
 export function vitalFormQuery(patientId: string, vitalId: string | null, reader: Pick<typeof db, 'select'> = db) {
-  const active = reader
-    .select({ id: encounters.id })
-    .from(encounters)
-    .where(and(eq(encounters.patientId, patientId), eq(encounters.isActive, true), isNull(encounters.deletedAt)))
-    .orderBy(desc(encounters.admittedAt), asc(encounters.id))
-    .limit(1);
+  const active = activeEncounterIdQuery(patientId, reader);
   return reader
     .select({ patient: patients, vital: vitals, draft: vitalFormDrafts, active: encounters })
     .from(patients)

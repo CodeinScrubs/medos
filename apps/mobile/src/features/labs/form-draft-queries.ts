@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import { attachments, encounters, labFormDrafts, labPanels, labValues, patients, type LabFormDraft } from '@/db/schema';
+import { activeEncounterIdQuery } from '@/features/encounters/status';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
@@ -24,12 +25,7 @@ const openTarget = (patientId: string, panelId: string | null) =>
   );
 /** Identity, panel, values, captured admission and draft come from one SQL snapshot. */
 export function labFormQuery(patientId: string, panelId: string | null, reader: Pick<typeof db, 'select'> = db) {
-  const active = reader
-    .select({ id: encounters.id })
-    .from(encounters)
-    .where(and(eq(encounters.patientId, patientId), isNull(encounters.deletedAt), eq(encounters.isActive, true)))
-    .orderBy(desc(encounters.admittedAt), asc(encounters.id))
-    .limit(1);
+  const active = activeEncounterIdQuery(patientId, reader);
   return reader
     .select({ patient: patients, panel: labPanels, value: labValues, draft: labFormDrafts, active: encounters })
     .from(patients)

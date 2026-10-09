@@ -23,7 +23,7 @@ import { refreshPatientSearchText } from '@/features/patients/search-index';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { statusAfterDischarge, statusForEncounterKind } from './logic';
-import { activeEncounterQuery, statusFor } from './status';
+import { activeEncounterIdQuery, activeEncounterQuery, encounterRecencyOrder, statusFor } from './status';
 
 const alive = isNull(encounters.deletedAt);
 
@@ -56,7 +56,7 @@ export function activeEncounterDetailQuery(patientId: string) {
     .leftJoin(places, eq(encounters.placeId, places.id))
     .leftJoin(doctors, eq(encounters.attendingId, doctors.id))
     .where(and(alive, eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
-    .orderBy(desc(encounters.admittedAt))
+    .orderBy(...encounterRecencyOrder())
     .limit(1);
 }
 
@@ -67,7 +67,7 @@ export function encounterHistoryQuery(patientId: string) {
     .leftJoin(places, eq(encounters.placeId, places.id))
     .leftJoin(doctors, eq(encounters.attendingId, doctors.id))
     .where(and(alive, eq(encounters.patientId, patientId)))
-    .orderBy(desc(encounters.admittedAt));
+    .orderBy(...encounterRecencyOrder());
 }
 
 /**
@@ -80,7 +80,7 @@ export function currentEncounterQuery(patientId: string) {
     .select()
     .from(encounters)
     .where(and(alive, eq(encounters.patientId, patientId)))
-    .orderBy(desc(encounters.isActive), desc(encounters.admittedAt))
+    .orderBy(desc(encounters.isActive), ...encounterRecencyOrder())
     .limit(1);
 }
 
@@ -98,12 +98,7 @@ export function encounterQuery(id: string) {
  * admission.
  */
 export function resolveActiveEncounterId(patientId: string, reader: Pick<Database, 'select'> = db): string | null {
-  const row = reader
-    .select({ id: encounters.id })
-    .from(encounters)
-    .where(and(alive, eq(encounters.patientId, patientId), eq(encounters.isActive, true)))
-    .orderBy(desc(encounters.admittedAt))
-    .get();
+  const row = activeEncounterIdQuery(patientId, reader).get();
   return row?.id ?? null;
 }
 

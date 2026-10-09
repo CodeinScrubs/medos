@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import { encounters, imagingFormDrafts, imagingStudies, patients, type ImagingFormDraft } from '@/db/schema';
+import { activeEncounterIdQuery } from '@/features/encounters/status';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { softDelete, stamps, touch } from '@/lib/ids';
 
@@ -25,12 +26,7 @@ const open = (patientId: string, studyId: string | null) =>
     isNull(imagingFormDrafts.deletedAt),
   );
 export function imagingFormQuery(patientId: string, studyId: string | null, reader: Pick<typeof db, 'select'> = db) {
-  const active = reader
-    .select({ id: encounters.id })
-    .from(encounters)
-    .where(and(eq(encounters.patientId, patientId), eq(encounters.isActive, true), isNull(encounters.deletedAt)))
-    .orderBy(desc(encounters.admittedAt), asc(encounters.id))
-    .limit(1);
+  const active = activeEncounterIdQuery(patientId, reader);
   return reader
     .select({ patient: patients, study: imagingStudies, draft: imagingFormDrafts, active: encounters })
     .from(patients)

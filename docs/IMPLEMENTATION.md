@@ -36,6 +36,22 @@ order; do not treat a successful test suite as acceptance of the entire product.
 
 ## Priority 0: data integrity and recovery
 
+0.11.45 makes equal/unknown admission-time selection consistent across current
+record/status/publication and raw form reads. One date-descending/id-ascending
+fallback keeps existing captured associations intact and retains imported
+duplicate episodes. Patient locations rank only live active episodes and return
+one matching location per patient; nested subscriptions still watch encounters.
+KardexTab uses the existing coherent current-episode/order read and reports
+failed/loading reads honestly, with retry and cached cards without current counts.
+Four tied-episode and four actual kardex read witnesses fail before correction;
+127 focused SQL/component checks pass; the final full check passes153 suites/
+2,079 app tests and five workflows. The backup startup mock retains actual
+readers and its focused41 checks pass. Native acceptance is pending.
+No dependency/schema/route/permission/clinical formula is added. The deterministic
+tie policy is not a clinical resolution of duplicate episodes. Seven manual raw
+forms, further clinical trash and the remaining product/native/physical gates
+below remain open. Accept the cumulative .45 APK rather than building .44 separately.
+
 0.11.44 distinguishes initial/failed note reads from a successfully empty list.
 Primary and voice reads offer retry while retaining loaded note cards; failed
 voice reads withhold stale counts. The first-note admission template is only
