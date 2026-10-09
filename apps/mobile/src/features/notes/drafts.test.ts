@@ -43,6 +43,20 @@ beforeEach(async () => {
 });
 
 describe('note drafts', () => {
+  it('selects one exact recovery draft without falling back across patient, note or retired scope', async () => {
+    await writeNoteDraft('selected-older', { patientId, noteId: null }, { ...blank, body: 'Older selected draft' });
+    await writeNoteDraft('selected-newer', { patientId, noteId: null }, { ...blank, body: 'Newer draft' });
+    const noteId = await createNote({ patientId, type: 'general', body: 'Published' });
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other recovery' });
+    expect((await noteDraftQuery(patientId, null, 'selected-older'))[0]?.body).toBe('Older selected draft');
+    expect(await noteDraftQuery(patientId, noteId, 'selected-older')).toEqual([]);
+    expect(await noteDraftQuery(other, null, 'selected-older')).toEqual([]);
+    expect(await noteDraftQuery(patientId, null, 'missing-selection')).toEqual([]);
+    await discardNoteDraft('selected-older');
+    expect(await noteDraftQuery(patientId, null, 'selected-older')).toEqual([]);
+    expect((await noteDraftQuery(patientId, null))[0]?.id).toBe('selected-newer');
+  });
+
   it('writes what is being typed and gives it back, without touching the record', async () => {
     const id = 'draft-1';
     await writeNoteDraft(id, { patientId, noteId: null }, { ...blank, body: 'patient looks' });

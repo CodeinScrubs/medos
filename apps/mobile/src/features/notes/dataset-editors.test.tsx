@@ -5,10 +5,12 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
+import { QuickDateField } from '@/components/quick-date-field';
 import { Button, EmptyState, Input, Text } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
 import { noteDrafts, notes, orders, patients } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
+import { openEncounter } from '@/features/encounters/queries';
 import { OrderFormScreen } from '@/features/kardex/order-form-screen';
 import { createOrder } from '@/features/kardex/queries';
 import * as orderQueries from '@/features/kardex/queries';
@@ -23,14 +25,16 @@ import { NoteEditorScreen } from './note-editor-screen';
 import { NoteHistoryScreen } from './note-history-screen';
 import { createNote, updateNote } from './queries';
 import * as noteQueries from './queries';
+import { UnfinishedNotes } from './unfinished-notes';
 
-let mockParams: { id: string; noteId?: string; orderId?: string };
+let mockParams: { id: string; noteId?: string; orderId?: string; draftId?: string };
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 const mockDismissTo = jest.fn();
 let mockFocused = true;
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
-  useRouter: () => ({ back: mockBack, push: jest.fn(), dismissTo: mockDismissTo }),
+  useRouter: () => ({ back: mockBack, push: mockPush, dismissTo: mockDismissTo }),
 }));
 jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
 jest.mock('react-native', () => {
@@ -125,10 +129,90 @@ beforeEach(async () => {
   mockParams = { id: patientId };
   mockFocused = true;
   mockBack.mockClear();
+  mockPush.mockClear();
   mockDismissTo.mockClear();
   jest.mocked(alertError).mockClear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.useFakeTimers();
+});
+
+describe('exact unfinished note selection', () => {
+  it('each card opens its own draft, including an older draft for the same patient', async () => {
+    await writeNoteDraft('older-selection', { patientId, noteId: null }, { ...fields, body: 'Older selected words' });
+    await writeNoteDraft('newer-selection', { patientId, noteId: null }, { ...fields, body: 'Newer selected words' });
+    await act(async () => {
+      tree = create(<UnfinishedNotes />);
+      await settle();
+    });
+    const cards = tree!.root.findAllByType(Pressable);
+    expect(cards).toHaveLength(2);
+    for (const [index, id] of ['older-selection', 'newer-selection'].entries()) {
+      const card = cards.find((node) =>
+        node
+          .findAllByType(Text)
+          .some((text) => text.props.children === (index ? 'Newer selected words' : 'Older selected words')),
+      )!;
+      card.props.onPress();
+      expect(mockPush).toHaveBeenLastCalledWith({
+        pathname: '/patient/[id]/note',
+        params: { id: patientId, draftId: id, type: 'general' },
+      });
+    }
+  });
+  it('opens and publishes the selected older draft while retaining another draft and the completed editor host', async () => {
+    await writeNoteDraft('older-selection', { patientId, noteId: null }, { ...fields, body: 'Older selected words' });
+    await writeNoteDraft('newer-selection', { patientId, noteId: null }, { ...fields, body: 'Newer selected words' });
+    mockParams.draftId = 'older-selection';
+    mockFocused = false;
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(input('متن نوت').props.value).toBe('Older selected words');
+    await act(async () => {
+      button('ثبت در پرونده').props.onPress();
+      await settle();
+      tree!.update(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(t.db.select().from(notes).get()?.body).toBe('Older selected words');
+    expect(t.db.select().from(noteDrafts).where(eq(noteDrafts.id, 'newer-selection')).get()?.deletedAt).toBeNull();
+    expect(tree!.root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(button('بستن')).toBeDefined();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+  it.each(['foreign', 'missing'] as const)(
+    'refuses an initial %s selected draft instead of opening the latest',
+    async (kind) => {
+      const other = await createPatient({ firstName: 'Synthetic', lastName: 'Foreign selected draft' });
+      await writeNoteDraft('foreign-selection', { patientId: other, noteId: null }, fields);
+      await writeNoteDraft('latest-selection', { patientId, noteId: null }, fields);
+      mockParams.draftId = kind === 'foreign' ? 'foreign-selection' : 'missing-selection';
+      await act(async () => {
+        tree = create(<NoteEditorScreen />);
+        await settle();
+      });
+      expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+      expect(tree!.root.findByType(EmptyState).props.title).toBe('پیش‌نویس در دسترس نیست');
+    },
+  );
+  it('retains original selected text after a route changes to another draft', async () => {
+    await writeNoteDraft('older-selection', { patientId, noteId: null }, { ...fields, body: 'Older selected words' });
+    await writeNoteDraft('newer-selection', { patientId, noteId: null }, { ...fields, body: 'Newer selected words' });
+    mockParams.draftId = 'older-selection';
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    mockParams.draftId = 'newer-selection';
+    await act(async () => {
+      tree!.update(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(input('متن نوت').props.value).toBe('Older selected words');
+    expect(input('متن نوت').props.editable).toBe(false);
+    expect(button('ثبت در پرونده').props.disabled).toBe(true);
+  });
 });
 
 describe('actual manual order form identity, pending publication and optional suggestions', () => {
@@ -470,6 +554,180 @@ afterEach(async () => {
 });
 
 describe('note route ownership and delayed history confirmations', () => {
+  it('keeps the originally shown outpatient context through an admission before the first edit', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    await openEncounter({ patientId, kind: 'admission' });
+    await act(async () => {
+      tree!.update(<NoteEditorScreen />);
+      input('Subjective').props.onChangeText('Original outpatient context');
+      await settle();
+    });
+    await act(async () => {
+      button('ثبت در پرونده').props.onPress();
+      await settle();
+    });
+    expect(t.db.select().from(notes).get()!.encounterId).toBeNull();
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers incomplete raw date/clock after a mounted editor closes and reopens', async () => {
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    const rawDate = { dateText: '1404/10/', clockText: '2:', customOpen: true };
+    await act(async () => {
+      input('Subjective').props.onChangeText('Recover these exact date inputs');
+      tree!.root.findByType(QuickDateField).props.onRawInputChange(rawDate);
+      jest.advanceTimersByTime(4000);
+      await settle();
+    });
+    expect(t.db.select().from(noteDrafts).get()!.rawDate).toEqual(rawDate);
+    await act(async () => {
+      tree!.unmount();
+      await settle();
+    });
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(tree!.root.findByType(QuickDateField).props.rawInput).toEqual(rawDate);
+    expect(input('Subjective').props.value).toBe('Recover these exact date inputs');
+    // The mocked date widget cannot supply a guard; the real query still refuses invalid raw input.
+    await act(async () => {
+      button('ثبت در پرونده').props.onPress();
+      await settle();
+    });
+    expect(t.db.select().from(notes).all()).toEqual([]);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(jest.mocked(alertError)).toHaveBeenCalled();
+  });
+
+  async function recoveredComparison(legacy = false) {
+    const id = await createNote({ patientId, type: 'general', body: 'Before recovery' });
+    await writeNoteDraft('review-draft', { patientId, noteId: id }, { ...fields, body: 'My recovered words' });
+    if (legacy) t.db.update(noteDrafts).set({ origin: null, revision: 0 }).run();
+    await updateNote(id, { body: 'Current corrected words' });
+    mockParams.noteId = id;
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    expect(input('متن نوت').props.value).toBe('My recovered words');
+    expect(button('ثبت در پرونده').props.disabled).toBe(true);
+    await act(async () => {
+      button('بررسی نسخهٔ فعلی').props.onPress();
+      await settle();
+    });
+    expect(
+      tree!.root
+        .findAllByType(Text)
+        .some((node) => JSON.stringify(node.props.children).includes('Current corrected words')),
+    ).toBe(true);
+    await act(async () => button('تطبیق و نگه‌داشتن نوشتهٔ من').props.onPress());
+    const dialog = jest.mocked(Alert.alert).mock.calls.at(-1)!;
+    return { id, dialog, confirm: dialog[2]!.find((item) => item.text === 'تطبیق')!.onPress! };
+  }
+
+  it.each([false, true])(
+    'explicitly reviews and rebases a recovered draft (legacy=%s), then separately publishes',
+    async (legacy) => {
+      const review = await recoveredComparison(legacy);
+      await act(async () => {
+        review.confirm();
+        review.confirm();
+        await settle();
+      });
+      expect(t.db.select().from(notes).get()!.body).toBe('Current corrected words');
+      expect(input('متن نوت').props.value).toBe('My recovered words');
+      expect(button('ثبت در پرونده').props.disabled).toBe(false);
+      expect(mockBack).not.toHaveBeenCalled();
+      await act(async () => {
+        button('ثبت در پرونده').props.onPress();
+        await settle();
+      });
+      expect(t.db.select().from(notes).get()!.body).toBe('My recovered words');
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('resolves a refused raw revision after showing the other persisted draft, retaining local input', async () => {
+    await writeNoteDraft('review-draft', { patientId, noteId: null }, { ...fields, body: 'Original raw text' });
+    await act(async () => {
+      tree = create(<NoteEditorScreen />);
+      await settle();
+    });
+    await act(async () => input('متن نوت').props.onChangeText('My only local text'));
+    await writeNoteDraft('review-draft', { patientId, noteId: null }, { ...fields, body: 'Other stored raw text' });
+    await act(async () => {
+      jest.advanceTimersByTime(4000);
+      await settle();
+    });
+    expect(t.db.select().from(noteDrafts).get()!.body).toBe('Other stored raw text');
+    await act(async () => {
+      button('بررسی نسخهٔ فعلی').props.onPress();
+      await settle();
+    });
+    expect(
+      tree!.root
+        .findAllByType(Text)
+        .some((node) => JSON.stringify(node.props.children).includes('Other stored raw text')),
+    ).toBe(true);
+    await act(async () => button('تطبیق و نگه‌داشتن نوشتهٔ من').props.onPress());
+    const dialog = jest.mocked(Alert.alert).mock.calls.at(-1)!;
+    await act(async () => {
+      dialog[2]!.find((item) => item.text === 'تطبیق')!.onPress!();
+      await settle();
+    });
+    expect(t.db.select().from(noteDrafts).get()!.body).toBe('My only local text');
+    expect(input('متن نوت').props.value).toBe('My only local text');
+    await act(async () => {
+      button('ثبت در پرونده').props.onPress();
+      await settle();
+    });
+    expect(t.db.select().from(notes).get()!.body).toBe('My only local text');
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['cancel', 'unmount', 'route', 'focus', 'restore'] as const)(
+    'does not apply a late raw review after %s',
+    async (reason) => {
+      const review = await recoveredComparison(true);
+      if (reason === 'cancel') review.dialog[2]!.find((item) => item.text === 'انصراف')!.onPress!();
+      else if (reason === 'unmount')
+        await act(async () => {
+          tree!.unmount();
+          tree = undefined;
+          await settle();
+        });
+      else if (reason === 'focus') mockFocused = false;
+      else if (reason === 'route') {
+        mockParams = { id: await createPatient({ firstName: 'Synthetic', lastName: 'Different review route' }) };
+        await act(async () => {
+          tree!.update(<NoteEditorScreen />);
+          await settle();
+        });
+      } else {
+        await act(async () => {
+          snapshot();
+          replace();
+          await settle();
+        });
+      }
+      const before = t.db.select().from(noteDrafts).all();
+      await act(async () => {
+        review.confirm();
+        await settle();
+      });
+      expect(t.db.select().from(noteDrafts).all()).toEqual(before);
+      expect(t.db.select().from(notes).get()!.body).toBe('Current corrected words');
+      expect(mockBack).not.toHaveBeenCalled();
+    },
+  );
+
   async function history() {
     const id = await createNote({ patientId, type: 'general', body: 'First history text' });
     await updateNote(id, { body: 'Current history text' });

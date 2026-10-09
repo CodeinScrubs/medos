@@ -38,6 +38,7 @@ export function UnfinishedNotes() {
                 pathname: '/patient/[id]/note',
                 params: {
                   id: draft.patientId,
+                  draftId: draft.id,
                   ...(draft.noteId ? { noteId: draft.noteId } : { type: draft.type }),
                 },
               })

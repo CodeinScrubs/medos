@@ -11,6 +11,7 @@ import {
   followUps,
   imagingStudies,
   notes,
+  noteDrafts,
   occasionFormDrafts,
   occasions,
   patients,
@@ -72,6 +73,56 @@ const settingValue = async (t: TestDatabase, key: string) =>
   (await t.db.select().from(settings)).find((s) => s.key === key)?.value ?? null;
 
 describe('importTables', () => {
+  it('restores pre-context note drafts with SQL defaults without inventing an origin or losing raw text', async () => {
+    const patientId = await addPatient(backup, 'Synthetic legacy note draft');
+    await backup.db.insert(noteDrafts).values({
+      id: 'legacy-note-draft',
+      ...stamps(),
+      patientId,
+      type: 'general',
+      body: 'Exact legacy words',
+      voices: [],
+    });
+    const expected = backup.db.select().from(noteDrafts).get()!;
+    backup.conn.execSync('ALTER TABLE note_drafts DROP COLUMN origin');
+    backup.conn.execSync('ALTER TABLE note_drafts DROP COLUMN raw_date');
+    backup.conn.execSync('ALTER TABLE note_drafts DROP COLUMN revision');
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(noteDrafts).get()).toEqual({ ...expected, origin: null, rawDate: null, revision: 0 });
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
+  });
+
+  it('preserves current note origins, revisions and invalid raw date/clock through actual import', async () => {
+    const patientId = await addPatient(backup, 'Synthetic current note draft');
+    await backup.db.insert(noteDrafts).values({
+      id: 'current-note-draft',
+      ...stamps(),
+      patientId,
+      type: 'general',
+      body: 'Exact current words',
+      origin: JSON.stringify({ version: 1, patientId, noteId: null, encounterId: null, basis: null }),
+      rawDate: { dateText: '1404/10/', clockText: '2:', customOpen: true },
+      revision: 17,
+      voices: [],
+    });
+    const expected = backup.db.select().from(noteDrafts).get()!;
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(noteDrafts).get()).toEqual(expected);
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
+  });
+
   it('preserves durable stopped voice states and acknowledgement links through current restore', async () => {
     const patientId = await addPatient(backup, 'Synthetic voice');
     const captured = new Date('2026-01-01T12:00:00Z');

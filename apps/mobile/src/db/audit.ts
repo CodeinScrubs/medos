@@ -39,6 +39,7 @@ export type AuditAction =
   | 'note.restored'
   | 'note.versionRestored'
   | 'note.draftDiscarded'
+  | 'note.draftRebased'
   | 'task.deleted'
   | 'task.restored'
   | 'task.statusChanged'

@@ -33,17 +33,24 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Source0.11.49/code65 scopes note/history reads to their live patient. The editor
-retains original identity/input through route reuse, deletion and concurrent
-changes; publication compares its exact loaded Note in the transaction. History
-restoration validates the shown snapshot/current row/live parents and original
-dataset, committing field/search/draft/history/id-only audit together. Delayed,
-superseded and repeated confirmations cannot change another dataset or close a
-newer page. Success returns to the patient workspace. Full source checks pass
-158 suites/2,194 application tests and five workflows, with typecheck/lint/both
-formatting checks green and no warnings. .49 native acceptance remains pending
-at this source checkpoint. Persisted recovered-draft basis and original new-note
-encounter ownership are not supplied by this mounted-editor comparison.
+Source0.11.50/code66 persists the original Note/encounter basis, including null,
+raw date/clock and draft revision. A reopened draft cannot overwrite a newer
+correction or attach itself to a later admission. Invalid dates remain raw and
+cannot publish their older parsed timestamp. Legacy/conflicting drafts require
+exact shown-row review/adoption, which changes only the raw draft; clinical
+publication remains separate. Recovery cards select their own scoped draft ID.
+The original dataset and loaded/completed native parents remain intact. Full
+source checks pass159 suites/2,243 application tests and five workflows, with
+typecheck/lint/both formatting checks green and no warnings. Old/current import
+compatibility passes; .50 native/hosted CI remain pending at this source checkpoint.
+
+Preceding .49 scopes note/history readers to the live patient and validates
+version/current-row/parent/dataset ownership in atomic history restoration.
+Success returns to the patient workspace. Its frozen-source native witnesses
+now pass: foreign-route refusal, intended version restoration and acknowledged
+base restore/cold export, with all4,117 original rows/49 tables/34 media exact.
+See [validation-0.11.49.md](validation-0.11.49.md). These witnesses do not validate
+.50 code or a complete shift.
 
 The preceding .48 binds delayed removal/old-dataset confirmation to the
 original mounted navigator and one removal attempt. A new route supersedes an
@@ -100,7 +107,7 @@ These do not prove full-shift performance, every failure path or phone acceptanc
 | ID | Contract | Current boundary and next work |
 |---|---|---|
 | D01 | Exact history | Note history retains SOAP boundaries, metadata, text and deterministic rapid-save ordering. Visual rich text needs a versioned codec and backward-compatible plain export/search. Permanent patient-field and other clinical correction history is not proved by note versions, soft deletion, id-only audit or retained raw drafts; complete and expose that owner requirement separately. Do not prune history. |
-| D02 | Atomic note/version/draft acknowledgment | Implemented software and bounded native evidence. .49 protects mounted existing-note publication and version restore with the exact shown basis. Persisted basis/conflict recovery for older recovered note drafts and original new-note encounter ownership, including null, remain open. Preserve the original dataset and native header/parent; general interruption/power acceptance remains open. |
+| D02 | Atomic note/version/draft acknowledgment | .50 persists original Note/encounter basis, including null, and raw date/clock/revision. Legacy or conflicting recovered drafts require exact shown-row adoption before separate publication; scoped recovery selects the intended draft. Software conflict, audit rollback, lifecycle and old/current import checks pass; .50 native acceptance is pending. .49 version restore has bounded native evidence. Preserve original dataset/native parents; general interruption/power acceptance remains open. |
 | D03 | Durable stopped voice publication | Existing record, draft-note and capture journals support verified-copy retry and atomic metadata acknowledgment. Active/pre-journal recording loss and physical recorder/audio behavior are separate gates. |
 | D04 | Atomic quick capture filing | Software preserves selected context, same-operation retry and one destination. Copied photo batches have a journal. Picker/pre-journal interruption and provider-loss/native failures still need acceptance. |
 | D05 | Recover every manual form | Patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital raw recovery exist. Eight remain: Kardex order, topic, idea, specialty profile, prescription, place, extension, credential. Use bounded shared draft lifecycle with feature-owned versioned codecs/publishers; pilot idea/topic without modifying existing draft stores. Preserve invalid raw dates, exact credential whitespace and partial prescription lines. Order intent must capture its original patient/encounter including null, compare its shown clinical basis, and retain explicit conflict recovery. Never copy a500-line engine eight times or reuse doctor drafts for unrelated entities. |

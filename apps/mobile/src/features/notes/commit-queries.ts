@@ -1,11 +1,12 @@
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
-import { attachments, noteDrafts, notes, patients, type Note } from '@/db/schema';
+import { attachments, encounters, noteDrafts, notes, patients, type Note } from '@/db/schema';
 import { addAttachmentInTransaction } from '@/features/attachments/queries';
 import { assertDatasetWrite, datasetGeneration } from '@/lib/dataset-write';
 import { softDelete, touch } from '@/lib/ids';
 
+import { decodeNoteOrigin, matchesNoteOrigin, NoteDraftConflict, noteDraftDate } from './draft-context';
 import { draftHasContent, draftVoiceRowsInTransaction, requireNoPendingDraftRecording } from './draft-queries';
 import { sameNoteSnapshot } from './logic';
 import { createNoteInTransaction, updateNoteInTransaction } from './queries';
@@ -15,6 +16,8 @@ export async function commitNoteDraft(
   draftId: string,
   generation = datasetGeneration(),
   expected?: Note,
+  now = new Date(),
+  expectedRevision?: number,
 ): Promise<string> {
   assertDatasetWrite(generation);
   return db.transaction((tx) => {
@@ -24,6 +27,27 @@ export async function commitNoteDraft(
       .where(and(eq(noteDrafts.id, draftId), isNull(noteDrafts.deletedAt)))
       .get();
     if (!draft) throw new Error('No saved draft to commit');
+    if (!Number.isSafeInteger(draft.revision) || draft.revision < 0 || draft.revision >= Number.MAX_SAFE_INTEGER)
+      throw new NoteDraftConflict();
+    if (expectedRevision !== undefined && expectedRevision !== draft.revision) throw new NoteDraftConflict();
+    if (!draft.origin) throw new NoteDraftConflict();
+    const origin = decodeNoteOrigin(draft.origin);
+    if (origin.patientId !== draft.patientId || origin.noteId !== draft.noteId) throw new NoteDraftConflict();
+    if (
+      origin.encounterId &&
+      !tx
+        .select({ id: encounters.id })
+        .from(encounters)
+        .where(
+          and(
+            eq(encounters.id, origin.encounterId),
+            eq(encounters.patientId, draft.patientId),
+            isNull(encounters.deletedAt),
+          ),
+        )
+        .get()
+    )
+      throw new NoteDraftConflict();
     requireNoPendingDraftRecording(tx, draftId);
     const voices = draftVoiceRowsInTransaction(tx, draftId);
     if (!draftHasContent(draft) && !voices.length) throw new Error('No saved draft to commit');
@@ -61,7 +85,7 @@ export async function commitNoteDraft(
       objective: draft.objective,
       assessment: draft.assessment,
       plan: draft.plan,
-      noteDate: draft.noteDate ?? draft.createdAt,
+      noteDate: noteDraftDate(draft.rawDate, draft.noteDate ?? draft.createdAt, now),
       doctorId: draft.doctorId,
       specialty: draft.specialty,
       isPinned: draft.isPinned ?? false,
@@ -75,12 +99,13 @@ export async function commitNoteDraft(
         .where(and(eq(notes.id, noteId), isNull(notes.deletedAt)))
         .get();
       if (!current || current.patientId !== draft.patientId) throw new Error('Draft target does not match the note');
+      if (!matchesNoteOrigin(origin, current)) throw new NoteDraftConflict();
       if (expected && !sameNoteSnapshot(current, expected))
         throw new Error('این نوت تغییر کرده است؛ پیش‌نویس شما باقی مانده و نسخهٔ جدید جایگزین نشد.');
       updateNoteInTransaction(tx, noteId, fields);
     } else {
       if (expected) throw new Error('مقصد پیش‌نویس با نوتِ اولیه یکسان نیست.');
-      noteId = createNoteInTransaction(tx, { patientId: draft.patientId, ...fields });
+      noteId = createNoteInTransaction(tx, { patientId: draft.patientId, encounterId: origin.encounterId, ...fields });
     }
     for (const voice of draft.voices ?? []) {
       if (voice.capturedAt !== undefined && typeof voice.capturedAt !== 'string')
@@ -107,7 +132,7 @@ export async function commitNoteDraft(
         .run();
     }
     tx.update(noteDrafts)
-      .set({ noteId, ...softDelete() })
+      .set({ noteId, revision: draft.revision + 1, ...softDelete() })
       .where(eq(noteDrafts.id, draftId))
       .run();
     return noteId;

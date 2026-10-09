@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, ne, or } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import {
   attachments,
@@ -8,18 +8,33 @@ import {
   notes,
   patients,
   recordingJobs,
+  encounters,
+  type Note,
+  type Encounter,
   type DraftVoice,
   type NoteDraft,
   type NoteType,
 } from '@/db/schema';
+import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { assertDatasetWrite, datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
+import type { DateTimeInput } from '@/lib/date-input';
 import { softDelete, stamps, touch } from '@/lib/ids';
+
+import {
+  decodeNoteOrigin,
+  encodeNoteOrigin,
+  initialNoteOrigin,
+  NoteDraftConflict,
+  type NoteDraftOrigin,
+} from './draft-context';
+import { sameNoteSnapshot } from './logic';
 
 /*
  * The unsaved half of a note.
  *
- * One row per thing being written: per note for an edit, and one per patient
- * for a note that does not exist yet. The editor owns its row's id for as long
+ * One row per writing intent. Concurrent editors can retain distinct rows;
+ * recovery cards carry the exact draft ID instead of always opening the latest.
+ * The editor owns its row's id for as long
  * as it is open and writes the whole shape every time — a draft is small, and
  * a partial update would mean tracking which fields changed in order to save
  * two hundred bytes.
@@ -45,10 +60,11 @@ export type NoteDraftFields = {
   isPinned: boolean;
   isDraft: boolean;
   voices: DraftVoice[];
+  rawDate?: DateTimeInput | null;
 };
 
 /** The draft for a note being edited, or for the next new note of a patient. */
-export function noteDraftQuery(patientId: string, noteId: string | null) {
+export function noteDraftQuery(patientId: string, noteId: string | null, draftId?: string) {
   return db
     .select()
     .from(noteDrafts)
@@ -57,6 +73,7 @@ export function noteDraftQuery(patientId: string, noteId: string | null) {
         alive,
         eq(noteDrafts.patientId, patientId),
         noteId ? eq(noteDrafts.noteId, noteId) : isNull(noteDrafts.noteId),
+        draftId !== undefined ? eq(noteDrafts.id, draftId) : undefined,
       ),
     )
     .orderBy(desc(noteDrafts.updatedAt))
@@ -110,7 +127,14 @@ export async function retargetNoteDraft(id: string, noteId: string): Promise<voi
     )
       throw new Error('نوت مقصد در دسترس نیست؛ پیش‌نویس تغییر نکرد.');
     tx.update(noteDrafts)
-      .set({ noteId, ...touch() })
+      .set({
+        noteId,
+        origin: encodeNoteOrigin(
+          initialNoteOrigin(draft.patientId, tx.select().from(notes).where(eq(notes.id, noteId)).get()!, null),
+        ),
+        revision: draft.revision + 1,
+        ...touch(),
+      })
       .where(eq(noteDrafts.id, id))
       .run();
   });
@@ -168,13 +192,13 @@ export function requireNoPendingDraftRecording(tx: DbTransaction, id: string): v
  */
 export async function writeNoteDraft(
   id: string,
-  target: { patientId: string; noteId: string | null },
+  target: { patientId: string; noteId: string | null; origin?: NoteDraftOrigin | null; revision?: number },
   fields: NoteDraftFields,
   generation = datasetGeneration(),
-): Promise<void> {
+): Promise<number> {
   assertDatasetWrite(generation);
   const now = new Date();
-  db.transaction((tx) => {
+  return db.transaction((tx) => {
     const current = tx.select().from(noteDrafts).where(eq(noteDrafts.id, id)).get();
     if (
       current &&
@@ -192,6 +216,13 @@ export async function writeNoteDraft(
     )
       throw new Error('پروندهٔ بیمار در دسترس نیست؛ پیش‌نویس ذخیره نشد.');
     const noteId = current?.noteId ?? target.noteId;
+    if (
+      current &&
+      (!Number.isSafeInteger(current.revision) || current.revision < 0 || current.revision >= Number.MAX_SAFE_INTEGER)
+    )
+      throw new NoteDraftConflict();
+    if (target.revision !== undefined && target.revision !== (current?.revision ?? 0)) throw new NoteDraftConflict();
+    const note = noteId ? (tx.select().from(notes).where(eq(notes.id, noteId)).get() ?? null) : null;
     if (current && current.noteId !== noteId) {
       requireNoPendingDraftRecording(tx, id);
       if (draftVoiceRowsInTransaction(tx, id).length) throw new Error('این پیش‌نویس وویس دارد؛ مقصد آن تغییر نکرد.');
@@ -205,31 +236,138 @@ export async function writeNoteDraft(
         .get()
     )
       throw new Error('نوت مقصد در دسترس نیست؛ پیش‌نویس ذخیره نشد.');
-    const values = { ...fields, patientId: target.patientId, noteId };
+    let origin = current?.origin ?? null;
+    if (!current)
+      origin = encodeNoteOrigin(
+        target.origin ?? initialNoteOrigin(target.patientId, note, resolveActiveEncounterId(target.patientId, tx)),
+      );
+    else if (current.noteId !== noteId) origin = encodeNoteOrigin(initialNoteOrigin(target.patientId, note, null));
+    else if (
+      target.origin &&
+      (!origin || encodeNoteOrigin(target.origin) !== encodeNoteOrigin(decodeNoteOrigin(origin)))
+    )
+      throw new NoteDraftConflict();
+    if (origin) {
+      const context = decodeNoteOrigin(origin);
+      if (context.patientId !== target.patientId || context.noteId !== noteId) throw new NoteDraftConflict();
+    }
+    const revision = (current?.revision ?? 0) + 1;
+    const values = { ...fields, patientId: target.patientId, noteId, origin, revision };
     tx.insert(noteDrafts)
       .values({ id, ...stamps(now), ...values })
       .onConflictDoUpdate({ target: noteDrafts.id, set: { ...values, ...touch(now) } })
       .run();
+    return revision;
   });
 }
 
-/** The draft is no longer wanted: saved into a note, or thrown away. */
-export async function discardNoteDraft(id: string, generation = datasetGeneration()): Promise<void> {
-  await withDatasetWrite(generation, async () => {
-    const changed = db.transaction((tx) => {
+export type NoteDraftComparison = {
+  draft: NoteDraft;
+  note: Note | null;
+  encounterId: string | null;
+  encounter: Encounter | null;
+};
+function inspectDraft(tx: DbTransaction, id: string, patientId: string, noteId: string | null): NoteDraftComparison {
+  const draft = tx
+    .select()
+    .from(noteDrafts)
+    .where(and(eq(noteDrafts.id, id), alive))
+    .get();
+  if (
+    !draft ||
+    !Number.isSafeInteger(draft.revision) ||
+    draft.revision < 0 ||
+    draft.revision >= Number.MAX_SAFE_INTEGER ||
+    draft.patientId !== patientId ||
+    draft.noteId !== noteId ||
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new NoteDraftConflict();
+  const note = noteId
+    ? (tx
+        .select()
+        .from(notes)
+        .where(and(eq(notes.id, noteId), isNull(notes.deletedAt)))
+        .get() ?? null)
+    : null;
+  if (noteId && (!note || note.patientId !== patientId)) throw new NoteDraftConflict();
+  // Known original context is retained. Only an explicitly reviewed legacy new draft uses the shown active encounter.
+  const origin = draft.origin ? decodeNoteOrigin(draft.origin) : null;
+  if (origin && (origin.patientId !== patientId || origin.noteId !== noteId)) throw new NoteDraftConflict();
+  const encounterId = note ? note.encounterId : origin ? origin.encounterId : resolveActiveEncounterId(patientId, tx);
+  const encounter = encounterId
+    ? (tx
+        .select()
+        .from(encounters)
+        .where(and(eq(encounters.id, encounterId), eq(encounters.patientId, patientId), isNull(encounters.deletedAt)))
+        .get() ?? null)
+    : null;
+  if (encounterId && !encounter) throw new NoteDraftConflict();
+  return { draft, note, encounterId, encounter };
+}
+export async function inspectNoteDraft(id: string, patientId: string, noteId: string | null, generation: number) {
+  return withDatasetWrite(generation, async () => db.transaction((tx) => inspectDraft(tx, id, patientId, noteId)));
+}
+/** Rebase only the raw draft after review of these exact persisted rows; never publish clinical fields. */
+export async function adoptNoteDraftOrigin(
+  shown: NoteDraftComparison,
+  generation: number,
+  fields?: NoteDraftFields,
+): Promise<NoteDraft> {
+  return withDatasetWrite(generation, async () =>
+    db.transaction((tx) => {
+      const current = inspectDraft(tx, shown.draft.id, shown.draft.patientId, shown.draft.noteId);
       if (
-        !tx
-          .select({ id: noteDrafts.id })
-          .from(noteDrafts)
-          .where(and(eq(noteDrafts.id, id), alive))
-          .get()
+        current.encounterId !== shown.encounterId ||
+        JSON.stringify(current.encounter) !== JSON.stringify(shown.encounter) ||
+        JSON.stringify(current.draft) !== JSON.stringify(shown.draft) ||
+        (current.note && shown.note ? !sameNoteSnapshot(current.note, shown.note) : current.note !== shown.note)
       )
-        return false;
+        throw new NoteDraftConflict();
+      const origin = encodeNoteOrigin(initialNoteOrigin(current.draft.patientId, current.note, current.encounterId));
+      tx.update(noteDrafts)
+        .set({ ...fields, origin, revision: current.draft.revision + 1, ...touch() })
+        .where(eq(noteDrafts.id, current.draft.id))
+        .run();
+      auditInTransaction(tx, 'note.draftRebased', { entityType: 'note_draft', entityId: current.draft.id }, new Date());
+      return tx.select().from(noteDrafts).where(eq(noteDrafts.id, current.draft.id)).get()!;
+    }),
+  );
+}
+
+/** The draft is no longer wanted: saved into a note, or thrown away. */
+export async function discardNoteDraft(
+  id: string,
+  generation = datasetGeneration(),
+  expectedRevision?: number,
+): Promise<void> {
+  await withDatasetWrite(generation, async () => {
+    db.transaction((tx) => {
+      const current = tx
+        .select()
+        .from(noteDrafts)
+        .where(and(eq(noteDrafts.id, id), alive))
+        .get();
+      if (!current) return;
+      if (
+        !Number.isSafeInteger(current.revision) ||
+        current.revision < 0 ||
+        current.revision >= Number.MAX_SAFE_INTEGER ||
+        (expectedRevision !== undefined && current.revision !== expectedRevision)
+      )
+        throw new NoteDraftConflict();
       requireNoPendingDraftRecording(tx, id);
-      tx.update(noteDrafts).set(softDelete()).where(eq(noteDrafts.id, id)).run();
-      return true;
+      const now = new Date();
+      tx.update(noteDrafts)
+        .set({ ...softDelete(now), revision: current.revision + 1 })
+        .where(eq(noteDrafts.id, id))
+        .run();
+      auditInTransaction(tx, 'note.draftDiscarded', { entityType: 'note_draft', entityId: id }, now);
     });
-    if (changed) await audit('note.draftDiscarded', { entityType: 'note_draft', entityId: id });
   });
 }
 

@@ -33,6 +33,54 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-09 — Persist note origin and exact raw recovery (0.11.50 source)
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint; preceding `a1aeaaa`.
+
+**Changed**
+- Reproduced two .49 data-integrity regressions: an outpatient draft attached
+  to a later admission, and a reopened older draft overwrote a newer correction.
+  Migration0028 persists the original Note/encounter basis, raw date/clock and
+  revision. Publication, raw writes and discard check that ownership/revision.
+- Legacy/conflicting drafts require full visible comparison and exact-row
+  adoption. Adoption changes the raw draft only; clinical Save stays separate.
+  Cancelled, delayed and old-dataset confirmations cannot rebase another intent.
+- Reproduced identical routes for different unfinished cards. Each card now
+  selects its own scoped draft ID; a missing/foreign ID cannot fall back to
+  another draft. Loaded/completed editor parents remain mounted on retirement.
+- No new dependency, permission, page or backup scheme. Version .50/code66.
+  Added the accepted historical .49 emulator report in `validation-0.11.49.md`.
+
+**Verified**
+- Full `npm run check`:159 suites/2,243 application tests and five workflows;
+  typecheck/lint/both formatting checks green without warnings. Reproduction,
+  real migrated-SQLite conflict/audit rollback, actual mounted-editor lifecycle
+  and old/current backup-import checks run. Regeneration adds no schema changes.
+- .49 native note/history ownership, exact intended version restore and
+  acknowledged base restore/cold export pass. Independent archives preserve
+  all4,117 original rows/49 tables/34 media; details and rejected observers are
+  in its report. Hosted .49 exact-source CI succeeds. Open PR heads1–5 unchanged.
+
+**Not verified**
+- .50 native acceptance/hosted CI/owner arm64 build and physical phone are
+  pending at this source checkpoint. `dist/` remains .39. No claim of crash-free
+  operation, power safety, full-shift timing or second-device recovery.
+
+**Open threads**
+- Finish .50 frozen-source native recovery and old/current schema witnesses.
+  Use one owned serial; the previously used5556 was absent at the fresh inventory.
+- Follow `IMPLEMENTATION.md`:eight raw manual forms, correction/trash/rich-text
+  and complete clinical workflows remain; phone testing is not the sole gate.
+
+**Gotchas**
+- Raw legacy drafts have null origin and must be reviewed; never manufacture a
+  current basis on reopen. Invalid visible date text is not its prior timestamp.
+- Component header options are mocked, so use the actual bottom action label
+  in tests. A missing test locator is not an observed app failure.
+
+---
+
 ## 2026-10-09 — Scope note readers and fence version restoration (0.11.49 source)
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.

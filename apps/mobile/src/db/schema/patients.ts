@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+import type { DateTimeInput } from '@/lib/date-input';
 import { BLOOD_SUGAR_UNITS } from '@/lib/glucose-unit';
 
 import { baseColumns, bool, isoDate, jsonList } from './_shared';
@@ -375,6 +376,11 @@ export const noteDrafts = sqliteTable(
       .references(() => patients.id, { onDelete: 'cascade' }),
     /** The note being edited, or null for one not yet created. */
     noteId: text('note_id').references(() => notes.id, { onDelete: 'cascade' }),
+    /** Versioned original chart/encounter/basis. Null means a legacy draft needs explicit review. */
+    origin: text('origin'),
+    /** Exact visible date/clock, including incomplete input; not a clinical timestamp. */
+    rawDate: text('raw_date', { mode: 'json' }).$type<DateTimeInput>(),
+    revision: integer('revision').notNull().default(0),
 
     type: text('type', { enum: NOTE_TYPES })
       .notNull()

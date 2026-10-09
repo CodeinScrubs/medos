@@ -5,6 +5,52 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## A recovered note retains its original basis (0.11.50)
+
+Migration0028 adds three columns to `note_drafts`: nullable versioned `origin`,
+nullable `raw_date` and SQL-defaulted `revision=0`. The origin contains the
+original patient/note, encounter (including an explicit null), and the complete
+published Note basis with sorted keys and exact timestamp milliseconds. A new
+editor captures its encounter before typing; a recovered draft never derives a
+new origin from the currently opened chart. Known closed encounters retain their
+historical association. Missing, deleted or foreign encounters refuse publication.
+
+Raw date/clock text survives incomplete or invalid editing. Publication validates
+that persisted text rather than silently using the previous parsed timestamp.
+Unchanged visible date/clock retains the timestamp's original seconds and
+milliseconds. A malformed imported raw shape remains visible and invalid instead
+of crashing the date widget. Ordinary whole-draft writes compare the acknowledged
+revision; publication and discard compare it again. Soft discard and its id-only
+audit commit together. Raw revisions are concurrency receipts, not permanent
+clinical history.
+
+Legacy drafts have no invented origin after upgrade or old-backup import. They
+remain readable and require explicit comparison before editing/publication. The
+failure-only comparison shows the current published fields, exact persisted raw
+draft and the destination encounter; local input remains in the mounted form.
+Keeping local input compares every shown draft/Note/encounter row, updates only
+the raw draft origin/fields/revision and records an id-only audit atomically.
+It never publishes the chart. A later separate Save performs clinical publication.
+Changed shown rows, cancellation, replacement, route/focus loss, unmount and
+repeated confirmations refuse late adoption. Corrupt/future origins are not
+guessed; text remains available for copying.
+
+Multiple writing intents can retain different draft IDs for one patient/note.
+Unfinished-note cards now carry the selected ID, and reads validate that ID's
+patient/note scope. Missing or foreign selections do not fall back to a different
+draft. The first seed and native screen/header parent survive later retirement;
+route reuse does not remount away the original input. Shared stopped-voice
+ownership and the one AutosaveScope remain unchanged.
+
+**Rejected: rebasing on reopen, timestamp-only equality, guessed invalid dates,
+and one generic latest-draft route for every recovery card.** These can replace a
+newer correction, attach an outpatient note to a later admission or hide the
+chosen draft. No dependency, permission, new page or backup-format change is
+needed. Old/current import, migrated SQLite and mounted-component checks cover
+the software contract; native/power/phone evidence remains separate.
+
+---
+
 ## Note editing and history belong to one chart (0.11.49)
 
 The single-note and version readers require the route's patient ID and join the
