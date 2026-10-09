@@ -17,11 +17,18 @@ import { ConsultsBrief } from '@/features/consults/consults-brief';
 import { patientConsultsQuery } from '@/features/consults/queries';
 import { admissionElapsed, formatAdmissionElapsed } from '@/features/encounters/logic';
 import { locationLabel } from '@/features/encounters/status';
+import { isRunning, orderSig, therapyDay } from '@/features/kardex/logic';
+import { patientOrdersQuery } from '@/features/kardex/queries';
+import { FLAG_LABEL, flagTone } from '@/features/labs/flags';
+import { labsToReview } from '@/features/labs/logic';
+import { patientLabValuesQuery } from '@/features/labs/queries';
 import { notePreview } from '@/features/notes/logic';
 import { latestPatientNoteQuery } from '@/features/notes/queries';
 import { AllergyBanner } from '@/features/patients/patient-header';
 import { TasksSection } from '@/features/tasks/tasks-section';
-import { formatJalaliDateTime } from '@/lib/jalali';
+import { vitalChips } from '@/features/vitals/logic';
+import { patientVitalsQuery } from '@/features/vitals/queries';
+import { formatJalaliDateTime, formatRelativeTime } from '@/lib/jalali';
 import { fullName, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
@@ -278,7 +285,24 @@ function RoundCard({ row }: { row: RoundRow }) {
     error: consultsError,
     retry: retryConsults,
   } = useLive(patientConsultsQuery(patient.id), [patient.id]);
+  const {
+    data: vitals,
+    error: vitalsError,
+    retry: retryVitals,
+  } = useLive(patientVitalsQuery(patient.id, 1), [patient.id]);
+  const {
+    data: orders,
+    error: ordersError,
+    retry: retryOrders,
+  } = useLive(patientOrdersQuery(patient.id, encounter?.id ?? null), [patient.id, encounter?.id]);
+  const { data: labs, error: labsError, retry: retryLabs } = useLive(patientLabValuesQuery(patient.id), [patient.id]);
+
   const lastNote = (notes ?? [])[0] ?? null;
+  const lastVital = vitals?.[0] ?? null;
+  const chips = lastVital ? vitalChips(lastVital) : [];
+  const runningOrders = (orders ?? []).filter(isRunning);
+  const reviewedLabs = labsToReview(labs ?? []);
+
   const where = locationLabel(encounter ?? undefined);
   const elapsed =
     encounter && !encounter.isActive && !encounter.dischargedAt
@@ -341,6 +365,109 @@ function RoundCard({ row }: { row: RoundRow }) {
         </Column>
       </Card>
 
+      <ErrorNotice error={vitalsError} what="علائم حیاتی" onRetry={retryVitals} />
+      {lastVital && chips.length > 0 ? (
+        <Card tone="alt">
+          <Column gap="xxs">
+            <Row justify="space-between" align="center">
+              <Row gap="xs" align="center">
+                <Ionicons name="pulse" size={16} color={colors.primary} />
+                <Text variant="captionStrong">علائم حیاتی</Text>
+              </Row>
+              <Text variant="tiny" color="textFaint">
+                {formatRelativeTime(lastVital.measuredAt, new Date(now))}
+              </Text>
+            </Row>
+            <Row gap="md" wrap style={{ marginTop: spacing.xxs }}>
+              {chips.map((chip) => (
+                <Row key={chip.key} gap="xxs" align="baseline">
+                  <Text variant="tiny" color="textMuted">
+                    {chip.label}:
+                  </Text>
+                  <Text numeric variant="bodyStrong">
+                    {chip.value}
+                  </Text>
+                </Row>
+              ))}
+            </Row>
+          </Column>
+        </Card>
+      ) : null}
+
+      <ErrorNotice error={ordersError} what="کاردکس" onRetry={retryOrders} />
+      {runningOrders.length > 0 ? (
+        <Card tone="alt">
+          <Column gap="xxs">
+            <Row justify="space-between" align="center">
+              <Row gap="xs" align="center">
+                <Ionicons name="medical" size={16} color={colors.primary} />
+                <Text variant="captionStrong">داروهای جاری ({toPersianDigits(runningOrders.length)})</Text>
+              </Row>
+            </Row>
+            <Column gap="xs" style={{ marginTop: spacing.xxs }}>
+              {runningOrders.slice(0, 5).map((o) => {
+                const day = therapyDay(o, new Date(now));
+                const sig = orderSig(o);
+                return (
+                  <Row key={o.id} justify="space-between" align="baseline">
+                    <Row gap="xs" align="baseline" style={{ flex: 1 }}>
+                      <Text variant="bodyStrong" ltr numberOfLines={1}>
+                        {o.name}
+                      </Text>
+                      {sig ? (
+                        <Text variant="caption" color="textMuted" ltr numberOfLines={1}>
+                          {sig}
+                        </Text>
+                      ) : null}
+                    </Row>
+                    {day != null ? <Badge label={`روز ${toPersianDigits(day)}`} tone="neutral" /> : null}
+                  </Row>
+                );
+              })}
+              {runningOrders.length > 5 ? (
+                <Text variant="tiny" color="textFaint">
+                  و {toPersianDigits(runningOrders.length - 5)} دستور دیگر در کاردکس
+                </Text>
+              ) : null}
+            </Column>
+          </Column>
+        </Card>
+      ) : null}
+
+      <ErrorNotice error={labsError} what="آزمایش‌ها" onRetry={retryLabs} />
+      {reviewedLabs.rows.length > 0 ? (
+        <Card tone="alt">
+          <Column gap="xxs">
+            <Row justify="space-between" align="center">
+              <Row gap="xs" align="center">
+                <Ionicons name="flask" size={16} color={colors.warning} />
+                <Text variant="captionStrong">آزمایش‌های هشدار</Text>
+              </Row>
+              {reviewedLabs.latestAt ? (
+                <Text variant="tiny" color="textFaint">
+                  {formatRelativeTime(reviewedLabs.latestAt, new Date(now))}
+                </Text>
+              ) : null}
+            </Row>
+            <Row gap="sm" wrap style={{ marginTop: spacing.xxs }}>
+              {reviewedLabs.rows.slice(0, 6).map((r) => (
+                <Row key={r.value.id} gap="xxs" align="center">
+                  <Text variant="captionStrong" ltr>
+                    {r.value.analyte}:
+                  </Text>
+                  <Text numeric variant="captionStrong">
+                    {r.value.value}
+                  </Text>
+                  {r.value.flag ? (
+                    <Badge label={FLAG_LABEL[r.value.flag]} tone={flagTone(r.value.flag) ?? undefined} />
+                  ) : null}
+                </Row>
+              ))}
+            </Row>
+          </Column>
+        </Card>
+      ) : null}
+
       <ErrorNotice error={notesError} what="آخرین نوت" onRetry={retryNotes} />
       {notesError || notes === undefined ? null : lastNote ? (
         <Card tone="alt">
@@ -379,6 +506,28 @@ function RoundCard({ row }: { row: RoundRow }) {
           onPress={() =>
             void scope.perform(() =>
               router.push({ pathname: '/patient/[id]/note', params: { id: patient.id, type: 'progress' } }),
+            )
+          }
+        />
+        <Button
+          label="علائم"
+          icon="pulse-outline"
+          variant="secondary"
+          size="sm"
+          onPress={() =>
+            void scope.perform(() =>
+              router.push({ pathname: '/patient/[id]', params: { id: patient.id, tab: 'vitals' } }),
+            )
+          }
+        />
+        <Button
+          label="کاردکس"
+          icon="medical-outline"
+          variant="secondary"
+          size="sm"
+          onPress={() =>
+            void scope.perform(() =>
+              router.push({ pathname: '/patient/[id]', params: { id: patient.id, tab: 'kardex' } }),
             )
           }
         />
