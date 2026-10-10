@@ -9,6 +9,9 @@ import { auditLog } from './schema';
  * happened to that record, and when" without trusting memory.
  */
 export type AuditAction =
+  | 'workspace.formPublished'
+  | 'workspace.draftDiscarded'
+  | 'workspace.draftRebased'
   | 'patient.deleted'
   | 'patient.restored'
   | 'capture.restored'

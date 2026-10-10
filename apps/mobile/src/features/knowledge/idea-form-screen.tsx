@@ -1,15 +1,22 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
-import { EditGate } from '@/components/edit-gate';
-import { alertError, notify } from '@/components/feedback';
+import { AutosaveScope } from '@/components/autosave-scope';
+import { ErrorNotice } from '@/components/error-notice';
+import { notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen } from '@/components/ui';
 import type { Idea } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { WorkspaceFormGate } from '@/features/workspace-forms/form-gate';
+import { WorkspaceFormDiscard, WorkspaceFormStatus } from '@/features/workspace-forms/form-status';
+import type { FormSeed } from '@/features/workspace-forms/types';
+import { useWorkspaceForm } from '@/features/workspace-forms/use-form';
 import { useTheme } from '@/theme';
 
-import { createIdea, ideaQuery, suggestIdeaAreas, updateIdea } from './ideas-queries';
+import type { IdeaFormFields } from './form-draft';
+import { ideaFormPort } from './form-draft-queries';
+import { ideaAreasQuery } from './ideas-queries';
 import { IDEA_KIND_LABELS, IDEA_PRIORITY_LABELS, IDEA_STATUS_LABELS, IDEA_STATUS_ORDER } from './labels';
 
 const KIND_OPTIONS = (Object.keys(IDEA_KIND_LABELS) as Idea['kind'][]).map((k) => ({
@@ -24,81 +31,123 @@ const PRIORITY_OPTIONS = (Object.keys(IDEA_PRIORITY_LABELS) as Idea['priority'][
 
 /** Add or edit an idea. Param: optional `ideaId`. */
 export function IdeaFormScreen() {
-  const { ideaId } = useLocalSearchParams<{ ideaId?: string }>();
-  const { data, error, retry } = useLive(ideaQuery(ideaId ?? ''), [ideaId]);
+  const { ideaId, draftId } = useLocalSearchParams<{ ideaId?: string; draftId?: string }>();
   return (
-    <EditGate editing={Boolean(ideaId)} rows={data} error={error} onRetry={retry} what="ایده">
-      {(idea, readNotice) => <IdeaForm readNotice={readNotice} idea={idea} />}
-    </EditGate>
+    <AutosaveScope>
+      <WorkspaceFormGate port={ideaFormPort} recordId={ideaId ?? null} draftId={draftId ?? null}>
+        {(seed, readNotice, unavailable) => <IdeaForm readNotice={readNotice} seed={seed} unavailable={unavailable} />}
+      </WorkspaceFormGate>
+    </AutosaveScope>
   );
 }
 
-function IdeaForm({ idea, readNotice }: { readNotice: ReactNode; idea: Idea | null }) {
+function IdeaForm({
+  seed,
+  readNotice,
+  unavailable,
+}: {
+  readNotice: ReactNode;
+  seed: FormSeed<Idea, IdeaFormFields>;
+  unavailable: boolean;
+}) {
   const router = useRouter();
   const { spacing } = useTheme();
 
-  const [title, setTitle] = useState(idea?.title ?? '');
-  const [body, setBody] = useState(idea?.body ?? '');
-  const [kind, setKind] = useState<Idea['kind']>(idea?.kind ?? 'feature');
-  const [status, setStatus] = useState<Idea['status']>(idea?.status ?? 'inbox');
-  const [priority, setPriority] = useState<Idea['priority']>(idea?.priority ?? 'normal');
-  const [area, setArea] = useState(idea?.area ?? '');
-  const [areas, setAreas] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  // The areas used before, so the field is a tap rather than typing the same
-  // word again. Read once: the list only changes when an idea is saved.
-  useEffect(() => {
-    void suggestIdeaAreas().then(setAreas);
-  }, []);
-
-  async function save() {
-    if (!title.trim()) {
-      notify('عنوان لازم است');
+  const editing = useWorkspaceForm(ideaFormPort, seed, unavailable, () => router.back());
+  const { title, body, kind, status, priority, area } = editing.document.fields;
+  const isEditing = seed.document.recordId !== null;
+  const { data: areaRows, error: areaError, retry: retryAreas } = useLive(ideaAreasQuery());
+  const areas = (areaRows ?? []).map((row) => row.area).filter((value): value is string => !!value);
+  function save() {
+    if (editing.completed || editing.stale) {
+      editing.close();
       return;
     }
-    setSaving(true);
-    try {
-      const payload = { title, body, kind, status, priority, area };
-      if (idea) await updateIdea(idea.id, payload);
-      else await createIdea(payload);
-      router.back();
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      setSaving(false);
-    }
+    void editing.save((fields) => {
+      if (!fields.title.trim()) {
+        notify('عنوان لازم است');
+        return false;
+      }
+      return true;
+    });
   }
 
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: idea ? 'ویرایش ایده' : 'ایده‌ی جدید' }} />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <ScreenOptions options={{ title: isEditing ? 'ویرایش ایده' : 'ایده‌ی جدید' }} />
+      <Column
+        collapsable={false}
+        gap="md"
+        style={{ paddingTop: spacing.md }}
+        pointerEvents={editing.busy ? 'none' : 'auto'}
+      >
         {readNotice}
-        <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="در یک جمله" />
-        <Input label="توضیح" value={body} onChangeText={setBody} multiline />
-        <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
-        <ChipSelect label="وضعیت" options={STATUS_OPTIONS} value={status} onChange={(v) => v && setStatus(v)} />
-        <ChipSelect label="اولویت" options={PRIORITY_OPTIONS} value={priority} onChange={(v) => v && setPriority(v)} />
+        <WorkspaceFormStatus port={ideaFormPort} editing={editing} />
+        <Input
+          label="عنوان"
+          required
+          value={title}
+          editable={!editing.locked}
+          onChangeText={(title) => editing.change({ title })}
+          placeholder="در یک جمله"
+        />
+        <Input
+          label="توضیح"
+          value={body}
+          editable={!editing.locked}
+          onChangeText={(body) => editing.change({ body })}
+          multiline
+        />
+        <ChipSelect
+          label="نوع"
+          disabled={editing.locked}
+          options={KIND_OPTIONS}
+          value={kind}
+          onChange={(v) => v && editing.change({ kind: v })}
+        />
+        <ChipSelect
+          label="وضعیت"
+          disabled={editing.locked}
+          options={STATUS_OPTIONS}
+          value={status}
+          onChange={(v) => v && editing.change({ status: v })}
+        />
+        <ChipSelect
+          label="اولویت"
+          disabled={editing.locked}
+          options={PRIORITY_OPTIONS}
+          value={priority}
+          onChange={(v) => v && editing.change({ priority: v })}
+        />
+        <ErrorNotice error={areaError} what="بخش‌های قبلی" onRetry={retryAreas} />
         {areas.length > 0 ? (
           <ChipSelect
             label="بخش"
             options={areas.map((a) => ({ value: a, label: a }))}
             value={areas.includes(area) ? area : null}
-            onChange={(v) => setArea(v ?? '')}
+            onChange={(v) => editing.change({ area: v ?? '' })}
+            disabled={editing.locked}
             allowDeselect
           />
         ) : null}
-        <Input label="کدام بخش اپ" value={area} onChangeText={setArea} placeholder="کاردکس، آزمایش، بکاپ…" />
+        <Input
+          label="کدام بخش اپ"
+          value={area}
+          editable={!editing.locked}
+          onChangeText={(area) => editing.change({ area })}
+          placeholder="کاردکس، آزمایش، بکاپ…"
+        />
 
         <Button
-          label={idea ? 'ذخیره' : 'ثبت ایده'}
+          label={editing.completed || editing.stale ? 'بستن' : isEditing ? 'ذخیره' : 'ثبت ایده'}
           icon="checkmark"
           onPress={() => void save()}
-          loading={saving}
+          loading={editing.busy}
+          disabled={editing.busy || (editing.locked && !editing.completed && !editing.stale)}
           full
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="بستن" variant="ghost" disabled={editing.busy} onPress={editing.close} full haptic={false} />
+        <WorkspaceFormDiscard editing={editing} />
       </Column>
     </Screen>
   );

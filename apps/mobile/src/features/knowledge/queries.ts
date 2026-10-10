@@ -1,6 +1,6 @@
-import { and, desc, eq, isNull, type SQL } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { doctors, specialties, topics } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { doctorDisplayName } from '@/features/doctors/logic';
@@ -52,6 +52,27 @@ export function topicQuery(id: string) {
     .limit(1);
 }
 
+/** Read only the selected references, including archived historical links.
+ * Archived rows remain visible here but never become picker choices.
+ */
+export function topicReferencesQuery(taughtById: string | null, specialtyId: string | null) {
+  return db
+    .select({
+      teacher: {
+        id: doctors.id,
+        title: doctors.title,
+        firstName: doctors.firstName,
+        lastName: doctors.lastName,
+        deletedAt: doctors.deletedAt,
+      },
+      specialty: { id: specialties.id, nameFa: specialties.nameFa, deletedAt: specialties.deletedAt },
+    })
+    .from(sql`(select 1) as topic_references`)
+    .leftJoin(doctors, taughtById === null ? sql`0` : eq(doctors.id, taughtById))
+    .leftJoin(specialties, specialtyId === null ? sql`0` : eq(specialties.id, specialtyId))
+    .limit(1);
+}
+
 export type TopicInput = {
   title: string;
   specialtyId?: string | null;
@@ -69,21 +90,32 @@ export type TopicInput = {
 };
 
 /** The teacher's name and the specialty's names, so both are searchable. */
-async function relatedWords(input: { specialtyId?: string | null; taughtById?: string | null }): Promise<string[]> {
+function relatedWords(
+  tx: DbTransaction,
+  input: { specialtyId?: string | null; taughtById?: string | null },
+  previous?: { specialtyId: string | null; taughtById: string | null },
+): string[] {
   const words: string[] = [];
   if (input.taughtById) {
-    const row = (
-      await db
-        .select({ title: doctors.title, firstName: doctors.firstName, lastName: doctors.lastName })
-        .from(doctors)
-        .where(eq(doctors.id, input.taughtById))
-        .limit(1)
-    )[0];
-    if (row) words.push(doctorDisplayName(row));
+    const row = tx
+      .select({
+        title: doctors.title,
+        firstName: doctors.firstName,
+        lastName: doctors.lastName,
+        deletedAt: doctors.deletedAt,
+      })
+      .from(doctors)
+      .where(eq(doctors.id, input.taughtById))
+      .get();
+    if (!row || (row.deletedAt !== null && input.taughtById !== previous?.taughtById))
+      throw new Error('استاد انتخاب‌شده در دسترس نیست.');
+    words.push(doctorDisplayName(row));
   }
   if (input.specialtyId) {
-    const row = (await db.select().from(specialties).where(eq(specialties.id, input.specialtyId)).limit(1))[0];
-    if (row) words.push(row.nameFa, row.nameEn ?? '', ...(row.aliases ?? []));
+    const row = tx.select().from(specialties).where(eq(specialties.id, input.specialtyId)).get();
+    if (!row || (row.deletedAt !== null && input.specialtyId !== previous?.specialtyId))
+      throw new Error('تخصص انتخاب‌شده در دسترس نیست.');
+    words.push(row.nameFa, row.nameEn ?? '', ...(row.aliases ?? []));
   }
   return words.filter(Boolean);
 }
@@ -106,38 +138,48 @@ function values(input: TopicInput) {
   };
 }
 
-export async function createTopic(input: TopicInput): Promise<string> {
+export function createTopicInTransaction(tx: DbTransaction, input: TopicInput, now: Date): string {
   const id = newId();
   const row = values(input);
-  await db.insert(topics).values({
-    id,
-    ...stamps(),
-    ...row,
-    searchText: topicSearchText(row, await relatedWords(row)),
-  });
+  tx.insert(topics)
+    .values({
+      id,
+      ...stamps(now),
+      ...row,
+      searchText: topicSearchText(row, relatedWords(tx, row)),
+    })
+    .run();
   return id;
 }
 
-export async function updateTopic(id: string, patch: Partial<TopicInput>): Promise<void> {
-  const current = (
-    await db
-      .select()
-      .from(topics)
-      .where(and(alive, eq(topics.id, id)))
-      .limit(1)
-  )[0];
-  if (!current) throw new Error(`Topic ${id} not found`);
+export function updateTopicInTransaction(tx: DbTransaction, id: string, patch: Partial<TopicInput>, now: Date): void {
+  const current = tx
+    .select()
+    .from(topics)
+    .where(and(alive, eq(topics.id, id)))
+    .get();
+  if (!current) throw new Error('مبحث در دسترس نیست.');
   // Rebuilt from the merged row, never from the patch: editing only the title
   // must not drop the body out of the index.
-  const merged = { ...current, ...values({ ...current, ...patch } as TopicInput) };
-  await db
-    .update(topics)
+  const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const row = values({ ...current, ...defined, tags: patch.tags ?? current.tags ?? [] });
+  const merged = { ...current, ...row };
+  tx.update(topics)
     .set({
-      ...values({ ...current, ...patch } as TopicInput),
-      searchText: topicSearchText(merged, await relatedWords(merged)),
-      ...touch(),
+      ...row,
+      // Keep an existing archived relationship; reject a newly selected one.
+      searchText: topicSearchText(merged, relatedWords(tx, merged, current)),
+      ...touch(now),
     })
-    .where(and(alive, eq(topics.id, id)));
+    .where(and(alive, eq(topics.id, id)))
+    .run();
+}
+
+export async function createTopic(input: TopicInput): Promise<string> {
+  return db.transaction((tx) => createTopicInTransaction(tx, input, new Date()));
+}
+export async function updateTopic(id: string, patch: Partial<TopicInput>): Promise<void> {
+  db.transaction((tx) => updateTopicInTransaction(tx, id, patch, new Date()));
 }
 
 /** Mark a subject reviewed: the flag comes off and the date is stamped. */

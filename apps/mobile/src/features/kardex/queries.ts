@@ -5,6 +5,7 @@ import { db, type Database } from '@/db/client';
 import { encounters, orders, patients, type Order } from '@/db/schema';
 import { startsWith } from '@/db/search';
 import { currentEncounterQuery, resolveActiveEncounterId } from '@/features/encounters/queries';
+import { activeEncounterIdQuery } from '@/features/encounters/status';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -26,7 +27,9 @@ export function patientOrdersQuery(patientId: string, encounterId: string | null
       and(
         alive,
         eq(orders.patientId, patientId),
-        encounterId ? or(eq(orders.encounterId, encounterId), isNull(orders.encounterId)) : isNull(orders.encounterId),
+        encounterId !== null
+          ? or(eq(orders.encounterId, encounterId), isNull(orders.encounterId))
+          : isNull(orders.encounterId),
       ),
     )
     .orderBy(asc(orders.sortOrder), desc(orders.startAt));
@@ -72,6 +75,19 @@ export function orderQuery(id: string, patientId?: string) {
     .limit(1);
 }
 
+export type OrderCreationContext = { patientId: string; encounterId: string | null };
+
+/** Capture the active episode once, including an explicit outpatient null, before typing. */
+export function orderCreationContextQuery(patientId: string) {
+  const activeId = activeEncounterIdQuery(patientId);
+  return db
+    .select({ patientId: patients.id, encounterId: encounters.id })
+    .from(patients)
+    .leftJoin(encounters, inArray(encounters.id, activeId))
+    .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+    .limit(1);
+}
+
 export type OrderInput = {
   patientId: string;
   kind: Order['kind'];
@@ -89,10 +105,21 @@ export type OrderInput = {
   notes?: string | null;
 };
 
-export async function createOrder(input: OrderInput, generation = datasetGeneration()): Promise<string> {
+export async function createOrder(
+  input: OrderInput,
+  generation = datasetGeneration(),
+  originalContext?: OrderCreationContext,
+): Promise<string> {
   return withDatasetWrite(generation, async () => {
     return db.transaction((tx) => {
-      requireOrderPatient(tx, input.patientId);
+      // Immediate callers may resolve now; mounted forms must pass their original snapshot.
+      // A captured null is meaningful and must never fall back to a later admission.
+      const context = originalContext ?? {
+        patientId: input.patientId,
+        encounterId: resolveActiveEncounterId(input.patientId, tx),
+      };
+      if (context.patientId !== input.patientId) throw new Error('مسیر بیمار تغییر کرده است.');
+      requireOrderContext(tx, context);
       const id = newId(),
         now = new Date();
       tx.insert(orders)
@@ -100,7 +127,7 @@ export async function createOrder(input: OrderInput, generation = datasetGenerat
           id,
           ...stamps(now),
           patientId: input.patientId,
-          encounterId: resolveActiveEncounterId(input.patientId, tx),
+          encounterId: context.encounterId,
           kind: input.kind,
           name: input.name.trim(),
           brandName: input.brandName ?? null,
@@ -175,9 +202,15 @@ function requireOrderPatient(reader: Pick<Database, 'select'>, patientId: string
   if (!patient) throw new Error('پروندهٔ بیمار در دسترس نیست.');
 }
 
-function requireOrderContext(reader: Pick<Database, 'select'>, order: Order, currentPatientId?: string): void {
+function requireOrderContext(
+  reader: Pick<Database, 'select'>,
+  order: OrderCreationContext,
+  currentPatientId?: string,
+): void {
   requireOrderPatient(reader, order.patientId);
-  if (order.encounterId) {
+  // SQLite permits an imported empty-string key. Only null means no episode;
+  // every stored reference must still belong to this live patient.
+  if (order.encounterId !== null) {
     const encounter = reader
       .select({ id: encounters.id })
       .from(encounters)

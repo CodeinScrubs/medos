@@ -5,6 +5,91 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## A new Kardex form owns its original active episode (0.11.52)
+
+One watched SQLite read captures the live patient and active encounter before
+the new form becomes editable. No active encounter means an explicit null;
+the latest historical encounter is not substituted. The mounted form retains
+that snapshot through later admissions and passes it with its original dataset
+generation into `createOrder`. Its synchronous transaction verifies the patient
+and original live encounter belong together before insertion. A discharged but
+still-live original encounter remains an explicit historical association.
+Immediate non-editor callers retain the existing transactional active lookup.
+
+The allergy banner may refresh with a correction in the same dataset. Only its
+last successfully owned display text is retained across restore; replacement
+patient data cannot appear beside old typed order fields. Publication remains
+locked for stale/read-failed/route-changed contexts, without remounting the
+native form parents. Unknown start times remain unknown.
+
+**Rejected: resolving the newest admission at Save, silently replacing null,
+or freezing allergies against ordinary same-dataset corrections.** This fixes
+association/display boundaries only. It does not implement raw Kardex recovery,
+permanent order history or order-trash restoration. Those remain separate gates
+in IMPLEMENTATION; evidence is in validation-0.11.52.
+
+---
+
+## Shared raw recovery for workspace forms (0.11.51)
+
+Idea and teaching-topic forms pilot one bounded lifecycle in
+`features/workspace-forms/`. Features own strict raw-field codecs, their display
+descriptions and synchronous publishers. Shared code owns loading, draft CAS,
+publication receipts, removal/background flush and explicit conflict recovery.
+The existing routes and fields remain; three recovery links with replaceable
+cursor pages live in each existing list. Destructive draft controls follow the
+writing controls rather than appearing above them.
+
+Migration0029 adds `workspace_form_drafts`. Kind and a JSON tuple of parent/
+record ids identify the one open scope, including a distinct new-record null.
+No foreign key can erase raw input when its published target disappears. Raw
+documents contain their version, exact input, original context and a complete
+canonical published basis; date milliseconds and whitespace are preserved.
+Revision is an SQL-defaulted concurrency receipt, not permanent edit history.
+Strict parsing refuses unsupported/foreign documents without rewriting them;
+their original body remains readable/copyable and survives archive restore.
+Old archives without the new table still restore. The frozen backup/KDF format
+is unchanged.
+
+Each mounted form retains its original route, selected draft id, seed,
+AutosaveScope and dataset generation. A selected retired draft never opens a
+different draft or blank form. Refresh/route/record errors retain typed input
+and lock publication. Raw autosave preserves an incomplete date, empty title
+and separators without publishing. Background/Back flush raw input; only the
+explicit normal Save validates and publishes. Topic date validation uses the
+visible raw date, preserves unchanged seconds/milliseconds and checks live
+teacher/specialty references in the publication transaction. An edit may retain
+its original archived teacher/specialty link; a newly selected archived or
+missing reference is refused. The form reads only its selected historical
+references separately, labels archived names and keeps them out of picker
+choices. Search rebuilds from the merged record with the same transactional
+related reads, preserving historical names when the link is retained.
+
+Publication compares the exact draft revision and complete current record,
+then publishes, soft-retires the draft, stores its receipt and writes an id-only
+audit in one synchronous transaction. Receipt replay returns the same live
+destination without creating another record. Overflow, malformed receipts,
+deleted targets and failed audit writes refuse the operation atomically.
+Conflict review reads all shown rows together. Loading or keeping local input
+requires an exact comparison and an explicit confirmation; keeping it only
+rebases the raw draft. A separate Save publishes. Confirmation ownership is
+consumed once and bound to the original focus/route/read state/dataset. The
+shared hook releases its action/removal guard before requesting route closure,
+checks focus after acknowledgments, and retains native screen/header parents.
+
+**Rejected: copying eight separate draft engines, replacing existing clinical
+draft stores, or treating a raw save as final publication.** This pilot supports
+only idea/topic forms with `parentId=null`. Adding another workspace form needs
+its own codec, query, publisher, descriptions and lifecycle/database/native
+tests. Do not plug Kardex or other clinical forms into this null-parent model:
+they must preserve the original patient/encounter, including outpatient null,
+and validate all clinical ownership before publication. Existing clinical
+stores and meaningful note history are separate contracts. Tests, native
+witnesses and remaining gates are recorded in validation-0.11.51 and
+IMPLEMENTATION; this abstraction is not a claim that all manual forms recover.
+
+---
+
 ## Today previews do not bury unfinished work (0.11.50)
 
 An actual synthetic shift showed 40 scheduled patient tasks above unfinished
@@ -2223,8 +2308,23 @@ Each selection keeps its own token: a later manual edit, newer selection, restor
 unmount, loss of context or focus makes the response inapplicable. Suggestions
 are optional user-owned history, not dose validation or treatment advice.
 
-This editor still needs raw draft/CAS recovery, explicit original new-encounter
-capture, conflict resolution and permanent correction history. The synchronous
-create query validates its live patient and resolves the active episode atomically
-at publication; this does not establish an encounter chosen when editing began.
-Do not call the manual editor autosave or process-death recovery.
+As of .52, a new editor captures its original active encounter, including null,
+in one watched patient/episode query before typing. It carries that context and
+the originating dataset generation into the synchronous insertion transaction.
+A later admission cannot redirect the order; a closed but live original episode
+remains a valid historical association. Only null means no episode: even an
+imported empty-string reference must pass the live ownership check for creation,
+edit, status and deletion. Existing immediate callers may resolve context inside
+insertion; an already-mounted editor must supply its original context.
+
+The editor retains its last successful original-dataset allergy display across
+replacement while ordinary same-dataset corrections remain live. It still needs
+raw draft/CAS recovery, explicit conflict review and permanent correction history.
+Do not call this manual editor autosave or process-death recovery. Frozen-source
+software/native/archive boundaries are in `validation-0.11.52.md`.
+As of .53, episode-specific order reads also distinguish explicit strings,
+including an imported empty key, from null. The discharge preview includes the
+requested episode and standing orders; null selects standing orders alone.
+Discharge's bulk order update requires both that episode and its patient. An
+inconsistent imported cross-patient link is retained unchanged rather than
+ending another patient's order or repairing/moving it implicitly.
