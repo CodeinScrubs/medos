@@ -2308,8 +2308,17 @@ Each selection keeps its own token: a later manual edit, newer selection, restor
 unmount, loss of context or focus makes the response inapplicable. Suggestions
 are optional user-owned history, not dose validation or treatment advice.
 
-This editor still needs raw draft/CAS recovery, explicit original new-encounter
-capture, conflict resolution and permanent correction history. The synchronous
-create query validates its live patient and resolves the active episode atomically
-at publication; this does not establish an encounter chosen when editing began.
-Do not call the manual editor autosave or process-death recovery.
+As of .52, a new editor captures its original active encounter, including null,
+in one watched patient/episode query before typing. It carries that context and
+the originating dataset generation into the synchronous insertion transaction.
+A later admission cannot redirect the order; a closed but live original episode
+remains a valid historical association. Only null means no episode: even an
+imported empty-string reference must pass the live ownership check for creation,
+edit, status and deletion. Existing immediate callers may resolve context inside
+insertion; an already-mounted editor must supply its original context.
+
+The editor retains its last successful original-dataset allergy display across
+replacement while ordinary same-dataset corrections remain live. It still needs
+raw draft/CAS recovery, explicit conflict review and permanent correction history.
+Do not call this manual editor autosave or process-death recovery. Frozen-source
+software/native/archive boundaries are in `validation-0.11.52.md`.

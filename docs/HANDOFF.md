@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Verify the final Kardex guard on Android and inspect its owner APK
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** application41a592b; this evidence/documentation checkpoint.
+
+**Changed**
+- Record final-source native/whole-archive/artifact evidence, refresh the current
+  ledger/reviewer entry points and reconcile the architecture's old creation note.
+  No further application, dependency, schema, permission or backup-format change.
+
+**Verified**
+- Source41a592b full check:164 suites/2,354 app tests plus five workflows;
+  typecheck/lint/formatting pass without act warnings.
+- Its inspected x86 APK is installed in place. Independent authenticated exports
+  preserve all4,117 prior rows and34 media hashes, confirm both original order
+  associations after later admissions and exactly match4,120 replacement rows.
+- Actual restore retains old form words/allergy, shows stale notice and disables
+  native input/publication; no app fatal/ANR observed in the retained PID2640 buffers.
+  Owned read-only emulator shuts down with original QCOW2 hashes unchanged.
+- Owner arm64 .52/code68 APK built/inspected from41a592b:53,407,775 bytes,
+  SHA64f29b361a38b69ed32581d4ad92165b62dac65f54a7ee0d6cf16061731d1a68.
+  Package, established signer and essential JNI pass. Details: validation-0.11.52.
+
+**Not verified**
+- Hosted CI for this final branch checkpoint awaits the normal push.
+- Physical phone, complete40-patient native timings, low-space/provider/power
+  interruptions and broader product acceptance; six manual forms still need recovery.
+
+**Open threads**
+- Push normally, verify final-head CI and refresh the existing draft PR6 description.
+- Finish D05 original-context raw recovery, then the other P0/product gates in
+  IMPLEMENTATION; phone testing is not the sole remaining work.
+
+**Gotchas**
+- Initial owner packaging fails without a lower cause. Diagnostic incremental
+  package retry and normal APK build succeed with source unchanged; cause remains
+  unestablished. Do not claim a cache/memory fix or substitute the older66dda88 APK.
+- Every archive comparison checks all intended rows/media, not counts or sampling.
+
+---
+
 ## 2026-10-10 — Close an imported empty-episode ownership bypass
 
 **Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.

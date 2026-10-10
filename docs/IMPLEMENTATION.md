@@ -33,14 +33,22 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application0.11.52/code68 adds bounded Kardex creation/display ownership to PR6.
+Application 0.11.52/code68, frozen source `41a592b`, adds bounded Kardex
+creation/display ownership to PR6.
 A new form retains its original active episode including null; publication
 checks original patient/episode/dataset together. After restore the old form
 retains its original allergy display while same-dataset corrections stay live.
-Full source checks pass164 suites/2,344 app tests and five workflows. The new
-replacement test act warning is corrected; both allergy cases pass cleanly.
-.52 hosted/native/APK acceptance is pending in
-[validation-0.11.52.md](validation-0.11.52.md). This is not raw order recovery.
+Every stored episode reference except null receives the same live ownership
+check, including an imported empty-string key. Full source checks pass 164
+suites/2,354 app tests and five workflows without act warnings. Frozen-source
+Android replay passes both later-admission scenarios and replacement restore
+with the old form retained. Independently authenticated full exports preserve
+all 4,117 prior rows and 34 media hashes on upgrade, confirm original order
+associations and exactly match the 4,120 expected replacement rows. The owner
+arm64 .52/code68 APK is built and inspected from this source. Exact-head hosted
+CI for the final branch is pending the normal push; see
+[validation-0.11.52.md](validation-0.11.52.md). This is not raw order recovery
+or physical-phone acceptance.
 
 Previous0.11.51/code67, source a541ce5 on PR6, passes163 suites/2,329
 app tests plus five workflows, with clean typecheck/lint/formatting. Exact-head

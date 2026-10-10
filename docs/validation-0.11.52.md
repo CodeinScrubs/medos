@@ -3,6 +3,11 @@
 This is a bounded clinical ownership/display correction following the .51
 workspace recovery pilot. It does not complete D05 or release acceptance.
 
+The final verified application source is `41a592b`. Its full source check,
+native replay, whole-archive comparisons and inspected owner APK pass as
+recorded below. Earlier checkpoint statements remain scoped to their own
+source; final-branch hosted CI is pending the normal push.
+
 ## Reproduction and scope
 
 Two actual mounted-screen regressions fail on the prior code: a new form opened
@@ -108,6 +113,58 @@ app tests and five workflows in166.189 Jest seconds, with clean typecheck,
 lint, formatting and no act warnings. Hosted, native and APK verification of
 this last guard remains pending at this checkpoint. Previous
 66dda88 UI/archive evidence remains explicitly attached to its own source.
+
+## Final native and owner artifact from41a592b
+
+The final x86_64 release package is 55,016,102 bytes, SHA-256
+`f51b46c95409893ad6abf8257622c847927a41f80b046e9d25edea0336b6c429`.
+It is installed in place over the retained .50 synthetic dataset, and pulled
+installed bytes match. Independent AES-GCM/scrypt decoding and migrated-SQLite
+comparison preserve every one of the 4,117 prior rows across 49 prior application
+tables, the new empty draft table and all 34 media hashes. Integrity and foreign
+keys pass. Upgrade archive SHA:
+`45e33f521b0ffb2624abfca7d7cbdd47c2191193d2f76cf311f5a9146aac90e4`.
+
+Both original-context Android scenarios are repeated against this exact source:
+an outpatient form stays null after a later admission, and an originally admitted
+form keeps its now-inactive original episode. Exact typed words remain before
+separate publication. The independent full export checks both new orders and
+admissions, two retired admission drafts, all unrelated baseline rows across 50
+application tables and every media hash. Only declared synthetic changes are
+allowed; integrity and foreign keys pass. Action archive SHA:
+`cf5315327f0596300b3e67960e1a8d1b556f4ba16e84a21bf3c1ac5076381ef9`.
+
+Actual replacement restore with an unfinished order still mounted preserves its
+exact words and original allergy label, excludes the replacement label, shows
+the stale-dataset notice and disables native input/publication controls. A new
+authenticated export exactly matches all 4,120 expected replacement rows across
+50 tables and all 34 media hashes. The replacement allergy is in the database;
+the old words were not published. Archive SHA:
+`c323c1461d1095176860b52b50dae46c90ce08d9be12dd848527a31365f96d5d`.
+
+The checked action process remains PID2640, with no observed app fatal/ANR in
+the retained buffers. System UI/GMS cold-start ANRs and observation failures are
+not reclassified as application passes or crashes. Original userdata and
+encryption QCOW2 hashes remain byte-identical after the owned read-only emulator
+shuts down. Completion observers take about59.55 and58.44 seconds for the two
+restores; these include polling and are not phase/performance measurements.
+
+`dist/MedOS-0.11.52.apk` is built from the same frozen `41a592b` application:
+53,407,775 bytes, SHA-256
+`64f29b361a38b69ed32581d4ad92165b62dac65f54a7ee0d6cf16061731d1a68`.
+Inspection confirms com.shayan.medos, version0.11.52/code68, arm64-v8a only,
+minSDK24/target36, essential JNI libraries and the established signer SHA-256
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+The QA package is private and is not the owner artifact. No physical phone is run.
+
+The first owner attempt fails at `:app:packageRelease` after6m18s with no lower
+cause in its output. A diagnostic incremental `:app:packageRelease --stacktrace`
+retry succeeds in1m38s, followed by the normal `npm run apk` in1m3s and actual
+package inspection. Source stays frozen; the first attempt had already cleaned
+the generated app build after switching ABI. No source, memory setting, signing
+or cache deletion is used to make the retry pass. The initial failure is not
+reproduced and its cause is not established. Existing Windows path and Gradle
+future-version warnings remain; a successful retry does not repair them.
 
 ## Remaining gates
 
