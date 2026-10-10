@@ -33,6 +33,48 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Keep new Kardex orders with their original episode/dataset
+
+**Agent:** GPT-6 via Codex; primary implementation and verification, no new delegation.
+**Commits:** this .52/code68 source checkpoint after .51 evidence7219d48.
+
+**Changed**
+- New manual order forms capture their original active episode, including null,
+  before typing; final insertion checks live patient/original episode ownership
+  in its synchronous transaction. Later admission does not redirect the order.
+- An old form cannot display replacement-dataset allergies beside old input.
+  Same-dataset allergy corrections remain live. Native parents remain mounted.
+- No schema/dependency/route/permission/crypto change. Scoped version edits only.
+
+**Verified**
+- Two real mounted regressions fail before the episode fix; a separate actual
+  same-ID database restore exposes mixed allergy display before correction.
+- Full check passes164 suites/2,344 app tests and five workflows in162.109 Jest
+  seconds. Typecheck/lint/formatting pass. The new test notification act warning
+  is corrected; both allergy cases pass cleanly afterward. Schema generation
+  reports no changes. Context, foreign/deleted ownership and original generation
+  are covered by migrated real SQLite and actual form handlers.
+
+**Not verified**
+- .52 hosted CI, native UI/archive acceptance and owner APK remain pending.
+  .51 native/APK evidence from a541ce5 does not witness the new .52 source.
+  No physical phone acceptance.
+
+**Open threads**
+- Freeze .52; inspect/install the x86 bytes, witness original null/old episode
+  through a later native admission and retained context after actual restore.
+  Compare complete independent exports, then build/inspect owner arm64.
+- All six manual forms still need raw recovery. This boundary correction does
+  not implement that or permanent clinical history/trash. Follow IMPLEMENTATION.
+
+**Gotchas**
+- New order creation uses active-only context, not the latest closed encounter.
+  Null is a captured association, never a nullish fallback to a later admission.
+- Full-check ref-render lint and app.json formatting failures were repaired,
+  not ignored. Preserve React act boundaries when replacing a mounted dataset.
+
+---
+
 ## 2026-10-10 — Witness .51 raw recovery, full archives and owner APK
 
 **Agent:** GPT-6 via Codex; primary native validation, no new delegation.

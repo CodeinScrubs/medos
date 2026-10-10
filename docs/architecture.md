@@ -5,6 +5,31 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## A new Kardex form owns its original active episode (0.11.52)
+
+One watched SQLite read captures the live patient and active encounter before
+the new form becomes editable. No active encounter means an explicit null;
+the latest historical encounter is not substituted. The mounted form retains
+that snapshot through later admissions and passes it with its original dataset
+generation into `createOrder`. Its synchronous transaction verifies the patient
+and original live encounter belong together before insertion. A discharged but
+still-live original encounter remains an explicit historical association.
+Immediate non-editor callers retain the existing transactional active lookup.
+
+The allergy banner may refresh with a correction in the same dataset. Only its
+last successfully owned display text is retained across restore; replacement
+patient data cannot appear beside old typed order fields. Publication remains
+locked for stale/read-failed/route-changed contexts, without remounting the
+native form parents. Unknown start times remain unknown.
+
+**Rejected: resolving the newest admission at Save, silently replacing null,
+or freezing allergies against ordinary same-dataset corrections.** This fixes
+association/display boundaries only. It does not implement raw Kardex recovery,
+permanent order history or order-trash restoration. Those remain separate gates
+in IMPLEMENTATION; evidence is in validation-0.11.52.
+
+---
+
 ## Shared raw recovery for workspace forms (0.11.51)
 
 Idea and teaching-topic forms pilot one bounded lifecycle in

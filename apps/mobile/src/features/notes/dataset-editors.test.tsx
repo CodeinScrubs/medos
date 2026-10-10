@@ -341,6 +341,78 @@ describe('exact unfinished note selection', () => {
 });
 
 describe('actual manual order form identity, pending publication and optional suggestions', () => {
+  it('a same-dataset allergy correction remains live without resetting typed words', async () => {
+    t.db.update(patients).set({ allergies: 'Original synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('نام دارو').props.onChangeText('Retained synthetic words'));
+    t.db.update(patients).set({ allergies: 'Corrected synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      tree!.update(<OrderFormScreen />);
+      await settle();
+    });
+    expect(tree!.root.findAllByProps({ text: 'Corrected synthetic allergy' })).toHaveLength(1);
+    expect(tree!.root.findAllByProps({ text: 'Original synthetic allergy' })).toHaveLength(0);
+    expect(input('نام دارو').props.value).toBe('Retained synthetic words');
+    expect(input('نام دارو').props.editable).toBe(true);
+  });
+
+  it('a same-ID dataset replacement cannot mix replacement allergies into the old order form', async () => {
+    t.db.update(patients).set({ allergies: 'Replacement synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    snapshot();
+    t.db.update(patients).set({ allergies: 'Original synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('نام دارو').props.onChangeText('Original synthetic words'));
+    const save = button('افزودن به کاردکس').props.onPress;
+    expect(tree!.root.findAllByProps({ text: 'Original synthetic allergy' })).toHaveLength(1);
+    await act(async () => {
+      replace();
+      tree!.update(<OrderFormScreen />);
+      await settle();
+      save();
+      await settle();
+    });
+    expect(tree!.root.findAllByProps({ text: 'Replacement synthetic allergy' })).toHaveLength(0);
+    expect(tree!.root.findAllByProps({ text: 'Original synthetic allergy' })).toHaveLength(1);
+    expect(input('نام دارو').props.value).toBe('Original synthetic words');
+    expect(input('نام دارو').props.editable).toBe(false);
+    expect(t.db.select().from(orders).all()).toEqual([]);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('a new form retains its original active episode, including null (%s)', async (admitted) => {
+    const originalEpisode = admitted
+      ? await openEncounter({ patientId, kind: 'admission', admittedAt: new Date('2025-01-01T12:00:00Z') })
+      : null;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('نام دارو').props.onChangeText('Synthetic original episode'));
+    const save = button('افزودن به کاردکس').props.onPress;
+    const nextEpisode = await openEncounter({
+      patientId,
+      kind: 'admission',
+      admittedAt: new Date('2025-01-03T12:00:00Z'),
+    });
+    await act(async () => {
+      tree!.update(<OrderFormScreen />);
+      await settle();
+      save();
+      await settle();
+    });
+    const rows = t.db.select().from(orders).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ patientId, encounterId: originalEpisode, name: 'Synthetic original episode' });
+    expect(rows[0]!.encounterId).not.toBe(nextEpisode);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
   it('an initial mismatched deep link cannot seed the other patient’s order', async () => {
     const other = await createPatient({ firstName: 'Synthetic', lastName: 'Foreign route' });
     const id = await createOrder({ patientId: other, kind: 'drug', name: 'Synthetic foreign order' });

@@ -10,6 +10,7 @@ import { alertError, notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Row, Screen, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
+import { useNow } from '@/components/use-now';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { AllergyBanner } from '@/features/patients/patient-header';
@@ -18,7 +19,15 @@ import { datasetGeneration } from '@/lib/dataset-write';
 import { useTheme } from '@/theme';
 
 import { FREQUENCIES, ORDER_KIND_LABELS, ROUTES } from './labels';
-import { createOrder, lastOrderNamed, orderQuery, suggestOrderNames, updateOrder } from './queries';
+import {
+  createOrder,
+  lastOrderNamed,
+  orderCreationContextQuery,
+  orderQuery,
+  suggestOrderNames,
+  updateOrder,
+  type OrderCreationContext,
+} from './queries';
 
 const KIND_OPTIONS = (['drug', 'fluid', 'diet', 'nursing', 'other'] as const).map((k) => ({
   value: k,
@@ -108,9 +117,22 @@ function OrderForm({
   const router = useRouter();
   const navigation = useNavigation();
   const { stale } = useDatasetIntent(generation);
+  // Cache only display text: live corrections may refresh it, a restore cannot.
+  const [ownedAllergy, setOwnedAllergy] = useState(patient?.allergies);
+  if (!stale && !patientError && patient && ownedAllergy !== patient.allergies) setOwnedAllergy(patient.allergies);
+  const allergy = stale ? ownedAllergy : patient?.allergies;
   const { colors, radii, spacing } = useTheme();
   const isEdit = order != null;
   const [basis] = useState(order);
+  const now = useNow();
+  const {
+    data: creationContexts,
+    error: creationError,
+    retry: retryCreation,
+  } = useLive(orderCreationContextQuery(isEdit ? '' : patientId), [patientId, isEdit]);
+  const [creationContext, setCreationContext] = useState<OrderCreationContext>();
+  if (!isEdit && !stale && !creationError && !creationContext && creationContexts?.[0])
+    setCreationContext(creationContexts[0]);
 
   const [fields, setFields] = useState<OrderFields>(() => ({
     kind: order?.kind ?? 'drug',
@@ -121,7 +143,7 @@ function OrderForm({
     rate: order?.rate ?? '',
     isPrn: order?.isPrn ?? false,
     prnCondition: order?.prnCondition ?? '',
-    startAt: order ? order.startAt : new Date(),
+    startAt: order ? order.startAt : new Date(now),
     indication: order?.indication ?? '',
     notes: order?.notes ?? '',
   }));
@@ -137,7 +159,11 @@ function OrderForm({
   const [suggestionError, setSuggestionError] = useState<Error>();
   const [prefillFailure, setPrefillFailure] = useState<{ picked: string; intent: number; error: Error }>();
   const [suggestionAttempt, setSuggestionAttempt] = useState(0);
-  const readable = patientRows !== undefined && patient != null && !patientError;
+  const readable =
+    patientRows !== undefined &&
+    patient != null &&
+    !patientError &&
+    (isEdit || (!creationError && creationContext !== undefined && !!creationContexts?.[0]));
   const contextValid = useRef(!contextChanged && !unavailable && readable);
   useLayoutEffect(() => {
     contextValid.current = !contextChanged && !unavailable && readable;
@@ -251,7 +277,10 @@ function OrderForm({
     };
     try {
       if (basis) await updateOrder(basis.id, payload, generation, basis);
-      else await createOrder({ patientId, ...payload }, generation);
+      else {
+        if (!creationContext) throw new Error('نوبت مربوط به این فرم در دسترس نیست.');
+        await createOrder({ patientId, ...payload }, generation, creationContext);
+      }
       published.current = true;
       if (mounted.current) setCompleted(true);
       if (mounted.current && navigation.isFocused()) router.back();
@@ -268,6 +297,10 @@ function OrderForm({
       <Column collapsable={false} gap="md" pointerEvents={saving ? 'none' : 'auto'} style={{ paddingTop: spacing.md }}>
         {readNotice}
         <ErrorNotice error={patientError} what="بیمار" onRetry={retryPatient} />
+        <ErrorNotice error={creationError} what="نوبت کاردکس" onRetry={retryCreation} />
+        {!patientError && patientRows !== undefined && !patient ? (
+          <Text color="danger">پروندهٔ بیمار در دسترس نیست؛ نوشته‌های روی صفحه حفظ شده‌اند.</Text>
+        ) : null}
         {contextChanged ? (
           <Text color="danger">مسیر بیمار تغییر کرده؛ این فرم فقط برای مرور نوشته‌های قبلی است.</Text>
         ) : null}
@@ -288,7 +321,7 @@ function OrderForm({
         {/* The allergy line where the order is written, not only on the record's
             header. Shown, never checked: matching a drug to an allergy class is a
             clinical rule that would need its own validation (invariant 10). */}
-        {patient ? <AllergyBanner text={patient.allergies} /> : null}
+        {allergy !== undefined ? <AllergyBanner text={allergy} /> : null}
         <ChipSelect
           label="نوع"
           disabled={locked}
@@ -448,7 +481,7 @@ function OrderForm({
               label="افزودن زمان شروع"
               disabled={locked}
               variant="ghost"
-              onPress={() => update({ startAt: new Date() })}
+              onPress={() => update({ startAt: new Date(now) })}
             />
           </Column>
         )}

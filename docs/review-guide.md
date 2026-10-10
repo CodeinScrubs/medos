@@ -80,7 +80,7 @@ Start with the newest entry in `docs/HANDOFF.md`, then its version-specific
 validation report and `docs/IMPLEMENTATION.md`. Read the exact commit named there;
 earlier test counts, PR checks and APKs are evidence for their own source only.
 
-The .51 pilot is on PR6. Read the exact application source a541ce5 and
+PR6 contains the .51 pilot and the .52 Kardex context correction. Read the exact application source a541ce5 and
 validation-0.11.51 for automated, hosted, native and inspected-APK boundaries.
 The owner arm64 artifact is built and inspected; no physical phone run is implied.
 
@@ -88,6 +88,7 @@ The owner arm64 artifact is built and inspected; no physical phone run is implie
 |---|---|---|
 | Raw workspace recovery | lib/form-document.ts; features/workspace-forms/queries.ts, form-gate.tsx, use-form.ts; knowledge/form-draft*.ts | Strict version/context; exact partial input; complete published basis and revision CAS; publication/retirement/audit atomically; adoption never publishes |
 | Historical teaching links | knowledge/queries.ts, topic-form-screen.tsx, form-drafts.test.ts, form-recovery.test.tsx | Retain an unchanged archived teacher/specialty and search names; refuse a newly selected unavailable reference; inspect selected IDs during refresh |
+| Kardex creation/display | kardex/queries.ts, order-form-screen.tsx, creation-context.test.ts; notes/dataset-editors.test.tsx | Original active episode including null, live parent checks inside insertion; retain original allergy display across restore without freezing ordinary corrections; .52 source/native evidence is separate |
 | Clinical note recovery | notes/draft-queries.ts, commit-queries.ts, note-editor-screen.tsx, dataset-editors.test.tsx | Preserve original patient/encounter including null, visible date/clock and meaningful voice; scoped draft ID; compare before publication; one original removal guard |
 | Voice/media lifetime | capture/writer.ts and queries.ts; attachments/recording-queries.ts; notes/draft-recording.test.ts | Reserve before IO; metadata acknowledgment; copied-file retry; original ownership across filing/restore; no staging-only recovery claim |
 | Native close/navigation | components/screen-options.tsx, use-save-before-leave.ts; notes/media-editors.test.tsx; validation-0.11.33/.34/.48 | Retain scroll host/native stacking parents and header presence; late acknowledgments close only the originating focused route |
