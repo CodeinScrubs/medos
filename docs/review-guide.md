@@ -80,52 +80,23 @@ Start with the newest entry in `docs/HANDOFF.md`, then its version-specific
 validation report and `docs/IMPLEMENTATION.md`. Read the exact commit named there;
 earlier test counts, PR checks and APKs are evidence for their own source only.
 
-For the 0.11.29 change, review these bounded areas:
+The .51 pilot is on PR6. Read the exact application source a541ce5 and
+validation-0.11.51 for automated, hosted, native and inspected-APK boundaries.
+The owner arm64 artifact is built and inspected; no physical phone run is implied.
 
 | Area | Read together | Principal checks |
 |---|---|---|
-| Active shift deck | `features/shifts/queries.ts`, `workspace.tsx`, `deck.ts`, `shift-card.tsx`, `shift-patient-row.tsx` | One watched snapshot; tasks belong to the pinned encounter/shift; filtering keeps pending editors mounted; reorder is an atomic compared permutation |
-| Occasion recovery | `occasion-form-draft.ts`, `occasion-form-queries.ts`, `use-occasion-form.ts`, `occasion-form-screen.tsx` | Exact raw input; synchronous publication/retirement; revision/base conflicts; one exit guard; original generation through retries/dialogs |
-| Message handover | `greeting-composer.tsx`, `messages-queries.ts`, `occasions-section.tsx` | Every channel accessible; failed opening creates no log; SQL retry does not reopen; sent time is idempotent; full history remains accessible |
-| Calendar | `lib/jalali.ts`, `lib/date-input.ts`, their tests | Strict syntax, month/leap boundaries, unsupported stored-date recovery and independent ICU comparison in the documented practical range |
+| Raw workspace recovery | lib/form-document.ts; features/workspace-forms/queries.ts, form-gate.tsx, use-form.ts; knowledge/form-draft*.ts | Strict version/context; exact partial input; complete published basis and revision CAS; publication/retirement/audit atomically; adoption never publishes |
+| Historical teaching links | knowledge/queries.ts, topic-form-screen.tsx, form-drafts.test.ts, form-recovery.test.tsx | Retain an unchanged archived teacher/specialty and search names; refuse a newly selected unavailable reference; inspect selected IDs during refresh |
+| Clinical note recovery | notes/draft-queries.ts, commit-queries.ts, note-editor-screen.tsx, dataset-editors.test.tsx | Preserve original patient/encounter including null, visible date/clock and meaningful voice; scoped draft ID; compare before publication; one original removal guard |
+| Voice/media lifetime | capture/writer.ts and queries.ts; attachments/recording-queries.ts; notes/draft-recording.test.ts | Reserve before IO; metadata acknowledgment; copied-file retry; original ownership across filing/restore; no staging-only recovery claim |
+| Native close/navigation | components/screen-options.tsx, use-save-before-leave.ts; notes/media-editors.test.tsx; validation-0.11.33/.34/.48 | Retain scroll host/native stacking parents and header presence; late acknowledgments close only the originating focused route |
+| Deck/calendar/messages | shifts/queries.ts and workspace.tsx; doctors/occasion-form-queries.ts and greeting-composer.tsx; lib/jalali.ts and date-input.ts | Matching preview/count/destination scope, explicit priority, stable order; leap dates and raw partial input; prepared is not sent |
 
-The 0.11.30 follow-up addresses actual native findings: read
-`use-occasion-form.ts` with its deferred-reminder/focus test. A late global Back
-must not pop a newer route. Shift/round use explicit safe edges only on routes
-with a native header; bottom navigation protection remains. Inline options must
-not remount the clinical editing scope. Native/software source checkpoints and
-artifact hashes stay separate in the two validation reports.
-
-For 0.11.31, read capture `writer.ts`, `queries.ts`, `capture-screen.tsx`,
-both inbox containers and `capture-card.tsx` alongside attachment
-`recording-queries.ts`. Reservation must precede native IO; capture kind/media/job
-acknowledgment is atomic; pending voices protect cleanup/filing. Cards, choices,
-recorders and delayed dialogs keep the parent's original dataset intent. Verify
-the actual-handler tests `capture-screen.test.tsx`, `inbox-intents.test.tsx` and
-`capture-card.test.tsx`, plus both real-SQLite query suites. This reuses the
-existing journal; draft-note voice and pre-journal interruption remain open.
-See `docs/validation-0.11.31.md` for the separate source and native evidence.
-
-For 0.11.32, read note `draft-queries.ts`, `commit-queries.ts` and
-`note-editor-screen.tsx` with attachment target resolution and journal queries.
-Canonical draft voices must survive `voices: []` autosave, stay outside the
-clinical gallery and move atomically with note/history/draft retirement.
-Pending jobs cannot lose their original parent. Check `draft-recording.test.ts`
-and the actual-handler `media-editors.test.tsx` for rollback, newer typing,
-acknowledgment/focus and final-submission failure/retry. The older JSON voice
-codec is still supported; the unused staging helper is removed. This does not
-add general cross-editor text CAS. Source/native limits: validation-0.11.32.md.
-
-For 0.11.33, check the completed branch of `note-editor-screen.tsx` and the
-actual-screen/header witnesses in `media-editors.test.tsx`. The 0.11.32 native
-close crashed despite successful publication and green tests: switching the
-scroll host remounted ScreenOptions during Back. Identical title/right options
-are insufficient if the component remounts. The patch retains the same host;
-rebuilt native and software acceptance are separated in validation-0.11.33.md.
-That retest still crashed. 0.11.34 additionally pins both note form Columns as
-native stacking parents across pointerEvents changes; real Column/View checks
-cover pending acknowledgment and failure/retry. See validation-0.11.34.md for
-the independent native result. A passing React contract is not a Fabric run.
+Six manual forms still need raw recovery. Orders additionally need original
+patient/encounter and clinical basis; credentials retain exact secret whitespace.
+Other P0 and product gates are in IMPLEMENTATION. Versioned reports preserve
+older change/retest details; this guide is not a chronological release history.
 
 The following integration test accelerates a 24-hour shift in real SQLite. It is
 not a 24-hour Android soak test or a physical-device performance measurement.

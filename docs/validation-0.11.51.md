@@ -62,15 +62,81 @@ reference without changing the target, draft or audit. All51 targeted SQL and
 mounted cases pass, including four new regression cases. Full checks then pass
 163 suites/2,329 app tests and five workflows in172.951 Jest seconds. One test
 import-order warning is corrected afterward and scoped lint is clean.
-Regeneration reports no schema changes. Native evidence for this correction
-is recorded separately when complete.
+Regeneration reports no schema changes. The normal push hook subsequently runs
+all checks on the corrected source without that warning:163 suites/2,329 app
+tests and five workflow tests pass. Exact application commit `a541ce5` passes
+hosted CI38013693701, including regeneration and the Android bundle.
 
-No .51 native build/install/UI/archive witness is complete at this checkpoint.
-The last inspected owner APK remains `dist/MedOS-0.11.50.apk` from `1915ee5`;
-see validation-0.11.50. A successful software test is not a native header/IME or
-crash-recovery witness. Exact-source build, actual APK identity/ABI/signature/
-essential-library inspection, in-place install and independent whole-archive
-comparisons are required before widening this evidence boundary.
+### Frozen Android acceptance
+
+The corrected `a541ce5` source is frozen before each build. An x86_64 release
+copy is installed in place over .50 in the owned read-only QA emulator; the
+pulled installed APK matches the inspected source artifact's exact hash.
+The emulator is not the owner's phone. Its original userdata/encryption-key
+image hashes match before startup and after the acknowledged shutdown.
+
+Actual UI actions and explicit process-stop/cold-reopen boundaries verify:
+
+- An untitled idea retains its exact leading/trailing spaces after acknowledged
+  raw persistence, without final Save. The recovered field is not a new seed.
+- A topic retains title, summary and incomplete visible Jalali text
+  `1404/10/`. Save refuses that invalid date; independent export confirms the
+  topic remains unpublished. Two distinct cold-reopen process boundaries pass.
+- An existing topic retains archived teacher/specialty names, original IDs and
+  original seconds/milliseconds during an unrelated body correction. Archived
+  names are visible and absent from new teacher choices.
+- Three short recovery links and older pages reach the intended oldest tied
+  draft, not another draft with the same update time. A future-version raw
+  document remains readable without an editable replacement. Native clipboard
+  copying of that future document is not tested.
+- Stale idea publication refuses. Comparison shows current and local words.
+  Explicit adoption changes only the raw draft; an actual export before a
+  separate Save proves the published body is still the newer body. Separate
+  Save then publishes once and retires the chosen raw draft.
+
+Independent Node AES-GCM/scrypt and sql.js decoding authenticates complete
+archives, including media. Upgrade matches all4,117 existing application rows
+across49 prior tables and all34 media files, with only the additive empty draft
+table. The synthetic action fixture adds21 declared rows. Adopted and final
+exports each match all4,141 intended rows across50 application tables and all34
+media hashes, including unrelated records, raw drafts and id-only audits.
+SQLite integrity is `ok` and foreign-key checks are empty. These are whole-set
+comparisons, not sampled counts or an in-process staging assertion.
+
+The retained application process is7356 throughout the final page selection,
+publication and exports. Observed application fatal/crash/ANR buffers are empty
+for those actions. Cold startup separately encounters a System UI ANR and
+other emulator system-service/input-method ANRs. The actual System UI wait
+dialog is acknowledged before MedOS acceptance proceeds. This does not prove
+the absence of ANRs generally, explain the older .33 pressure ANR, or establish
+40-patient latency or a hardware performance budget.
+
+Observer failures remain private evidence: early empty accessibility trees,
+an ambiguous flattened field locator, one incorrect harness deep link and one
+exact-case input mismatch. Assertions refuse them; subsequent steps use actual
+visible bounds, the existing `medos://library` route and exact synthetic paste.
+No failed attempt is counted as a successful application witness. Fixture
+restore completion is observed and acknowledged before later mutations.
+
+### Inspected artifacts
+
+Both packages are from `a541ce5`, package `com.shayan.medos`, version.51/code67,
+minSDK24/targetSDK36. Essential JNI libraries and actual ABI are inspected.
+Owner certificate SHA256 is
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+
+| Artifact | Bytes | SHA256 |
+|---|---:|---|
+| Private x86_64 QA package | 55,015,086 | `c75f4d4c1ed4fc822bd4fbacaa83b52615449464645fb7c8ace5b322eb67f261` |
+| `dist/MedOS-0.11.51.apk`, arm64-v8a only | 53,406,759 | `7fa7839358d08a6cbba23dff46dec6f8e977ab458dbf5ae36e3f14ec367666da` |
+
+The owner build succeeds in8 minutes after cleaning only the generated app
+build for the ABI switch. Gradle future-version deprecation, Windows CMake path
+and color-environment warnings remain; they are not asserted repaired.
+The arm64 package is built/inspected but not installed on a physical phone.
+Archive hashes: upgrade `16eb68434e49707e205e7233c9ff257aac90f47d4b92e4050bf33e66a653da16`,
+adopted `9db3acb4073cfa0aed689bde1a11941757415eb80f9020c9aad9126f4d1df838`,
+final `14ed3ea019456934c205ea56a65876a226b92460bc30d780e0ff250d10f54c3a`.
 
 ## Remaining gates
 

@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Witness .51 raw recovery, full archives and owner APK
+
+**Agent:** GPT-6 via Codex; primary native validation, no new delegation.
+**Commits:** application a541ce5 following d1c0a5f; this evidence checkpoint.
+
+**Changed**
+- Record exact-source native recovery/conflict/archived-reference witnesses and
+  independent whole-archive comparisons. Build and inspect owner arm64 .51/code67.
+- Replace chronological detail in the current execution/review guides with the
+  live checkpoint and focused review paths; historical handoffs/reports remain.
+
+**Verified**
+- Normal push hook passes163 suites/2,329 app tests and five workflows without
+  warnings; exact-head a541ce5 CI38013693701 succeeds.
+- Actual in-place x86 upgrade matches the inspected/installed APK. Acknowledged
+  untitled whitespace and invalid-date raw forms survive process-stop/cold reopen.
+  Archived links/time precision, tied-draft selection, future raw refusal and
+  explicit adoption before separate Save pass their native witnesses.
+- Independent authenticated upgrade comparison preserves4,117 original rows;
+  adopted/final action exports match4,141 intended rows/50 tables/34 media.
+  Original read-only AVD userdata/key hashes match after acknowledged shutdown.
+- Frozen owner APK succeeds in8 minutes; actual .51/code67, arm64-only ABI,
+  essential JNI and unchanged owner certificate are inspected. Artifact hashes
+  and observer failures are in validation-0.11.51.
+
+**Not verified**
+- Physical-phone camera/audio/Doze/provider/power/second-device behavior,
+  full40-patient performance/pressure and wider product/clinical gates.
+  Native future-document clipboard copying is not witnessed.
+
+**Open threads**
+- D05 has six manual forms. First protect new Kardex's original active episode
+  including null; its current publisher resolves a later active episode at Save.
+  That containment is separate from implementing recoverable order drafts.
+- Complete remaining integrity/product gates in IMPLEMENTATION. No crash-free
+  or only-phone-testing claim is supported by this bounded milestone.
+
+**Gotchas**
+- Cold AVD System UI/input-service ANRs are distinct from observed MedOS actions.
+  Early empty UI trees, flattened labels, one wrong harness deep link and exact
+  paste mismatch refused acceptance until actual visible content matched.
+- ABI switches require generated app build clean; never erase app data.
+
+---
+
 ## 2026-10-10 — Preserve archived teaching links during topic correction
 
 **Agent:** GPT-6 via Codex; primary implementation and verification, no delegation.
