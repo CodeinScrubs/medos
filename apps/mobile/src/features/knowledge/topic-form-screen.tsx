@@ -1,66 +1,93 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 
+import { AutosaveScope } from '@/components/autosave-scope';
 import { CollapsibleSection } from '@/components/collapsible-section';
-import { EditGate } from '@/components/edit-gate';
-import { alertError, notify } from '@/components/feedback';
+import { ErrorNotice } from '@/components/error-notice';
+import { notify } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Screen, SectionHeader, SelectField, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
-import type { Specialty } from '@/db/schema';
+import { useNow } from '@/components/use-now';
+import type { Specialty, Topic } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
 import { doctorsQuery, quickCreateDoctor, specialtiesQuery } from '@/features/doctors/queries';
+import { WorkspaceFormGate } from '@/features/workspace-forms/form-gate';
+import { WorkspaceFormDiscard, WorkspaceFormStatus } from '@/features/workspace-forms/form-status';
+import type { FormSeed } from '@/features/workspace-forms/types';
+import { useWorkspaceForm } from '@/features/workspace-forms/use-form';
 import { useTheme } from '@/theme';
 
+import { initialTopicFields, topicFormDate, type TopicFormFields } from './form-draft';
+import { describeTopic, topicFormPort } from './form-draft-queries';
 import { COMMON_CONTEXTS } from './labels';
-import { createTopic, topicQuery, updateTopic } from './queries';
-
-const toList = (text: string) =>
-  text
-    .split(/[,،]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
 
 /** Write or edit a subject summary. Param: optional `topicId`. */
 export function TopicFormScreen() {
-  const { topicId } = useLocalSearchParams<{ topicId?: string }>();
-  const { data, error, retry } = useLive(topicQuery(topicId ?? ''), [topicId]);
+  const { topicId, draftId } = useLocalSearchParams<{ topicId?: string; draftId?: string }>();
   return (
-    <EditGate editing={Boolean(topicId)} rows={data} error={error} onRetry={retry} what="مبحث">
-      {(row, readNotice) => <TopicForm readNotice={readNotice} row={row} />}
-    </EditGate>
+    <AutosaveScope>
+      <WorkspaceFormGate port={topicFormPort} recordId={topicId ?? null} draftId={draftId ?? null}>
+        {(seed, readNotice, unavailable) => <TopicForm seed={seed} readNotice={readNotice} unavailable={unavailable} />}
+      </WorkspaceFormGate>
+    </AutosaveScope>
   );
 }
 
-type TopicRow = NonNullable<Awaited<ReturnType<typeof topicQuery>>[number]>;
-
-function TopicForm({ row, readNotice }: { readNotice: ReactNode; row: TopicRow | null }) {
+function TopicForm({
+  seed,
+  readNotice,
+  unavailable,
+}: {
+  readNotice: ReactNode;
+  seed: FormSeed<Topic, TopicFormFields>;
+  unavailable: boolean;
+}) {
   const router = useRouter();
   const { spacing } = useTheme();
-  const topic = row?.topic ?? null;
-
-  const [title, setTitle] = useState(topic?.title ?? '');
-  const [summary, setSummary] = useState(topic?.summary ?? '');
-  const [body, setBody] = useState(topic?.body ?? '');
-  const [professorNotes, setProfessorNotes] = useState(topic?.professorNotes ?? '');
-  const [pearls, setPearls] = useState(topic?.pearls ?? '');
-  const [source, setSource] = useState(topic?.source ?? '');
-  const [context, setContext] = useState(topic?.context ?? '');
-  const [taughtAt, setTaughtAt] = useState<Date>(topic?.taughtAt ?? new Date());
-  const [specialtyId, setSpecialtyId] = useState<string | null>(topic?.specialtyId ?? null);
-  const [taughtById, setTaughtById] = useState<string | null>(topic?.taughtById ?? null);
-  const [tags, setTags] = useState((topic?.tags ?? []).join('، '));
-  const [starred, setStarred] = useState(topic?.starred ?? false);
-  const [needsReview, setNeedsReview] = useState(topic?.needsReview ?? false);
+  const isEditing = seed.document.recordId !== null;
+  const editing = useWorkspaceForm(topicFormPort, seed, unavailable, () => router.back());
+  const {
+    title,
+    summary,
+    body,
+    professorNotes,
+    pearls,
+    source,
+    context,
+    specialtyId,
+    taughtById,
+    tags,
+    starred,
+    needsReview,
+  } = editing.document.fields;
+  const setTitle = (title: string) => editing.change({ title });
+  const setSummary = (summary: string) => editing.change({ summary });
+  const setBody = (body: string) => editing.change({ body });
+  const setProfessorNotes = (professorNotes: string) => editing.change({ professorNotes });
+  const setPearls = (pearls: string) => editing.change({ pearls });
+  const setSource = (source: string) => editing.change({ source });
+  const setContext = (context: string) => editing.change({ context });
+  const setSpecialtyId = (specialtyId: string | null) => editing.change({ specialtyId });
+  const setTaughtById = (taughtById: string | null) => editing.change({ taughtById });
+  const setTags = (tags: string) => editing.change({ tags });
+  const setStarred = (starred: boolean) => editing.change({ starred });
+  const setNeedsReview = (needsReview: boolean) => editing.change({ needsReview });
+  const now = useNow();
+  let taughtAt = new Date(editing.document.fields.dateValue);
+  try {
+    taughtAt = topicFormDate(editing.document.fields, new Date(now));
+  } catch {
+    /* Keep incomplete raw date visible. */
+  }
   const [picker, setPicker] = useState<'specialty' | 'teacher' | null>(null);
-  const [saving, setSaving] = useState(false);
   const dateValidation = useDateValidation();
 
-  const { data: specialtyRows } = useLive(specialtiesQuery());
-  const { data: doctorRows } = useLive(doctorsQuery());
+  const { data: specialtyRows, error: specialtyError, retry: retrySpecialties } = useLive(specialtiesQuery());
+  const { data: doctorRows, error: doctorError, retry: retryDoctors } = useLive(doctorsQuery());
 
   const specialtyItems = useMemo(
     () =>
@@ -79,68 +106,87 @@ function TopicForm({ row, readNotice }: { readNotice: ReactNode; row: TopicRow |
 
   const specialtyName = specialtyRows?.find((s) => s.id === specialtyId)?.nameFa ?? null;
   const teacherName = doctorRows?.find((d) => d.id === taughtById);
+  function describeFields(fields: TopicFormFields) {
+    const teacher = doctorRows?.find((row) => row.id === fields.taughtById);
+    return describeTopic(fields, {
+      teacher: teacher ? doctorDisplayName(teacher) : undefined,
+      specialty: specialtyRows?.find((row) => row.id === fields.specialtyId)?.nameFa,
+    });
+  }
+  function describeRecord(row: Topic) {
+    const fields = initialTopicFields(row, new Date(now));
+    if (!row.taughtAt) fields.date.dateText = 'ثبت نشده';
+    return describeFields(fields);
+  }
 
-  async function save() {
-    if (!dateValidation.check()) return;
-    if (!title.trim()) {
-      notify('عنوان لازم است');
+  function save() {
+    if (editing.completed || editing.stale) {
+      editing.close();
       return;
     }
-    setSaving(true);
-    const payload = {
-      title,
-      summary,
-      body,
-      professorNotes,
-      pearls,
-      source,
-      context,
-      taughtAt,
-      specialtyId,
-      taughtById,
-      tags: toList(tags),
-      starred,
-      needsReview,
-    };
-    try {
-      if (topic) await updateTopic(topic.id, payload);
-      else await createTopic(payload);
-      router.back();
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      setSaving(false);
-    }
+    void editing.save((fields) => {
+      if (!dateValidation.check()) return false;
+      if (!fields.title.trim()) {
+        notify('عنوان لازم است');
+        return false;
+      }
+      return true;
+    });
   }
 
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: topic ? 'ویرایش مبحث' : 'مبحث جدید' }} />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <ScreenOptions options={{ title: isEditing ? 'ویرایش مبحث' : 'مبحث جدید' }} />
+      <Column
+        collapsable={false}
+        gap="md"
+        style={{ paddingTop: spacing.md }}
+        pointerEvents={editing.busy ? 'none' : 'auto'}
+      >
         {readNotice}
-        <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="مثلاً ARDS" />
+        <WorkspaceFormStatus
+          editing={editing}
+          port={topicFormPort}
+          describeFields={describeFields}
+          describeRecord={describeRecord}
+        />
+        <Input
+          label="عنوان"
+          required
+          value={title}
+          editable={!editing.locked}
+          onChangeText={setTitle}
+          placeholder="مثلاً ARDS"
+        />
         <Input
           label="خلاصه"
           value={summary}
           onChangeText={setSummary}
           multiline
+          editable={!editing.locked}
           hint="یک پاراگراف که ماه‌ها بعد کافی باشد"
         />
 
         <SectionHeader title="از کجا" />
+        <ErrorNotice error={doctorError} what="پزشکان" onRetry={retryDoctors} />
+        <ErrorNotice error={specialtyError} what="تخصص‌ها" onRetry={retrySpecialties} />
         <SelectField
           label="استاد"
           icon="person-outline"
           value={teacherName ? doctorDisplayName(teacherName) : null}
           placeholder="انتخاب از دفترچه‌ی پزشکان"
-          onPress={() => setPicker('teacher')}
+          onPress={() => {
+            if (!editing.locked) setPicker('teacher');
+          }}
           onClear={() => setTaughtById(null)}
         />
         <SelectField
           label="تخصص"
           icon="medkit-outline"
           value={specialtyName}
-          onPress={() => setPicker('specialty')}
+          onPress={() => {
+            if (!editing.locked) setPicker('specialty');
+          }}
           onClear={() => setSpecialtyId(null)}
         />
         <ChipSelect
@@ -149,13 +195,16 @@ function TopicForm({ row, readNotice }: { readNotice: ReactNode; row: TopicRow |
           value={COMMON_CONTEXTS.includes(context) ? context : null}
           onChange={(v) => setContext(v ?? '')}
           allowDeselect
+          disabled={editing.locked}
         />
-        <Input label="یا خودتان بنویسید" value={context} onChangeText={setContext} />
+        <Input label="یا خودتان بنویسید" value={context} editable={!editing.locked} onChangeText={setContext} />
         <QuickDateField
           onValidityChange={dateValidation.setValid}
           label="تاریخ"
           value={taughtAt}
-          onChange={setTaughtAt}
+          rawInput={editing.document.fields.date}
+          onRawInputChange={(patch) => editing.change((fields) => ({ date: { ...fields.date, ...patch } }))}
+          disabled={editing.locked}
           direction="past"
         />
 
@@ -166,36 +215,52 @@ function TopicForm({ row, readNotice }: { readNotice: ReactNode; row: TopicRow |
           filledCount={[body, professorNotes, pearls, source].filter(Boolean).length}
         >
           <Column gap="md">
-            <Input label="متن" value={body} onChangeText={setBody} multiline />
+            <Input label="متن" value={body} editable={!editing.locked} onChangeText={setBody} multiline />
             <Input
               label="عین حرف استاد"
               value={professorNotes}
               onChangeText={setProfessorNotes}
               multiline
+              editable={!editing.locked}
               hint="جمله‌هایی که بهتر است با همان لحن بماند"
             />
-            <Input label="نکته‌های کلیدی" value={pearls} onChangeText={setPearls} multiline />
-            <Input label="منبع" value={source} onChangeText={setSource} />
+            <Input
+              label="نکته‌های کلیدی"
+              value={pearls}
+              editable={!editing.locked}
+              onChangeText={setPearls}
+              multiline
+            />
+            <Input label="منبع" value={source} editable={!editing.locked} onChangeText={setSource} />
           </Column>
         </CollapsibleSection>
 
-        <Input label="برچسب‌ها" value={tags} onChangeText={setTags} hint="با ویرگول جدا کنید" />
-        <Toggle label="ستاره‌دار" value={starred} onChange={setStarred} />
+        <Input
+          label="برچسب‌ها"
+          value={tags}
+          editable={!editing.locked}
+          onChangeText={setTags}
+          hint="با ویرگول جدا کنید"
+        />
+        <Toggle label="ستاره‌دار" value={starred} onChange={setStarred} disabled={editing.locked} />
         <Toggle
           label="نیاز به مرور"
           description="قبل از امتحان دوباره سراغش بیایید"
           value={needsReview}
           onChange={setNeedsReview}
+          disabled={editing.locked}
         />
 
         <Button
-          label={topic ? 'ذخیره' : 'ثبت مبحث'}
+          label={editing.completed || editing.stale ? 'بستن' : isEditing ? 'ذخیره' : 'ثبت مبحث'}
           icon="checkmark"
           onPress={() => void save()}
-          loading={saving}
+          loading={editing.busy}
+          disabled={editing.busy || (editing.locked && !editing.completed && !editing.stale)}
           full
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="بستن" variant="ghost" disabled={editing.busy} onPress={editing.close} full haptic={false} />
+        <WorkspaceFormDiscard editing={editing} />
       </Column>
 
       <PickerModal
@@ -208,7 +273,7 @@ function TopicForm({ row, readNotice }: { readNotice: ReactNode; row: TopicRow |
           setTaughtById(item.id);
           setPicker(null);
         }}
-        onCreate={quickCreateDoctor}
+        onCreate={(name) => editing.related(() => quickCreateDoctor(name))}
         createLabel="افزودن پزشک"
         emptyText="هنوز پزشکی ثبت نشده — نامش را بنویسید و اضافه کنید."
       />

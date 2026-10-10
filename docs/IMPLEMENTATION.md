@@ -33,7 +33,21 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Source0.11.50/code66 persists the original Note/encounter basis, including null,
+Source0.11.51/code67 connects raw recovery to the existing idea/topic forms.
+One shared lifecycle uses feature-owned strict codecs and synchronous
+publishers. Exact whitespace, partial tags and invalid visible dates survive
+raw persistence independently of publication. Complete published bases and
+revision CAS prevent a recovered draft overwriting a newer correction. Exact
+shown-row adoption changes only raw input; Save remains a separate transaction.
+Original route/draft/dataset/focus ownership survives refresh and replacement.
+Three short recovery links with older/newer pages stay in each existing list.
+No new route, dependency, permission or backup format. Verification status and
+source/native boundaries are in [validation-0.11.51.md](validation-0.11.51.md).
+Full checks pass163 suites/2,325 app tests plus five workflows, with clean
+typecheck/lint/formatting. Exact-source native acceptance and hosted CI are
+pending; the last inspected owner artifact remains .50 below.
+
+Previous0.11.50/code66 persists the original Note/encounter basis, including null,
 raw date/clock and draft revision. A reopened draft cannot overwrite a newer
 correction or attach itself to a later admission. Invalid dates remain raw and
 cannot publish their older parsed timestamp. Legacy/conflicting drafts require
@@ -52,7 +66,8 @@ read results, retaining the screen and native header parents.
 The combined recovery/deck corrections pass81 focused cases. Final full checks
 pass160 suites/2,255 application tests and five workflows, with typecheck/lint/
 both formatting checks clean and no warnings. Regeneration reports no schema
-changes. Preceding `a674921` exact-head hosted CI succeeds; current CI is pending.
+changes. Exact final-head `2dcd60b` hosted CI succeeds, including schema
+regeneration and the Android bundle.
 Frozen `1915ee5` x86 native acceptance includes explicit adoption before
 publication, original outpatient null association, invalid raw date/clock and
 voice-only recovery. Independent final exports preserve the intended4,136
@@ -132,7 +147,7 @@ acceptance or completion of the remaining product gates.
 | D02 | Atomic note/version/draft acknowledgment | .50 persists original Note/encounter basis, including null, and raw date/clock/revision. Legacy or conflicting recovered drafts require exact shown-row adoption before separate publication; scoped recovery selects the intended draft. Software conflict, audit rollback, lifecycle and old/current import checks pass. Bounded native adoption/publication, outpatient/date/voice recovery, pages and whole archives pass in validation-0.11.50. .49 version restore has bounded native evidence. Preserve original dataset/native parents; general interruption/power acceptance remains open. |
 | D03 | Durable stopped voice publication | Existing record, draft-note and capture journals support verified-copy retry and atomic metadata acknowledgment. Active/pre-journal recording loss and physical recorder/audio behavior are separate gates. |
 | D04 | Atomic quick capture filing | Software preserves selected context, same-operation retry and one destination. Copied photo batches have a journal. Picker/pre-journal interruption and provider-loss/native failures still need acceptance. |
-| D05 | Recover every manual form | Patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital raw recovery exist. Eight remain: Kardex order, topic, idea, specialty profile, prescription, place, extension, credential. Use bounded shared draft lifecycle with feature-owned versioned codecs/publishers; pilot idea/topic without modifying existing draft stores. Preserve invalid raw dates, exact credential whitespace and partial prescription lines. Order intent must capture its original patient/encounter including null, compare its shown clinical basis, and retain explicit conflict recovery. Never copy a500-line engine eight times or reuse doctor drafts for unrelated entities. |
+| D05 | Recover every manual form | Existing patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital recovery is unchanged. .51 connects one shared idea/topic lifecycle with feature-owned codecs/publishers, exact selected draft, raw date/whitespace, complete-basis CAS and separate publication. Software checks pass; native pilot acceptance is pending in validation-0.11.51. Six forms remain: Kardex order, specialty profile, prescription, place, extension and credential. Preserve exact credential whitespace and partial prescription lines. Kardex needs its original patient/encounter including null and shown clinical basis; do not plug it into the pilot's workspace-only null-parent port. Never copy a500-line engine or reuse doctor drafts for unrelated entities. |
 | D06 | Consult reply ownership | Software keeps replies with their original consultation and preserves failed input. Verify full native request/answer/follow-up workflow. |
 | D07 | Numerical integrity | Blank differs from invalid; paired BP conflicts cannot be half-merged; observation time/context stay explicit. Glucose units are recorded, never guessed/converted, and charts separate units. Broader chart/device and clinical applicability review remain open. |
 | D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. Labs, imaging, vitals, orders, consults, diagnoses and encounters need appropriate restore/audit paths. Order status/delete audit now commits atomically; order restore and permanent correction history remain. Lab deletion still needs audit. Never infer a deleted encounter's former active state. |
@@ -157,7 +172,7 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
 | W07 | Trash and correction | Extend appropriate original-context restore beyond current record kinds. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
 | W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
-| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. Complete remaining raw forms and actual edit/search acceptance. Handle idea-area read rejection/retry. Extension creation/editing now rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. These software checks do not finish raw recovery, intent fencing, deleted-place recovery/move or native acceptance. |
+| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. .51 connects idea/topic raw recovery and exposes area-read rejection/retry. Topic teacher/specialty checks and merged search commit in its publication transaction. Complete remaining forms and actual edit/search acceptance. Extension creation/editing rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. These software checks do not finish deleted-place recovery/move or full native acceptance. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |
 
 ## Priority2: validated clinical tools and future AI

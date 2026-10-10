@@ -5,6 +5,62 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Shared raw recovery for workspace forms (0.11.51)
+
+Idea and teaching-topic forms pilot one bounded lifecycle in
+`features/workspace-forms/`. Features own strict raw-field codecs, their display
+descriptions and synchronous publishers. Shared code owns loading, draft CAS,
+publication receipts, removal/background flush and explicit conflict recovery.
+The existing routes and fields remain; three recovery links with replaceable
+cursor pages live in each existing list. Destructive draft controls follow the
+writing controls rather than appearing above them.
+
+Migration0029 adds `workspace_form_drafts`. Kind and a JSON tuple of parent/
+record ids identify the one open scope, including a distinct new-record null.
+No foreign key can erase raw input when its published target disappears. Raw
+documents contain their version, exact input, original context and a complete
+canonical published basis; date milliseconds and whitespace are preserved.
+Revision is an SQL-defaulted concurrency receipt, not permanent edit history.
+Strict parsing refuses unsupported/foreign documents without rewriting them;
+their original body remains readable/copyable and survives archive restore.
+Old archives without the new table still restore. The frozen backup/KDF format
+is unchanged.
+
+Each mounted form retains its original route, selected draft id, seed,
+AutosaveScope and dataset generation. A selected retired draft never opens a
+different draft or blank form. Refresh/route/record errors retain typed input
+and lock publication. Raw autosave preserves an incomplete date, empty title
+and separators without publishing. Background/Back flush raw input; only the
+explicit normal Save validates and publishes. Topic date validation uses the
+visible raw date, preserves unchanged seconds/milliseconds and checks live
+teacher/specialty references in the publication transaction. Search rebuilds
+from the merged record, using those same transactional related reads.
+
+Publication compares the exact draft revision and complete current record,
+then publishes, soft-retires the draft, stores its receipt and writes an id-only
+audit in one synchronous transaction. Receipt replay returns the same live
+destination without creating another record. Overflow, malformed receipts,
+deleted targets and failed audit writes refuse the operation atomically.
+Conflict review reads all shown rows together. Loading or keeping local input
+requires an exact comparison and an explicit confirmation; keeping it only
+rebases the raw draft. A separate Save publishes. Confirmation ownership is
+consumed once and bound to the original focus/route/read state/dataset. The
+shared hook releases its action/removal guard before requesting route closure,
+checks focus after acknowledgments, and retains native screen/header parents.
+
+**Rejected: copying eight separate draft engines, replacing existing clinical
+draft stores, or treating a raw save as final publication.** This pilot supports
+only idea/topic forms with `parentId=null`. Adding another workspace form needs
+its own codec, query, publisher, descriptions and lifecycle/database/native
+tests. Do not plug Kardex or other clinical forms into this null-parent model:
+they must preserve the original patient/encounter, including outpatient null,
+and validate all clinical ownership before publication. Existing clinical
+stores and meaningful note history are separate contracts. Tests, native
+witnesses and remaining gates are recorded in validation-0.11.51 and
+IMPLEMENTATION; this abstraction is not a claim that all manual forms recover.
+
+---
+
 ## Today previews do not bury unfinished work (0.11.50)
 
 An actual synthetic shift showed 40 scheduled patient tasks above unfinished

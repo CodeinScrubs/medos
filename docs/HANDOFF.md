@@ -33,6 +33,57 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Pilot shared raw recovery in idea and teaching-topic forms
+
+**Agent:** GPT-6 via Codex; primary implementation and verification, no new delegation.
+**Commits:** this source checkpoint; branch `codex/workspace-form-recovery`, base `2dcd60b`.
+
+**Changed**
+- .51/code67 connects one bounded shared raw lifecycle to the existing idea/topic
+  routes. Feature codecs/publishers retain exact input and original context;
+  complete-basis/revision CAS and explicit review protect newer corrections.
+- Publication, retirement, replay receipt and id-only audit commit together.
+  Raw adoption requires separate Save. Unsupported bodies stay copyable;
+  old archives without the additive0029 table still restore. Frozen crypto
+  and existing clinical draft stores are untouched.
+- Three short, paged unfinished links stay in each existing notebook. Read
+  errors retain input/retry. Native header/screen parents and removal guards
+  remain mounted; late acknowledgments close only their originating focus.
+  No new dependency, permission or route.
+
+**Verified**
+- Fresh repaired baseline passes161 suites/2,275 app tests plus five workflows,
+  including the then-untracked20 codec cases. Three mounted regressions fail
+  before connection and pass afterward. The prior125 focused cases pass.
+- Targeted lifecycle/boundary checks pass46 cases. Final `npm run check`
+  passes163 suites/2,325 app tests and five workflows; typecheck/lint/both
+  formatting checks are clean. This includes the later foreign-document
+  loading regression and selectable-raw assertion.
+- Regeneration reports no schema changes and preserves the exact bundled
+  migration file hashes. Older migrations and archive/KDF rules are unchanged.
+- .50 final-head `2dcd60b` CI38007035821 succeeds. Existing PR1–5 heads are
+  unchanged. New pilot source is not yet pushed or validated by hosted CI.
+
+**Not verified**
+- Exact-source native/UI/archive acceptance, hosted CI and .51 APK.
+  The inspected owner artifact remains .50. No physical phone acceptance.
+
+**Open threads**
+- Push this pilot normally and inspect exact-head CI.
+  Freeze before building the inspected x86 native witness, then owner arm64.
+- D05 has six other manual forms; the null-parent workspace pilot must not
+  silently become a clinical-order port. Other IMPLEMENTATION gates remain.
+
+**Gotchas**
+- The first new full check stopped only on formatting of our added restore
+  cases; that file is corrected. Targeted lint also exposed unused raw-date
+  destructuring and a lazy-initializer ref callback; both are corrected.
+- Mounted observer failures from reading a renderer before act committed were
+  fixed in the harness; do not describe them as application crashes. Full
+  checks, native builds and native acceptance remain serialized.
+
+---
+
 ## 2026-10-10 — Validate .50 recovery/deck and inspect the owner APK
 
 **Agent:** GPT-6 via Codex; primary native validation and integration.

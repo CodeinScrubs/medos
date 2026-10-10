@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { ideas, type Idea } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -64,21 +64,35 @@ function values(input: IdeaInput) {
   };
 }
 
-export async function createIdea(input: IdeaInput): Promise<string> {
+export function createIdeaInTransaction(tx: DbTransaction, input: IdeaInput, now: Date): string {
   const id = newId();
   const row = values(input);
-  await db.insert(ideas).values({ id, ...stamps(), ...row, searchText: ideaSearchText(row) });
+  tx.insert(ideas)
+    .values({ id, ...stamps(now), ...row, searchText: ideaSearchText(row) })
+    .run();
   return id;
 }
 
+export function updateIdeaInTransaction(tx: DbTransaction, id: string, patch: Partial<IdeaInput>, now: Date): void {
+  const current = tx
+    .select()
+    .from(ideas)
+    .where(and(alive, eq(ideas.id, id)))
+    .get();
+  if (!current) throw new Error('ایده در دسترس نیست.');
+  const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const row = values({ ...current, ...defined, tags: patch.tags ?? current.tags ?? [] });
+  tx.update(ideas)
+    .set({ ...row, searchText: ideaSearchText(row), ...touch(now) })
+    .where(and(alive, eq(ideas.id, id)))
+    .run();
+}
+
+export async function createIdea(input: IdeaInput): Promise<string> {
+  return db.transaction((tx) => createIdeaInTransaction(tx, input, new Date()));
+}
 export async function updateIdea(id: string, patch: Partial<IdeaInput>): Promise<void> {
-  const current = (await ideaQuery(id))[0];
-  if (!current) throw new Error(`Idea ${id} not found`);
-  const row = values({ ...current, ...patch } as IdeaInput);
-  await db
-    .update(ideas)
-    .set({ ...row, searchText: ideaSearchText(row), ...touch() })
-    .where(and(alive, eq(ideas.id, id)));
+  db.transaction((tx) => updateIdeaInTransaction(tx, id, patch, new Date()));
 }
 
 export async function setIdeaStatus(id: string, status: Idea['status']): Promise<void> {
@@ -93,14 +107,17 @@ export async function deleteIdea(id: string): Promise<void> {
 }
 
 /** Areas used before, so the field is a choice rather than free typing every time. */
-export async function suggestIdeaAreas(limit = 10): Promise<string[]> {
-  const rows = await db
+export function ideaAreasQuery(limit = 10) {
+  return db
     .select({ area: ideas.area, uses: sql<number>`count(*)` })
     .from(ideas)
     .where(and(alive, sql`${ideas.area} is not null and ${ideas.area} <> ''`))
     .groupBy(ideas.area)
     .orderBy(desc(sql`count(*)`), asc(ideas.area))
     .limit(limit);
+}
+export async function suggestIdeaAreas(limit = 10): Promise<string[]> {
+  const rows = await ideaAreasQuery(limit);
   return rows.map((r) => r.area).filter((a): a is string => Boolean(a));
 }
 

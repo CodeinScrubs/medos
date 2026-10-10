@@ -14,3 +14,4 @@ export * from './vault';
 export * from './media';
 export * from './system';
 export * from './calls';
+export * from './workspace';
