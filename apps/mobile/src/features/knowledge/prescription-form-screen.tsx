@@ -193,6 +193,7 @@ function PrescriptionForm({
         <ErrorNotice error={referenceError} what="تخصص انتخاب‌شده" onRetry={retryReferences} />
         <SelectField
           label="تخصص"
+          disabled={editing.locked}
           icon="medkit-outline"
           value={specialtyName}
           onPress={() => {

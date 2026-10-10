@@ -326,6 +326,7 @@ describe('remaining knowledge forms reuse the original workspace lifecycle', () 
       expect(mockBack).not.toHaveBeenCalled();
       expect(input(label).props.value).not.toBe('Too late');
       expect(input(label).props.editable).toBe(false);
+      expect(tree!.root.findByType(SelectField).props.disabled).toBe(true);
       expect(tree!.root.findByType(Screen)).toBe(screen);
       expect(tree!.root.findByType(ScreenOptions)).toBe(header);
       expect(tree!.root.findAllByType(Column).find((node) => node.props.collapsable === false)).toBe(parent);
@@ -469,6 +470,7 @@ describe('remaining knowledge forms reuse the original workspace lifecycle', () 
       expect(input(label).props.value).toBe('Original raw input');
       expect(input(label).props.editable).toBe(false);
       expect(tree!.root.findByType(SelectField).props.value).toBe('Original specialty');
+      expect(tree!.root.findByType(SelectField).props.disabled).toBe(true);
       expect(tree!.root.findByType(PickerModal).props.items).toEqual([]);
       expect(t.db.select().from(workspaceFormDrafts).get()).toEqual(before);
       expect(mockBack).not.toHaveBeenCalled();
@@ -496,12 +498,14 @@ describe('remaining knowledge forms reuse the original workspace lifecycle', () 
       });
       expect(input(label).props.value).toBe('Retained raw words');
       expect(input(label).props.editable).toBe(false);
+      expect(tree!.root.findByType(SelectField).props.disabled).toBe(true);
       await act(async () => {
         mockReadError = undefined;
         tree!.update(<Form />);
         await settle();
       });
       expect(input(label).props.editable).toBe(true);
+      expect(tree!.root.findByType(SelectField).props.disabled).toBe(false);
       await act(async () => {
         mockParams =
           kind === 'specialty-profile' ? { profileId: 'different-intent' } : { templateId: 'different-intent' };
@@ -511,6 +515,7 @@ describe('remaining knowledge forms reuse the original workspace lifecycle', () 
       expect(input(label).props.value).toBe('Retained raw words');
       expect(input(label).props.editable).toBe(false);
       expect(button('ذخیره').props.disabled).toBe(true);
+      expect(tree!.root.findByType(SelectField).props.disabled).toBe(true);
     },
   );
   it('requires explicit prescription conflict adoption before separate publication', async () => {

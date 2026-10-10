@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Match notebook selectors to the retained form lock
+
+**Agent:** GPT-6 via Codex; primary integration, no additional delegation.
+**Commits:** implementation in this commit; remaining-form parent `bab597f`.
+
+**Changed**
+- Pass the existing editing lock to both knowledge specialty selectors,
+  including their clear controls and accessibility state. No new workflow.
+- Extend mounted completion, dataset-replacement and read-retry checks.
+
+**Verified**
+- Six assertions fail on the parent source (10.672s): locked selectors still
+  present as enabled. Corrected full root check passes 171 suites/2,474 app
+  tests (221.402s), five workflow checks, typecheck/lint/format without warnings.
+- Intermediate bab597f native recovery passes for all five new raw forms after
+  actual process death. Independently authenticated archives retain all 4,117
+  prior rows in 50 application tables and 34 media hashes, plus the intended
+  raw drafts and one explicitly created parent fixture. No domain publication.
+
+**Not verified**
+- This newer source still needs its own frozen native publication/replacement
+  and owner artifact. Intermediate native results do not accept the change.
+- A native synthetic typing attempt produced two characters instead of the
+  requested string; a later idle retry matches. Cause remains unestablished.
+- No physical phone or full 40-patient shift; IMPLEMENTATION gates remain open.
+
+**Open threads**
+- Freeze, build, inspect and accept this source, then deliver an incremental
+  draft PR against PR7. Keep the input/IME/pressure diagnostic gate explicit.
+
+**Gotchas**
+- Empty Android EditText exposes its hint, and flattened columns require actual
+  label/bounds association. These observer defects do not explain the typing
+  mismatch. A first System UI ANR was observed and explicitly acknowledged.
+- Avoid needless app-clean for JS-only rebuilds; inspect actual ABI/JNI before
+  installation and clean/rebuild only when inspection shows it is necessary.
+
+---
+
 ## 2026-10-10 — Recover the remaining notebook forms without a new workflow
 
 **Agent:** GPT-6 via Codex; two authorized GPT-6.1 Sol extra-high agents

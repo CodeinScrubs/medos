@@ -153,6 +153,7 @@ function SpecialtyForm({
         <ErrorNotice error={referenceError} what="رشتهٔ انتخاب‌شده" onRetry={retryReferences} />
         <SelectField
           label="رشته"
+          disabled={editing.locked}
           icon="medkit-outline"
           value={specialtyName}
           placeholder="انتخاب از فهرست"

@@ -53,6 +53,16 @@ scoped; no dependency changes. Frozen-source native/artifact evidence is still
 pending at this source checkpoint. Neither an earlier run nor .54's native/APK
 evidence accepts this newer source.
 
+Further source review reproduces six failing mounted regressions (10.672s):
+the two knowledge specialty selectors appear enabled after completion, dataset
+replacement or a read failure, although their mutations are guarded. Both now
+pass the existing lock state into `SelectField`, disabling its picker and clear
+controls with the same accessible state as the surrounding inputs. Recovery
+of a read failure enables the controls again. Corrected full root check passes
+171 suites/2,474 app tests (221.402s), five workflow checks and typecheck/lint/
+format without warnings. Final-source native artifacts are recorded below when
+completed; the earlier artifact is not reused.
+
 ## Deliberate boundaries
 
 Raw recovery does not implement permanent clinical correction history, broader
