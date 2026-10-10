@@ -10,7 +10,7 @@ import { softDelete, stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
-import { createOrder, orderCreationContextQuery, type OrderCreationContext } from './queries';
+import { createOrder, orderCreationContextQuery, patientOrdersQuery, type OrderCreationContext } from './queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -22,6 +22,42 @@ const input = () => ({ patientId, name: 'Synthetic context order', kind: 'drug' 
 beforeEach(async () => {
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Creation context' });
+});
+
+describe('an explicitly requested episode is distinct from outpatient null', () => {
+  it.each(['', 'synthetic-historical-episode'])(
+    'the discharge order read retains episode %s and standing orders without later or deleted orders',
+    async (encounterId) => {
+      t.db
+        .insert(encounters)
+        .values({ id: encounterId, patientId, ...stamps(at), isActive: true })
+        .run();
+      const context = { patientId, encounterId };
+      const bound = await createOrder(input(), datasetGeneration(), context);
+      const removed = await createOrder(input(), datasetGeneration(), context);
+      t.db.update(orders).set(softDelete(at)).where(eq(orders.id, removed)).run();
+      const standing = await createOrder(input(), datasetGeneration(), { patientId, encounterId: null });
+      const later = await openEncounter({ patientId, kind: 'admission', admittedAt: at });
+      await createOrder(input(), datasetGeneration(), { patientId, encounterId: later });
+      const before = rows();
+
+      expect(new Set((await patientOrdersQuery(patientId, encounterId)).map((row) => row.id))).toEqual(
+        new Set([bound, standing]),
+      );
+      expect(rows()).toEqual(before);
+    },
+  );
+
+  it('outpatient null never includes the active imported empty episode', async () => {
+    t.db
+      .insert(encounters)
+      .values({ id: '', patientId, ...stamps(at), isActive: true })
+      .run();
+    await createOrder(input(), datasetGeneration(), { patientId, encounterId: '' });
+    const standing = await createOrder(input(), datasetGeneration(), { patientId, encounterId: null });
+
+    expect((await patientOrdersQuery(patientId, null)).map((row) => row.id)).toEqual([standing]);
+  });
 });
 
 describe('a mounted order creation intent retains its clinical association', () => {

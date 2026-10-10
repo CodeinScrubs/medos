@@ -33,6 +33,17 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+Application 0.11.53/code69 corrects one further read omission: a requested
+imported empty episode must include its own orders and standing orders in the
+discharge preview, while null remains a separate outpatient scope. A real
+SQLite probe fails before correction. Three new cases and five targeted suites
+pass 178 tests. A second two-case probe confirms that an inconsistent imported
+cross-patient order can be ended by another patient's discharge. The update now
+requires the episode's patient as well, with two retained-row regressions.
+Final source checks pass 164 suites/2,359 app tests and five workflows without
+act warnings. Hosted/native/artifact acceptance for this version remains
+pending in [validation-0.11.53.md](validation-0.11.53.md). No UI or schema change.
+
 Application 0.11.52/code68, frozen source `41a592b`, adds bounded Kardex
 creation/display ownership to PR6.
 A new form retains its original active episode including null; publication

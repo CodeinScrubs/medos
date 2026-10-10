@@ -33,6 +33,46 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Keep discharge order reads and changes in their original clinical scope
+
+**Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
+**Commits:** this .53/code69 read correction after .52 evidence706345c.
+
+**Changed**
+- Only null requests standing orders alone. An explicit empty imported episode
+  includes its episode orders in the discharge preview without including a later
+  episode or deleted order. No ID repair, UI/schema/dependency/permission change.
+- Ending orders also requires the episode's patient: an inconsistent imported
+  cross-patient link cannot change another patient's active/held order.
+- Scoped version metadata changes keep the earlier inspected .52 APK separate.
+
+**Verified**
+- A migrated-SQLite pre-fix probe fails: an explicit empty episode omits its order.
+- Three new regression cases exercise historical/empty/null scopes and retained
+  rows; five context/mutation/record/read-failure/editor suites pass178 cases
+  in29.655 seconds without act warnings.
+- Two migrated-SQLite probes reproduce foreign active/held completion before
+  the additional guard. Two retained-row regressions cover the correction.
+- Initial read-only full check passes164 suites/2,357 app tests plus five
+  workflows in156.441 Jest seconds. The separate final check including the
+  mutation guard passes164 suites/2,359 app tests plus five workflows in157.338
+  Jest seconds, with clean typecheck/lint/formatting and no act warnings.
+
+**Not verified**
+- .53 hosted checks and native/artifact acceptance await the frozen source.
+  .52 evidence does not silently become evidence for this changed read.
+- Physical phone and broader product/pressure/recovery gates remain open.
+
+**Open threads**
+- Finish .53 source/native/artifact checks, then push normally and update PR6.
+- Six manual forms still need raw recovery. Follow IMPLEMENTATION's P0 order.
+
+**Gotchas**
+- Never use truthiness to distinguish an explicit SQLite text key from null.
+- Keep .52 artifacts/hashes and the failed pre-fix probe attached to their source.
+
+---
+
 ## 2026-10-10 — Verify the final Kardex guard on Android and inspect its owner APK
 
 **Agent:** GPT-6 via Codex; primary verification, no new delegation.

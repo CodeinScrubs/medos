@@ -86,6 +86,9 @@ validation-0.11.52 for each source's automated, hosted, native and inspected-APK
 boundaries. The current owner arm64 .52 artifact is built and inspected from
 `41a592b`; no physical phone run is implied. Later documentation commits do not
 change the application bytes used for those witnesses.
+The .53 follow-up corrects explicit-episode order reads and discharge's patient
+filter. Its source checks pass; its separate native/artifact/hosted gates are in
+validation-0.11.53. Do not substitute an earlier artifact for this changed source.
 
 | Area | Read together | Principal checks |
 |---|---|---|

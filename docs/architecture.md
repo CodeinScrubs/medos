@@ -2322,3 +2322,9 @@ replacement while ordinary same-dataset corrections remain live. It still needs
 raw draft/CAS recovery, explicit conflict review and permanent correction history.
 Do not call this manual editor autosave or process-death recovery. Frozen-source
 software/native/archive boundaries are in `validation-0.11.52.md`.
+As of .53, episode-specific order reads also distinguish explicit strings,
+including an imported empty key, from null. The discharge preview includes the
+requested episode and standing orders; null selects standing orders alone.
+Discharge's bulk order update requires both that episode and its patient. An
+inconsistent imported cross-patient link is retained unchanged rather than
+ending another patient's order or repairing/moving it implicitly.

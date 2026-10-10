@@ -240,7 +240,14 @@ export function dischargeEncounterInTransaction(tx: DbTransaction, id: string, i
   // count and all — a drug the patient stopped months ago.
   tx.update(orders)
     .set({ status: 'completed', endAt: input.dischargedAt, ...touch(now) })
-    .where(and(eq(orders.encounterId, id), isNull(orders.deletedAt), inArray(orders.status, ['active', 'held'])))
+    .where(
+      and(
+        eq(orders.patientId, current.patientId),
+        eq(orders.encounterId, id),
+        isNull(orders.deletedAt),
+        inArray(orders.status, ['active', 'held']),
+      ),
+    )
     .run();
 
   tx.update(patients)

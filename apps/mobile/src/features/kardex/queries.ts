@@ -27,7 +27,9 @@ export function patientOrdersQuery(patientId: string, encounterId: string | null
       and(
         alive,
         eq(orders.patientId, patientId),
-        encounterId ? or(eq(orders.encounterId, encounterId), isNull(orders.encounterId)) : isNull(orders.encounterId),
+        encounterId !== null
+          ? or(eq(orders.encounterId, encounterId), isNull(orders.encounterId))
+          : isNull(orders.encounterId),
       ),
     )
     .orderBy(asc(orders.sortOrder), desc(orders.startAt));
