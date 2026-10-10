@@ -33,6 +33,38 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Verify the delivered .53 branch on GitHub
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** application `e357dbf`; native evidence `5fe3c14`; this delivery checkpoint.
+
+**Changed**
+- Record the actual normal push and exact hosted result. Refresh PR6's review
+  scope with the .51 recovery, .52 original context and .53 discharge corrections.
+- No application, schema, dependency, permission or artifact change.
+
+**Verified**
+- Normal pre-push check: 164 suites/2,359 app tests and five workflow tests,
+  152.393 Jest seconds; clean typecheck/lint/formatting.
+- Exact `5fe3c14` CI38028660734 succeeds, including migration regeneration and
+  Android bundling. Local and remote branch heads match at that checkpoint.
+- Application-tree diff from frozen `e357dbf` is empty. Rehashed owner .53 APK
+  matches the full SHA-256 in validation-0.11.53; native evidence stays source-bound.
+
+**Not verified**
+- No physical phone, complete 40-patient pressure test or remaining product gates.
+- A later documentation/source head needs its own hosted check; follow PR6 checks.
+
+**Open threads**
+- Finish original-context raw recovery for the six manual forms, starting with
+  Kardex. Keep patient/episode context explicit, including null and imported keys.
+- The phone is not the sole remaining work. Use IMPLEMENTATION's acceptance gates.
+
+**Gotchas**
+- Do not relabel earlier native evidence or an earlier CI run as a later-source pass.
+
+---
+
 ## 2026-10-10 — Verify native discharge scope and deliver the inspected .53 owner APK
 
 **Agent:** GPT-6 via Codex; primary verification, no new delegation.

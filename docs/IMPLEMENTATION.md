@@ -48,7 +48,9 @@ final rows across 50 application tables, with every one of 34 media hashes exact
 Foreign/standing/deleted orders stay unchanged. No app fatal/ANR is observed in
 the checked buffers; original read-only AVD data/key hashes remain exact.
 The owner-signed arm64 .53/code69 APK is built and inspected from this source.
-Final-branch hosted CI awaits the normal push. See
+The normal push check and exact checkpoint `5fe3c14` hosted CI38028660734 pass,
+including migration regeneration and the Android bundle; the application tree
+matches the frozen source. See
 [validation-0.11.53.md](validation-0.11.53.md) for hashes and evidence limits.
 
 PR6 also retains the .51 shared idea/topic raw-recovery pilot and .52 original

@@ -39,7 +39,14 @@ workflows in157.338 Jest seconds. Typecheck/lint/both formatting checks pass,
 without act warnings. Hosted/native/artifact acceptance remains pending.
 
 The frozen application source is `e357dbf`; its native/artifact results follow.
-Final-branch hosted CI is pending the normal push.
+The normal push repeats the full check successfully: 164 suites/2,359 app tests
+and five workflow tests, with 152.393 Jest seconds and clean typecheck/lint/formatting.
+[Hosted CI 38028660734](https://github.com/CodeinScrubs/medos/actions/runs/38028660734)
+passes on exact branch checkpoint `5fe3c14a24e4355c01992606c04a2d676684d7b1`,
+including migration regeneration and the Android bundle. The application tree
+is unchanged between `e357dbf` and this documentation checkpoint. The current
+[PR6 checks](https://github.com/CodeinScrubs/medos/pull/6/checks) remain the authority
+for any later branch checkpoint; an earlier passing run is not a new-head check.
 
 No schema, dependency, route, permission, UI, clinical formula or archive/KDF change.
 Version edits affect only the four app metadata locations and the three allowed
