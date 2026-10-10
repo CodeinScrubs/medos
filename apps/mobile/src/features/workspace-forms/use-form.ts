@@ -263,6 +263,7 @@ export function useWorkspaceForm<R extends FormRecord, F>(
         persistence.revision(),
         new Date(now),
         generation,
+        port.parentId ?? null,
       );
       finished.current = true;
       saver.cancel();
@@ -324,6 +325,8 @@ export function useWorkspaceForm<R extends FormRecord, F>(
     locked: busy || !!completed || stale || unavailable,
     hasDraft: !!seed.draft || state.status !== 'idle',
     change,
+    canChange: () =>
+      !acting.current && !dialog.current && !finished.current && interactive() && generation === datasetGeneration(),
     save,
     close,
     discard,

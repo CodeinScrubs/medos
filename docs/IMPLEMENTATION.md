@@ -33,25 +33,23 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.53/code69, frozen source `e357dbf`, preserves the explicit
-patient/episode scope of discharge orders. An imported empty episode is distinct
-from null in the preview; ending orders requires both the episode and its patient.
-Pre-fix SQLite probes fail for the omitted order and cross-patient completion.
-Five regressions cover the corrections without repairing or moving old records.
-No UI, schema, dependency or permission is added.
+Application 0.11.54/code70 on `codex/kardex-form-recovery` adds original-context
+raw Kardex recovery through the existing shared lifecycle. Its explicit parent
+key retains patient/episode ownership, including null and imported empty keys.
+Partial text/date input persists independently of an Order; publication compares
+the complete original basis/revision and commits record/receipt/audit together.
+Recovery links stay inside the existing Kardex. No SQL schema, route, dependency
+or permission is added. Full `npm run check` passes 166 suites/2,388 app tests
+and five workflow checks without act warnings. SQL regeneration is unchanged;
+hosted/native and .54 owner-artifact acceptance remain pending. See
+[validation-0.11.54.md](validation-0.11.54.md).
 
-Full source checks pass 164 suites/2,359 app tests and five workflows without
-act warnings. Frozen-source Android replay shows two ending orders and separately
-publishes the discharge. Independent authenticated exports preserve 4,117 prior
-rows on upgrade, exactly match 4,129 fixture rows and confirm all 4,130 intended
-final rows across 50 application tables, with every one of 34 media hashes exact.
-Foreign/standing/deleted orders stay unchanged. No app fatal/ANR is observed in
-the checked buffers; original read-only AVD data/key hashes remain exact.
-The owner-signed arm64 .53/code69 APK is built and inspected from this source.
-The normal push check and exact checkpoint `5fe3c14` hosted CI38028660734 pass,
-including migration regeneration and the Android bundle; the application tree
-matches the frozen source. See
-[validation-0.11.53.md](validation-0.11.53.md) for hashes and evidence limits.
+The delivered parent PR6 checkpoint `e68e6a4` passes CI38029238968, including
+migration regeneration and Android bundling. Its .53 discharge corrections and
+inspected owner APK remain attributed to frozen `e357dbf`; whole-state native
+witnesses preserve all prior/unrelated fields and 34 media hashes. Those older
+results do not accept this new continuation. See
+[validation-0.11.53.md](validation-0.11.53.md).
 
 PR6 also retains the .51 shared idea/topic raw-recovery pilot and .52 original
 Kardex creation/allergy context. Their native/whole-archive/owner-artifact
@@ -62,7 +60,7 @@ Earlier evidence is in HANDOFF and [.50](validation-0.11.50.md),
 [.49](validation-0.11.49.md), [.48](validation-0.11.48.md) and
 [.47](validation-0.11.47.md). Never relabel an older witness as a new-source test.
 
-Six manual forms still need raw recovery. Physical-phone acceptance,
+Five other manual forms still need raw recovery. Physical-phone acceptance,
 complete 40-patient timings, pressure/restore costs, clinical history/trash,
 rich text and fuller product workflows remain open below. The phone is not
 currently the sole remaining work.
@@ -75,7 +73,7 @@ currently the sole remaining work.
 | D02 | Atomic note/version/draft acknowledgment | .50 persists original Note/encounter basis, including null, and raw date/clock/revision. Legacy or conflicting recovered drafts require exact shown-row adoption before separate publication; scoped recovery selects the intended draft. Software conflict, audit rollback, lifecycle and old/current import checks pass. Bounded native adoption/publication, outpatient/date/voice recovery, pages and whole archives pass in validation-0.11.50. .49 version restore has bounded native evidence. Preserve original dataset/native parents; general interruption/power acceptance remains open. |
 | D03 | Durable stopped voice publication | Existing record, draft-note and capture journals support verified-copy retry and atomic metadata acknowledgment. Active/pre-journal recording loss and physical recorder/audio behavior are separate gates. |
 | D04 | Atomic quick capture filing | Software preserves selected context, same-operation retry and one destination. Copied photo batches have a journal. Picker/pre-journal interruption and provider-loss/native failures still need acceptance. |
-| D05 | Recover every manual form | Existing patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital recovery is unchanged. .51 connects one shared idea/topic lifecycle with feature-owned codecs/publishers, exact selected draft, raw date/whitespace, complete-basis CAS and separate publication. Software checks and bounded native recovery/conflict/archive witnesses pass in validation-0.11.51. Six forms remain: Kardex order, specialty profile, prescription, place, extension and credential. Preserve exact credential whitespace and partial prescription lines. The .52 manual Kardex form retains its original active patient/encounter including null and refuses foreign/deleted context; it still needs raw recovery with its shown clinical basis; do not plug it into the pilot's workspace-only null-parent port. Never copy a500-line engine or reuse doctor drafts for unrelated entities. |
+| D05 | Recover every manual form | Existing clinical stores and the .51 idea/topic pilot are unchanged. .54 explicitly extends the shared lifecycle with an immutable patient/episode parent key and a strict Order codec/publisher; raw input and complete clinical basis remain separate from publication. Full current-source checks pass; native/artifact/hosted gates remain in validation-0.11.54. Five forms remain: specialty profile, prescription, place, extension and credential. Preserve exact credential whitespace and partial prescription lines. Clinical forms must validate original ownership rather than use an unparented notebook port. Never copy a500-line engine or reuse doctor drafts for unrelated entities. |
 | D06 | Consult reply ownership | Software keeps replies with their original consultation and preserves failed input. Verify full native request/answer/follow-up workflow. |
 | D07 | Numerical integrity | Blank differs from invalid; paired BP conflicts cannot be half-merged; observation time/context stay explicit. Glucose units are recorded, never guessed/converted, and charts separate units. Broader chart/device and clinical applicability review remain open. |
 | D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. Labs, imaging, vitals, orders, consults, diagnoses and encounters need appropriate restore/audit paths. Order status/delete audit now commits atomically; order restore and permanent correction history remain. Lab deletion still needs audit. Never infer a deleted encounter's former active state. |

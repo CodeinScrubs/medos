@@ -15,10 +15,10 @@ import { softDelete, stamps, touch } from '@/lib/ids';
 
 import type { FormComparison, FormPort, FormRecord, FormRow, FormSeed } from './types';
 
-export const openFormScope = (kind: WorkspaceFormKind, recordId: string | null) =>
+export const openFormScope = (kind: WorkspaceFormKind, recordId: string | null, parentId: string | null = null) =>
   and(
     eq(workspaceFormDrafts.kind, kind),
-    eq(workspaceFormDrafts.scope, formScope(recordId)),
+    eq(workspaceFormDrafts.scope, formScope(recordId, parentId)),
     isNull(workspaceFormDrafts.deletedAt),
   );
 
@@ -49,8 +49,13 @@ export function workspaceDraftsQuery(kind: WorkspaceFormKind, cursor: WorkspaceD
     .orderBy(desc(workspaceFormDrafts.updatedAt), desc(workspaceFormDrafts.id))
     .limit(4);
 }
-function context(row: WorkspaceFormDraft, kind: WorkspaceFormKind, recordId: string | null) {
-  if (row.kind !== kind || row.recordId !== recordId || row.parentId !== null || row.scope !== formScope(recordId))
+function context(row: WorkspaceFormDraft, kind: WorkspaceFormKind, recordId: string | null, parentId: string | null) {
+  if (
+    row.kind !== kind ||
+    row.recordId !== recordId ||
+    row.parentId !== parentId ||
+    row.scope !== formScope(recordId, parentId)
+  )
     throw new FormDraftConflict();
 }
 function validRevision(revision: number) {
@@ -61,12 +66,17 @@ function nextRevision(revision: number) {
   validRevision(revision + 1);
   return revision + 1;
 }
-function documentContext<F>(document: FormDocument<F>, kind: WorkspaceFormKind, recordId: string | null) {
+function documentContext<F>(
+  document: FormDocument<F>,
+  kind: WorkspaceFormKind,
+  recordId: string | null,
+  parentId: string | null,
+) {
   if (
     document.kind !== kind ||
     document.recordId !== recordId ||
-    document.parentId !== null ||
-    document.scope !== formScope(recordId)
+    document.parentId !== parentId ||
+    document.scope !== formScope(recordId, parentId)
   )
     throw new FormDraftConflict();
 }
@@ -76,13 +86,15 @@ export function workspaceFormSeed<R extends FormRecord, F>(
   recordId: string | null,
   now: Date,
 ): FormSeed<R, F> {
-  if (row.scope !== formScope(recordId) || (row.record && row.record.id !== recordId)) throw new FormDraftConflict();
+  const parentId = port.parentId ?? null;
+  if (row.scope !== formScope(recordId, parentId) || (row.record && row.record.id !== recordId))
+    throw new FormDraftConflict();
   if (row.draft) {
-    context(row.draft, port.codec.kind, recordId);
+    context(row.draft, port.codec.kind, recordId, parentId);
     validRevision(row.draft.revision);
     if (row.draft.deletedAt || row.draft.committedId) throw new FormDraftConflict();
     const document = port.codec.decode(row.draft.body);
-    documentContext(document, port.codec.kind, recordId);
+    documentContext(document, port.codec.kind, recordId, parentId);
     return { ...row, document };
   }
   if (recordId !== null && (!row.record || row.record.deletedAt)) throw new FormDraftConflict();
@@ -90,6 +102,7 @@ export function workspaceFormSeed<R extends FormRecord, F>(
     ...row,
     document: port.codec.create({
       recordId,
+      parentId,
       basis: row.record ? formBasis(row.record) : null,
       fields: port.initial(row.record, now),
     }),
@@ -102,11 +115,16 @@ function inspect<R extends FormRecord, F>(
   recordId: string | null,
 ): FormComparison<R> {
   const original = tx.select().from(workspaceFormDrafts).where(eq(workspaceFormDrafts.id, id)).get() ?? null;
-  if (original) context(original, port.codec.kind, recordId);
+  if (original) context(original, port.codec.kind, recordId, port.parentId ?? null);
   return {
-    scope: formScope(recordId),
+    scope: formScope(recordId, port.parentId ?? null),
     record: recordId === null ? null : port.read(tx, recordId),
-    draft: tx.select().from(workspaceFormDrafts).where(openFormScope(port.codec.kind, recordId)).get() ?? null,
+    draft:
+      tx
+        .select()
+        .from(workspaceFormDrafts)
+        .where(openFormScope(port.codec.kind, recordId, port.parentId ?? null))
+        .get() ?? null,
     original,
   };
 }
@@ -126,12 +144,16 @@ export async function saveWorkspaceDraft<R extends FormRecord, F>(
     db.transaction((tx) => {
       validRevision(revision);
       const body = port.codec.encode(document);
-      documentContext(document, port.codec.kind, document.recordId);
+      documentContext(document, port.codec.kind, document.recordId, port.parentId ?? null);
       const current = tx.select().from(workspaceFormDrafts).where(eq(workspaceFormDrafts.id, id)).get();
       if (!current) {
         if (
           revision !== 0 ||
-          tx.select().from(workspaceFormDrafts).where(openFormScope(port.codec.kind, document.recordId)).get()
+          tx
+            .select()
+            .from(workspaceFormDrafts)
+            .where(openFormScope(port.codec.kind, document.recordId, port.parentId ?? null))
+            .get()
         )
           throw new FormDraftConflict();
         tx.insert(workspaceFormDrafts)
@@ -139,7 +161,7 @@ export async function saveWorkspaceDraft<R extends FormRecord, F>(
             id,
             ...stamps(),
             kind: port.codec.kind,
-            parentId: null,
+            parentId: document.parentId,
             recordId: document.recordId,
             scope: document.scope,
             body,
@@ -148,9 +170,9 @@ export async function saveWorkspaceDraft<R extends FormRecord, F>(
           .run();
         return 1;
       }
-      context(current, port.codec.kind, document.recordId);
+      context(current, port.codec.kind, document.recordId, port.parentId ?? null);
       const stored = port.codec.decode(current.body);
-      documentContext(stored, port.codec.kind, document.recordId);
+      documentContext(stored, port.codec.kind, document.recordId, port.parentId ?? null);
       if (current.deletedAt || current.committedId || current.revision !== revision || stored.basis !== document.basis)
         throw new FormDraftConflict();
       if (port.codec.encode(port.codec.decode(current.body)) === body) return revision;
@@ -177,10 +199,10 @@ export async function publishWorkspaceDraft<R extends FormRecord, F>(
       validRevision(revision);
       const row = tx.select().from(workspaceFormDrafts).where(eq(workspaceFormDrafts.id, id)).get();
       if (!row) throw new FormDraftConflict();
-      context(row, port.codec.kind, recordId);
+      context(row, port.codec.kind, recordId, port.parentId ?? null);
       validRevision(row.revision);
       const document = port.codec.decode(row.body);
-      documentContext(document, port.codec.kind, recordId);
+      documentContext(document, port.codec.kind, recordId, port.parentId ?? null);
       if (row.committedId && row.revision === revision + 1) {
         const prior = port.read(tx, row.committedId);
         if (!row.deletedAt || !prior || prior.deletedAt || (recordId !== null && prior.id !== recordId))
@@ -225,19 +247,20 @@ export async function replaceWorkspaceDraft<R extends FormRecord, F>(
 ) {
   return withDatasetWrite(generation, async () =>
     db.transaction((tx) => {
-      documentContext(document, port.codec.kind, document.recordId);
+      documentContext(document, port.codec.kind, document.recordId, port.parentId ?? null);
       const live = inspect(tx, port, id, document.recordId);
       if (!sameFormComparison(live, shown) || live.original?.deletedAt || live.original?.committedId)
         throw new FormDraftConflict();
       if (document.recordId !== null && (!live.record || live.record.deletedAt)) throw new FormDraftConflict();
       if (live.draft) {
-        context(live.draft, port.codec.kind, document.recordId);
+        context(live.draft, port.codec.kind, document.recordId, port.parentId ?? null);
         validRevision(live.draft.revision);
         if (live.draft.committedId) throw new FormDraftConflict();
-        documentContext(port.codec.decode(live.draft.body), port.codec.kind, document.recordId);
+        documentContext(port.codec.decode(live.draft.body), port.codec.kind, document.recordId, port.parentId ?? null);
       }
       const next = port.codec.create({
         recordId: document.recordId,
+        parentId: document.parentId,
         basis: live.record ? formBasis(live.record) : null,
         fields: document.fields,
       });
@@ -254,7 +277,7 @@ export async function replaceWorkspaceDraft<R extends FormRecord, F>(
             id: nextId,
             ...stamps(now),
             kind: port.codec.kind,
-            parentId: null,
+            parentId: next.parentId,
             recordId: next.recordId,
             scope: next.scope,
             body: port.codec.encode(next),
@@ -274,13 +297,14 @@ export async function discardWorkspaceDraft(
   revision: number,
   now: Date,
   generation: number,
+  parentId: string | null = null,
 ) {
   return withDatasetWrite(generation, async () =>
     db.transaction((tx) => {
       validRevision(revision);
       const row = tx.select().from(workspaceFormDrafts).where(eq(workspaceFormDrafts.id, id)).get();
       if (!row) throw new FormDraftConflict();
-      context(row, kind, recordId);
+      context(row, kind, recordId, parentId);
       if (row.deletedAt || row.committedId || row.revision !== revision) throw new FormDraftConflict();
       tx.update(workspaceFormDrafts)
         .set({ revision: nextRevision(revision), ...softDelete(now) })

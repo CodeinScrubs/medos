@@ -33,6 +33,48 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Recover unfinished Kardex input in its original clinical context
+
+**Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
+**Commits:** implementation in this commit; parent PR6 `e68e6a4`.
+
+**Changed**
+- Extend the existing raw lifecycle with an explicit immutable parent key.
+  Order uses patient/episode, including null and imported empty keys; notebook
+  scope keys stay unchanged. No new SQL migration, route, dependency or permission.
+- Preserve exact partial text/invalid date input before publication. Original
+  record basis/revision, synchronous domain write, retirement/receipt/audit commit
+  together. Conflict adoption remains separate from clinical Save.
+- Keep recovery links in the existing Kardex and reset only read-only pager state
+  across patient/dataset changes. Keep original form/allergy/focus/removal ownership.
+
+**Verified**
+- Delivered parent `e68e6a4` CI38029238968 succeeds, including migrations/bundle.
+- Pre-change UI probe fails: unfinished text produces no raw draft (3.721s).
+- Three focused suites pass 49 tests in 9.202s without act warnings, covering raw
+  lifecycle, original context, conflicts, rollback, late callbacks and paging.
+- Full `npm run check` green: 166 suites/2,388 app tests (155.608s) and five
+  workflow tests; no act warnings. Includes late-child original-allergy regression.
+- Migration regeneration reports no schema changes; version edits are scoped.
+
+**Not verified**
+- Exact hosted CI, new native recovery and inspected .54 APK remain pending
+  here. Older .53 APK/native results do not accept this source.
+- No physical phone, complete pressure/40-patient performance or all product gates.
+
+**Open threads**
+- Freeze this checked source for native process-death/publication,
+  complete authenticated-state comparison and owner APK inspection.
+- Submit this incremental continuation against PR6 for clear senior review.
+- Five other raw forms plus the other IMPLEMENTATION gates remain; not only phone.
+
+**Gotchas**
+- Original null must never resolve to a later admission. No fresh dataset token in
+  old callbacks. Use replacement.committed/release, and run React notifications
+  inside act when testing. Close saves raw input; deletion is a separate confirmation.
+
+---
+
 ## 2026-10-10 — Verify the delivered .53 branch on GitHub
 
 **Agent:** GPT-6 via Codex; primary verification, no new delegation.

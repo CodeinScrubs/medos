@@ -10,6 +10,8 @@ export type FormComparison<R> = FormRow<R> & { original: WorkspaceFormDraft | nu
 /** All publication callbacks are synchronous and use the caller's transaction. */
 export type FormPort<R extends FormRecord, F> = {
   codec: FormCodec<F>;
+  /** Stable context captured before editing; omitted only for unparented notebooks. */
+  parentId?: string | null;
   query(recordId: string | null, draftId?: string | null): { then: Promise<FormRow<R>[]>['then'] };
   read(tx: DbTransaction, recordId: string): R | null;
   initial(record: R | null, now: Date): F;

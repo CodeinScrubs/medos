@@ -88,9 +88,16 @@ whose actual native preview/publication and complete-state comparisons pass.
 No physical phone run is implied. Later documentation commits do not change
 the application bytes used for those witnesses; never substitute an older APK.
 
+The separate `codex/kardex-form-recovery` continuation starts at PR6's delivered
+`e68e6a4`, whose CI38029238968 also passes. Review this incremental diff against
+that parent: .54 extends the shared lifecycle with an explicit clinical parent
+key and feature-owned Order validation/publication. Its current-source/native
+and artifact gates are recorded separately in validation-0.11.54.
+
 | Area | Read together | Principal checks |
 |---|---|---|
 | Raw workspace recovery | lib/form-document.ts; features/workspace-forms/queries.ts, form-gate.tsx, use-form.ts; knowledge/form-draft*.ts | Strict version/context; exact partial input; complete published basis and revision CAS; publication/retirement/audit atomically; adoption never publishes |
+| Raw Kardex recovery | kardex/form-draft*.ts, form-recovery.test.tsx, order-form-screen.tsx; workspace-forms; validation-0.11.54 | Immutable patient/episode key; invalid raw dates/whitespace; no clinical order until Save; complete-basis conflict; audit rollback; original focus/dataset and one removal guard; patient-scoped recovery pages |
 | Historical teaching links | knowledge/queries.ts, topic-form-screen.tsx, form-drafts.test.ts, form-recovery.test.tsx | Retain an unchanged archived teacher/specialty and search names; refuse a newly selected unavailable reference; inspect selected IDs during refresh |
 | Kardex creation/display | kardex/queries.ts, order-form-screen.tsx, creation-context.test.ts, mutations.test.ts; notes/dataset-editors.test.tsx | Original active episode including null; every other stored reference, including an empty key, needs live ownership; retain original allergy display across restore without freezing ordinary corrections |
 | Discharge orders | kardex/queries.ts, creation-context.test.ts; encounters/queries.ts; records.test.ts; validation-0.11.53 | An explicit empty episode is distinct from null; only the original patient's episode orders end, preserving inconsistent imported foreign rows |
@@ -99,8 +106,8 @@ the application bytes used for those witnesses; never substitute an older APK.
 | Native close/navigation | components/screen-options.tsx, use-save-before-leave.ts; notes/media-editors.test.tsx; validation-0.11.33/.34/.48 | Retain scroll host/native stacking parents and header presence; late acknowledgments close only the originating focused route |
 | Deck/calendar/messages | shifts/queries.ts and workspace.tsx; doctors/occasion-form-queries.ts and greeting-composer.tsx; lib/jalali.ts and date-input.ts | Matching preview/count/destination scope, explicit priority, stable order; leap dates and raw partial input; prepared is not sent |
 
-Six manual forms still need raw recovery. Orders additionally need original
-patient/encounter and clinical basis; credentials retain exact secret whitespace.
+Five other manual forms still need raw recovery. Current .54 Order acceptance
+remains separate; credentials must retain exact secret whitespace.
 Other P0 and product gates are in IMPLEMENTATION. Versioned reports preserve
 older change/retest details; this guide is not a chronological release history.
 

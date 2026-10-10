@@ -22,13 +22,18 @@ export function WorkspaceFormGate<R extends FormRecord, F>({
   draftId?: string | null;
   children: (seed: FormSeed<R, F>, notice: ReactNode, unavailable: boolean) => ReactNode;
 }) {
-  const [intent] = useState(() => ({ kind: port.codec.kind, recordId, draftId }));
+  const [intent] = useState(() => ({ kind: port.codec.kind, parentId: port.parentId ?? null, recordId, draftId }));
   const [seed, setSeed] = useState<FormSeed<R, F> | null>(null);
   const { stale } = useDatasetIntent();
   const now = useNow();
-  const switching = recordId !== intent.recordId || draftId !== intent.draftId || port.codec.kind !== intent.kind;
+  const switching =
+    recordId !== intent.recordId ||
+    draftId !== intent.draftId ||
+    port.codec.kind !== intent.kind ||
+    (port.parentId ?? null) !== intent.parentId;
   const { data, error, retry } = useLive(port.query(intent.recordId, intent.draftId), [
     intent.kind,
+    intent.parentId,
     intent.recordId,
     intent.draftId,
   ]);

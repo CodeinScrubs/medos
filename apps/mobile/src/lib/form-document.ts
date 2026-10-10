@@ -1,12 +1,12 @@
 import { z, type ZodType } from 'zod';
 
 /** Only shipped codecs belong here; adding a form does not require a new store. */
-export type WorkspaceFormKind = 'idea' | 'topic';
+export type WorkspaceFormKind = 'idea' | 'topic' | 'order';
 
 export type FormDocument<T> = {
   version: 1;
   kind: WorkspaceFormKind;
-  /** Parent is a record context, not a user/tenant. Workspace forms have none. */
+  /** Immutable feature-owned context key, not a user/tenant. Notebooks have none. */
   parentId: string | null;
   recordId: string | null;
   scope: string;
