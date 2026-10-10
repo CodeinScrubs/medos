@@ -33,8 +33,12 @@ and lock publication. Raw autosave preserves an incomplete date, empty title
 and separators without publishing. Background/Back flush raw input; only the
 explicit normal Save validates and publishes. Topic date validation uses the
 visible raw date, preserves unchanged seconds/milliseconds and checks live
-teacher/specialty references in the publication transaction. Search rebuilds
-from the merged record, using those same transactional related reads.
+teacher/specialty references in the publication transaction. An edit may retain
+its original archived teacher/specialty link; a newly selected archived or
+missing reference is refused. The form reads only its selected historical
+references separately, labels archived names and keeps them out of picker
+choices. Search rebuilds from the merged record with the same transactional
+related reads, preserving historical names when the link is retained.
 
 Publication compares the exact draft revision and complete current record,
 then publishes, soft-retires the draft, stores its receipt and writes an id-only

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { tablesOf } from '@/db/query-tables';
-import { auditLog, doctors, ideas, topics, workspaceFormDrafts } from '@/db/schema';
+import { auditLog, doctors, ideas, specialties, topics, workspaceFormDrafts } from '@/db/schema';
 import { createDoctor } from '@/features/doctors/queries';
 import {
   discardWorkspaceDraft,
@@ -22,7 +22,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 import { ideaFormCodec, topicFormCodec, topicFormDate } from './form-draft';
 import { ideaFormPort, ideaFormQuery, topicFormPort, topicFormQuery } from './form-draft-queries';
 import { createIdea } from './ideas-queries';
-import { createTopic, topicsQuery, updateTopic } from './queries';
+import { createTopic, topicReferencesQuery, topicsQuery, updateTopic } from './queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -400,4 +400,57 @@ describe('topic-owned raw data and synchronous publication', () => {
       summary: 'Added summary',
     });
   });
+  it('preserves historical teacher and specialty links when editing a topic after they are archived', async () => {
+    const teacher = await createDoctor({ firstName: 'Historical', lastName: 'Teacher' });
+    t.db
+      .insert(specialties)
+      .values({ id: 'historical-specialty', ...stamps(), nameFa: 'Historical specialty' })
+      .run();
+    const id = await createTopic({
+      title: 'Historical teaching',
+      taughtAt: now,
+      taughtById: teacher,
+      specialtyId: 'historical-specialty',
+    });
+    const document = await topicDocument(id);
+    document.fields.body = 'Updated clinical learning';
+    await saveWorkspaceDraft(topicFormPort, 'topic-raw', document, 0, generation);
+    t.db.update(doctors).set(softDelete()).where(eq(doctors.id, teacher)).run();
+    t.db.update(specialties).set(softDelete()).where(eq(specialties.id, 'historical-specialty')).run();
+    await publishWorkspaceDraft(topicFormPort, 'topic-raw', id, 1, now, generation);
+    expect((await topicsQuery({ search: 'Historical Teacher' }))[0]?.topic).toMatchObject({
+      body: 'Updated clinical learning',
+      taughtById: teacher,
+      specialtyId: 'historical-specialty',
+    });
+    expect(await topicsQuery({ search: 'Historical specialty' })).toHaveLength(1);
+    const references = (await topicReferencesQuery(teacher, 'historical-specialty'))[0]!;
+    expect(references.teacher?.deletedAt).toBeInstanceOf(Date);
+    expect(references.specialty?.deletedAt).toBeInstanceOf(Date);
+    expect(tablesOf(topicReferencesQuery(teacher, 'historical-specialty')).sort()).toEqual(['doctors', 'specialties']);
+    expect(await topicReferencesQuery(null, null)).toEqual([{ teacher: null, specialty: null }]);
+  });
+  it.each(['teacher', 'specialty'])(
+    'refuses a newly selected archived %s without publishing or retiring raw input',
+    async (kind) => {
+      const teacher = await createDoctor({ firstName: 'Archived', lastName: 'Teacher' });
+      t.db
+        .insert(specialties)
+        .values({ id: 'archived-specialty', ...stamps(), nameFa: 'Archived specialty' })
+        .run();
+      t.db.update(doctors).set(softDelete()).where(eq(doctors.id, teacher)).run();
+      t.db.update(specialties).set(softDelete()).where(eq(specialties.id, 'archived-specialty')).run();
+      const id = await createTopic({ title: 'Existing unlinked topic', taughtAt: now });
+      const document = await topicDocument(id);
+      if (kind === 'teacher') document.fields.taughtById = teacher;
+      else document.fields.specialtyId = 'archived-specialty';
+      await saveWorkspaceDraft(topicFormPort, 'topic-raw', document, 0, generation);
+      const before = t.db.select().from(topics).get();
+      const rawBefore = draft('topic-raw');
+      await expect(publishWorkspaceDraft(topicFormPort, 'topic-raw', id, 1, now, generation)).rejects.toThrow();
+      expect(t.db.select().from(topics).get()).toEqual(before);
+      expect(draft('topic-raw')).toEqual(rawBefore);
+      expect(t.db.select().from(auditLog).all()).toEqual([]);
+    },
+  );
 });

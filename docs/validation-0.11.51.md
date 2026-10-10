@@ -41,7 +41,7 @@ deleted target refusal, atomic audit-failure rollback, soft discard, old/current
 archive imports, background/Back recovery, read failures, same-id actual dataset
 replacement, dialog/focus/route/read/unmount ownership, selected retired drafts,
 bounded tied-time recovery pages, raw-only adoption and separate Save. Topic
-publication uses visible dates and live teacher/specialty reads; unchanged
+publication uses visible dates and transactional teacher/specialty reads; unchanged
 timestamps retain seconds/milliseconds. Malformed receipt replay cannot claim
 publication. Unsupported raw documents stay selectable without a fresh form.
 
@@ -49,7 +49,21 @@ publication. Unsupported raw documents stay selectable without a fresh form.
 
 Previous .50 final-head `2dcd60b` hosted CI38007035821 is successful, including
 full checks, regeneration and the Android bundle. PR1–5 retain their previously
-reviewed exact heads. This does not establish CI for the new source.
+reviewed exact heads. Pilot `d1c0a5f` is pushed normally, attached as draft PR6,
+and passes exact-head CI38011864223. Its frozen x86 build succeeds with essential
+native-library inspection. This precedes the historical-reference correction;
+it is not native acceptance of that later source.
+
+One later real-SQLite reproduction shows that archiving a teacher/specialty
+incorrectly blocks editing an already-linked topic. The correction retains
+unchanged historical references and their search names, shows archived names
+without making them picker choices, and refuses a newly selected unavailable
+reference without changing the target, draft or audit. All51 targeted SQL and
+mounted cases pass, including four new regression cases. Full checks then pass
+163 suites/2,329 app tests and five workflows in172.951 Jest seconds. One test
+import-order warning is corrected afterward and scoped lint is clean.
+Regeneration reports no schema changes. Native evidence for this correction
+is recorded separately when complete.
 
 No .51 native build/install/UI/archive witness is complete at this checkpoint.
 The last inspected owner APK remains `dist/MedOS-0.11.50.apk` from `1915ee5`;

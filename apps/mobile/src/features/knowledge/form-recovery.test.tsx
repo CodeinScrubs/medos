@@ -4,16 +4,19 @@ import { Alert, AppState, Pressable } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
+import { PickerModal } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { ScreenOptions } from '@/components/screen-options';
-import { Button, Input, Text } from '@/components/ui';
+import { Button, Input, SelectField, Text } from '@/components/ui';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { restoreDatabase } from '@/db/client';
-import { ideas, topics, workspaceFormDrafts } from '@/db/schema';
+import { doctors, ideas, specialties, topics, workspaceFormDrafts } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
+import { createDoctor } from '@/features/doctors/queries';
 import * as formQueries from '@/features/workspace-forms/queries';
 import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { datasetGeneration, reserveDatasetReplacement } from '@/lib/dataset-write';
+import { softDelete, stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -21,6 +24,7 @@ import { ideaFormCodec } from './form-draft';
 import { ideaFormPort, ideaFormQuery } from './form-draft-queries';
 import { IdeaFormScreen } from './idea-form-screen';
 import { createIdea } from './ideas-queries';
+import { createTopic } from './queries';
 import { TopicFormScreen } from './topic-form-screen';
 
 let mockParams: { ideaId?: string; topicId?: string; draftId?: string } = {};
@@ -113,6 +117,48 @@ afterEach(async () => {
 });
 
 describe('workspace form recovery through the existing routes', () => {
+  it('shows archived historical references without offering them as picker choices or blocking a body edit', async () => {
+    const teacher = await createDoctor({ firstName: 'Historical', lastName: 'Teacher' });
+    t.db
+      .insert(specialties)
+      .values({ id: 'historical-specialty', ...stamps(), nameFa: 'Historical specialty' })
+      .run();
+    const id = await createTopic({
+      title: 'Historical topic',
+      taughtById: teacher,
+      specialtyId: 'historical-specialty',
+      taughtAt: new Date(),
+    });
+    t.db.update(doctors).set(softDelete()).where(eq(doctors.id, teacher)).run();
+    t.db.update(specialties).set(softDelete()).where(eq(specialties.id, 'historical-specialty')).run();
+    mockParams = { topicId: id };
+    await act(async () => {
+      tree = create(<TopicFormScreen />);
+      await settle();
+    });
+    const selected = tree!.root.findAllByType(SelectField);
+    expect(selected.find((node) => node.props.label === 'استاد')?.props.value).toBe('Historical Teacher (بایگانی‌شده)');
+    expect(selected.find((node) => node.props.label === 'تخصص')?.props.value).toBe(
+      'Historical specialty (بایگانی‌شده)',
+    );
+    const pickers = tree!.root.findAllByType(PickerModal);
+    expect(
+      pickers.every((node) =>
+        node.props.items.every((item: { id: string }) => item.id !== teacher && item.id !== 'historical-specialty'),
+      ),
+    ).toBe(true);
+    await act(async () => {
+      input('متن').props.onChangeText('Updated retained teaching');
+    });
+    await press('ذخیره');
+    expect(t.db.select().from(topics).get()).toMatchObject({
+      body: 'Updated retained teaching',
+      taughtById: teacher,
+      specialtyId: 'historical-specialty',
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(alertError).not.toHaveBeenCalled();
+  });
   it.each([
     { kind: 'idea', Form: IdeaFormScreen, label: 'توضیح' },
     { kind: 'topic', Form: TopicFormScreen, label: 'متن' },

@@ -24,6 +24,7 @@ import { useTheme } from '@/theme';
 import { initialTopicFields, topicFormDate, type TopicFormFields } from './form-draft';
 import { describeTopic, topicFormPort } from './form-draft-queries';
 import { COMMON_CONTEXTS } from './labels';
+import { topicReferencesQuery } from './queries';
 
 /** Write or edit a subject summary. Param: optional `topicId`. */
 export function TopicFormScreen() {
@@ -88,6 +89,11 @@ function TopicForm({
 
   const { data: specialtyRows, error: specialtyError, retry: retrySpecialties } = useLive(specialtiesQuery());
   const { data: doctorRows, error: doctorError, retry: retryDoctors } = useLive(doctorsQuery());
+  const {
+    data: referenceRows,
+    error: referenceError,
+    retry: retryReferences,
+  } = useLive(topicReferencesQuery(taughtById, specialtyId), [taughtById, specialtyId]);
 
   const specialtyItems = useMemo(
     () =>
@@ -104,13 +110,23 @@ function TopicForm({
     [doctorRows],
   );
 
-  const specialtyName = specialtyRows?.find((s) => s.id === specialtyId)?.nameFa ?? null;
-  const teacherName = doctorRows?.find((d) => d.id === taughtById);
+  // useLive retains old rows briefly after a selection changes; match the ID.
+  const selectedReferences = referenceRows?.[0];
+  const teacher = selectedReferences?.teacher?.id === taughtById ? selectedReferences.teacher : null;
+  const specialty = selectedReferences?.specialty?.id === specialtyId ? selectedReferences.specialty : null;
+  const teacherName = teacher ? `${doctorDisplayName(teacher)}${teacher.deletedAt ? ' (بایگانی‌شده)' : ''}` : null;
+  const specialtyName = specialty ? `${specialty.nameFa}${specialty.deletedAt ? ' (بایگانی‌شده)' : ''}` : null;
   function describeFields(fields: TopicFormFields) {
-    const teacher = doctorRows?.find((row) => row.id === fields.taughtById);
+    const liveTeacher = doctorRows?.find((row) => row.id === fields.taughtById);
     return describeTopic(fields, {
-      teacher: teacher ? doctorDisplayName(teacher) : undefined,
-      specialty: specialtyRows?.find((row) => row.id === fields.specialtyId)?.nameFa,
+      teacher: liveTeacher
+        ? doctorDisplayName(liveTeacher)
+        : fields.taughtById === taughtById
+          ? (teacherName ?? undefined)
+          : undefined,
+      specialty:
+        specialtyRows?.find((row) => row.id === fields.specialtyId)?.nameFa ??
+        (fields.specialtyId === specialtyId ? (specialtyName ?? undefined) : undefined),
     });
   }
   function describeRecord(row: Topic) {
@@ -170,10 +186,11 @@ function TopicForm({
         <SectionHeader title="از کجا" />
         <ErrorNotice error={doctorError} what="پزشکان" onRetry={retryDoctors} />
         <ErrorNotice error={specialtyError} what="تخصص‌ها" onRetry={retrySpecialties} />
+        <ErrorNotice error={referenceError} what="ارتباط‌های مبحث" onRetry={retryReferences} />
         <SelectField
           label="استاد"
           icon="person-outline"
-          value={teacherName ? doctorDisplayName(teacherName) : null}
+          value={teacherName}
           placeholder="انتخاب از دفترچه‌ی پزشکان"
           onPress={() => {
             if (!editing.locked) setPicker('teacher');

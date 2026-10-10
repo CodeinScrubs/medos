@@ -33,6 +33,42 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Preserve archived teaching links during topic correction
+
+**Agent:** GPT-6 via Codex; primary implementation and verification, no delegation.
+**Commits:** this correction checkpoint, following pilot `d1c0a5f` on PR6.
+
+**Changed**
+- Editing an old topic may retain its original archived teacher/specialty.
+  Names remain searchable and visible with an archived label; archived rows
+  are not new picker choices. A newly selected unavailable reference still
+  refuses publication atomically. No dependency, schema or route change.
+
+**Verified**
+- A real-SQLite regression fails before the correction. All51 focused SQL/
+  mounted cases pass afterward, including four new regression cases.
+- Full `npm run check` passes163 suites/2,329 app tests and five workflows.
+  An import-order warning in the added test is corrected afterward and checked
+  with scoped lint. Regeneration reports no schema changes.
+- Pilot `d1c0a5f` is pushed through the normal full-check hook, attached as
+  draft PR6 and passes exact-head CI38011864223. Its frozen x86 build succeeds.
+
+**Not verified**
+- Hosted CI and native acceptance of this correction are pending.
+  The older x86 build cannot witness this new source. No physical phone run.
+
+**Open threads**
+- Freeze the corrected source, rebuild x86, inspect/install actual bytes, then
+  witness raw recovery and independent archive preservation before owner arm64.
+- D05 still has six other manual forms; the wider IMPLEMENTATION gates remain.
+
+**Gotchas**
+- Availability rules for newly selected references must not erase historical
+  relationships or block unrelated body corrections. Read only the selected
+  historical rows and match their IDs while a reactive query changes scope.
+
+---
+
 ## 2026-10-10 — Pilot shared raw recovery in idea and teaching-topic forms
 
 **Agent:** GPT-6 via Codex; primary implementation and verification, no new delegation.

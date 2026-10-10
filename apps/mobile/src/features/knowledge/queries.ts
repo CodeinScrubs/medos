@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, type SQL } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 
 import { db, type DbTransaction } from '@/db/client';
 import { doctors, specialties, topics } from '@/db/schema';
@@ -52,6 +52,27 @@ export function topicQuery(id: string) {
     .limit(1);
 }
 
+/** Read only the selected references, including archived historical links.
+ * Archived rows remain visible here but never become picker choices.
+ */
+export function topicReferencesQuery(taughtById: string | null, specialtyId: string | null) {
+  return db
+    .select({
+      teacher: {
+        id: doctors.id,
+        title: doctors.title,
+        firstName: doctors.firstName,
+        lastName: doctors.lastName,
+        deletedAt: doctors.deletedAt,
+      },
+      specialty: { id: specialties.id, nameFa: specialties.nameFa, deletedAt: specialties.deletedAt },
+    })
+    .from(sql`(select 1) as topic_references`)
+    .leftJoin(doctors, taughtById === null ? sql`0` : eq(doctors.id, taughtById))
+    .leftJoin(specialties, specialtyId === null ? sql`0` : eq(specialties.id, specialtyId))
+    .limit(1);
+}
+
 export type TopicInput = {
   title: string;
   specialtyId?: string | null;
@@ -69,24 +90,31 @@ export type TopicInput = {
 };
 
 /** The teacher's name and the specialty's names, so both are searchable. */
-function relatedWords(tx: DbTransaction, input: { specialtyId?: string | null; taughtById?: string | null }): string[] {
+function relatedWords(
+  tx: DbTransaction,
+  input: { specialtyId?: string | null; taughtById?: string | null },
+  previous?: { specialtyId: string | null; taughtById: string | null },
+): string[] {
   const words: string[] = [];
   if (input.taughtById) {
     const row = tx
-      .select({ title: doctors.title, firstName: doctors.firstName, lastName: doctors.lastName })
+      .select({
+        title: doctors.title,
+        firstName: doctors.firstName,
+        lastName: doctors.lastName,
+        deletedAt: doctors.deletedAt,
+      })
       .from(doctors)
-      .where(and(eq(doctors.id, input.taughtById), isNull(doctors.deletedAt)))
+      .where(eq(doctors.id, input.taughtById))
       .get();
-    if (!row) throw new Error('استاد انتخاب‌شده در دسترس نیست.');
+    if (!row || (row.deletedAt !== null && input.taughtById !== previous?.taughtById))
+      throw new Error('استاد انتخاب‌شده در دسترس نیست.');
     words.push(doctorDisplayName(row));
   }
   if (input.specialtyId) {
-    const row = tx
-      .select()
-      .from(specialties)
-      .where(and(eq(specialties.id, input.specialtyId), isNull(specialties.deletedAt)))
-      .get();
-    if (!row) throw new Error('تخصص انتخاب‌شده در دسترس نیست.');
+    const row = tx.select().from(specialties).where(eq(specialties.id, input.specialtyId)).get();
+    if (!row || (row.deletedAt !== null && input.specialtyId !== previous?.specialtyId))
+      throw new Error('تخصص انتخاب‌شده در دسترس نیست.');
     words.push(row.nameFa, row.nameEn ?? '', ...(row.aliases ?? []));
   }
   return words.filter(Boolean);
@@ -139,7 +167,8 @@ export function updateTopicInTransaction(tx: DbTransaction, id: string, patch: P
   tx.update(topics)
     .set({
       ...row,
-      searchText: topicSearchText(merged, relatedWords(tx, merged)),
+      // Keep an existing archived relationship; reject a newly selected one.
+      searchText: topicSearchText(merged, relatedWords(tx, merged, current)),
       ...touch(now),
     })
     .where(and(alive, eq(topics.id, id)))

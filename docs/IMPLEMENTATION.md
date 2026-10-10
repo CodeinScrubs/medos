@@ -43,9 +43,13 @@ Original route/draft/dataset/focus ownership survives refresh and replacement.
 Three short recovery links with older/newer pages stay in each existing list.
 No new route, dependency, permission or backup format. Verification status and
 source/native boundaries are in [validation-0.11.51.md](validation-0.11.51.md).
-Full checks pass163 suites/2,325 app tests plus five workflows, with clean
-typecheck/lint/formatting. Exact-source native acceptance and hosted CI are
-pending; the last inspected owner artifact remains .50 below.
+Topic corrections retain unchanged archived teacher/specialty relationships;
+historical names remain visible/searchable and out of new picker choices.
+Full checks pass163 suites/2,329 app tests plus five workflows. The one added
+test import-order warning is corrected and scoped lint is clean. Pilot
+`d1c0a5f` passes hosted CI; exact-source native acceptance and CI of the later
+historical-reference correction remain pending. The last inspected owner
+artifact remains .50 below.
 
 Previous0.11.50/code66 persists the original Note/encounter basis, including null,
 raw date/clock and draft revision. A reopened draft cannot overwrite a newer
