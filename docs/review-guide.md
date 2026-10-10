@@ -94,7 +94,8 @@ that parent: .54 extends the shared lifecycle with an explicit clinical parent
 key and feature-owned Order validation/publication. Its full-source, bounded
 native and inspected .54 owner-APK witnesses pass on frozen d69163d.
 Read validation-0.11.54 for complete-state comparison details;
-physical acceptance and hosted status remain separate.
+Exact d403933 passes CI38034525674. Draft PR7 remains separate from its
+prerequisite PR6 and physical-phone acceptance.
 
 | Area | Read together | Principal checks |
 |---|---|---|

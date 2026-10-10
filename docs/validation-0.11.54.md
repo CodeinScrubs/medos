@@ -60,8 +60,12 @@ formatting, 166 app suites/2,388 tests in 155.608 Jest seconds and five workflow
 checks. Its output contains no act warnings. This includes the corrected
 late-mount regression. Migration regeneration reports no SQL changes.
 
-Hosted CI for this incremental branch remains pending at this checkpoint.
-The native and artifact acceptance below is attributed to frozen d69163d.
+The incremental draft [PR7](https://github.com/CodeinScrubs/medos/pull/7) is
+against PR6. Exact d403933 passes [CI38034525674](https://github.com/CodeinScrubs/medos/actions/runs/38034525674),
+including the full check, unchanged migrations and Android bundle. The normal
+push hook also passes 166 suites/2,388 app tests in156.044s plus five workflow
+checks without act warnings. Native/application bytes remain attributed to
+frozen d69163d; later delivery documentation does not relabel those witnesses.
 
 ## Frozen native acceptance
 

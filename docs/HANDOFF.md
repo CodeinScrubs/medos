@@ -33,6 +33,38 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Deliver reviewed .54 evidence with exact hosted checks
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** app `d69163d`, native evidence `d403933`; delivery docs in this commit.
+
+**Changed**
+- Push/attach incremental draft PR7 against PR6 and record exact source CI.
+  Both PRs remain drafts/unmerged. APK/application attribution stays d69163d.
+
+**Verified**
+- Normal push hook full check:166 suites/2,388 app tests (156.044s), five workflow
+  checks, no act warnings. Exact d403933 CI38034525674 succeeds in every step,
+  including schema regeneration and Android bundle. PR1–5 heads are unchanged.
+- .54 owner APK rehash matches inspected SHA256 5ce4ca6c…f5824653; details and
+  complete native/archive/negative-probe evidence are in validation-0.11.54.
+
+**Not verified**
+- No physical phone, power-loss or full 40-patient timings; five other manual
+  forms plus history/trash, rich text and other IMPLEMENTATION gates remain.
+- This documentation-only delivery triggers its own CI; live checks are on PR7.
+
+**Open threads**
+- Continue D05: specialty profile, prescription, place, extension and credential.
+  Then the other priority gates. The phone is not the only remaining work.
+- Senior review can compare PR7 to delivered e68e6a4 without rereading all PR6.
+
+**Gotchas**
+- Fresh HEAD/CI metadata is required; never attribute parent CI or an older APK
+  to a newer app source. New documentation does not change the frozen app bytes.
+
+---
+
 ## 2026-10-10 — Accept the frozen .54 Kardex recovery and owner APK
 
 **Agent:** GPT-6 via Codex; primary verification, no new delegation.
