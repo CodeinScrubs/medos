@@ -7,10 +7,18 @@ import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { QuickDateField } from '@/components/quick-date-field';
 import { ScreenOptions } from '@/components/screen-options';
-import { Button, Input, SelectField, Text } from '@/components/ui';
+import { Button, Column, Input, Screen, SelectField, Text } from '@/components/ui';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { restoreDatabase } from '@/db/client';
-import { doctors, ideas, specialties, topics, workspaceFormDrafts } from '@/db/schema';
+import {
+  doctors,
+  ideas,
+  prescriptionTemplates,
+  specialties,
+  specialtyProfiles,
+  topics,
+  workspaceFormDrafts,
+} from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { createDoctor } from '@/features/doctors/queries';
 import * as formQueries from '@/features/workspace-forms/queries';
@@ -24,11 +32,16 @@ import { ideaFormCodec } from './form-draft';
 import { ideaFormPort, ideaFormQuery } from './form-draft-queries';
 import { IdeaFormScreen } from './idea-form-screen';
 import { createIdea } from './ideas-queries';
+import { PrescriptionFormScreen } from './prescription-form-screen';
+import { createPrescription } from './prescriptions-queries';
 import { createTopic } from './queries';
+import { SpecialtyFormScreen } from './specialty-form-screen';
+import { createSpecialtyProfile } from './specialty-profiles-queries';
 import { TopicFormScreen } from './topic-form-screen';
 
-let mockParams: { ideaId?: string; topicId?: string; draftId?: string } = {};
+let mockParams: { ideaId?: string; topicId?: string; profileId?: string; templateId?: string; draftId?: string } = {};
 let mockReadError: Error | undefined;
+let mockHoldGateContent = false;
 let mockFocused = true;
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
@@ -41,6 +54,19 @@ jest.mock('react-native', () => {
   return new Proxy(native, { get: (target, key) => (key === 'Pressable' ? 'Pressable' : Reflect.get(target, key)) });
 });
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
+jest.mock('@/features/workspace-forms/form-gate', () => {
+  const actual = jest.requireActual<typeof import('@/features/workspace-forms/form-gate')>(
+    '@/features/workspace-forms/form-gate',
+  );
+  return {
+    ...actual,
+    WorkspaceFormGate: (props: import('react').ComponentProps<typeof actual.WorkspaceFormGate>) => (
+      <actual.WorkspaceFormGate {...props}>
+        {(...args) => (mockHoldGateContent ? null : props.children(...args))}
+      </actual.WorkspaceFormGate>
+    ),
+  };
+});
 jest.mock('@/db/use-live', () => ({
   useLive: (query: { all(): unknown[] }) => ({
     data: mockReadError ? undefined : query.all(),
@@ -51,6 +77,7 @@ jest.mock('@/db/use-live', () => ({
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/components/use-save-before-leave', () => ({ useSaveBeforeLeave: jest.fn() }));
 jest.mock('@/components/screen-options', () => ({ ScreenOptions: 'ScreenOptions' }));
+jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
 jest.mock('@/components/feedback', () => ({ alertError: jest.fn(), notify: jest.fn() }));
 jest.mock('@/components/quick-date-field', () => ({ QuickDateField: 'QuickDateField' }));
@@ -95,6 +122,7 @@ beforeEach(async () => {
   mockParams = {};
   mockFocused = true;
   mockReadError = undefined;
+  mockHoldGateContent = false;
   mockBack.mockClear();
   mockBack.mockReset();
   jest.mocked(alertError).mockClear();
@@ -105,6 +133,423 @@ beforeEach(async () => {
   });
   jest.useFakeTimers();
   jest.setSystemTime(new Date('2026-01-02T10:00:00Z'));
+});
+
+const notebookCases = [
+  {
+    kind: 'specialty-profile',
+    Form: SpecialtyFormScreen,
+    label: 'در یک نگاه',
+    field: 'overview',
+    createLabel: 'ثبت رشته',
+  },
+  {
+    kind: 'prescription',
+    Form: PrescriptionFormScreen,
+    label: 'توصیه‌ها',
+    field: 'adviceText',
+    createLabel: 'ثبت نسخه',
+  },
+] as const;
+function fillNotebookRequired(kind: (typeof notebookCases)[number]['kind']) {
+  if (kind === 'specialty-profile') input('یا نام دلخواه').props.onChangeText('Synthetic research');
+  else {
+    input('عنوان').props.onChangeText('Synthetic prescription');
+    input('دارو').props.onChangeText('Synthetic drug');
+  }
+}
+
+describe('remaining knowledge forms reuse the original workspace lifecycle', () => {
+  it.each(notebookCases)(
+    'recovers exact unfinished $kind input after remount without publication',
+    async ({ kind, Form, label, field }) => {
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      const words = '  unfinished\n\nknowledge words  ';
+      await act(async () => {
+        input(label).props.onChangeText(words);
+        jest.advanceTimersByTime(3200);
+        await settle();
+      });
+      const acknowledged = t.db.select().from(workspaceFormDrafts).get()!;
+      expect(acknowledged.kind).toBe(kind);
+      expect(JSON.parse(acknowledged.body).fields[field]).toBe(words);
+      expect(t.db.select().from(specialtyProfiles).all()).toEqual([]);
+      expect(t.db.select().from(prescriptionTemplates).all()).toEqual([]);
+      await act(async () => {
+        tree!.unmount();
+        await settle();
+        tree = create(<Form />);
+        await settle();
+      });
+      expect(input(label).props.value).toBe(words);
+      expect(mockBack).not.toHaveBeenCalled();
+    },
+  );
+  it('retains partial prescription rows and their stable keys after deleting another line and recovering', async () => {
+    await act(async () => {
+      tree = create(<PrescriptionFormScreen />);
+      await settle();
+    });
+    await press('قلم بعدی');
+    await act(async () => {
+      const doses = tree!.root.findAllByType(Input).filter((node) => node.props.label === 'دوز');
+      doses[0]!.props.onChangeText(' first dose ');
+      doses[1]!.props.onChangeText(' 12,5 mg ');
+      tree!.root
+        .findAllByType(Input)
+        .filter((node) => node.props.label === 'یا خط را خودتان بنویسید')[1]!
+        .props.onChangeText('  incomplete SIG  ');
+    });
+    const secondDose = tree!.root.findAllByType(Input).filter((node) => node.props.label === 'دوز')[1]!;
+    const heldDoseCallback = secondDose.props.onChangeText;
+    await act(async () => {
+      tree!.root
+        .findAllByType(Pressable)
+        .find((node) => node.props.accessibilityLabel === 'حذف قلم ۱')!
+        .props.onPress();
+      heldDoseCallback('  retained second dose  ');
+      background!('background');
+      await settle();
+    });
+    expect(input('دوز')).toBe(secondDose);
+    const lines = JSON.parse(t.db.select().from(workspaceFormDrafts).get()!.body).fields.items;
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ drug: '', dose: '  retained second dose  ', sig: '  incomplete SIG  ' });
+    expect(t.db.select().from(prescriptionTemplates).all()).toEqual([]);
+    await act(async () => {
+      tree!.unmount();
+      await settle();
+      tree = create(<PrescriptionFormScreen />);
+      await settle();
+    });
+    expect(input('دوز').props.value).toBe('  retained second dose  ');
+    expect(input('یا خط را خودتان بنویسید').props.value).toBe('  incomplete SIG  ');
+    await act(async () => {
+      input('توضیح این قلم').props.onChangeText(' raw notes ');
+      background!('background');
+      await settle();
+    });
+    expect(JSON.parse(t.db.select().from(workspaceFormDrafts).get()!.body).fields.items[0].key).toBe(lines[0].key);
+  });
+  it('refuses explicit prescription publication while another line contains an unnamed dose', async () => {
+    await act(async () => {
+      tree = create(<PrescriptionFormScreen />);
+      await settle();
+    });
+    await act(async () => {
+      fillNotebookRequired('prescription');
+    });
+    await press('قلم بعدی');
+    await act(async () => {
+      tree!.root
+        .findAllByType(Input)
+        .filter((node) => node.props.label === 'دوز')[1]!
+        .props.onChangeText(' 500 mg ');
+      button('ثبت نسخه').props.onPress();
+      await settle();
+    });
+    expect(t.db.select().from(prescriptionTemplates).all()).toEqual([]);
+    expect(JSON.parse(t.db.select().from(workspaceFormDrafts).get()!.body).fields.items[1].dose).toBe(' 500 mg ');
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(alertError).toHaveBeenCalled();
+  });
+  it.each(notebookCases)(
+    'flushes $kind through background and Close without publication',
+    async ({ Form, label, field }) => {
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      await act(async () => {
+        input(label).props.onChangeText('Background raw');
+        background!('background');
+        await settle();
+      });
+      expect(JSON.parse(t.db.select().from(workspaceFormDrafts).get()!.body).fields[field]).toBe('Background raw');
+      await act(async () => {
+        input(label).props.onChangeText('Close raw');
+        button('بستن').props.onPress();
+        await settle();
+      });
+      expect(JSON.parse(t.db.select().from(workspaceFormDrafts).get()!.body).fields[field]).toBe('Close raw');
+      expect(t.db.select().from(specialtyProfiles).all()).toEqual([]);
+      expect(t.db.select().from(prescriptionTemplates).all()).toEqual([]);
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    },
+  );
+  it.each(notebookCases)(
+    'retains failed $kind raw input and acknowledges only after Retry',
+    async ({ Form, label, field }) => {
+      t.sqlite.exec(
+        "CREATE TRIGGER fail_raw BEFORE INSERT ON workspace_form_drafts BEGIN SELECT RAISE(ABORT, 'synthetic disk failure'); END",
+      );
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      await act(async () => {
+        input(label).props.onChangeText('Unacknowledged words');
+        jest.advanceTimersByTime(3200);
+        await settle();
+      });
+      expect(t.db.select().from(workspaceFormDrafts).all()).toEqual([]);
+      expect(input(label).props.value).toBe('Unacknowledged words');
+      t.sqlite.exec('DROP TRIGGER fail_raw');
+      await press('تلاش دوباره');
+      expect(JSON.parse(t.db.select().from(workspaceFormDrafts).get()!.body).fields[field]).toBe(
+        'Unacknowledged words',
+      );
+    },
+  );
+  it.each(notebookCases)(
+    'retains $kind native parents and does not close a newer route after late publication',
+    async ({ kind, Form, label, createLabel }) => {
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      const screen = tree!.root.findByType(Screen);
+      const header = tree!.root.findByType(ScreenOptions);
+      const parent = tree!.root.findAllByType(Column).find((node) => node.props.collapsable === false)!;
+      await act(async () => {
+        fillNotebookRequired(kind);
+      });
+      await act(async () => {
+        button(createLabel).props.onPress();
+        input(label).props.onChangeText('Too late');
+        mockFocused = false;
+        await settle();
+      });
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(input(label).props.value).not.toBe('Too late');
+      expect(input(label).props.editable).toBe(false);
+      expect(tree!.root.findByType(Screen)).toBe(screen);
+      expect(tree!.root.findByType(ScreenOptions)).toBe(header);
+      expect(tree!.root.findAllByType(Column).find((node) => node.props.collapsable === false)).toBe(parent);
+      expect(
+        t.db
+          .select()
+          .from(kind === 'specialty-profile' ? specialtyProfiles : prescriptionTemplates)
+          .all(),
+      ).toHaveLength(1);
+      await act(async () => {
+        mockFocused = true;
+        button('بستن').props.onPress();
+        await settle();
+      });
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    },
+  );
+  it.each(notebookCases)(
+    'shows an original archived specialty for $kind without offering it in the picker',
+    async ({ kind, Form, label }) => {
+      t.db
+        .insert(specialties)
+        .values({ id: 'historical-reference', ...stamps(), nameFa: 'Historical specialty' })
+        .run();
+      const id =
+        kind === 'specialty-profile'
+          ? await createSpecialtyProfile({ specialtyId: 'historical-reference' })
+          : await createPrescription({
+              title: 'Synthetic',
+              specialtyId: 'historical-reference',
+              items: [{ drug: 'Synthetic' }],
+            });
+      mockParams = kind === 'specialty-profile' ? { profileId: id } : { templateId: id };
+      t.db.update(specialties).set(softDelete()).where(eq(specialties.id, 'historical-reference')).run();
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      expect(tree!.root.findByType(SelectField).props.value).toBe('Historical specialty (بایگانی‌شده)');
+      expect(
+        tree!.root
+          .findByType(PickerModal)
+          .props.items.some((item: { id: string }) => item.id === 'historical-reference'),
+      ).toBe(false);
+      await act(async () => {
+        input(label).props.onChangeText('Edited historical words');
+      });
+      await press('ذخیره');
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(alertError).not.toHaveBeenCalled();
+    },
+  );
+  it.each(notebookCases)(
+    'does not initialize a late $kind child with a replacement specialty label',
+    async ({ kind, Form, label }) => {
+      t.db
+        .insert(specialties)
+        .values({ id: 'late-specialty', ...stamps(), nameFa: 'Original late specialty' })
+        .run();
+      const id =
+        kind === 'specialty-profile'
+          ? await createSpecialtyProfile({ specialtyId: 'late-specialty', overview: 'Original late words' })
+          : await createPrescription({
+              title: 'Original late prescription',
+              specialtyId: 'late-specialty',
+              items: [{ drug: 'Synthetic' }],
+              adviceText: 'Original late words',
+            });
+      mockParams = kind === 'specialty-profile' ? { profileId: id } : { templateId: id };
+      mockHoldGateContent = true;
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+      await act(async () => {
+        const replacement = reserveDatasetReplacement();
+        try {
+          restoreDatabase(replacement)
+            .db.update(specialties)
+            .set({ nameFa: 'Replacement late specialty' })
+            .where(eq(specialties.id, 'late-specialty'))
+            .run();
+          replacement.committed();
+        } finally {
+          replacement.release();
+        }
+        mockHoldGateContent = false;
+        tree!.update(<Form />);
+        await settle();
+      });
+      expect(input(label).props.value).toBe('Original late words');
+      expect(input(label).props.editable).toBe(false);
+      expect(tree!.root.findByType(SelectField).props.value).not.toBe('Replacement late specialty');
+      expect(tree!.root.findByType(PickerModal).props.items).toEqual([]);
+      expect(t.db.select().from(workspaceFormDrafts).all()).toEqual([]);
+    },
+  );
+  it.each(notebookCases)(
+    'retains $kind input and owned specialty labels across same-key dataset replacement',
+    async ({ kind, Form, label }) => {
+      t.db
+        .insert(specialties)
+        .values({ id: 'same-key', ...stamps(), nameFa: 'Original specialty' })
+        .run();
+      const id =
+        kind === 'specialty-profile'
+          ? await createSpecialtyProfile({ specialtyId: 'same-key' })
+          : await createPrescription({ title: 'Synthetic', specialtyId: 'same-key', items: [{ drug: 'Synthetic' }] });
+      mockParams = kind === 'specialty-profile' ? { profileId: id } : { templateId: id };
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      await act(async () => {
+        input(label).props.onChangeText('Original raw input');
+        background!('background');
+        await settle();
+      });
+      const oldSave = button('ذخیره').props.onPress;
+      const oldChange = input(label).props.onChangeText;
+      const oldSelect = tree!.root.findByType(PickerModal).props.onSelect;
+      const before = t.db.select().from(workspaceFormDrafts).get()!;
+      await act(async () => {
+        const replacement = reserveDatasetReplacement();
+        const trusted = restoreDatabase(replacement);
+        trusted.db
+          .update(specialties)
+          .set({ nameFa: 'Replacement specialty' })
+          .where(eq(specialties.id, 'same-key'))
+          .run();
+        replacement.committed();
+        replacement.release();
+        tree!.update(<Form />);
+        await settle();
+        oldChange('Old callback replacement');
+        oldSelect({ id: 'same-key' });
+        oldSave();
+        await settle();
+      });
+      expect(input(label).props.value).toBe('Original raw input');
+      expect(input(label).props.editable).toBe(false);
+      expect(tree!.root.findByType(SelectField).props.value).toBe('Original specialty');
+      expect(tree!.root.findByType(PickerModal).props.items).toEqual([]);
+      expect(t.db.select().from(workspaceFormDrafts).get()).toEqual(before);
+      expect(mockBack).not.toHaveBeenCalled();
+    },
+  );
+  it.each(notebookCases)(
+    'keeps loaded $kind input through refresh errors and route reuse',
+    async ({ kind, Form, label }) => {
+      const id =
+        kind === 'specialty-profile'
+          ? await createSpecialtyProfile({ nameText: 'Original specialty' })
+          : await createPrescription({ title: 'Original prescription', items: [{ drug: 'Synthetic' }] });
+      mockParams = kind === 'specialty-profile' ? { profileId: id } : { templateId: id };
+      await act(async () => {
+        tree = create(<Form />);
+        await settle();
+      });
+      await act(async () => {
+        input(label).props.onChangeText('Retained raw words');
+      });
+      await act(async () => {
+        mockReadError = new Error('Synthetic refresh failure');
+        tree!.update(<Form />);
+        await settle();
+      });
+      expect(input(label).props.value).toBe('Retained raw words');
+      expect(input(label).props.editable).toBe(false);
+      await act(async () => {
+        mockReadError = undefined;
+        tree!.update(<Form />);
+        await settle();
+      });
+      expect(input(label).props.editable).toBe(true);
+      await act(async () => {
+        mockParams =
+          kind === 'specialty-profile' ? { profileId: 'different-intent' } : { templateId: 'different-intent' };
+        tree!.update(<Form />);
+        await settle();
+      });
+      expect(input(label).props.value).toBe('Retained raw words');
+      expect(input(label).props.editable).toBe(false);
+      expect(button('ذخیره').props.disabled).toBe(true);
+    },
+  );
+  it('requires explicit prescription conflict adoption before separate publication', async () => {
+    const id = await createPrescription({
+      title: 'Original',
+      items: [{ drug: 'Synthetic' }],
+      adviceText: 'Published advice',
+    });
+    mockParams = { templateId: id };
+    await act(async () => {
+      tree = create(<PrescriptionFormScreen />);
+      await settle();
+    });
+    await act(async () => {
+      input('توصیه‌ها').props.onChangeText('Local advice');
+    });
+    t.db
+      .update(prescriptionTemplates)
+      .set({ adviceText: 'Changed advice', usageCount: 2 })
+      .where(eq(prescriptionTemplates.id, id))
+      .run();
+    await press('ذخیره');
+    expect(mockBack).not.toHaveBeenCalled();
+    await press('مقایسهٔ نسخه‌ها');
+    await press('نگه‌داشتن نسخهٔ من');
+    const accept = jest.mocked(Alert.alert).mock.calls.at(-1)![2]![1]!.onPress!;
+    await act(async () => {
+      accept();
+      await settle();
+    });
+    expect(t.db.select().from(prescriptionTemplates).get()!.adviceText).toBe('Changed advice');
+    expect(input('توصیه‌ها').props.value).toBe('Local advice');
+    await press('ذخیره');
+    expect(t.db.select().from(prescriptionTemplates).get()!).toMatchObject({
+      adviceText: 'Local advice',
+      usageCount: 2,
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
 });
 afterEach(async () => {
   await act(async () => {

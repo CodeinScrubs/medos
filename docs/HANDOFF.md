@@ -33,6 +33,50 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Recover the remaining notebook forms without a new workflow
+
+**Agent:** GPT-6 via Codex; two authorized GPT-6.1 Sol extra-high agents
+implement knowledge/place ports; primary owns vault, integration and verification.
+**Commits:** implementation in this commit; delivered parent PR7 `3d458ab`.
+
+**Changed**
+- Connect specialty profile, prescription, place, extension and credential to
+  the existing raw document/recovery/publication engine and feature lists.
+- Keep exact partial input, secret whitespace and invalid expiry separate from
+  published records. Refuse dropping a partial prescription line on Save.
+- Commit complete-basis comparison, feature/index writes, receipt/retirement
+  and required audit together. Explicit secret clear/replacement clears legacy
+  cipher/nonce; unrelated edits preserve them and unchanged expiry milliseconds.
+- Preserve original references, dataset/focus and native parents, including
+  children first mounted after replacement. Invalid imported ratings remain
+  editable until explicitly corrected. No new dependency/route/permission/SQL.
+
+**Verified**
+- Pre-change vault probes reproduce absent raw recovery and secret resurrection.
+  Integration probes reproduce two late-child labels and an uneditable rating;
+  corrected focused tests pass. Final root check passes 171 suites/2,474 app
+  tests (203.895s) and five workflow checks, without lint/act warnings.
+- Schema regeneration reports no changes; scoped version/lock edits checked.
+
+**Not verified**
+- Frozen .55 native recovery/publication/restore and owner artifact are pending
+  at this source checkpoint; .54 evidence does not accept the new source.
+- No physical phone, every-keystroke power guarantee, full timed 40-patient shift
+  or completion of history/trash/rich-text and other IMPLEMENTATION gates.
+
+**Open threads**
+- Freeze this source, test actual Android/complete authenticated archives, then
+  build/inspect the owner arm64 APK and deliver an incremental draft PR against PR7.
+- Continue the other priority gates; phone testing is not the only remaining work.
+
+**Gotchas**
+- Do not initialize retained labels from replacement rows on a late child mount.
+  Raw codecs must retain invalid finite imported ratings; publication validates.
+- Keep all tracked files and HEAD unchanged during native builds. QA x86_64
+  artifacts stay private; no real credential or private fixture enters the repo.
+
+---
+
 ## 2026-10-10 — Deliver reviewed .54 evidence with exact hosted checks
 
 **Agent:** GPT-6 via Codex; primary verification, no new delegation.

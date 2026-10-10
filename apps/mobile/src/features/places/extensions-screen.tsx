@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Card, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Extension, Place } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { callExtension, copyExtension } from '@/features/places/actions';
 import { deleteExtension, extensionsQuery, setExtensionStarred } from '@/features/places/queries';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
@@ -23,7 +25,7 @@ export function ExtensionsScreen() {
   const { colors, radii, spacing, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
-  const { data } = useLive(extensionsQuery({ search }), [search]);
+  const { data, error, retry } = useLive(extensionsQuery({ search }), [search]);
   const rows = data ?? [];
 
   return (
@@ -50,9 +52,19 @@ export function ExtensionsScreen() {
             style={[typography.body, styles.input, { color: colors.text }]}
           />
         </Row>
+        <ErrorNotice error={error} what="داخلی‌ها" onRetry={retry} />
+        <UnfinishedWorkspaceForms
+          kind="extension"
+          onOpen={(extensionId, draftId) =>
+            router.push({
+              pathname: '/extensions/edit',
+              params: { ...(extensionId === null ? {} : { extensionId }), draftId },
+            })
+          }
+        />
       </View>
 
-      {rows.length === 0 && data !== undefined ? (
+      {rows.length === 0 && data !== undefined && !error ? (
         <EmptyState
           icon="call-outline"
           title={search ? 'پیدا نشد' : 'هنوز داخلی‌ای ثبت نشده'}

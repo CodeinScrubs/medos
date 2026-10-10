@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, type SQL } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { prescriptionTemplates, specialties, type PrescriptionItem, type PrescriptionTemplate } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -75,26 +75,58 @@ function values(input: PrescriptionInput) {
   };
 }
 
-export async function createPrescription(input: PrescriptionInput): Promise<string> {
+function requireSpecialty(tx: DbTransaction, specialtyId: string | null, previous?: string | null) {
+  if (specialtyId === null) return;
+  const row = tx
+    .select({ deletedAt: specialties.deletedAt })
+    .from(specialties)
+    .where(eq(specialties.id, specialtyId))
+    .get();
+  if (!row || (row.deletedAt !== null && specialtyId !== previous)) throw new Error('تخصص انتخاب‌شده در دسترس نیست.');
+}
+
+export function createPrescriptionInTransaction(tx: DbTransaction, input: PrescriptionInput, now: Date): string {
   const id = newId();
   const row = values(input);
-  await db.insert(prescriptionTemplates).values({
-    id,
-    ...stamps(),
-    ...row,
-    searchText: prescriptionSearchText(row, row.items),
-  });
+  requireSpecialty(tx, row.specialtyId);
+  tx.insert(prescriptionTemplates)
+    .values({
+      id,
+      ...stamps(now),
+      ...row,
+      searchText: prescriptionSearchText(row, row.items),
+    })
+    .run();
   return id;
 }
 
+export function updatePrescriptionInTransaction(
+  tx: DbTransaction,
+  id: string,
+  patch: Partial<PrescriptionInput>,
+  now: Date,
+): void {
+  const current = tx
+    .select()
+    .from(prescriptionTemplates)
+    .where(and(alive, eq(prescriptionTemplates.id, id)))
+    .get();
+  if (!current) throw new Error('نسخه در دسترس نیست.');
+  const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const row = values({ ...current, ...defined, tags: patch.tags ?? current.tags ?? [] } as PrescriptionInput);
+  requireSpecialty(tx, row.specialtyId, current.specialtyId);
+  tx.update(prescriptionTemplates)
+    .set({ ...row, searchText: prescriptionSearchText({ ...current, ...row }, row.items), ...touch(now) })
+    .where(and(alive, eq(prescriptionTemplates.id, id)))
+    .run();
+}
+
+export async function createPrescription(input: PrescriptionInput): Promise<string> {
+  return db.transaction((tx) => createPrescriptionInTransaction(tx, input, new Date()));
+}
+
 export async function updatePrescription(id: string, patch: Partial<PrescriptionInput>): Promise<void> {
-  const current = (await prescriptionQuery(id))[0];
-  if (!current) throw new Error(`Prescription ${id} not found`);
-  const row = values({ ...current, ...patch } as PrescriptionInput);
-  await db
-    .update(prescriptionTemplates)
-    .set({ ...row, searchText: prescriptionSearchText(row, row.items), ...touch() })
-    .where(and(alive, eq(prescriptionTemplates.id, id)));
+  db.transaction((tx) => updatePrescriptionInTransaction(tx, id, patch, new Date()));
 }
 
 /**

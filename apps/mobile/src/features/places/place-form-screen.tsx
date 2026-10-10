@@ -1,18 +1,21 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { EditGate } from '@/components/edit-gate';
-import { alertError, notify } from '@/components/feedback';
+import { AutosaveScope } from '@/components/autosave-scope';
+import { notify } from '@/components/feedback';
 import { ScreenOptions } from '@/components/screen-options';
 import { Button, ChipSelect, Column, Input, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import type { Place } from '@/db/schema';
-import { useLive } from '@/db/use-live';
+import { WorkspaceFormGate } from '@/features/workspace-forms/form-gate';
+import { WorkspaceFormDiscard, WorkspaceFormStatus } from '@/features/workspace-forms/form-status';
+import type { FormSeed } from '@/features/workspace-forms/types';
+import { useWorkspaceForm } from '@/features/workspace-forms/use-form';
 import { useTheme } from '@/theme';
 
+import type { PlaceFormFields } from './form-draft';
+import { placeFormPort } from './form-draft-queries';
 import { PLACE_KIND_LABELS } from './labels';
-import { parseCoordinates } from './logic';
-import { createPlace, placeQuery, updatePlace } from './queries';
 
 const KIND_OPTIONS = (Object.keys(PLACE_KIND_LABELS) as Place['kind'][]).map((k) => ({
   value: k,
@@ -21,88 +24,95 @@ const KIND_OPTIONS = (Object.keys(PLACE_KIND_LABELS) as Place['kind'][]).map((k)
 
 /** Add or edit a place. Param: optional `placeId`. */
 export function PlaceFormScreen() {
-  const { placeId } = useLocalSearchParams<{ placeId?: string }>();
-  const { data, error, retry } = useLive(placeQuery(placeId ?? ''), [placeId]);
+  const { placeId, draftId } = useLocalSearchParams<{ placeId?: string; draftId?: string }>();
   return (
-    <EditGate editing={Boolean(placeId)} rows={data} error={error} onRetry={retry} what="مکان">
-      {(place, readNotice) => <PlaceForm readNotice={readNotice} place={place} />}
-    </EditGate>
+    <AutosaveScope>
+      <WorkspaceFormGate port={placeFormPort} recordId={placeId ?? null} draftId={draftId ?? null}>
+        {(seed, readNotice, unavailable) => <PlaceForm readNotice={readNotice} seed={seed} unavailable={unavailable} />}
+      </WorkspaceFormGate>
+    </AutosaveScope>
   );
 }
 
-function PlaceForm({ place, readNotice }: { readNotice: ReactNode; place: Place | null }) {
+function PlaceForm({
+  seed,
+  readNotice,
+  unavailable,
+}: {
+  readNotice: ReactNode;
+  seed: FormSeed<Place, PlaceFormFields>;
+  unavailable: boolean;
+}) {
   const router = useRouter();
   const { spacing } = useTheme();
 
-  const [name, setName] = useState(place?.name ?? '');
-  const [kind, setKind] = useState<Place['kind']>(place?.kind ?? 'hospital');
-  const [city, setCity] = useState(place?.city ?? '');
-  const [address, setAddress] = useState(place?.address ?? '');
-  const [phone, setPhone] = useState(place?.phone ?? '');
-  const [switchboard, setSwitchboard] = useState(place?.switchboard ?? '');
-  const [mapUrl, setMapUrl] = useState(place?.mapUrl ?? '');
-  const [lat, setLat] = useState(place?.lat ?? '');
-  const [lng, setLng] = useState(place?.lng ?? '');
-  const [notes, setNotes] = useState(place?.notes ?? '');
-  const [saving, setSaving] = useState(false);
-
-  /** A pasted Neshan/Google link often carries coordinates; pull them out. */
-  function onMapUrl(text: string) {
-    setMapUrl(text);
-    const coords = parseCoordinates(text);
-    if (coords && !lat && !lng) {
-      setLat(coords.lat);
-      setLng(coords.lng);
-    }
-  }
-
-  async function save() {
-    if (!name.trim()) {
-      notify('نام لازم است');
+  const editing = useWorkspaceForm(placeFormPort, seed, unavailable, () => router.back());
+  const isEditing = seed.document.recordId !== null;
+  const { name, kind, city, address, phone, switchboard, mapUrl, lat, lng, notes } = editing.document.fields;
+  function save() {
+    if (editing.completed || editing.stale) {
+      editing.close();
       return;
     }
-    setSaving(true);
-    const payload = {
-      name: name.trim(),
-      kind,
-      city: city.trim() || null,
-      address: address.trim() || null,
-      phone: phone.trim() || null,
-      switchboard: switchboard.trim() || null,
-      mapUrl: mapUrl.trim() || null,
-      lat: lat.trim() || null,
-      lng: lng.trim() || null,
-      notes: notes.trim() || null,
-    };
-    try {
-      if (place) await updatePlace(place.id, payload);
-      else await createPlace(payload);
-      router.back();
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      setSaving(false);
-    }
+    void editing.save((fields) => {
+      if (!fields.name.trim()) {
+        notify('نام لازم است');
+        return false;
+      }
+      return true;
+    });
   }
 
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: place ? 'ویرایش مکان' : 'مکان جدید' }} />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <ScreenOptions options={{ title: isEditing ? 'ویرایش مکان' : 'مکان جدید' }} />
+      <Column
+        collapsable={false}
+        gap="md"
+        style={{ paddingTop: spacing.md }}
+        pointerEvents={editing.busy ? 'none' : 'auto'}
+      >
         {readNotice}
-        <Input label="نام" required value={name} onChangeText={setName} placeholder="مثلاً بیمارستان مرکزی" />
-        <ChipSelect label="نوع" options={KIND_OPTIONS} value={kind} onChange={(v) => v && setKind(v)} />
-        <Input label="شهر" value={city} onChangeText={setCity} />
-        <Input label="آدرس" value={address} onChangeText={setAddress} multiline />
+        <WorkspaceFormStatus port={placeFormPort} editing={editing} />
+        <Input
+          label="نام"
+          required
+          value={name}
+          editable={!editing.locked}
+          onChangeText={(name) => editing.change({ name })}
+          placeholder="مثلاً بیمارستان مرکزی"
+        />
+        <ChipSelect
+          label="نوع"
+          options={KIND_OPTIONS}
+          value={kind}
+          disabled={editing.locked}
+          onChange={(v) => v && editing.change({ kind: v })}
+        />
+        <Input label="شهر" value={city} editable={!editing.locked} onChangeText={(city) => editing.change({ city })} />
+        <Input
+          label="آدرس"
+          value={address}
+          editable={!editing.locked}
+          onChangeText={(address) => editing.change({ address })}
+          multiline
+        />
 
         <SectionHeader title="تماس" />
-        <Input label="تلفن" value={phone} onChangeText={setPhone} keyboardType="phone-pad" numericFold ltr />
+        <Input
+          label="تلفن"
+          value={phone}
+          editable={!editing.locked}
+          onChangeText={(phone) => editing.change({ phone })}
+          keyboardType="phone-pad"
+          ltr
+        />
         <Input
           label="تلفنخانه (برای گرفتن داخلی از بیرون)"
           value={switchboard}
-          onChangeText={setSwitchboard}
+          onChangeText={(switchboard) => editing.change({ switchboard })}
+          editable={!editing.locked}
           keyboardType="phone-pad"
-          numericFold
           ltr
           hint="با داشتن این شماره، دکمه‌ی تماس هر داخلی از بیرون مستقیم آن داخلی را می‌گیرد"
         />
@@ -111,7 +121,8 @@ function PlaceForm({ place, readNotice }: { readNotice: ReactNode; place: Place 
         <Input
           label="لینک نقشه (نشان، بلد، گوگل)"
           value={mapUrl}
-          onChangeText={onMapUrl}
+          onChangeText={(mapUrl) => editing.change({ mapUrl })}
+          editable={!editing.locked}
           ltr
           autoCapitalize="none"
           keyboardType="url"
@@ -121,8 +132,8 @@ function PlaceForm({ place, readNotice }: { readNotice: ReactNode; place: Place 
             <Input
               label="عرض جغرافیایی"
               value={lat}
-              onChangeText={setLat}
-              numericFold
+              onChangeText={(lat) => editing.change({ lat })}
+              editable={!editing.locked}
               ltr
               keyboardType="numbers-and-punctuation"
             />
@@ -131,25 +142,39 @@ function PlaceForm({ place, readNotice }: { readNotice: ReactNode; place: Place 
             <Input
               label="طول جغرافیایی"
               value={lng}
-              onChangeText={setLng}
-              numericFold
+              onChangeText={(lng) => editing.change({ lng })}
+              editable={!editing.locked}
               ltr
               keyboardType="numbers-and-punctuation"
             />
           </View>
         </Row>
         <Text variant="tiny" color="textFaint">
-          کافی است لینک مکان را از برنامه‌ی نقشه کپی کنید؛ اگر مختصات داخلش باشد خودکار پر می‌شود.
+          کافی است لینک مکان را از برنامه‌ی نقشه کپی کنید؛ هنگام ذخیره، مختصات خالی از لینک کامل می‌شود.
         </Text>
 
-        <Input label="یادداشت" value={notes} onChangeText={setNotes} multiline />
+        <Input
+          label="یادداشت"
+          value={notes}
+          editable={!editing.locked}
+          onChangeText={(notes) => editing.change({ notes })}
+          multiline
+        />
 
         <Row gap="sm" style={{ marginTop: spacing.sm }}>
           <View style={{ flex: 1 }}>
-            <Button label="ذخیره" icon="checkmark" onPress={() => void save()} loading={saving} full />
+            <Button
+              label={editing.completed || editing.stale ? 'بستن' : 'ذخیره'}
+              icon="checkmark"
+              onPress={save}
+              loading={editing.busy}
+              disabled={editing.busy || (editing.locked && !editing.completed && !editing.stale)}
+              full
+            />
           </View>
-          <Button label="انصراف" variant="ghost" onPress={() => router.back()} haptic={false} />
+          <Button label="بستن" variant="ghost" disabled={editing.busy} onPress={editing.close} haptic={false} />
         </Row>
+        <WorkspaceFormDiscard editing={editing} />
       </Column>
     </Screen>
   );
