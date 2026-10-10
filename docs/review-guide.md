@@ -18,9 +18,9 @@ npm run check     # typecheck, architecture lint, formatting, app and workflow t
 npm run brief     # version, recent commits with the agent that made them, open threads
 ```
 
-Same checks run in CI on every push (`.github/workflows/ci.yml`), plus two that only make
-sense on a clean machine: the schema and its migrations must agree, and the app must
-bundle for Android.
+Same checks run in CI on pushes to main and on every pull request
+(`.github/workflows/ci.yml`), plus two that only make sense on a clean machine:
+the schema and its migrations must agree, and the app must bundle for Android.
 
 ## Then: the five files that explain the design
 
@@ -91,8 +91,10 @@ the application bytes used for those witnesses; never substitute an older APK.
 The separate `codex/kardex-form-recovery` continuation starts at PR6's delivered
 `e68e6a4`, whose CI38029238968 also passes. Review this incremental diff against
 that parent: .54 extends the shared lifecycle with an explicit clinical parent
-key and feature-owned Order validation/publication. Its current-source/native
-and artifact gates are recorded separately in validation-0.11.54.
+key and feature-owned Order validation/publication. Its full-source, bounded
+native and inspected .54 owner-APK witnesses pass on frozen d69163d.
+Read validation-0.11.54 for complete-state comparison details;
+physical acceptance and hosted status remain separate.
 
 | Area | Read together | Principal checks |
 |---|---|---|
@@ -106,8 +108,8 @@ and artifact gates are recorded separately in validation-0.11.54.
 | Native close/navigation | components/screen-options.tsx, use-save-before-leave.ts; notes/media-editors.test.tsx; validation-0.11.33/.34/.48 | Retain scroll host/native stacking parents and header presence; late acknowledgments close only the originating focused route |
 | Deck/calendar/messages | shifts/queries.ts and workspace.tsx; doctors/occasion-form-queries.ts and greeting-composer.tsx; lib/jalali.ts and date-input.ts | Matching preview/count/destination scope, explicit priority, stable order; leap dates and raw partial input; prepared is not sent |
 
-Five other manual forms still need raw recovery. Current .54 Order acceptance
-remains separate; credentials must retain exact secret whitespace.
+Five other manual forms still need raw recovery; credentials must retain exact
+secret whitespace. .54 Order acceptance does not complete that broader gate.
 Other P0 and product gates are in IMPLEMENTATION. Versioned reports preserve
 older change/retest details; this guide is not a chronological release history.
 

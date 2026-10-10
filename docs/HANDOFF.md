@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Accept the frozen .54 Kardex recovery and owner APK
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** application `d69163d`; evidence in this commit; parent PR6 `e68e6a4`.
+
+**Changed**
+- Record bounded native recovery, publication/replacement and complete-state
+  acceptance in validation-0.11.54. Update the execution/review checkpoint.
+- Correct CI trigger wording only: pushes to main and all PRs; behavior unchanged.
+
+**Verified**
+- Full source check: 166 suites/2,388 app tests and five workflow checks; unchanged SQL.
+- Frozen actual x86_64 installed bytes match. Cold PID4146 ->7706 recovers exact
+  name/dose/spaced notes/invalid date without clinical publication. Invalid Save
+  refuses; separate corrected Save retains PID7706 and publishes once.
+- Complete authenticated exports: all50 application tables and34 media hashes
+  exact for upgrade4,117, fixture4,119, raw4,120, published4,121 and replacement4,119
+  intended rows. Integrity/FKs clean. Native old input/allergy remain read-only
+  across replacement and Save stays disabled. Original AVD base hashes unchanged.
+- Signed arm64-only owner APK 0.11.54/code70:53,415,455bytes;
+  SHA256 `5ce4ca6c7f2fa4c1b11298ed7c4435ef5caaf6c42c7e04fe00670040f5824653`.
+
+**Not verified**
+- Exact hosted CI for this incremental branch is pending; older CI is not substituted.
+- No physical phone, every-keystroke power durability or full pressure/40-patient timings.
+- Five other manual forms, clinical history/trash, rich text and other ledger gates remain.
+
+**Open threads**
+- Push this checked continuation and create/attach a draft PR against PR6; inspect its CI.
+- Continue D05's five remaining forms and the other priority gates; not only phone tests.
+
+**Gotchas**
+- System UI ANR/instrumentation timeout and private selector/RTL-clear failures
+  precede successful native witnesses; see report. Read-only controls require
+  geometry assertions, not actionable selectors. Generated dex lock is an
+  environment failure; no source/data/shared ADB deletion. Keep builds frozen.
+
+---
+
 ## 2026-10-10 — Recover unfinished Kardex input in its original clinical context
 
 **Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
