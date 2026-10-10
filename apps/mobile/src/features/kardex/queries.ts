@@ -206,7 +206,9 @@ function requireOrderContext(
   currentPatientId?: string,
 ): void {
   requireOrderPatient(reader, order.patientId);
-  if (order.encounterId) {
+  // SQLite permits an imported empty-string key. Only null means no episode;
+  // every stored reference must still belong to this live patient.
+  if (order.encounterId !== null) {
     const encounter = reader
       .select({ id: encounters.id })
       .from(encounters)

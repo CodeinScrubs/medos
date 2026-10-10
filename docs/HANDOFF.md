@@ -33,6 +33,44 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Close an imported empty-episode ownership bypass
+
+**Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
+**Commits:** this guard checkpoint after66dda88.
+
+**Changed**
+- Only null means an order has no episode. A stored empty-string reference now
+  receives the same live patient/episode check for create/edit/status/delete.
+  No rekeying, schema/dependency/route/permission/crypto change or added UI.
+
+**Verified**
+- Two real migrated-SQLite probes fail before correction: a foreign/deleted
+  empty episode permits an order. Ten regression cases cover these references,
+  a missing reference, a valid owned reference and unchanged order/audit on refusal.
+- Three suites/96 tests pass in15.920 seconds without act warnings.
+- Full check passes164 suites/2,354 app tests plus five workflows in166.189
+  Jest seconds; typecheck/lint/formatting are green with no act warnings.
+- Earlier frozen66dda88 native publication/restore, full archive comparisons
+  and inspected x86/owner arm64 APKs pass; exact sources/hashes and observer
+  failures are documented in validation-0.11.52. Original AVD images are exact.
+
+**Not verified**
+- Final guard hosted CI/native replay/owner artifact remain pending.
+  The66dda88 witnesses do not silently become evidence for changed source.
+- Physical-phone and broader product/release acceptance remain open.
+
+**Open threads**
+- Freeze this guard; build/inspect its own artifacts and
+  repeat native context/restore acceptance before the final normal push.
+- Six manual forms still need durable raw recovery. See IMPLEMENTATION.
+
+**Gotchas**
+- An empty imported SQLite text key is not absence. Preserve null explicitly.
+- Do not edit source during native builds, or infer success from a button tap;
+  independently compare the authenticated output database and media.
+
+---
+
 ## 2026-10-10 — Keep new Kardex orders with their original episode/dataset
 
 **Agent:** GPT-6 via Codex; primary implementation and verification, no new delegation.

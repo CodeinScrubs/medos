@@ -89,6 +89,33 @@ describe('a mounted order creation intent retains its clinical association', () 
     expect(rows()).toEqual([]);
   });
 
+  it.each(['missing', 'deleted', 'foreign'] as const)(
+    'an empty imported key cannot bypass a %s original episode check',
+    async (kind) => {
+      if (kind !== 'missing') {
+        const owner =
+          kind === 'foreign' ? await createPatient({ firstName: 'Synthetic', lastName: 'Other' }) : patientId;
+        t.db
+          .insert(encounters)
+          .values({ id: '', patientId: owner, ...stamps(at), ...(kind === 'deleted' ? softDelete(at) : {}) })
+          .run();
+      }
+      await expect(createOrder(input(), datasetGeneration(), { patientId, encounterId: '' })).rejects.toThrow('نوبت');
+      expect(rows()).toEqual([]);
+    },
+  );
+
+  it('checks an empty imported key without treating its live owned episode as null', async () => {
+    t.db
+      .insert(encounters)
+      .values({ id: '', patientId, ...stamps(at), admittedAt: at, isActive: true })
+      .run();
+    const context = (await orderCreationContextQuery(patientId))[0]!;
+    expect(context).toEqual({ patientId, encounterId: '' });
+    await createOrder(input(), datasetGeneration(), context);
+    expect(rows()[0]).toMatchObject({ patientId, encounterId: '', startAt: null });
+  });
+
   it('same-ID rows cannot make an old dataset context fresh', async () => {
     const generation = datasetGeneration(),
       context = (await orderCreationContextQuery(patientId))[0]!;

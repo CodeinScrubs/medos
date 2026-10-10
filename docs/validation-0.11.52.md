@@ -49,6 +49,66 @@ without suppressing that rule. The next attempt passes typecheck/lint and stops
 at app.json formatting after the version edit. Root-scoped Prettier corrects
 that file before the final run. Neither early attempt is reported as green.
 
+## Native and archive evidence from66dda88
+
+The frozen .52 x86 APK is installed over the retained .50 dataset, with pulled
+installed bytes matching SHA-256
+`ff504537287d841e85654eced0c093ed37cce776ce126d3f39bc35f0b9799862`.
+Independent authentication/decryption and SQLite comparison preserve all4,117
+previous rows across49 prior application tables, the new empty workspace draft
+table, and every hash of34 media files. Integrity and foreign keys pass.
+
+On the actual Android UI, two unfinished new order forms retain their exact
+input through a later admission before separate publication. Independent full
+exports prove one order remains outpatient null and the other remains attached
+to its original, now-inactive episode; both later admissions are distinct.
+Every unrelated baseline row/media hash remains exact. The action archive SHA
+is `03009e4a3f6b3933398b6226102e825ff326a9952e889423db3843737086cc69`.
+
+An actual replacement restore while an order form remains mounted keeps its
+words and original allergy display; the replacement allergy is absent from
+that old form. Its stale notice is visible and native input/publication controls
+are disabled. Independent export matches every expected4,120 application rows
+across50 tables and all34 media hashes, with the replacement allergy actually
+in the database and no implicit publication of the old words. That archive SHA
+is `031ea1acb4ab3ee64ce5852f48bf074ffbd8536897849a2b0d1a23cc22e30edd`.
+
+The retained action PID has no observed app fatal/ANR in the checked buffers;
+this is bounded evidence. Initial installation observes a System UI ANR dialog
+before the app appears. A QA field tap opens Android QuickShare instead of
+reaching its input; resumption checks actual focus and scrolls the field into
+view. Two other observers initially use an exact allergy text that is nested
+inside a combined native label, or exclude disabled controls as invisible;
+correct selectors confirm the actual state. These failed observations are not
+application test passes. The original AVD userdata/encryption QCOW2 hashes
+remain exact after the owned read-only emulator shuts down. An initial hash
+comparison accidentally uses the small raw images instead of the recorded
+QCOW2 paths; checking the actual recorded paths resolves that harness failure.
+
+The same66dda88 source builds an inspected owner-signed arm64 .52/code68 APK,
+53,407,771 bytes, SHA
+`75c85a094187f9156e847d3900aab27d8e618d030dac99ef1f7866430b2eca04`.
+It has the established signing certificate, package, minSDK24/target36 and all
+required native libraries. This precedes the additional guard below; it is not
+evidence for that guard's final APK or a physical-phone test.
+
+## Empty imported episode keys
+
+A separate two-case probe against migrated real SQLite reproduces another
+ownership bypass on66dda88: a stored empty-string episode key skips a truthy
+reference check, permitting creation beneath a foreign or deleted episode.
+Only null now means no episode; every other stored reference is checked with
+the same live ownership query. No identifiers or records are repaired/deleted.
+
+Ten regression cases cover missing/deleted/foreign empty references, a valid
+owned empty reference, and edit/status/delete refusal without order/audit changes.
+The creation/mutation/mounted-editor run passes96 tests in15.920 seconds,
+without the earlier act warnings. Full final-source checks pass164 suites/2,354
+app tests and five workflows in166.189 Jest seconds, with clean typecheck,
+lint, formatting and no act warnings. Hosted, native and APK verification of
+this last guard remains pending at this checkpoint. Previous
+66dda88 UI/archive evidence remains explicitly attached to its own source.
+
 ## Remaining gates
 
 Kardex still needs durable raw fields/date/clock and original patient/encounter

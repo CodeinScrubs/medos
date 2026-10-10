@@ -5,7 +5,7 @@ import { auditLog, encounters, orders, patients, type Order } from '@/db/schema'
 import { openEncounter } from '@/features/encounters/queries';
 import { createPatient } from '@/features/patients/queries';
 import { datasetGeneration, DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
-import { softDelete } from '@/lib/ids';
+import { softDelete, stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -82,6 +82,26 @@ describe('order mutation acknowledgment is bounded to its shown row and clinical
     const before = tracked();
     await expect(mutate(action, id, row(id))).rejects.toThrow('نوبت');
     expect(tracked()).toEqual(before);
+  });
+
+  describe.each(['foreign', 'deleted'] as const)('an empty imported %s episode reference', (kind) => {
+    it.each(['edit', 'status', 'delete'] as const)('refuses %s without changing the order or audit', async (action) => {
+      const owner = kind === 'foreign' ? await createPatient({ firstName: 'Synthetic', lastName: 'Other' }) : patientId;
+      t.db
+        .insert(encounters)
+        .values({ id: '', patientId: owner, ...stamps(at), ...(kind === 'deleted' ? softDelete(at) : {}) })
+        .run();
+      const id = await add();
+      t.db.update(orders).set({ encounterId: '' }).where(eq(orders.id, id)).run();
+      const expected = row(id),
+        before = tracked();
+      const operation =
+        action === 'edit'
+          ? updateOrder(id, { notes: 'Synthetic unpublished correction' }, datasetGeneration(), expected)
+          : mutate(action, id, expected);
+      await expect(operation).rejects.toThrow('نوبت');
+      expect(tracked()).toEqual(before);
+    });
   });
 
   it.each(['status', 'delete'] as const)('rejects a missing order without acknowledging %s', async (action) => {
