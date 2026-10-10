@@ -38,9 +38,73 @@ guard, a separate final full check passes 164 suites/2,359 app tests and five
 workflows in157.338 Jest seconds. Typecheck/lint/both formatting checks pass,
 without act warnings. Hosted/native/artifact acceptance remains pending.
 
+The frozen application source is `e357dbf`; its native/artifact results follow.
+Final-branch hosted CI is pending the normal push.
+
 No schema, dependency, route, permission, UI, clinical formula or archive/KDF change.
 Version edits affect only the four app metadata locations and the three allowed
 lockfile version fields.
+
+## Native and complete-state witnesses
+
+The inspected x86_64 .53/code69 package is installed in place, and pulled
+installed bytes match its hash. Independent authenticated exports compare all
+50 application tables (excluding settings, backup/audit bookkeeping and migration
+metadata) and every media hash. Upgrade preserves all 4,117 previous application
+rows and all 34 media files. The named fixture then exactly matches all 4,129
+intended rows, including an explicit empty episode, two owned live orders, a
+deleted order, a standing order and two inconsistent cross-patient links.
+
+On the actual Android discharge page, the original patient identity and
+two-ending-orders preview are visible. Separate Save succeeds with PID4550
+retained. The full exported state has exactly the intended 4,130 application
+rows: only the two owned orders end, their end times match the discharged episode,
+the legitimate patient's status changes and one retired discharge receipt is
+added. Every foreign patient/order field, standing/deleted order, unrelated row
+and media hash stays exact. All database integrity and foreign-key checks pass.
+This checks complete intended states, not selected rows or counts alone.
+
+Authenticated archive SHA-256 values:
+
+| Stage | SHA-256 |
+|---|---|
+| Upgrade | `d80ca5cf94f63e0ea5e4852d90e6e319129eb76363308c0bed071b5c47a0ba73` |
+| Imported fixture before publication | `5d38460163ba66bbe0ec3c2c5aef78bab03c79861435dd68a7b957bd28c135da` |
+| After actual discharge | `84e1fded2c1561196bb9de08c206cc354f4aea2fb831f81684876d0bad3d1f1e` |
+
+No app fatal or app ANR is observed in the checked process crash/event buffers.
+Initial observation is blocked by an actual System UI ANR dialog; choosing its
+observed Wait button allows the app to appear. One private driver first uses
+the plural list route instead of the actual singular patient route, then stops
+before Save because it tries to overwrite PowerShell's constant PID variable.
+Both harness errors are corrected before the successful native/publication and
+complete-state comparisons. These failed observations are not application passes.
+
+The named restore's completion is observed and acknowledged; about61.924 seconds
+include its polling and do not establish restore/KDF phases or phone performance.
+The owned read-only emulator does not exit after an acknowledged emu kill.
+Only its exact SDK/AVD/port/read-only child and launcher are verified and stopped;
+no shared ADB server or unrelated process is stopped. Original userdata and
+encryption QCOW2 hashes remain byte-identical afterward.
+
+## Inspected packages
+
+Both packages come from frozen `e357dbf`, identify com.shayan.medos,
+version0.11.53/code69, minSDK24/target36, and contain their essential JNI libraries.
+The established signer SHA-256 remains
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+
+| Package | Bytes | SHA-256 |
+|---|---:|---|
+| Private x86_64 QA package | 55,016,134 | `dcf791efa6ea0ee230a0773fab3a9d93df3f8b447f672ff385b4236c57728297` |
+| `dist/MedOS-0.11.53.apk`, arm64-v8a only | 53,407,807 | `76aabc45a2f362261b0c58604a7e8782cf2034d7d11a682d5c0578ba899c6108` |
+
+The QA build succeeds in11m19s and the owner build in8m27s after cleaning only
+the generated app build for each ABI switch. Source stays unchanged during
+both builds. Existing Windows path/Gradle future-version warnings are not
+asserted repaired. The owner artifact is inspected, not run on a physical phone.
+The .52 original-context/replacement-form witnesses retain their own41a592b
+source attribution; they are not silently relabeled as .53 native tests.
 
 ## Remaining gates
 

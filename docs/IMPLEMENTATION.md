@@ -33,61 +33,37 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.53/code69 corrects one further read omission: a requested
-imported empty episode must include its own orders and standing orders in the
-discharge preview, while null remains a separate outpatient scope. A real
-SQLite probe fails before correction. Three new cases and five targeted suites
-pass 178 tests. A second two-case probe confirms that an inconsistent imported
-cross-patient order can be ended by another patient's discharge. The update now
-requires the episode's patient as well, with two retained-row regressions.
-Final source checks pass 164 suites/2,359 app tests and five workflows without
-act warnings. Hosted/native/artifact acceptance for this version remains
-pending in [validation-0.11.53.md](validation-0.11.53.md). No UI or schema change.
+Application 0.11.53/code69, frozen source `e357dbf`, preserves the explicit
+patient/episode scope of discharge orders. An imported empty episode is distinct
+from null in the preview; ending orders requires both the episode and its patient.
+Pre-fix SQLite probes fail for the omitted order and cross-patient completion.
+Five regressions cover the corrections without repairing or moving old records.
+No UI, schema, dependency or permission is added.
 
-Application 0.11.52/code68, frozen source `41a592b`, adds bounded Kardex
-creation/display ownership to PR6.
-A new form retains its original active episode including null; publication
-checks original patient/episode/dataset together. After restore the old form
-retains its original allergy display while same-dataset corrections stay live.
-Every stored episode reference except null receives the same live ownership
-check, including an imported empty-string key. Full source checks pass 164
-suites/2,354 app tests and five workflows without act warnings. Frozen-source
-Android replay passes both later-admission scenarios and replacement restore
-with the old form retained. Independently authenticated full exports preserve
-all 4,117 prior rows and 34 media hashes on upgrade, confirm original order
-associations and exactly match the 4,120 expected replacement rows. The owner
-arm64 .52/code68 APK is built and inspected from this source. Exact-head hosted
-CI for the final branch is pending the normal push; see
-[validation-0.11.52.md](validation-0.11.52.md). This is not raw order recovery
-or physical-phone acceptance.
+Full source checks pass 164 suites/2,359 app tests and five workflows without
+act warnings. Frozen-source Android replay shows two ending orders and separately
+publishes the discharge. Independent authenticated exports preserve 4,117 prior
+rows on upgrade, exactly match 4,129 fixture rows and confirm all 4,130 intended
+final rows across 50 application tables, with every one of 34 media hashes exact.
+Foreign/standing/deleted orders stay unchanged. No app fatal/ANR is observed in
+the checked buffers; original read-only AVD data/key hashes remain exact.
+The owner-signed arm64 .53/code69 APK is built and inspected from this source.
+Final-branch hosted CI awaits the normal push. See
+[validation-0.11.53.md](validation-0.11.53.md) for hashes and evidence limits.
 
-Previous0.11.51/code67, source a541ce5 on PR6, passes163 suites/2,329
-app tests plus five workflows, with clean typecheck/lint/formatting. Exact-head
-CI38013693701 succeeds, including regeneration and the Android bundle. One
-shared raw lifecycle connects existing idea/topic forms and three paged recovery
-links without new routes, dependencies or permissions. Complete-basis/revision
-comparison, original intent and separate final publication protect corrections.
-Archived teacher/specialty links remain visible and searchable during correction,
-but unavailable references are not new picker choices.
+PR6 also retains the .51 shared idea/topic raw-recovery pilot and .52 original
+Kardex creation/allergy context. Their native/whole-archive/owner-artifact
+witnesses stay attached to their own sources:
+[.51 workspace recovery](validation-0.11.51.md),
+[.52 original clinical context](validation-0.11.52.md).
+Earlier evidence is in HANDOFF and [.50](validation-0.11.50.md),
+[.49](validation-0.11.49.md), [.48](validation-0.11.48.md) and
+[.47](validation-0.11.47.md). Never relabel an older witness as a new-source test.
 
-Frozen-source Android witnesses pass raw whitespace/invalid-date recovery after
-process stop, archived teaching links, tied-draft pages, future raw refusal and
-explicit conflict adoption before separate Save. Independent authenticated
-exports compare every intended row across50 application tables and all34 media
-files. In-place upgrade preserves4,117 prior rows; the synthetic final action
-archive matches4,141 intended rows. The read-only emulator's original userdata
-and encryption-key image hashes remain exact. The same source produces the
-inspected owner-signed arm64 .51/code67 APK in dist/. See
-[validation-0.11.51.md](validation-0.11.51.md) for exact artifacts and limits.
-
-Earlier source/native evidence remains in HANDOFF and version-specific reports:
-[.50 note recovery and Today previews](validation-0.11.50.md),
-[.49 scoped history restoration](validation-0.11.49.md),
-[.48 delayed navigation and place ownership](validation-0.11.48.md), and
-[.47 Kardex mutation ownership](validation-0.11.47.md). Do not substitute one
-source's evidence for another. Six manual forms still need raw recovery.
-Physical-phone acceptance, complete40-patient timings, pressure/restore costs,
-clinical history/trash, rich text and fuller product workflows remain open below.
+Six manual forms still need raw recovery. Physical-phone acceptance,
+complete 40-patient timings, pressure/restore costs, clinical history/trash,
+rich text and fuller product workflows remain open below. The phone is not
+currently the sole remaining work.
 
 ## Priority0: finish integrity and recovery
 

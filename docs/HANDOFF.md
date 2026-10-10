@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Verify native discharge scope and deliver the inspected .53 owner APK
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** applicatione357dbf; this evidence/documentation checkpoint.
+
+**Changed**
+- Record final-source native/whole-state/artifact evidence and refresh the live
+  ledger/review guide. No further application/dependency/schema/permission change.
+
+**Verified**
+- Frozen source check:164 suites/2,359 app tests plus five workflows; clean
+  typecheck/lint/formatting, no act warnings. Actual code/tests are in e357dbf.
+- Inspected x86 package installed in place; pulled bytes match. Independent
+  full exports preserve4,117 prior rows/34 media hashes and exactly match the
+  imported4,129 rows. Actual two-order preview/Save produces4,130 intended rows:
+  only owned orders end, one receipt retires, all other fields/media stay exact.
+- PID4550 remains; no app fatal/ANR observed in checked buffers. Original AVD
+  QCOW2 hashes match after owned read-only processes are closed.
+- Owner .53/code69 arm64 APK built and inspected from e357dbf,53,407,807 bytes,
+  SHA76aabc45a2f362261b0c58604a7e8782cf2034d7d11a682d5c0578ba899c6108.
+  Package, established signer and essential JNI pass. See validation-0.11.53.
+
+**Not verified**
+- Hosted final-branch CI awaits the normal push. No physical phone run.
+- Earlier .52 retained-form restore evidence remains on its own source; broad
+  40-patient timings, pressure/low-space/provider/power and product gates remain.
+
+**Open threads**
+- Push normally, verify final-head CI and update the existing draft PR6.
+- Finish original-context raw recovery for the six manual forms and the other
+  P0/product gates in IMPLEMENTATION; phone testing is not the sole remaining work.
+
+**Gotchas**
+- System UI cold-start ANR and a wrong plural route/PID-constant mistake are
+  observer/environment failures, not app passes. Corrected native tests complete.
+- Emu kill acknowledges but leaves the owned processes running; verify exact
+  SDK/AVD/port/read-only ownership before stopping only those processes.
+- Never edit source while building or relabel an older APK as the final source.
+
+---
+
 ## 2026-10-10 — Keep discharge order reads and changes in their original clinical scope
 
 **Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.

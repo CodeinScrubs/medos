@@ -80,21 +80,20 @@ Start with the newest entry in `docs/HANDOFF.md`, then its version-specific
 validation report and `docs/IMPLEMENTATION.md`. Read the exact commit named there;
 earlier test counts, PR checks and APKs are evidence for their own source only.
 
-PR6 contains the .51 recovery pilot (`a541ce5`) and the final .52 Kardex
-ownership correction (`41a592b`). Read validation-0.11.51 and
-validation-0.11.52 for each source's automated, hosted, native and inspected-APK
-boundaries. The current owner arm64 .52 artifact is built and inspected from
-`41a592b`; no physical phone run is implied. Later documentation commits do not
-change the application bytes used for those witnesses.
-The .53 follow-up corrects explicit-episode order reads and discharge's patient
-filter. Its source checks pass; its separate native/artifact/hosted gates are in
-validation-0.11.53. Do not substitute an earlier artifact for this changed source.
+PR6 contains the .51 recovery pilot (`a541ce5`), .52 Kardex context correction
+(`41a592b`) and .53 discharge scope (`e357dbf`). Read their validation reports
+for each source's automated, hosted, native and inspected-APK boundaries.
+The current owner arm64 .53 artifact is built and inspected from `e357dbf`,
+whose actual native preview/publication and complete-state comparisons pass.
+No physical phone run is implied. Later documentation commits do not change
+the application bytes used for those witnesses; never substitute an older APK.
 
 | Area | Read together | Principal checks |
 |---|---|---|
 | Raw workspace recovery | lib/form-document.ts; features/workspace-forms/queries.ts, form-gate.tsx, use-form.ts; knowledge/form-draft*.ts | Strict version/context; exact partial input; complete published basis and revision CAS; publication/retirement/audit atomically; adoption never publishes |
 | Historical teaching links | knowledge/queries.ts, topic-form-screen.tsx, form-drafts.test.ts, form-recovery.test.tsx | Retain an unchanged archived teacher/specialty and search names; refuse a newly selected unavailable reference; inspect selected IDs during refresh |
 | Kardex creation/display | kardex/queries.ts, order-form-screen.tsx, creation-context.test.ts, mutations.test.ts; notes/dataset-editors.test.tsx | Original active episode including null; every other stored reference, including an empty key, needs live ownership; retain original allergy display across restore without freezing ordinary corrections |
+| Discharge orders | kardex/queries.ts, creation-context.test.ts; encounters/queries.ts; records.test.ts; validation-0.11.53 | An explicit empty episode is distinct from null; only the original patient's episode orders end, preserving inconsistent imported foreign rows |
 | Clinical note recovery | notes/draft-queries.ts, commit-queries.ts, note-editor-screen.tsx, dataset-editors.test.tsx | Preserve original patient/encounter including null, visible date/clock and meaningful voice; scoped draft ID; compare before publication; one original removal guard |
 | Voice/media lifetime | capture/writer.ts and queries.ts; attachments/recording-queries.ts; notes/draft-recording.test.ts | Reserve before IO; metadata acknowledgment; copied-file retry; original ownership across filing/restore; no staging-only recovery claim |
 | Native close/navigation | components/screen-options.tsx, use-save-before-leave.ts; notes/media-editors.test.tsx; validation-0.11.33/.34/.48 | Retain scroll host/native stacking parents and header presence; late acknowledgments close only the originating focused route |
