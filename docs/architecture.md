@@ -5,6 +5,49 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Raw Kardex recovery with explicit clinical ownership (0.11.54)
+
+The shared lifecycle now accepts an immutable feature-owned parent key; its
+unparented idea/topic codecs and persisted scope keys stay unchanged. Kardex
+uses a canonical JSON tuple `[patientId, encounterId]`, retaining explicit null,
+imported empty episode keys and literal `new` keys distinctly. This extends the
+parent-aware contract explicitly; it does not treat clinical forms as notebooks.
+The existing raw table already has the parent column and an open-scope uniqueness
+index. Adding the TypeScript `order` kind changes no SQL schema or archive format.
+
+One watched query resolves the original active episode or selected draft before
+editing. A draft selected from an older episode retains that episode; the default
+new form resumes only its current scope. Patient-scoped recovery links remain in
+the existing Kardex, with three short rows and older/newer pages. Read-only pager
+state resets across patient/notebook or dataset changes; editing input never
+remounts to accomplish that reset. A short Jalali episode label makes the intended
+association visible without exposing technical identifiers.
+
+The strict feature codec retains exact partial names, doses, notes and visible
+invalid date text, independently of an Order. An unknown start stays null, and an
+unchanged known timestamp retains seconds/milliseconds. One original AutosaveScope
+flushes on background, Close and route removal. Partial input cannot publish an
+order. Explicit Save validates it and compares the complete original Order basis
+and draft revision, then uses the existing synchronous domain writes to publish,
+retire the draft and record acknowledgment/audit atomically. A failed audit rolls
+everything back. Explicit conflict comparison/adoption updates only the raw draft;
+a separate Save is still necessary. Clinical publication checks live patient and
+original episode ownership, including recovered historical contexts.
+
+Original route, selected draft, dataset and navigation ownership remain fixed.
+Read failures retain loaded input. Suggestions are optional history and cannot
+overwrite a newer edit, confirmation, publication or old dataset. Completed late
+publication does not close another route. Future raw documents remain copyable.
+This is recoverable draft persistence, not permanent clinical correction history
+or a guarantee that a keystroke survives before acknowledgment.
+
+**Rejected: copying another clinical draft engine, resolving an episode again at
+Save, converting invalid raw dates into the last valid value, or adding a separate
+recovery route.** Five other manual forms and order history/trash remain separate
+gates. Validation and native/artifact boundaries are in validation-0.11.54.
+
+---
+
 ## A new Kardex form owns its original active episode (0.11.52)
 
 One watched SQLite read captures the live patient and active encounter before

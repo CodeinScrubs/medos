@@ -33,6 +33,119 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-10 — Deliver reviewed .54 evidence with exact hosted checks
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** app `d69163d`, native evidence `d403933`; delivery docs in this commit.
+
+**Changed**
+- Push/attach incremental draft PR7 against PR6 and record exact source CI.
+  Both PRs remain drafts/unmerged. APK/application attribution stays d69163d.
+
+**Verified**
+- Normal push hook full check:166 suites/2,388 app tests (156.044s), five workflow
+  checks, no act warnings. Exact d403933 CI38034525674 succeeds in every step,
+  including schema regeneration and Android bundle. PR1–5 heads are unchanged.
+- .54 owner APK rehash matches inspected SHA256 5ce4ca6c…f5824653; details and
+  complete native/archive/negative-probe evidence are in validation-0.11.54.
+
+**Not verified**
+- No physical phone, power-loss or full 40-patient timings; five other manual
+  forms plus history/trash, rich text and other IMPLEMENTATION gates remain.
+- This documentation-only delivery triggers its own CI; live checks are on PR7.
+
+**Open threads**
+- Continue D05: specialty profile, prescription, place, extension and credential.
+  Then the other priority gates. The phone is not the only remaining work.
+- Senior review can compare PR7 to delivered e68e6a4 without rereading all PR6.
+
+**Gotchas**
+- Fresh HEAD/CI metadata is required; never attribute parent CI or an older APK
+  to a newer app source. New documentation does not change the frozen app bytes.
+
+---
+
+## 2026-10-10 — Accept the frozen .54 Kardex recovery and owner APK
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** application `d69163d`; evidence in this commit; parent PR6 `e68e6a4`.
+
+**Changed**
+- Record bounded native recovery, publication/replacement and complete-state
+  acceptance in validation-0.11.54. Update the execution/review checkpoint.
+- Correct CI trigger wording only: pushes to main and all PRs; behavior unchanged.
+
+**Verified**
+- Full source check: 166 suites/2,388 app tests and five workflow checks; unchanged SQL.
+- Frozen actual x86_64 installed bytes match. Cold PID4146 ->7706 recovers exact
+  name/dose/spaced notes/invalid date without clinical publication. Invalid Save
+  refuses; separate corrected Save retains PID7706 and publishes once.
+- Complete authenticated exports: all50 application tables and34 media hashes
+  exact for upgrade4,117, fixture4,119, raw4,120, published4,121 and replacement4,119
+  intended rows. Integrity/FKs clean. Native old input/allergy remain read-only
+  across replacement and Save stays disabled. Original AVD base hashes unchanged.
+- Signed arm64-only owner APK 0.11.54/code70:53,415,455bytes;
+  SHA256 `5ce4ca6c7f2fa4c1b11298ed7c4435ef5caaf6c42c7e04fe00670040f5824653`.
+
+**Not verified**
+- Exact hosted CI for this incremental branch is pending; older CI is not substituted.
+- No physical phone, every-keystroke power durability or full pressure/40-patient timings.
+- Five other manual forms, clinical history/trash, rich text and other ledger gates remain.
+
+**Open threads**
+- Push this checked continuation and create/attach a draft PR against PR6; inspect its CI.
+- Continue D05's five remaining forms and the other priority gates; not only phone tests.
+
+**Gotchas**
+- System UI ANR/instrumentation timeout and private selector/RTL-clear failures
+  precede successful native witnesses; see report. Read-only controls require
+  geometry assertions, not actionable selectors. Generated dex lock is an
+  environment failure; no source/data/shared ADB deletion. Keep builds frozen.
+
+---
+
+## 2026-10-10 — Recover unfinished Kardex input in its original clinical context
+
+**Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
+**Commits:** implementation in this commit; parent PR6 `e68e6a4`.
+
+**Changed**
+- Extend the existing raw lifecycle with an explicit immutable parent key.
+  Order uses patient/episode, including null and imported empty keys; notebook
+  scope keys stay unchanged. No new SQL migration, route, dependency or permission.
+- Preserve exact partial text/invalid date input before publication. Original
+  record basis/revision, synchronous domain write, retirement/receipt/audit commit
+  together. Conflict adoption remains separate from clinical Save.
+- Keep recovery links in the existing Kardex and reset only read-only pager state
+  across patient/dataset changes. Keep original form/allergy/focus/removal ownership.
+
+**Verified**
+- Delivered parent `e68e6a4` CI38029238968 succeeds, including migrations/bundle.
+- Pre-change UI probe fails: unfinished text produces no raw draft (3.721s).
+- Three focused suites pass 49 tests in 9.202s without act warnings, covering raw
+  lifecycle, original context, conflicts, rollback, late callbacks and paging.
+- Full `npm run check` green: 166 suites/2,388 app tests (155.608s) and five
+  workflow tests; no act warnings. Includes late-child original-allergy regression.
+- Migration regeneration reports no schema changes; version edits are scoped.
+
+**Not verified**
+- Exact hosted CI, new native recovery and inspected .54 APK remain pending
+  here. Older .53 APK/native results do not accept this source.
+- No physical phone, complete pressure/40-patient performance or all product gates.
+
+**Open threads**
+- Freeze this checked source for native process-death/publication,
+  complete authenticated-state comparison and owner APK inspection.
+- Submit this incremental continuation against PR6 for clear senior review.
+- Five other raw forms plus the other IMPLEMENTATION gates remain; not only phone.
+
+**Gotchas**
+- Original null must never resolve to a later admission. No fresh dataset token in
+  old callbacks. Use replacement.committed/release, and run React notifications
+  inside act when testing. Close saves raw input; deletion is a separate confirmation.
+
+---
+
 ## 2026-10-10 — Verify the delivered .53 branch on GitHub
 
 **Agent:** GPT-6 via Codex; primary verification, no new delegation.

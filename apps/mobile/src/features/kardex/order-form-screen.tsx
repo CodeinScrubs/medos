@@ -3,10 +3,11 @@ import { useNavigation } from 'expo-router/react-navigation';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { AutosaveScope } from '@/components/autosave-scope';
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { EditGate } from '@/components/edit-gate';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError, notify } from '@/components/feedback';
+import { notify } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, ChipSelect, Column, Input, Row, Screen, Text, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
@@ -15,19 +16,19 @@ import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { AllergyBanner } from '@/features/patients/patient-header';
 import { patientQuery } from '@/features/patients/queries';
-import { datasetGeneration } from '@/lib/dataset-write';
+import { WorkspaceFormGate } from '@/features/workspace-forms/form-gate';
+import { WorkspaceFormDiscard, WorkspaceFormStatus } from '@/features/workspace-forms/form-status';
+import type { FormPort, FormSeed } from '@/features/workspace-forms/types';
+import { useWorkspaceForm } from '@/features/workspace-forms/use-form';
+import { dateInputText } from '@/lib/date-input';
+import { formatJalali } from '@/lib/jalali';
+import { formatClock } from '@/lib/time';
 import { useTheme } from '@/theme';
 
+import { orderFormContext, orderFormStart, type OrderFormFields } from './form-draft';
+import { orderContextLabelQuery, orderFormIntentQuery, orderFormPort } from './form-draft-queries';
 import { FREQUENCIES, ORDER_KIND_LABELS, ROUTES } from './labels';
-import {
-  createOrder,
-  lastOrderNamed,
-  orderCreationContextQuery,
-  orderQuery,
-  suggestOrderNames,
-  updateOrder,
-  type OrderCreationContext,
-} from './queries';
+import { lastOrderNamed, suggestOrderNames } from './queries';
 
 const KIND_OPTIONS = (['drug', 'fluid', 'diet', 'nursing', 'other'] as const).map((k) => ({
   value: k,
@@ -45,155 +46,187 @@ const NAME_HINTS: Record<Order['kind'], string> = {
   other: '',
 };
 
-type OrderFields = {
-  kind: Order['kind'];
-  name: string;
-  dose: string;
-  route: string | null;
-  frequency: string | null;
-  rate: string;
-  isPrn: boolean;
-  prnCondition: string;
-  startAt: Date | null;
-  indication: string;
-  notes: string;
-};
-
 /** Create or edit a kardex order. Params: `id` (patient), optional `orderId`. */
 export function OrderFormScreen() {
-  const { id: patientId, orderId } = useLocalSearchParams<{ id: string; orderId?: string }>();
+  return (
+    <AutosaveScope>
+      <OrderIntent />
+    </AutosaveScope>
+  );
+}
+
+function OrderIntent() {
+  const {
+    id: patientId,
+    orderId,
+    draftId,
+  } = useLocalSearchParams<{ id: string; orderId?: string; draftId?: string }>();
   // Route-param reuse must not place a cached order under another patient's allergy context.
   // Retain this editing intent and its input; a changed route makes it read-only.
-  const [context] = useState(() => ({ patientId: patientId ?? '', orderId }));
+  const [context] = useState(() => ({
+    patientId: patientId ?? '',
+    orderId: orderId ?? null,
+    draftId: draftId ?? null,
+  }));
   const { stale } = useDatasetIntent();
-  const contextChanged = context.patientId !== (patientId ?? '') || context.orderId !== orderId;
-  const { data, error, retry } = useLive(orderQuery(context.orderId ?? '', context.patientId), [
+  const contextChanged =
+    context.patientId !== (patientId ?? '') ||
+    context.orderId !== (orderId ?? null) ||
+    context.draftId !== (draftId ?? null);
+  const { data, error, retry } = useLive(orderFormIntentQuery(context.patientId, context.orderId, context.draftId), [
     context.orderId,
     context.patientId,
+    context.draftId,
   ]);
-  const [seed, setSeed] = useState<Order | undefined>(() => data?.[0]);
-  if (!stale && seed === undefined && data?.[0]) setSeed(data[0]);
-  const unavailable = Boolean(context.orderId) && (error !== undefined || data === undefined || data.length === 0);
+  const row = data?.[0];
+  const [original, setOriginal] = useState<{
+    port: FormPort<Order, OrderFormFields>;
+    allergy: string | null | undefined;
+  }>();
+  let contextError: Error | undefined;
+  if (!original && !stale && !contextChanged && row && !error) {
+    try {
+      if (context.draftId !== null && row.draft?.id !== context.draftId) throw new Error('این پیش‌نویس در دسترس نیست.');
+      if (context.orderId !== null && !row.record && !row.draft) throw new Error('این دستور در دسترس نیست.');
+      const owner = row.draft
+        ? orderFormContext(row.draft.parentId)
+        : row.record
+          ? { patientId: row.record.patientId, encounterId: row.record.encounterId }
+          : { patientId: context.patientId, encounterId: row.activeEpisode };
+      if (owner.patientId !== context.patientId) throw new Error('مسیر بیمار تغییر کرده است.');
+      setOriginal({ port: orderFormPort(owner), allergy: row.patient?.allergies });
+    } catch (cause) {
+      contextError = cause instanceof Error ? cause : new Error('پیش‌نویس قابل خواندن نیست.');
+    }
+  }
+  if (original)
+    return (
+      <WorkspaceFormGate port={original.port} recordId={context.orderId} draftId={context.draftId}>
+        {(seed, readNotice, unavailable) => (
+          <OrderForm
+            seed={seed}
+            port={original.port}
+            allergyAtOpen={original.allergy}
+            patientId={context.patientId}
+            readNotice={
+              <>
+                {readNotice}
+                <ErrorNotice error={error} what="نوبت کاردکس" onRetry={retry} />
+              </>
+            }
+            unavailable={unavailable || !!error || contextChanged}
+          />
+        )}
+      </WorkspaceFormGate>
+    );
+  if (contextError && row?.draft)
+    return (
+      <Screen scroll>
+        <Column>
+          <ErrorNotice error={contextError} what="پیش‌نویس کاردکس" onRetry={retry} />
+          <Text selectable>{row.draft.body}</Text>
+        </Column>
+      </Screen>
+    );
   return (
-    <EditGate
-      editing={Boolean(context.orderId)}
-      rows={seed ? [seed] : data}
-      error={error}
-      onRetry={retry}
-      what="کاردکس"
-      fenceDataset
-    >
-      {(order, readNotice, generation) => (
-        <OrderForm
-          readNotice={readNotice}
-          patientId={context.patientId}
-          order={order}
-          generation={generation}
-          contextChanged={contextChanged}
-          unavailable={unavailable}
-        />
-      )}
+    <EditGate editing rows={contextError ? [] : undefined} error={error} onRetry={retry} what="کاردکس" fenceDataset>
+      {() => null}
     </EditGate>
   );
 }
 
 function OrderForm({
   patientId,
-  order,
+  seed,
+  port,
   readNotice,
-  generation,
-  contextChanged,
   unavailable,
+  allergyAtOpen,
 }: {
   readNotice: ReactNode;
   patientId: string;
-  order: Order | null;
-  generation: number;
-  contextChanged: boolean;
+  seed: FormSeed<Order, OrderFormFields>;
+  port: FormPort<Order, OrderFormFields>;
   unavailable: boolean;
+  allergyAtOpen: string | null | undefined;
 }) {
   const { data: patientRows, error: patientError, retry: retryPatient } = useLive(patientQuery(patientId), [patientId]);
   const patient = patientRows?.[0];
   const router = useRouter();
   const navigation = useNavigation();
-  const { stale } = useDatasetIntent(generation);
+  const { stale } = useDatasetIntent();
+  const [originalContext] = useState(() => orderFormContext(port.parentId ?? null));
+  const {
+    data: contextRows,
+    error: episodeError,
+    retry: retryEpisode,
+  } = useLive(orderContextLabelQuery(originalContext), [originalContext.patientId, originalContext.encounterId]);
+  const episode = contextRows?.[0];
+  const currentLabel =
+    originalContext.encounterId === null
+      ? 'بدون نوبت بستری'
+      : episode
+        ? ['بستری', episode.admittedAt ? formatJalali(episode.admittedAt) : null, episode.ward]
+            .filter(Boolean)
+            .join(' · ')
+        : contextRows === undefined
+          ? 'در حال خواندن بستری…'
+          : 'بستریِ اصلی در دسترس نیست';
+  const [ownedContextLabel, setOwnedContextLabel] = useState(() =>
+    stale ? (originalContext.encounterId === null ? 'بدون نوبت بستری' : 'بستریِ اصلی فرم قدیمی') : currentLabel,
+  );
+  if (!stale && !episodeError && contextRows !== undefined && ownedContextLabel !== currentLabel)
+    setOwnedContextLabel(currentLabel);
   // Cache only display text: live corrections may refresh it, a restore cannot.
-  const [ownedAllergy, setOwnedAllergy] = useState(patient?.allergies);
+  // A recovered child can first mount after replacement; only the parent intent's
+  // original read can seed its old-dataset banner in that case.
+  const [ownedAllergy, setOwnedAllergy] = useState(() =>
+    stale ? allergyAtOpen : patient ? patient.allergies : allergyAtOpen,
+  );
   if (!stale && !patientError && patient && ownedAllergy !== patient.allergies) setOwnedAllergy(patient.allergies);
   const allergy = stale ? ownedAllergy : patient?.allergies;
   const { colors, radii, spacing } = useTheme();
-  const isEdit = order != null;
-  const [basis] = useState(order);
+  const isEdit = seed.document.recordId !== null;
   const now = useNow();
-  const {
-    data: creationContexts,
-    error: creationError,
-    retry: retryCreation,
-  } = useLive(orderCreationContextQuery(isEdit ? '' : patientId), [patientId, isEdit]);
-  const [creationContext, setCreationContext] = useState<OrderCreationContext>();
-  if (!isEdit && !stale && !creationError && !creationContext && creationContexts?.[0])
-    setCreationContext(creationContexts[0]);
-
-  const [fields, setFields] = useState<OrderFields>(() => ({
-    kind: order?.kind ?? 'drug',
-    name: order?.name ?? '',
-    dose: order?.dose ?? '',
-    route: order?.route ?? null,
-    frequency: order?.frequency ?? null,
-    rate: order?.rate ?? '',
-    isPrn: order?.isPrn ?? false,
-    prnCondition: order?.prnCondition ?? '',
-    startAt: order ? order.startAt : new Date(now),
-    indication: order?.indication ?? '',
-    notes: order?.notes ?? '',
-  }));
-  const latest = useRef(fields);
-  const { kind, name, dose, route, frequency, rate, isPrn, prnCondition, startAt, indication, notes } = fields;
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const acting = useRef(false);
-  const published = useRef(false);
-  const mounted = useRef(true);
-  const suggestionIntent = useRef(0);
-  const [suggestionError, setSuggestionError] = useState<Error>();
-  const [prefillFailure, setPrefillFailure] = useState<{ picked: string; intent: number; error: Error }>();
-  const [suggestionAttempt, setSuggestionAttempt] = useState(0);
   const readable =
     patientRows !== undefined &&
     patient != null &&
     !patientError &&
-    (isEdit || (!creationError && creationContext !== undefined && !!creationContexts?.[0]));
-  const contextValid = useRef(!contextChanged && !unavailable && readable);
+    (originalContext.encounterId === null || (!!episode && !episodeError));
+  const editing = useWorkspaceForm(port, seed, unavailable || !readable, () => router.back());
+  const fields = editing.document.fields;
+  const latest = useRef(fields);
   useLayoutEffect(() => {
-    contextValid.current = !contextChanged && !unavailable && readable;
-  }, [contextChanged, unavailable, readable]);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-  const locked = saving || completed || stale || contextChanged || unavailable || !readable;
+    latest.current = fields;
+  }, [fields]);
+  const { kind, name, dose, route, frequency, rate, isPrn, prnCondition, indication, notes } = fields;
+  let startAt = fields.hasStart ? new Date(fields.dateValue) : null;
+  try {
+    startAt = orderFormStart(fields, new Date(now));
+  } catch {
+    /* The invalid raw date stays visible. */
+  }
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const saving = editing.busy;
+  const completed = !!editing.completed;
+  const suggestionIntent = useRef(0);
+  const [suggestionError, setSuggestionError] = useState<Error>();
+  const [prefillFailure, setPrefillFailure] = useState<{ picked: string; intent: number; error: Error }>();
+  const [suggestionAttempt, setSuggestionAttempt] = useState(0);
+  const locked = editing.locked;
   const dateValidation = useDateValidation();
 
   function mayEdit() {
-    return (
-      !acting.current &&
-      !published.current &&
-      mounted.current &&
-      contextValid.current &&
-      generation === datasetGeneration()
-    );
+    return editing.canChange();
   }
-  function update(patch: Partial<OrderFields>) {
+  function update(patch: Partial<OrderFormFields>) {
     if (!mayEdit()) return;
     // Invalidate any pending suggestion on any manual edit, including editing then clearing a dose.
     suggestionIntent.current++;
     setPrefillFailure(undefined);
     const next = { ...latest.current, ...patch };
     latest.current = next;
-    setFields(next);
+    editing.change(patch);
   }
 
   // Suggestions from this user's own past orders, not a drug database.
@@ -250,72 +283,36 @@ function OrderForm({
 
   const isMedication = kind === 'drug' || kind === 'fluid';
 
-  async function save() {
-    if (acting.current || published.current || !mounted.current || !contextValid.current || !navigation.isFocused())
-      return;
-    if (!dateValidation.check()) return;
-    const value = latest.current;
-    if (!value.name.trim()) {
-      notify('نام دستور لازم است');
-      return;
-    }
-    acting.current = true;
-    setSaving(true);
-    const medication = value.kind === 'drug' || value.kind === 'fluid';
-    const payload = {
-      kind: value.kind,
-      name: value.name.trim(),
-      dose: medication ? value.dose.trim() || null : null,
-      route: medication ? value.route : null,
-      frequency: value.kind === 'drug' ? value.frequency : null,
-      rate: value.kind === 'fluid' ? value.rate.trim() || null : null,
-      isPrn: value.kind === 'drug' ? value.isPrn : false,
-      prnCondition: value.kind === 'drug' && value.isPrn ? value.prnCondition.trim() || null : null,
-      startAt: value.startAt,
-      indication: value.indication.trim() || null,
-      notes: value.notes.trim() || null,
-    };
-    try {
-      if (basis) await updateOrder(basis.id, payload, generation, basis);
-      else {
-        if (!creationContext) throw new Error('نوبت مربوط به این فرم در دسترس نیست.');
-        await createOrder({ patientId, ...payload }, generation, creationContext);
+  function save() {
+    return editing.save((value) => {
+      if (value.hasStart && !dateValidation.check()) return false;
+      if (!value.name.trim()) {
+        notify('نام دستور لازم است');
+        return false;
       }
-      published.current = true;
-      if (mounted.current) setCompleted(true);
-      if (mounted.current && navigation.isFocused()) router.back();
-    } catch (e) {
-      if (mounted.current && navigation.isFocused()) alertError('ذخیره نشد', e);
-    } finally {
-      acting.current = false;
-      if (mounted.current) setSaving(false);
-    }
+      return true;
+    });
   }
 
   return (
     <Screen scroll>
       <Column collapsable={false} gap="md" pointerEvents={saving ? 'none' : 'auto'} style={{ paddingTop: spacing.md }}>
         {readNotice}
+        <WorkspaceFormStatus editing={editing} port={port} />
         <ErrorNotice error={patientError} what="بیمار" onRetry={retryPatient} />
-        <ErrorNotice error={creationError} what="نوبت کاردکس" onRetry={retryCreation} />
+        <ErrorNotice error={episodeError} what="بستری کاردکس" onRetry={retryEpisode} />
+        <Text variant="caption" color="textMuted">
+          {stale ? ownedContextLabel : currentLabel}
+        </Text>
         {!patientError && patientRows !== undefined && !patient ? (
           <Text color="danger">پروندهٔ بیمار در دسترس نیست؛ نوشته‌های روی صفحه حفظ شده‌اند.</Text>
-        ) : null}
-        {contextChanged ? (
-          <Text color="danger">مسیر بیمار تغییر کرده؛ این فرم فقط برای مرور نوشته‌های قبلی است.</Text>
         ) : null}
         {unavailable ? (
           <Text color="danger">این دستور فعلاً در دسترس نیست؛ نوشته‌های روی صفحه حفظ شده‌اند.</Text>
         ) : null}
         {completed ? (
           <Column gap="sm">
-            <Text>دستور ثبت شد.</Text>
-            <Button
-              label="بستن"
-              onPress={() => {
-                if (navigation.isFocused()) router.back();
-              }}
-            />
+            <Button label="بستن" onPress={editing.close} />
           </Column>
         ) : null}
         {/* The allergy line where the order is written, not only on the record's
@@ -469,7 +466,8 @@ function OrderForm({
             label="شروع"
             disabled={locked}
             value={startAt}
-            onChange={(startAt) => update({ startAt })}
+            rawInput={fields.date}
+            onRawInputChange={(patch) => update({ date: { ...latest.current.date, ...patch } })}
             direction="past"
           />
         ) : (
@@ -481,7 +479,14 @@ function OrderForm({
               label="افزودن زمان شروع"
               disabled={locked}
               variant="ghost"
-              onPress={() => update({ startAt: new Date(now) })}
+              onPress={() => {
+                const at = new Date(now);
+                update({
+                  hasStart: true,
+                  dateValue: at.getTime(),
+                  date: { dateText: dateInputText(at), clockText: formatClock(at), customOpen: false },
+                });
+              }}
             />
           </Column>
         )}
@@ -507,16 +512,9 @@ function OrderForm({
               full
             />
           </View>
-          <Button
-            label="انصراف"
-            disabled={saving || completed}
-            variant="ghost"
-            onPress={() => {
-              if (!acting.current && !published.current && mounted.current && navigation.isFocused()) router.back();
-            }}
-            haptic={false}
-          />
+          <Button label="بستن" disabled={saving || completed} variant="ghost" onPress={editing.close} haptic={false} />
         </Row>
+        <WorkspaceFormDiscard editing={editing} />
       </Column>
     </Screen>
   );

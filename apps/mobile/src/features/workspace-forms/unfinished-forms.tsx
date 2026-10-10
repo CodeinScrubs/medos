@@ -11,24 +11,42 @@ import { formatRelative } from '@/lib/jalali';
 
 import { workspaceDraftsQuery, type WorkspaceDraftCursor } from './queries';
 
-/** Three short links, inside the existing notebook; older input stays reachable. */
-export function UnfinishedWorkspaceForms({
-  kind,
-  onOpen,
-}: {
+type DraftLink = { id: string; recordId: string | null; updatedAt: Date; title: string | null };
+type DraftPageQuery = (cursor: WorkspaceDraftCursor | null) => { then: Promise<DraftLink[]>['then'] };
+type DraftNavigationProps = {
   kind: WorkspaceFormKind;
   onOpen: (recordId: string | null, draftId: string) => void;
-}) {
-  const [previous, setPrevious] = useState<(WorkspaceDraftCursor | null)[]>([]);
-  const [cursor, setCursor] = useState<WorkspaceDraftCursor | null>(null);
+  contextKey?: string;
+  queryPage?: DraftPageQuery;
+};
+
+/** Three short links, inside the existing notebook; older input stays reachable. */
+export function UnfinishedWorkspaceForms({ kind, onOpen, contextKey = '', queryPage }: DraftNavigationProps) {
   const current = useSyncExternalStore(subscribeDataset, datasetGeneration, datasetGeneration);
   return (
+    <DraftNavigation
+      key={JSON.stringify([kind, contextKey, current])}
+      kind={kind}
+      onOpen={onOpen}
+      contextKey={contextKey}
+      queryPage={queryPage}
+    />
+  );
+}
+
+/** Reset only this read-only pager when its patient/notebook or dataset changes. */
+function DraftNavigation({ kind, onOpen, contextKey = '', queryPage }: DraftNavigationProps) {
+  const [previous, setPrevious] = useState<(WorkspaceDraftCursor | null)[]>([]);
+  const [cursor, setCursor] = useState<WorkspaceDraftCursor | null>(null);
+  return (
     <DraftPage
-      key={JSON.stringify([kind, cursor, current])}
+      key={JSON.stringify([kind, contextKey, cursor])}
       kind={kind}
       cursor={cursor}
       hasPrevious={previous.length > 0}
       onOpen={onOpen}
+      contextKey={contextKey}
+      queryPage={queryPage}
       onOlder={(next) => {
         setPrevious([...previous, cursor]);
         setCursor(next);
@@ -47,6 +65,8 @@ function DraftPage({
   onOpen,
   onOlder,
   onNewer,
+  contextKey,
+  queryPage,
 }: {
   kind: WorkspaceFormKind;
   cursor: WorkspaceDraftCursor | null;
@@ -54,8 +74,14 @@ function DraftPage({
   onOpen: (recordId: string | null, draftId: string) => void;
   onOlder: (cursor: WorkspaceDraftCursor) => void;
   onNewer: () => void;
+  contextKey: string;
+  queryPage?: DraftPageQuery;
 }) {
-  const { data, error, retry } = useLive(workspaceDraftsQuery(kind, cursor), [kind, cursor]);
+  const { data, error, retry } = useLive(queryPage ? queryPage(cursor) : workspaceDraftsQuery(kind, cursor), [
+    kind,
+    contextKey,
+    cursor,
+  ]);
   const now = useNow();
   const rows = data?.slice(0, 3) ?? [];
   if (!error && !rows.length && !hasPrevious) return null;

@@ -1,6 +1,6 @@
 name: CI
 
-# Every push and pull request: the same checks `npm run check` runs locally,
+# Pushes to main and every pull request: the same checks `npm run check` runs locally,
 # plus two that only make sense on a clean machine.
 
 on:

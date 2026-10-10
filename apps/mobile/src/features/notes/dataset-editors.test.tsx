@@ -15,6 +15,7 @@ import { OrderFormScreen } from '@/features/kardex/order-form-screen';
 import { createOrder } from '@/features/kardex/queries';
 import * as orderQueries from '@/features/kardex/queries';
 import { createPatient } from '@/features/patients/queries';
+import * as formDraftQueries from '@/features/workspace-forms/queries';
 import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { softDelete, stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
@@ -468,7 +469,7 @@ describe('actual manual order form identity, pending publication and optional su
     const current = t.db.select().from(orders).where(eq(orders.id, id)).get()!;
     expect(current).toMatchObject({ dose: '3 g', notes: null });
     expect(input('یادداشت').props.value).toBe('Synthetic new note');
-    expect(alertError).toHaveBeenCalledWith('ذخیره نشد', expect.any(Error));
+    expect(alertError).toHaveBeenCalledWith('ثبت نشد', expect.any(Error));
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -484,13 +485,13 @@ describe('actual manual order form identity, pending publication and optional su
     const pending = new Promise<void>((resolve) => {
       acknowledge = resolve;
     });
-    const update = orderQueries.updateOrder;
-    const writes = jest.spyOn(orderQueries, 'updateOrder').mockImplementation(async (...args) => {
+    const publish = formDraftQueries.publishWorkspaceDraft;
+    const writes = jest.spyOn(formDraftQueries, 'publishWorkspaceDraft').mockImplementation(async (...args) => {
       await pending;
-      await update(...args);
+      return publish(...args);
     });
     const save = button('ذخیره').props.onPress;
-    const cancel = button('انصراف').props.onPress;
+    const cancel = button('بستن').props.onPress;
     const oldDose = input('دوز').props.onChangeText;
     await act(async () => {
       save();
@@ -503,7 +504,7 @@ describe('actual manual order form identity, pending publication and optional su
     expect(mockBack).not.toHaveBeenCalled();
     expect(input('دوز').props.value).toBe('2 g');
     expect(input('دوز').props.editable).toBe(false);
-    expect(button('انصراف').props.disabled).toBe(true);
+    expect(button('بستن').props.disabled).toBe(true);
     mockFocused = false;
     await act(async () => {
       acknowledge();
@@ -1225,7 +1226,7 @@ describe('mounted note and order intents across real same-ID SQL import', () => 
       await settle();
     });
     expect(t.db.select().from(orders).get()!.dose).toBe('500 mg');
-    expect(jest.mocked(alertError)).toHaveBeenCalledWith('ذخیره نشد', expect.any(DatasetChangedError));
+    expect(jest.mocked(alertError)).toHaveBeenCalledWith('ثبت نشد', expect.any(DatasetChangedError));
     expect(mockBack).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, getTableColumns, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { auditInTransaction } from '@/db/audit';
-import { db, type Database } from '@/db/client';
+import { db, type Database, type DbTransaction } from '@/db/client';
 import { encounters, orders, patients, type Order } from '@/db/schema';
 import { startsWith } from '@/db/search';
 import { currentEncounterQuery, resolveActiveEncounterId } from '@/features/encounters/queries';
@@ -110,43 +110,50 @@ export async function createOrder(
   generation = datasetGeneration(),
   originalContext?: OrderCreationContext,
 ): Promise<string> {
-  return withDatasetWrite(generation, async () => {
-    return db.transaction((tx) => {
-      // Immediate callers may resolve now; mounted forms must pass their original snapshot.
-      // A captured null is meaningful and must never fall back to a later admission.
-      const context = originalContext ?? {
-        patientId: input.patientId,
-        encounterId: resolveActiveEncounterId(input.patientId, tx),
-      };
-      if (context.patientId !== input.patientId) throw new Error('مسیر بیمار تغییر کرده است.');
-      requireOrderContext(tx, context);
-      const id = newId(),
-        now = new Date();
-      tx.insert(orders)
-        .values({
-          id,
-          ...stamps(now),
-          patientId: input.patientId,
-          encounterId: context.encounterId,
-          kind: input.kind,
-          name: input.name.trim(),
-          brandName: input.brandName ?? null,
-          dose: input.dose ?? null,
-          route: input.route ?? null,
-          frequency: input.frequency ?? null,
-          rate: input.rate ?? null,
-          duration: input.duration ?? null,
-          isPrn: input.isPrn ?? false,
-          prnCondition: input.prnCondition ?? null,
-          startAt: input.startAt === undefined ? now : input.startAt,
-          indication: input.indication ?? null,
-          notes: input.notes ?? null,
-          status: 'active',
-        })
-        .run();
-      return id;
-    });
-  });
+  return withDatasetWrite(generation, async () =>
+    db.transaction((tx) => createOrderInTransaction(tx, input, originalContext, new Date())),
+  );
+}
+
+/** Draft publication and its receipt must share the caller's synchronous transaction. */
+export function createOrderInTransaction(
+  tx: DbTransaction,
+  input: OrderInput,
+  originalContext: OrderCreationContext | undefined,
+  now: Date,
+): string {
+  // Immediate callers may resolve now; mounted forms must pass their original snapshot.
+  // A captured null is meaningful and must never fall back to a later admission.
+  const context = originalContext ?? {
+    patientId: input.patientId,
+    encounterId: resolveActiveEncounterId(input.patientId, tx),
+  };
+  if (context.patientId !== input.patientId) throw new Error('مسیر بیمار تغییر کرده است.');
+  requireOrderContext(tx, context);
+  const id = newId();
+  tx.insert(orders)
+    .values({
+      id,
+      ...stamps(now),
+      patientId: input.patientId,
+      encounterId: context.encounterId,
+      kind: input.kind,
+      name: input.name.trim(),
+      brandName: input.brandName ?? null,
+      dose: input.dose ?? null,
+      route: input.route ?? null,
+      frequency: input.frequency ?? null,
+      rate: input.rate ?? null,
+      duration: input.duration ?? null,
+      isPrn: input.isPrn ?? false,
+      prnCondition: input.prnCondition ?? null,
+      startAt: input.startAt === undefined ? now : input.startAt,
+      indication: input.indication ?? null,
+      notes: input.notes ?? null,
+      status: 'active',
+    })
+    .run();
+  return id;
 }
 
 export async function updateOrder(
@@ -155,17 +162,25 @@ export async function updateOrder(
   generation = datasetGeneration(),
   expected?: Order,
 ): Promise<void> {
-  await withDatasetWrite(generation, async () => {
-    db.transaction((tx) => {
-      const current = requireOrderBasis(tx.select().from(orders).where(eq(orders.id, id)).get(), expected);
-      if (current.deletedAt) throw new Error('این دستور حذف شده است.');
-      requireOrderContext(tx, current);
-      tx.update(orders)
-        .set({ ...patch, ...touch() })
-        .where(eq(orders.id, id))
-        .run();
-    });
-  });
+  await withDatasetWrite(generation, async () =>
+    db.transaction((tx) => updateOrderInTransaction(tx, id, patch, new Date(), expected)),
+  );
+}
+
+export function updateOrderInTransaction(
+  tx: DbTransaction,
+  id: string,
+  patch: Partial<Omit<OrderInput, 'patientId'>>,
+  now: Date,
+  expected?: Order,
+): void {
+  const current = requireOrderBasis(tx.select().from(orders).where(eq(orders.id, id)).get(), expected);
+  if (current.deletedAt) throw new Error('این دستور حذف شده است.');
+  requireOrderContext(tx, current);
+  tx.update(orders)
+    .set({ ...patch, ...touch(now) })
+    .where(eq(orders.id, id))
+    .run();
 }
 
 export type OrderMutationOptions = {
