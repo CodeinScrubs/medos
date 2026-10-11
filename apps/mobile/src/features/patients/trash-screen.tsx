@@ -178,7 +178,7 @@ export function TrashScreen() {
               title="نوت‌ها"
               count={ready && !stale && noteRead.data!.length <= noteLimit ? noteRows.length : undefined}
             />
-            {noteRows.map(({ note, patient }) => (
+            {noteRows.map(({ note, patient, lifecycle }) => (
               <Card key={note.id}>
                 <Row justify="space-between" gap="sm">
                   <Column gap="xxs" style={{ flex: 1 }}>
@@ -201,7 +201,7 @@ export function TrashScreen() {
                     size="sm"
                     variant="secondary"
                     disabled={locked}
-                    onPress={() => void restore(() => restoreNote(note.id, note))}
+                    onPress={() => void restore(() => restoreNote(note.id, note, lifecycle))}
                   />
                 </Row>
               </Card>

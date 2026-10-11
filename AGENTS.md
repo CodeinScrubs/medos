@@ -51,7 +51,9 @@ Then read, in this order:
 
 MedOS is a **personal clinical operating system** for one physician: their own patients,
 their own colleagues, their own notes. It is not a product, not multi-tenant, not for other
-users. Do not add sign-up, tenancy, billing, analytics, telemetry, or sharing features.
+users. Do not add sign-up, tenancy, billing, analytics, telemetry, or public/collaboration
+sharing. Owner-controlled backups and explicitly requested local evidence exports are
+separate from sharing with other users; neither authorizes automatic upload.
 
 The owner is a medical student and physician in Iran. They read and write Persian and are
 not a professional developer. **Reply to them in Persian**, explain trade-offs in plain
@@ -86,7 +88,7 @@ say so explicitly and let the owner decide.
 | 6 | **`db.transaction()` is synchronous.** Inside it use `.run()` / `.all()` / `.get()`; an `async` callback commits before your statements run. | Silent data loss. | ESLint bans async transaction callbacks |
 | 7 | **Schema changes are additive.** New tables/columns only; NOT NULL needs an **SQL-level** `.default()`, not drizzle's `$default()`. Never edit an existing migration. | The app holds real data, and restore copies the columns old and new schemas share. | CI regenerates migrations and fails on a diff |
 | 8 | **Backup compatibility is forever.** The `.medosbak` format and the passphrase schemes in `lib/crypto.ts` are frozen; add a new scheme number instead of changing one. | A changed rule makes every existing backup unopenable. | `crypto.test.ts` golden keys |
-| 9 | **No patient data in logs, errors or anything that leaves the app.** Everything goes through `redactErrorText`. | A failed query carries its parameters — names, national ids. | `redactErrorText` test; review |
+| 9 | **Default technical logs and errors contain no patient data, credentials or private colleague notes.** `redactErrorText` removes query parameters; it is not proof that arbitrary error text is safe. The owner requested local, selected clinical evidence for their coding agent on 2026-10-11: a separate, explicit local export may include the selected clinical records, with a visible scope and sensitive-content acknowledgment. No automatic upload or patient data in GitHub/CI. Never mix clinical export bodies into ordinary diagnostics. | Query errors can contain names/notes outside `params:`. Coding-agent evidence must use the clinical source of truth, without silent disclosure or fabricated completeness. | redaction/diagnostic tests, export contract and review |
 | 10 | **Clinical tools need explicit validation.** The owner expanded scope on 2026-09-23 to sourced, deterministic scores/algorithms with physician review. Each enabled tool needs source/version, population/exclusions, units, visible inputs, reference/boundary tests and clinical review. Never infer missing inputs or automatically issue diagnoses/orders/treatment. AI output stays a draft. | A chat-generated formula or green software tests do not validate a clinical tool. | per-tool evidence; review |
 | 11 | **Ratings and personal profiles about colleagues are private working notes.** Never shared or exported by default. | They are about real, named people. | review |
 

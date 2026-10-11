@@ -33,6 +33,80 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-12 — Deliver inspected .61 APK and native note acceptance
+
+**Agent:** GPT-6 via Codex; primary native integration and verification.
+**Commits:** application3ee0ce5; this documentation checkpoint. Draft PR12.
+
+**Changed**
+- Deliver dist/MedOS-0.11.61.apk,arm64/code77 from frozen3ee0ce5; record exact
+  hashes, installed-byte provenance and the limited native acceptance matrix.
+- No additional application change. Private proposals are not integrated.
+
+**Verified**
+- Normal push repeats183 suites/2,759 app tests and five workflow checks,
+  zero lint warnings; exact-source hosted check/bundle succeeds.
+- Both signed APKs pass version/code/ABI/certificate/JNI checks. Actual native
+  note create/pin/edit/version-restore/delete/trash-restore/cold restart passes.
+- Independent authenticated three-archive comparison covers all55 tables,
+  preserves every old record,41 patients and34 media byte hashes. The one new
+  note retains four versions and original context. Owned AVD shuts down with
+  both base-image hashes unchanged; source/WIP remained frozen during builds.
+
+**Not verified**
+- Physical phone, full timed40-patient shift, broad native interruption and
+  clinical applicability. Initial System UI ANR/boot delay remain in the report.
+
+**Open threads**
+- Integrate/review the private content-free diagnostic proposal and corrected
+  places/extensions trash/device-action proposal, one clear checkpoint at a time.
+- Other notebook trash, rich text, full follow-up/outpatient workflows, native
+  pressure/input and physical gates remain. Local coding-agent use history/export
+  is a recorded requirement, not the current error log. See IMPLEMENTATION.md.
+
+**Gotchas**
+- Production AVD denies root; use authenticated owner-controlled archive copies
+  for independent full-state evidence. Note-specific saved wording and flattened
+  version rows require actual native selectors, not assumed generic helpers.
+
+## 2026-10-11 — Verify new AI reviews and close ordinary note mutation gaps
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint, based on8ecaa67.
+
+**Changed**
+- .61/code77: validate original patient/episode on ordinary note writers; typed
+  and runtime correction allowlist; defined-field merged search; atomic required
+  delete/restore audit. Preserve explicit null and original closed episodes.
+- Retained pin/delete and trash restore carry compact immutable-version/lifecycle
+  evidence, original dataset, mount and focus; list bounds stay unchanged.
+- Classify the supplied reports against actual source; record the owner's new
+  local coding-agent evidence requirement and separate selected-export contract.
+
+**Verified**
+- Original red witnesses for audit/ownership/runtime patch/search and four
+  rendered-card lifetime/focus cases, plus imported-empty version ownership.
+- Final full check:183 suites/2,759 app tests and five workflow checks;
+  typecheck/lint/format, zero lint warnings. Final parent focused set45 tests.
+- Public main2dcd60b/.50 and PR11's8ecaa67/.60 verified; open PR heads refreshed.
+
+**Not verified**
+- .61 push/hosted CI/frozen APK/native acceptance pending at this source commit;
+  physical phone, full timed shift and physician review were not performed.
+
+**Open threads**
+- Complete .61 frozen build/inspect/native note acceptance and owner artifact.
+- Default diagnostic text safety/handled sharing, then local agent-readable use
+  history with explicit scope/completeness. Places actions and notebook trash,
+  rich text, full workflows/native pressure and phone gates remain; see
+  validation-0.11.61.md and IMPLEMENTATION.md. No broad rewrite is justified.
+
+**Gotchas**
+- Single-table Drizzle projections remove outer qualifiers inside correlated
+  SQL; the action/lifecycle consumers retain a join. Keep real SQLite tests.
+- The old cross-patient trash fixture must inject legacy bad SQL directly;
+  guarded public create now correctly refuses it. Do not relax its assertion.
+
 ## 2026-10-11 — Deliver verified .60 optional-lock repair and owner APK
 
 **Agent:** GPT-6 via Codex; primary integration and native verification.

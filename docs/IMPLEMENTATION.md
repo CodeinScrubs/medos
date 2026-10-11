@@ -33,13 +33,30 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+Application 0.11.61/code77 on codex/note-action-integrity builds on PR11's
+8ecaa67. Ordinary note creation/correction/deletion/version restoration now
+validates original patient/episode ownership. Delete and trash restore require
+their audit atomically. Retained card choices use compact immutable-version/
+lifecycle evidence plus original dataset, focus and mount; existing pagination
+and the33KB list bound remain unchanged. Full software check passes183 suites/
+2,759 app tests and five workflow checks, with zero lint warnings. Frozen3ee0ce5
+passes normal push and exact-source hosted CI. Both signed APKs pass actual
+version/code/ABI/signer/JNI inspection; dist/MedOS-0.11.61.apk is the newest
+owner artifact. Native create/pin/correction/version-restore/delete/trash-restore/
+cold persistence passes with independent three-archive/all55-table comparison;
+all41 original synthetic patients and34 media byte hashes remain. Initial boot/
+System UI ANR and selector assumptions are recorded separately. See
+[validation-0.11.61.md](validation-0.11.61.md). No migration/dependency/route
+or archive/key change is added. This is bounded native evidence, not phone or
+complete-shift acceptance.
+
 Application 0.11.60/code 76 on codex/permission-state-recovery is draft PR 11's
 candidate. Frozen source e34e79e passes 35 focused tests, the full 182-suite/
 2,734-test check, five workflow checks, normal push and exact-source hosted CI.
 Actual installed QA bytes accept repaired no-credential disable, enrolled
 cancel/retry/disable and cold cancel/retry with the original synthetic patients.
 Both signed x86/arm64 APKs pass actual version/ABI/certificate/JNI inspection;
-dist/MedOS-0.11.60.apk is the newest owner artifact, not physical acceptance.
+dist/MedOS-0.11.60.apk is the prior owner artifact, not physical acceptance.
 First-source camera/grace observations, environmental failures and exact hashes
 remain separate in [validation-0.11.60.md](validation-0.11.60.md).
 
@@ -122,6 +139,23 @@ failure/race/context/replay tests. Test retained forms and delayed callbacks,
 not just pure serialization. Keep raw invalid input separate from clinical truth.
 
 ## Priority1: finish everyday workflows
+
+Next diagnostic integrity slice: prove arbitrary-message/stack/context redaction
+with synthetic canaries; make default persisted/shared diagnostics content-free
+with stable technical evidence, strict legacy decoding and bounded size. Handle
+share availability/file/native rejection through the originating screen's
+mount/focus and a single-flight latch. A closed chooser is not delivery. Inspect
+interrupted backup scratch cleanup separately from restore safety journals.
+
+The owner's2026-10-11 pasted request adds local patient/settings/use history for
+coding agents across weeks. After the diagnostic repair, define a versioned,
+bounded local event/evidence contract alongside existing clinical history, then
+an explicit selected clinical export with app/source/dataset lineage, retention
+and missing-segment/completeness boundaries and an independent reader. Ordinary
+diagnostics cannot carry clinical bodies, credentials or colleague ratings;
+AGENTS.md now records the separate owner-controlled export exception. No
+automatic upload, duplicate chart or second navigation dashboard. This is
+pending implementation, not something the current100-error log already does.
 
 | ID | Deliverable | Remaining acceptance or implementation |
 |---|---|---|

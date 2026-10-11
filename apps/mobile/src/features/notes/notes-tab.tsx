@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
@@ -13,6 +14,7 @@ import { useLive } from '@/db/use-live';
 import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime, formatRelativeTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
+import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
 
 import { NOTE_TYPE_LABELS } from './labels';
@@ -184,11 +186,34 @@ function NoteCard({
   now: Date;
 }) {
   const router = useRouter();
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const { generation, stale } = useDatasetIntent();
   const isEvent = note.type === 'event';
+  const mounted = useRef(true);
+  const acting = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  function run(title: string, work: () => Promise<void>) {
+    if (acting.current || !mounted.current || !navigation.isFocused()) return;
+    acting.current = true;
+    void withDatasetWrite(generation, work)
+      .catch((e) => {
+        if (mounted.current && navigation.isFocused()) alertError(title, e);
+        else logError(e, { source: 'handled', context: 'note.card' });
+      })
+      .finally(() => {
+        acting.current = false;
+      });
+  }
 
   function actions() {
+    if (!mounted.current || !navigation.isFocused() || acting.current) return;
     Alert.alert(
       NOTE_TYPE_LABELS[note.type],
       formatJalaliDateTime(note.noteDate),
@@ -196,23 +221,22 @@ function NoteCard({
         {
           text: note.isPinned ? 'برداشتن سنجاق' : 'سنجاق کردن',
           onPress: () =>
-            void withDatasetWrite(generation, () => setNotePinned(note.id, !note.isPinned)).catch((e) =>
-              alertError('تغییر ثبت نشد', e),
-            ),
+            run('تغییر ثبت نشد', () => setNotePinned(note.id, !note.isPinned, { patientId, stamp: note.action })),
         },
         {
           text: 'حذف',
           style: 'destructive',
-          onPress: () =>
+          onPress: () => {
+            if (!mounted.current || !navigation.isFocused() || acting.current) return;
             Alert.alert('حذف نوت؟', 'از پرونده‌ی بیمار برداشته می‌شود و از «بیشتر ← حذف‌شده‌ها» برمی‌گردد.', [
               { text: 'انصراف', style: 'cancel' },
               {
                 text: 'حذف',
                 style: 'destructive',
-                onPress: () =>
-                  void withDatasetWrite(generation, () => deleteNote(note.id)).catch((e) => alertError('حذف نشد', e)),
+                onPress: () => run('حذف نشد', () => deleteNote(note.id, { patientId, stamp: note.action })),
               },
-            ]),
+            ]);
+          },
         },
         { text: 'انصراف', style: 'cancel' },
       ],
