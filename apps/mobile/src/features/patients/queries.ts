@@ -1,14 +1,15 @@
-import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
 
 import { auditInTransaction } from '@/db/audit';
 import { db, type Database, type DbTransaction } from '@/db/client';
-import { withClinicalHistory } from '@/db/clinical-history';
+import { clinicalHistorySequence, withClinicalHistory } from '@/db/clinical-history';
 import { patientContacts, patients, type NewPatient, type Patient, type PatientStatus } from '@/db/schema';
 import { contains, matchesSearch } from '@/db/search';
 import { activeEncounterQuery, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
 import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { requireDeletedRecord } from '@/lib/deleted-record';
+import { formBasis } from '@/lib/form-document';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
 
@@ -76,11 +77,15 @@ export function deletedPatientsQuery(limit = 50) {
 
 export function patientContactsQuery(patientId: string) {
   return db
-    .select()
+    .select({
+      ...getTableColumns(patientContacts),
+      clinicalSequence: clinicalHistorySequence('contact', patientContacts.id),
+    })
     .from(patientContacts)
     .where(and(eq(patientContacts.patientId, patientId), isNull(patientContacts.deletedAt)))
     .orderBy(desc(patientContacts.isPrimary));
 }
+export type ShownPatientContact = Awaited<ReturnType<typeof patientContactsQuery>>[number];
 
 /** Used by the duplicate check when creating a patient. */
 export function possibleDuplicatesQuery(
@@ -287,7 +292,7 @@ export function addPatientContactInTransaction(
   });
 }
 
-export async function deletePatientContact(id: string): Promise<void> {
+export async function deletePatientContact(id: string, expected: ShownPatientContact): Promise<void> {
   const now = new Date();
   db.transaction((tx) => {
     const row = tx
@@ -295,7 +300,15 @@ export async function deletePatientContact(id: string): Promise<void> {
       .from(patientContacts)
       .where(and(eq(patientContacts.id, id), isNull(patientContacts.deletedAt)))
       .get();
-    if (!row) return;
+    if (!row) throw new Error('شمارهٔ همراه در دسترس نیست؛ فهرست را دوباره بخوانید.');
+    const sequence = tx
+      .select({ value: clinicalHistorySequence('contact', id) })
+      .from(patientContacts)
+      .where(eq(patientContacts.id, id))
+      .get()!.value;
+    const { clinicalSequence, ...shown } = expected;
+    if (id !== expected.id || sequence !== clinicalSequence || formBasis(row) !== formBasis(shown))
+      throw new Error('اطلاعات همراه تغییر کرده است؛ پیش از حذف دوباره آن را مرور کنید.');
     if (
       !tx
         .select({ id: patients.id })

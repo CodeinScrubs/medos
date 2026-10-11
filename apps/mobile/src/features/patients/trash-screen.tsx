@@ -4,19 +4,19 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { deletedCapturesQuery, restoreCapture } from '@/features/capture/queries';
 import { NOTE_TYPE_LABELS } from '@/features/notes/labels';
 import { deletedNotesQuery, restoreNote } from '@/features/notes/queries';
-import { withDatasetWrite } from '@/lib/dataset-write';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { ClinicalTrashPanel } from './clinical-trash-panel';
-import { deletedClinicalCountQuery } from './clinical-trash-queries';
+import { deletedClinicalCountQuery, type ClinicalRestoreNotice } from './clinical-trash-queries';
 import { deletedPatientsQuery, restorePatient } from './queries';
 
 /**
@@ -59,14 +59,21 @@ export function TrashScreen() {
     admission.current = !locked;
   }, [locked]);
 
-  async function restore(work: () => Promise<void>) {
+  async function restore(work: () => Promise<void | ClinicalRestoreNotice>) {
     // State alone cannot block two presses in the same render. Retain original
     // admission through reminders and audit, not just the first SQL statement.
     if (acting.current || !mounted.current || !admission.current || !navigation.isFocused()) return;
     acting.current = true;
     setBusy(true);
     try {
-      await withDatasetWrite(generation, work);
+      const result = await withDatasetWrite(generation, work);
+      if (result?.reminderIssue && mounted.current && navigation.isFocused() && generation === datasetGeneration())
+        notify(
+          'پیگیری برگردانده شد',
+          result.reminderIssue === 'dirty'
+            ? 'یادآور نیاز به هماهنگی دارد؛ از کارت پیگیری دوباره تلاش کنید.'
+            : 'یادآور فعال نیست؛ از کارت پیگیری دوباره تلاش کنید.',
+        );
     } catch (e) {
       if (mounted.current && navigation.isFocused()) alertError('برگردانده نشد', e);
     } finally {

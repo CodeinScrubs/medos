@@ -10,18 +10,21 @@ import { Button, Input } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
 import { followUps, patients } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
+import { deletedClinicalQuery, restoreClinicalRecord } from '@/features/patients/clinical-trash-queries';
 import { createPatient } from '@/features/patients/queries';
 import { DatasetBusyError, DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import * as notifications from '@/platform/notifications';
+import { databaseRows } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { FollowUpCard } from './follow-up-card';
 import { postponedDueDate } from './logic';
-import { createFollowUp } from './queries';
+import { completeFollowUp, createFollowUp, deleteFollowUp, updateFollowUp } from './queries';
 
 // Keep the real PromptModal; expose native press handlers without native hit testing.
+let mockFocused = true;
 jest.mock('react-native', () => {
   const native = jest.requireActual<typeof import('react-native')>('react-native');
   return new Proxy(native, { get: (target, key) => (key === 'Pressable' ? 'Pressable' : Reflect.get(target, key)) });
@@ -29,6 +32,7 @@ jest.mock('react-native', () => {
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicon');
 jest.mock('react-native-keyboard-controller', () => ({ KeyboardController: { isVisible: () => false } }));
 jest.mock('@/components/feedback', () => ({
@@ -112,6 +116,7 @@ async function askMore(choice: string) {
     .find((button) => button.text === choice)!.onPress!;
 }
 beforeEach(async () => {
+  mockFocused = true;
   t = useTestDatabase(await createTestDatabase());
   resetNotifications();
   jest.clearAllMocks();
@@ -245,9 +250,136 @@ describe('follow-up card dataset intent', () => {
     await render();
     await invoke(remove);
     expect(current()).toEqual(original);
-    expect(alertError).toHaveBeenCalledWith('عملیات انجام نشد', expect.any(DatasetChangedError));
+    expect(alertError).not.toHaveBeenCalled();
     await invoke(await askMore('حذف'));
     expect(current().deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('refuses a held delete after the stored clinical outcome changes without a timestamp change', async () => {
+    await render();
+    const remove = await askMore('حذف');
+    t.db.update(followUps).set({ outcome: 'Synthetic newer outcome' }).where(eq(followUps.id, current().id)).run();
+    const before = databaseRows(t);
+    await invoke(remove);
+    expect(databaseRows(t)).toEqual(before);
+    expect(alertError).toHaveBeenCalledWith('عملیات انجام نشد', expect.any(Error));
+  });
+
+  it('retains a newer completed result when an old missed-status confirmation arrives', async () => {
+    await render();
+    const old = await askMore('انجام نشد');
+    await completeFollowUp(current().id, 'Synthetic newer reviewed result');
+    const before = databaseRows(t);
+    await invoke(old);
+    expect(databaseRows(t)).toEqual(before);
+  });
+
+  it('refuses an old postponement after a newer deadline has been acknowledged', async () => {
+    await render();
+    const postpone = await ask('تعویق', '۱ هفته');
+    await updateFollowUp(current().id, { dueAt: new Date(current().dueAt.getTime() + 2 * 86_400_000) });
+    const before = databaseRows(t);
+    await invoke(postpone);
+    expect(databaseRows(t)).toEqual(before);
+    expect(alertError).toHaveBeenCalledWith('عملیات انجام نشد', expect.any(Error));
+  });
+
+  it('retains typed outcome and original intent when a refreshed card receives a newer row', async () => {
+    await render();
+    await invoke(action('انجام شد').props.onPress);
+    await act(async () => tree!.root.findByType(Input).props.onChangeText('Original unpublished result'));
+    t.db.update(followUps).set({ reason: 'Synthetic newer reason' }).where(eq(followUps.id, current().id)).run();
+    await act(async () => tree!.update(scoped()));
+    const before = databaseRows(t);
+    await invoke(button('ثبت').props.onPress);
+    expect(databaseRows(t)).toEqual(before);
+    expect(prompt().props.visible).toBe(true);
+    expect(tree!.root.findByType(Input).props.value).toBe('Original unpublished result');
+    expect(alertError).toHaveBeenCalledWith('عملیات انجام نشد', expect.any(Error));
+    await invoke(button('انصراف').props.onPress);
+    await invoke(action('انجام شد').props.onPress);
+    await act(async () => tree!.root.findByType(Input).props.onChangeText('Deliberately reviewed result'));
+    await invoke(button('ثبت').props.onPress);
+    expect(current()).toMatchObject({ status: 'done', outcome: 'Deliberately reviewed result' });
+  });
+
+  it('allows a clinical confirmation when only the native reminder receipt changes', async () => {
+    t.db
+      .update(followUps)
+      .set({ notificationId: null, reminderAppliedRevision: -1 })
+      .where(eq(followUps.id, current().id))
+      .run();
+    await render();
+    const remove = await askMore('حذف');
+    t.db
+      .update(followUps)
+      .set({ notificationId: 'synthetic-ack', reminderAppliedRevision: current().reminderRevision })
+      .where(eq(followUps.id, current().id))
+      .run();
+    await invoke(remove);
+    expect(current().deletedAt).not.toBeNull();
+    expect(alertError).not.toHaveBeenCalled();
+  });
+
+  it('consumes a failed postponement choice and requires deliberate fresh review to retry', async () => {
+    await render();
+    const originalDue = current().dueAt.getTime();
+    const postpone = await ask('تعویق', 'فردا');
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_postpone BEFORE UPDATE ON follow_ups BEGIN SELECT RAISE(ABORT,'Synthetic postpone'); END",
+    );
+    const before = databaseRows(t);
+    await invoke(postpone);
+    expect(databaseRows(t)).toEqual(before);
+    t.sqlite.exec('DROP TRIGGER fail_postpone');
+    await invoke(postpone);
+    expect(databaseRows(t)).toEqual(before);
+    await invoke(await ask('تعویق', 'فردا'));
+    expect(current().dueAt.getTime()).toBeGreaterThan(originalDue);
+    expect(alertError).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an unused delete after the same follow-up is recovered in the original dataset', async () => {
+    await render();
+    const remove = await askMore('حذف');
+    const id = current().id;
+    await deleteFollowUp(id, current());
+    const selected = deletedClinicalQuery({ kind: 'followup' }).get()!;
+    await restoreClinicalRecord('followup', id, selected.expectedBasis, new Date());
+    const before = databaseRows(t);
+    await invoke(remove);
+    expect(databaseRows(t)).toEqual(before);
+    expect(alertError).toHaveBeenCalledWith('عملیات انجام نشد', expect.any(Error));
+  });
+
+  it.each(['unfocus', 'unmount'] as const)(
+    'drops a delete choice after %s without touching clinical/history/audit state',
+    async (change) => {
+      await render();
+      const remove = await askMore('حذف');
+      if (change === 'unfocus') mockFocused = false;
+      else await act(async () => tree!.unmount());
+      const before = databaseRows(t);
+      await invoke(remove);
+      expect(databaseRows(t)).toEqual(before);
+      expect(alertError).not.toHaveBeenCalled();
+    },
+  );
+
+  it('consumes a failed delete choice so a duplicate native callback cannot retry it', async () => {
+    await render();
+    const remove = await askMore('حذف');
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_followup_delete BEFORE UPDATE ON follow_ups BEGIN SELECT RAISE(ABORT,'Synthetic delete'); END",
+    );
+    const before = databaseRows(t);
+    await invoke(remove);
+    expect(databaseRows(t)).toEqual(before);
+    t.sqlite.exec('DROP TRIGGER fail_followup_delete');
+    await invoke(remove);
+    expect(databaseRows(t)).toEqual(before);
+    await invoke(await askMore('حذف'));
+    expect(current().deletedAt).not.toBeNull();
   });
 
   it('rejects an old reminder retry without reacknowledging the restored task', async () => {
@@ -333,6 +465,7 @@ describe('follow-up card dataset intent', () => {
     await render();
     await invoke(await ask('تعویق', '۳ روز'));
     expect(current().dueAt).toEqual(postponedDueDate(originalDue, 3));
+    await act(async () => tree!.update(scoped()));
     await invoke(await askMore('انجام نشد'));
     expect(current().status).toBe('missed');
     await act(async () => tree!.update(scoped()));

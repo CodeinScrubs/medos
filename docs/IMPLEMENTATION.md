@@ -33,14 +33,26 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.57/code73 on `codex/clinical-history-recovery` continues
-delivered PR8 `faa7160` and .56 source `8ee111a`. Permanent clinical correction history covers patient,
+Application 0.11.58/code74 on `codex/contact-followup-recovery` continues
+delivered PR9 `d1e9a5c`. Permanent clinical correction history covers patient,
 companion, encounter, diagnosis, vital, whole lab panel, imaging, order, consult
-and follow-up records. Seven clinical record kinds can be restored from the
+and follow-up records. Nine clinical record kinds can be restored from the
 existing trash. Corrections appear in the existing patient timeline. Exact
 ownership, audit/history rollback, original dataset and bounded reads are
 required; no new route, dependency, permission or backup scheme is introduced.
-Two additive migrations create the history table and ownership indexes.
+The earlier two additive migrations create the history table and ownership
+indexes; .58 adds no migration.
+
+.58 adds companion/follow-up recovery and protects all nine trash kinds from
+identical same-millisecond edit cycles. Companion deletion and follow-up status,
+completion and postponement retain the shown clinical decision. Native reminder
+receipt changes alone do not invalidate it. Recovery preserves original context/
+status/result and acknowledges native reminder work separately from committed
+clinical data. Focused software evidence is recorded in
+[validation-0.11.58.md](validation-0.11.58.md). Full check passes178 suites/2,683
+app tests, five workflow tests and typecheck/lint/format; no migration changes.
+New-source native acceptance, owner artifact and exact-source hosted CI are
+pending at this source checkpoint.
 
 The .56 seven-kind restore/history/archive/native matrix and both inspected APKs
 are recorded in [validation-0.11.56.md](validation-0.11.56.md). A later verified
@@ -77,10 +89,10 @@ The phone is not currently the sole remaining work.
 | D05 | Recover every manual form | Existing clinical stores and the .51 idea/topic and .54 Order ports are retained. .55 adds specialty profile, prescription, place, extension and credential to the same engine. Strict raw codecs preserve partial fields/secret whitespace; full-basis comparison, feature mutation, receipt/retirement and audit are one transaction. Blank-drug partial lines and invalid expiry refuse publication without losing raw input; explicit credential replacement/clear removes legacy cipher/nonce. Live references, original dataset/focus and retained native parents remain required. See validation-0.11.55 for actual software/native/artifact boundaries. Broader interruption/physical acceptance remains open; this milestone does not prove every keystroke durable. Clinical forms must validate original ownership rather than use an unparented notebook port. Never copy the engine or reuse doctor drafts for unrelated entities. |
 | D06 | Consult reply ownership | Software keeps replies with their original consultation and preserves failed input. Verify full native request/answer/follow-up workflow. |
 | D07 | Numerical integrity | Blank differs from invalid; paired BP conflicts cannot be half-merged; observation time/context stay explicit. Glucose units are recorded, never guessed/converted, and charts separate units. Broader chart/device and clinical applicability review remain open. |
-| D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. .56 adds audited restore for labs, imaging, vitals, orders, consults, diagnoses and historical/inactive encounters, with original full-row basis and patient/episode ownership. Lab deletion and required clinical audit/history share the write transaction. Contact/follow-up/notebook trash and native acceptance remain. Never infer a deleted encounter's former active state. |
+| D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. .56 adds audited restore for labs, imaging, vitals, orders, consults, diagnoses and historical/inactive encounters, with original full-row basis and patient/episode ownership. .58 adds companion/follow-up restore, clinical-sequence recovery tokens and retained delete/status/result/postpone intent. Lab deletion and required clinical audit/history share the write transaction. Notebook trash and new-source native acceptance remain. Never infer a deleted encounter's former active state. |
 | D09 | Consistent rounds and active episode | New memberships validate live ownership, preserve reorder/handoff and use latest published clinical note independent of pins. .45 makes encounter readers consistent. Imported duplicate memberships/episodes are preserved; clinical duplicate resolution and broader native rounds acceptance remain open. |
 | D10 | Compatible verified backup/restore | Format/KDF remain frozen; verified destination strength governs pruning. Restore excludes admitted writers/file jobs and preserves original ownership of old forms. Independent old/current restore exists in versioned reports. Critical swap/commit interruption, low disk, provider grants and second-device recovery remain open. |
-| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. Actual alarm/reboot/Doze behavior and the complete received/reviewed/action/closed product flow remain open. |
+| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. .58 recovery preserves outcome/status/deadline and reports native repair separately; retained row checks protect clinical choices across live refresh. Actual alarm/reboot/Doze behavior and the complete received/reviewed/action/closed product flow remain open. |
 | D12 | Jalali occasions and communication | Leap-day edits/raw recovery, scheduled occurrence-year text, database-first reminder revision/repair and explicit sent confirmation are implemented in software. Test real lifecycle/delivery separately. Do not transmit messages during development tests. |
 
 Reproduce before changing. Each new persistence path needs migrated-SQLite
@@ -97,7 +109,7 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 | W04 | Patient deck | Existing first-tab episode and bedside snapshot lead with identity/location/impressions/allergies, timed observations/labs, running orders and open work. Physician review and measured40-patient shift acceptance remain. Do not add a dashboard maze. |
 | W05 | Clinical history | Separate encounters, timeline filters/bounded previews/keyset pages and direct record access exist. .56 adds bounded correction history and seven clinical restore kinds. Accept new-source native pagination/every kind/pressure; note and clinical history retain separate codecs. |
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
-| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds. Contact/follow-up/notebook tombstones still need appropriate recovery. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
+| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Notebook tombstones still need appropriate recovery. Accept new-source native contact/follow-up behavior and reminder repair separately. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
 | W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
 | W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. .51 connects idea/topic raw recovery and exposes area-read rejection/retry; .55 connects the remaining notebook forms. Topic/reference checks and merged search commit with publication. Extension creation/editing rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. Complete broad edit/search acceptance and deleted-place recovery/move; bounded recovery checks do not finish every native workflow. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |

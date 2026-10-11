@@ -2488,8 +2488,9 @@ may then append explicit reconciliation history. Ordinary mutations still reject
 a misowned lab value rather than copying it into another patient's history; .57
 startup repair isolates that explicitly inconsistent panel without blocking healthy
 records. Backup
-format/KDF compatibility is unchanged. Contact/follow-up trash, other notebook
-trash and broader product/device acceptance remain separate work.
+format/KDF compatibility is unchanged. As of .58 contact/follow-up trash is
+implemented below; other notebook trash and broader product/device acceptance
+remain separate work.
 
 ## Lab ownership is a read boundary as well as a write boundary (0.11.57)
 
@@ -2513,3 +2514,33 @@ foreign row rather than creating an apparently clean form. Reload must validate
 the fetched basis and acknowledge the current draft before cancelling/resetting
 the saver. Keep the read-only ownership marker out of the stored CAS basis.
 No codec/schema/backup format change is needed for these boundaries.
+
+## Retained clinical choices and reminder-aware recovery (0.11.58)
+
+The existing clinical trash now supports companions and follow-ups as well as
+the seven original kinds. Its lossless SQLite-row/shown-patient basis includes
+the existing immutable clinical sequence. Even an identical same-millisecond
+restore/delete cycle requires a fresh choice. History sequence is an indexed
+scalar lookup after bounded pagination; count and global sorting do not fetch
+whole clinical/history bodies. The helper keeps actual table objects for live
+observers, but qualifies the outer record id with explicit schema identifiers:
+Drizzle otherwise strips its qualifier in a single-table SQL expression and
+SQLite may bind an inner id instead. Never interpolate user identifiers.
+
+Companion delete also checks shown row and sequence. Follow-up clinical actions
+compare the originally shown full clinical row and desired reminder revision,
+excluding only notificationId and reminderAppliedRevision, which are native
+receipts. The outcome prompt retains its opening basis across live refresh.
+Old or repeated native choices cannot silently affect a corrected row. Mount,
+focus and original dataset admission remain distinct from clinical row equality.
+
+Restore changes tombstone/touch only for a companion. Follow-up restore also
+increments desired reminder revision and marks receipt dirty, while preserving
+status, outcome, completion time, deadline and original episode. Required audit
+and immutable clinical snapshots commit with the row. Awaited reconciliation
+holds the outer original dataset admission; it does not ask permission on its
+own. Native receipt failure leaves recoverable clinical data and the existing
+card's reminder retry, with one conditional notice rather than a false restore
+failure. Unsupported imported state remains intact and refused. Native receipt
+writes do not create fabricated clinical corrections. Draft publication receipts
+still return the original recovered id, never a duplicate record.

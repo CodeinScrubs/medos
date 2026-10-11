@@ -175,7 +175,7 @@ describe('follow-up reminders', () => {
       "CREATE TRIGGER fail_change BEFORE UPDATE ON follow_ups BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
     );
     await expect(completeFollowUp(id, 'reviewed')).rejects.toThrow();
-    await expect(deleteFollowUp(id)).rejects.toThrow();
+    await expect(deleteFollowUp(id, await row(id))).rejects.toThrow();
     expect(await row(id)).toMatchObject({ status: 'pending', outcome: null, deletedAt: null });
     expect([...scheduled.keys()]).toEqual([followUpReminderId(id)]);
   });
@@ -252,7 +252,7 @@ describe('follow-up reminders', () => {
           : operation === 'complete'
             ? completeFollowUp(id, 'done')
             : operation === 'delete'
-              ? deleteFollowUp(id)
+              ? deleteFollowUp(id, await row(id))
               : deletePatient(patientId);
       release();
       await Promise.all([first, second]);

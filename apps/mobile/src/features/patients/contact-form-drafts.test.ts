@@ -9,6 +9,7 @@ import { databaseRows, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
+import { deletedClinicalQuery, restoreClinicalRecord } from './clinical-trash-queries';
 import {
   ContactFormConflict,
   contactFormValues,
@@ -25,7 +26,7 @@ import {
   replaceContactFormDraft,
   saveContactFormDraft,
 } from './contact-form-queries';
-import { createPatient, deletePatient } from './queries';
+import { createPatient, deletePatient, deletePatientContact, patientContactsQuery } from './queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -43,6 +44,17 @@ beforeEach(async () => {
 });
 
 describe('raw companion details and atomic publication on migrated SQLite', () => {
+  it('replays the same published contact receipt after ordinary trash recovery without duplicating it', async () => {
+    await saveContactFormDraft('draft', patientId, raw(), 0);
+    const id = await commitContactFormDraft('draft', patientId, 1);
+    await deletePatientContact(id, patientContactsQuery(patientId).get()!);
+    const selected = deletedClinicalQuery({ kind: 'contact' }).get()!;
+    await restoreClinicalRecord('contact', id, selected.expectedBasis, new Date());
+    const before = databaseRows(t);
+    expect(await commitContactFormDraft('draft', patientId, 1)).toBe(id);
+    expect(databaseRows(t)).toEqual(before);
+    expect(contacts()).toHaveLength(1);
+  });
   it('observes patient and draft together and creates nothing for an untouched form', async () => {
     expect(tablesOf(contactFormQuery(patientId))).toEqual(['patients', 'contact_form_drafts']);
     const before = databaseRows(t);

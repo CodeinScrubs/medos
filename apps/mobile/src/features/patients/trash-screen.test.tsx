@@ -6,12 +6,23 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
 import { Button, ChipSelect, EmptyState, SectionHeader } from '@/components/ui';
-import { auditLog, encounters, labPanels, notes, patients } from '@/db/schema';
+import {
+  auditLog,
+  clinicalVersions,
+  encounters,
+  followUps,
+  labPanels,
+  notes,
+  patientContacts,
+  patients,
+} from '@/db/schema';
 import * as captures from '@/features/capture/queries';
 import * as noteQueries from '@/features/notes/queries';
 import { stamps } from '@/lib/ids';
+import * as notifications from '@/platform/notifications';
 import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
+import { permission, resetNotifications } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import * as patientQueries from './queries';
@@ -62,6 +73,7 @@ function buttons(label = 'برگرداندن') {
   return tree!.root.findAllByType(Button).filter((n) => n.props.label === label);
 }
 beforeEach(async () => {
+  resetNotifications();
   jest.clearAllMocks();
   mockListeners.clear();
   mockFocused = true;
@@ -70,6 +82,26 @@ beforeEach(async () => {
 });
 
 describe('clinical trash in the existing screen', () => {
+  function seedRecovery(kind: 'contact' | 'followup') {
+    const base = { id: `deleted-${kind}`, patientId, ...stamps(new Date(1)), deletedAt: new Date(2) };
+    if (kind === 'contact')
+      t.db
+        .insert(patientContacts)
+        .values({ ...base, name: 'Synthetic companion', phone: '+12025550123', notes: 'Synthetic private text' })
+        .run();
+    else
+      t.db
+        .insert(followUps)
+        .values({
+          ...base,
+          reason: 'Synthetic result follow-up',
+          dueAt: new Date(Date.now() + 86_400_000),
+          channel: 'lab',
+          status: 'pending',
+          outcome: 'Synthetic retained outcome',
+        })
+        .run();
+  }
   function seedLab(id = 'deleted-lab') {
     t.db
       .insert(labPanels)
@@ -100,6 +132,83 @@ describe('clinical trash in the existing screen', () => {
   beforeEach(() => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
+  it.each(['contact', 'followup'] as const)(
+    'recovers %s through the existing filtered page with original patient/history/audit',
+    async (kind) => {
+      seedRecovery(kind);
+      await render();
+      await act(async () => {
+        tree!.root.findByType(ChipSelect).props.onChange(kind);
+        await settle();
+      });
+      expect(buttons('برگرداندن سابقه')).toHaveLength(1);
+      const dialog = await ask();
+      expect(dialog[1]).toContain('Synthetic Trash');
+      expect(dialog[1]).toContain(kind === 'contact' ? 'Synthetic companion' : 'Synthetic result follow-up');
+      await confirm(dialog);
+      const table = kind === 'contact' ? patientContacts : followUps;
+      expect(t.db.select().from(table).get()).toMatchObject({ id: `deleted-${kind}`, patientId, deletedAt: null });
+      expect(
+        t.db
+          .select()
+          .from(clinicalVersions)
+          .where(eq(clinicalVersions.kind, kind))
+          .all()
+          .map((row) => row.reason),
+      ).toEqual(['baseline', 'restored']);
+      expect(t.db.select().from(auditLog).all()).toMatchObject([{ action: `${kind}.restored` }]);
+      expect(notify).not.toHaveBeenCalled();
+    },
+  );
+
+  it('reports saved follow-up recovery separately from missing notification permission', async () => {
+    seedRecovery('followup');
+    permission.granted = false;
+    await render();
+    await confirm(await ask());
+    expect(t.db.select().from(followUps).get()).toMatchObject({
+      deletedAt: null,
+      status: 'pending',
+      outcome: 'Synthetic retained outcome',
+      notificationId: null,
+    });
+    expect(alertError).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith('پیگیری برگردانده شد', expect.stringContaining('فعال نیست'));
+  });
+
+  it.each(['unfocus', 'unmount'] as const)(
+    'holds admitted recovery and suppresses late reminder notice after %s',
+    async (change) => {
+      seedRecovery('followup');
+      let release: () => void = () => {
+        throw new Error('Not started');
+      };
+      const native = jest.spyOn(notifications, 'scheduleReminder').mockImplementation(async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        throw new Error('Synthetic late native failure');
+      });
+      await render();
+      const dialog = await ask();
+      await confirm(dialog);
+      await confirm(dialog);
+      expect(native).toHaveBeenCalledTimes(1);
+      expect(t.db.select().from(followUps).get()!.deletedAt).toBeNull();
+      expect(replacementFailure()).toBeInstanceOf(Error);
+      if (change === 'unfocus') mockFocused = false;
+      else await act(async () => tree!.unmount());
+      await act(async () => {
+        release();
+        await settle();
+      });
+      expect(replacementFailure()).toBeNull();
+      expect(t.db.select().from(followUps).get()).toMatchObject({ deletedAt: null, reminderAppliedRevision: -1 });
+      expect(t.db.select().from(auditLog).all()).toMatchObject([{ action: 'followup.restored' }]);
+      expect(notify).not.toHaveBeenCalled();
+      expect(alertError).not.toHaveBeenCalled();
+    },
+  );
   it('does not claim global empty when only clinical tombstones exist and restores the real shown row once', async () => {
     seedLab();
     await render();

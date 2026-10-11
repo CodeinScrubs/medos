@@ -15,10 +15,12 @@ import {
   labValues,
   notes,
   orders,
+  patientContacts,
   patients,
   tasks,
   vitals,
 } from '@/db/schema';
+import { deleteDiagnosis } from '@/features/diagnoses/queries';
 import { createLabPanelInTransaction, deleteLabPanel, updateLabPanelInTransaction } from '@/features/labs/queries';
 import { stamps } from '@/lib/ids';
 import { databaseRows } from '@/test/dataset-snapshot';
@@ -42,7 +44,7 @@ const deletedAt = new Date('2026-01-02T10:00:00.000Z');
 const restoredAt = new Date('2026-01-03T10:00:00.000Z');
 const patientId = 'synthetic-patient';
 const otherId = 'synthetic-other';
-const childKinds = CLINICAL_TRASH_KINDS.filter((kind) => kind !== 'encounter');
+const childKinds = CLINICAL_TRASH_KINDS.filter((kind) => kind !== 'encounter' && kind !== 'contact');
 const clinicalTables = {
   lab: labPanels,
   imaging: imagingStudies,
@@ -51,6 +53,8 @@ const clinicalTables = {
   consult: consultations,
   diagnosis: diagnoses,
   encounter: encounters,
+  contact: patientContacts,
+  followup: followUps,
 };
 let t: TestDatabase;
 
@@ -86,6 +90,35 @@ function seedEncounter(id: string, owner = patientId, deleted: Date | null = nul
 function seed(kind: ClinicalTrashKind, id: string = kind, owner = patientId, encounterId: string | null = null) {
   const base = { id, ...stamps(createdAt), deletedAt, patientId: owner, encounterId };
   switch (kind) {
+    case 'contact':
+      t.db
+        .insert(patientContacts)
+        .values({
+          id,
+          ...stamps(createdAt),
+          deletedAt,
+          patientId: owner,
+          name: 'Synthetic companion',
+          phone: '+12025550123',
+          notes: 'Synthetic private contact note',
+          isPrimary: true,
+        })
+        .run();
+      break;
+    case 'followup':
+      t.db
+        .insert(followUps)
+        .values({
+          ...base,
+          dueAt: createdAt,
+          reason: 'Synthetic follow-up',
+          status: 'pending',
+          outcome: 'Synthetic retained outcome',
+          channel: 'lab',
+          priority: 'high',
+        })
+        .run();
+      break;
     case 'lab':
       t.db
         .insert(labPanels)
@@ -227,7 +260,9 @@ describe('bounded clinical trash reads', () => {
       statement.free();
     }
     expect(plan).toContain('CO-ROUTINE clinical_page');
-    expect(plan.filter((detail) => detail.includes('CORRELATED SCALAR SUBQUERY'))).toHaveLength(7);
+    expect(plan.filter((detail) => detail.includes('CORRELATED SCALAR SUBQUERY'))).toHaveLength(
+      2 * CLINICAL_TRASH_KINDS.length,
+    );
     for (const table of [
       'lab_panels',
       'imaging_studies',
@@ -236,6 +271,8 @@ describe('bounded clinical trash reads', () => {
       'consultations',
       'diagnoses',
       'encounters',
+      'patient_contacts',
+      'follow_ups',
     ])
       expect(plan).toContain(`SEARCH ${table} USING INDEX sqlite_autoindex_${table}_1 (id=?)`);
     const count = deletedClinicalCountQuery().toSQL().sql;
@@ -246,7 +283,7 @@ describe('bounded clinical trash reads', () => {
     for (const kind of CLINICAL_TRASH_KINDS) seed(kind);
     const query = deletedClinicalQuery();
     const rows = query.all();
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(CLINICAL_TRASH_KINDS.length);
     for (const row of rows) {
       expect(row).toMatchObject({
         patientId,
@@ -281,10 +318,16 @@ describe('bounded clinical trash reads', () => {
       'orders',
       'patients',
       'vitals',
+      'patient_contacts',
+      'follow_ups',
     ].sort();
-    expect(tablesOf(query).sort()).toEqual(expected);
+    expect(tablesOf(query).sort()).toEqual([...expected, 'clinical_versions'].sort());
     expect(tablesOf(deletedClinicalCountQuery()).sort()).toEqual(expected);
-    expect(tablesOf(deletedClinicalQuery({ kind: 'lab' })).sort()).toEqual(['lab_panels', 'patients']);
+    expect(tablesOf(deletedClinicalQuery({ kind: 'lab' })).sort()).toEqual([
+      'clinical_versions',
+      'lab_panels',
+      'patients',
+    ]);
   });
 
   it('uses stable global keyset pages with equal timestamps and applies all filters before LIMIT', () => {
@@ -308,7 +351,7 @@ describe('bounded clinical trash reads', () => {
     const filtered = deletedClinicalQuery({ kind: 'lab', patientId: otherId }, null, 1).all();
     expect(filtered.map((row) => row.id)).toEqual(['other-lab']);
     expect(deletedClinicalCountQuery({ kind: 'lab', patientId: otherId }).get()?.count).toBe(1);
-    expect(deletedClinicalCountQuery({ patientId }).get()?.count).toBe(12);
+    expect(deletedClinicalCountQuery({ patientId }).get()?.count).toBe(CLINICAL_TRASH_KINDS.length + 5);
   });
 
   it('keeps blocked and missing-owner tombstones readable and countable', async () => {
@@ -334,13 +377,29 @@ describe('bounded clinical trash reads', () => {
 
   it('validates the closed kind allowlist, cursors and bounded limit instead of accepting arbitrary table names', () => {
     expect(() => deletedClinicalQuery({ kind: 'patients' as ClinicalTrashKind })).toThrow();
-    expect(() => deletedClinicalCountQuery({ kind: 'followup' as ClinicalTrashKind })).toThrow();
+    expect(() => deletedClinicalCountQuery({ kind: 'patient' as ClinicalTrashKind })).toThrow();
     for (const limit of [0, -1, 101, 1.5, Infinity, NaN]) expect(() => deletedClinicalQuery({}, null, limit)).toThrow();
     expect(() => deletedClinicalQuery({}, { deletedAt: new Date(NaN), kind: 'lab', id: '' })).toThrow();
   });
 });
 
 describe('clinical restore transactions', () => {
+  it('refuses an unused old restore choice after a complete same-millisecond restore/delete cycle', async () => {
+    jest.useFakeTimers({ now: deletedAt });
+    try {
+      seed('diagnosis');
+      t.db.update(diagnoses).set({ updatedAt: deletedAt }).where(eq(diagnoses.id, 'diagnosis')).run();
+      const original = read('diagnosis');
+      const oldBasis = shown('diagnosis').expectedBasis;
+      await restoreClinicalRecord('diagnosis', 'diagnosis', oldBasis, deletedAt);
+      await deleteDiagnosis('diagnosis');
+      expect(read('diagnosis')).toEqual(original);
+      expect(shown('diagnosis').expectedBasis).not.toBe(oldBasis);
+      await refuse('diagnosis', 'diagnosis', oldBasis);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
   it.each(CLINICAL_TRASH_KINDS)(
     'restores only %s, retaining exact payload and creating id-only audit plus permanent history',
     async (kind) => {
@@ -352,6 +411,7 @@ describe('clinical restore transactions', () => {
         deletedAt: null,
         updatedAt: restoredAt,
         ...(kind === 'encounter' ? { isActive: false } : {}),
+        ...(kind === 'followup' ? { reminderRevision: 1, reminderAppliedRevision: 1 } : {}),
       });
       expect(t.db.select().from(auditLog).all()).toEqual([
         expect.objectContaining({

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 import { Alert, Pressable } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
@@ -31,14 +32,17 @@ import { createLabPanel } from '@/features/labs/queries';
 import { createTask, taskQuery } from '@/features/tasks/queries';
 import { TaskRow } from '@/features/tasks/task-row';
 import { DatasetBusyError, DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
+import { databaseRows } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
+import { deletedClinicalQuery, restoreClinicalRecord } from './clinical-trash-queries';
 import { OverviewTab } from './overview-tab';
 import { PatientHeader } from './patient-header';
-import { addPatientContact, createPatient, patientQuery } from './queries';
+import { addPatientContact, createPatient, deletePatientContact, patientContactsQuery, patientQuery } from './queries';
 
 let mockSource: ((source: 'camera' | 'library') => Promise<void>) | undefined;
+let mockFocused = true;
 let mockUndo: (() => Promise<void>) | undefined;
 const mockPhotoWork = jest.fn<() => Promise<string[]>>().mockResolvedValue([]);
 jest.mock('react-native', () => {
@@ -48,7 +52,7 @@ jest.mock('react-native', () => {
   });
 });
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
-jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('expo-haptics', () => ({
   impactAsync: () => Promise.resolve(),
@@ -173,6 +177,7 @@ function tracked() {
   };
 }
 beforeEach(async () => {
+  mockFocused = true;
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Intent' });
   mockSource = undefined;
@@ -328,6 +333,97 @@ describe('manual patient mutations keep the originating dataset', () => {
     await invoke(old);
     expect(tracked()).toEqual(before);
     expect(alertError).toHaveBeenCalledWith('حذف نشد', expect.any(DatasetChangedError));
+  });
+
+  it('refuses a held contact delete after its hidden notes change without a timestamp change', async () => {
+    const id = await addPatientContact(patientId, { name: 'Synthetic contact', phone: '1234567890' });
+    await render(<OverviewTab patient={(await patientQuery(patientId))[0]!} />);
+    await invoke(() =>
+      tree!.root
+        .findAllByType(Pressable)
+        .find((n) => n.props.onLongPress)!
+        .props.onLongPress(),
+    );
+    const old = confirmation('حذف');
+    t.db.update(patientContacts).set({ notes: 'Synthetic newer note' }).where(eq(patientContacts.id, id)).run();
+    const before = databaseRows(t);
+    await invoke(old);
+    expect(databaseRows(t)).toEqual(before);
+    expect(alertError).toHaveBeenCalledWith('حذف نشد', expect.any(Error));
+  });
+
+  it('refuses an unused shown contact deletion after same-ms recovery of an identical live row', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-01T10:00:00.000Z') });
+    try {
+      const id = await addPatientContact(patientId, { name: 'Synthetic contact', phone: '1234567890' });
+      const original = t.db.select().from(patientContacts).get()!;
+      await render(<OverviewTab patient={(await patientQuery(patientId))[0]!} />);
+      await invoke(() =>
+        tree!.root
+          .findAllByType(Pressable)
+          .find((n) => n.props.onLongPress)!
+          .props.onLongPress(),
+      );
+      const old = confirmation('حذف');
+      await deletePatientContact(id, patientContactsQuery(patientId).get()!);
+      const selected = deletedClinicalQuery({ kind: 'contact' }).get()!;
+      await restoreClinicalRecord('contact', id, selected.expectedBasis, new Date());
+      expect(t.db.select().from(patientContacts).get()).toEqual(original);
+      const before = databaseRows(t);
+      await invoke(old);
+      expect(databaseRows(t)).toEqual(before);
+      expect(alertError).toHaveBeenCalledWith('حذف نشد', expect.any(Error));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each(['unfocus', 'unmount'] as const)('does not apply a contact confirmation after %s', async (change) => {
+    await addPatientContact(patientId, { name: 'Synthetic contact', phone: '1234567890' });
+    await render(<OverviewTab patient={(await patientQuery(patientId))[0]!} />);
+    await invoke(() =>
+      tree!.root
+        .findAllByType(Pressable)
+        .find((n) => n.props.onLongPress)!
+        .props.onLongPress(),
+    );
+    const old = confirmation('حذف');
+    if (change === 'unfocus') mockFocused = false;
+    else await act(async () => tree!.unmount());
+    const before = databaseRows(t);
+    await invoke(old);
+    expect(databaseRows(t)).toEqual(before);
+    expect(alertError).not.toHaveBeenCalled();
+  });
+
+  it('uses a contact confirmation once, including after a failed first deletion and exact recovery', async () => {
+    const id = await addPatientContact(patientId, { name: 'Synthetic contact', phone: '1234567890' });
+    await render(<OverviewTab patient={(await patientQuery(patientId))[0]!} />);
+    await invoke(() =>
+      tree!.root
+        .findAllByType(Pressable)
+        .find((n) => n.props.onLongPress)!
+        .props.onLongPress(),
+    );
+    const old = confirmation('حذف');
+    t.sqlite.exec(
+      "CREATE TRIGGER fail_contact_delete BEFORE UPDATE ON patient_contacts BEGIN SELECT RAISE(ABORT,'Synthetic delete'); END",
+    );
+    const before = databaseRows(t);
+    await invoke(old);
+    expect(databaseRows(t)).toEqual(before);
+    t.sqlite.exec('DROP TRIGGER fail_contact_delete');
+    await invoke(old);
+    expect(databaseRows(t)).toEqual(before);
+    // A fresh confirmation can delete; the consumed failed choice cannot.
+    await invoke(() =>
+      tree!.root
+        .findAllByType(Pressable)
+        .find((n) => n.props.onLongPress)!
+        .props.onLongPress(),
+    );
+    await invoke(confirmation('حذف'));
+    expect(t.db.select().from(patientContacts).where(eq(patientContacts.id, id)).get()!.deletedAt).not.toBeNull();
   });
 
   it('refuses a held imaging removal', async () => {

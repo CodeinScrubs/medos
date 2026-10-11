@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Recover companions and follow-ups without accepting stale choices
+
+**Agent:** GPT-6 via Codex; primary implementation/verification with one read-only
+GPT-6.1 Sol/xhigh review.
+**Commits:** this source commit, based on delivered PR9 `d1e9a5c`.
+
+**Changed**
+- .58/code74 adds companions and follow-ups to the existing bounded clinical
+  trash. Original context/status/result remain; reminder intent is durable before
+  native reconciliation, with a short conditional retry notice.
+- Include clinical sequence in every recovery basis. Companion delete checks
+  shown row/sequence; follow-up status/delete/postpone/result check original
+  clinical intent. Keep typed outcomes on refusal; retain focus/dataset ownership
+  and consume native choices once. No new dependency, migration or route.
+
+**Verified**
+- Four failing stale-action/cycle witnesses reproduce before fixes. Corrected
+  integrated recovery/UI run passes198/6; expanded receipt/import tests53/3;
+  final follow-up retained-action/card/query tests46/2. See validation-0.11.58.
+- Final full check passes178 suites/2,683 app tests (213.035s), five workflow
+  tests and typecheck/lint/format without warnings. No new migration; scoped
+  lockfile edits and unrelated WIP hashes are verified.
+
+**Not verified**
+- New-source native acceptance, owner .58 APK and hosted CI remain pending at
+  this source checkpoint. .57 evidence does not accept .58.
+- Physical phone/IME/alarm delivery, complete timed40-patient shifts, provider/
+  interruption/power acceptance or clinical review.
+
+**Open threads**
+- Finish frozen-source .58 checks, native whole-archive acceptance, inspected
+  owner artifact and exact-head CI. Keep notebook trash/rich text/full follow-up
+  workflow and remaining IMPLEMENTATION gates open; phone is not the sole work.
+- Diagnose original short .55 input mismatch and older focus ANR separately.
+
+**Gotchas**
+- Drizzle strips ordinary column qualification inside a single-table SQL
+  expression. Explicit schema-derived identifiers keep a correlated outer id
+  from binding to the inner history id. Native receipt-only changes are not a
+  different clinical decision; desired reminder revision still is.
+
 ## 2026-10-11 — Deliver lab isolation with independent native state witnesses
 
 **Agent:** GPT-6 via Codex; primary verification, no additional delegation.

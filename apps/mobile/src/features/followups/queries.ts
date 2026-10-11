@@ -5,6 +5,7 @@ import { db, type DbTransaction } from '@/db/client';
 import { withClinicalHistory } from '@/db/clinical-history';
 import { encounters, followUps, patients, type FollowUp } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { formBasis } from '@/lib/form-document';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { endOfDay } from '@/lib/time';
 
@@ -101,10 +102,15 @@ export function createFollowUpInTransaction(
   });
 }
 
-export async function updateFollowUp(id: string, patch: Partial<Omit<FollowUpInput, 'patientId'>>): Promise<void> {
+export async function updateFollowUp(
+  id: string,
+  patch: Partial<Omit<FollowUpInput, 'patientId'>>,
+  expected?: FollowUp,
+): Promise<void> {
   const now = new Date();
   db.transaction((tx) => {
     const current = requireFollowUp(tx, id);
+    requireExpectedFollowUp(current, expected);
     const merged = {
       ...current,
       reason: patch.reason ?? current.reason,
@@ -154,26 +160,51 @@ function requireFollowUp(tx: DbTransaction, id: string): FollowUp {
   return row;
 }
 
+function requireExpectedFollowUp(current: FollowUp, expected: FollowUp | undefined) {
+  if (!expected) return;
+  const basis = (row: FollowUp) => {
+    // Native receipts can progress while a physician reads or writes an outcome.
+    // Clinical fields and the desired reminder revision remain the shown intent.
+    const { notificationId: _notificationId, reminderAppliedRevision: _applied, ...record } = row;
+    return formBasis(record);
+  };
+  if (basis(current) !== basis(expected))
+    throw new Error('پیگیری تغییر کرده است؛ پیش از اعمال انتخاب قبلی دوباره آن را مرور کنید.');
+}
+
 function validate(input: Pick<FollowUpInput, 'reason' | 'dueAt'>): void {
   if (!input.reason.trim()) throw new Error('دلیل پیگیری را بنویسید.');
   if (!Number.isFinite(input.dueAt.getTime())) throw new Error('تاریخ پیگیری معتبر نیست.');
 }
 
-export async function completeFollowUp(id: string, outcome: string | null, now = new Date()): Promise<void> {
-  await changeStatus(id, 'done', now, outcome?.trim() || null);
+export async function completeFollowUp(
+  id: string,
+  outcome: string | null,
+  now = new Date(),
+  expected?: FollowUp,
+): Promise<void> {
+  await changeStatus(id, 'done', now, outcome?.trim() || null, expected);
 }
 
 export async function setFollowUpStatus(
   id: string,
   status: 'missed' | 'cancelled' | 'pending',
   now = new Date(),
+  expected?: FollowUp,
 ): Promise<void> {
-  await changeStatus(id, status, now);
+  await changeStatus(id, status, now, undefined, expected);
 }
 
-async function changeStatus(id: string, status: FollowUp['status'], now: Date, outcome?: string | null): Promise<void> {
+async function changeStatus(
+  id: string,
+  status: FollowUp['status'],
+  now: Date,
+  outcome?: string | null,
+  expected?: FollowUp,
+): Promise<void> {
   db.transaction((tx) => {
     const current = requireFollowUp(tx, id);
+    requireExpectedFollowUp(current, expected);
     withClinicalHistory(tx, 'followup', id, now, () => {
       tx.update(followUps)
         .set({
@@ -196,10 +227,12 @@ async function changeStatus(id: string, status: FollowUp['status'], now: Date, o
   await reconcileFollowUpReminder(id);
 }
 
-export async function deleteFollowUp(id: string): Promise<void> {
+export async function deleteFollowUp(id: string, expected: FollowUp): Promise<void> {
   const now = new Date();
   db.transaction((tx) => {
     const current = requireFollowUp(tx, id);
+    if (id !== expected.id) throw new Error('پیگیری انتخاب‌شده معتبر نیست.');
+    requireExpectedFollowUp(current, expected);
     withClinicalHistory(tx, 'followup', id, now, () => {
       tx.update(followUps)
         .set({ ...softDelete(now), reminderRevision: current.reminderRevision + 1 })

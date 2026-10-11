@@ -17,6 +17,7 @@ import {
   restoreClinicalRecord,
   type ClinicalTrashCursor,
   type ClinicalTrashKind,
+  type ClinicalRestoreNotice,
 } from './clinical-trash-queries';
 import { HISTORY_KIND_LABEL } from './history-labels';
 
@@ -24,7 +25,7 @@ type Owner = {
   generation: number;
   stale: boolean;
   locked: boolean;
-  restore: (work: () => Promise<void>) => Promise<void>;
+  restore: (work: () => Promise<void | ClinicalRestoreNotice>) => Promise<void>;
 };
 type DeletedRow = Awaited<ReturnType<typeof deletedClinicalQuery>>[number];
 
