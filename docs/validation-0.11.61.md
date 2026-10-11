@@ -95,6 +95,81 @@ native observations remain attributed to validation-0.11.60. Later actual .61
 evidence must be appended with its exact source and bytes, not substituted by
 the successful software check.
 
+### Completed evidence, 2026-10-12
+
+Frozen application source3ee0ce5e2cb03a9b92b694a3966c92759f9fc01c is pushed
+normally and attached as draft [PR12](https://github.com/CodeinScrubs/medos/pull/12)
+against PR11. Normal pre-push check passes the same183 suites/2,759 tests and
+five workflow checks (Jest285.193s). An earlier interactive push process ended
+without a completion/remote branch; its partial log is not counted as passing.
+The recorded hidden retry completes with exit0 and exact remote source hash.
+The exact-source [hosted check/bundle job](https://github.com/CodeinScrubs/medos/actions/runs/38168015728/job/114554526403)
+succeeds. These checks do not validate native behavior.
+
+Both builds clean only generated app build output before switching ABI.
+Actual APK inspection verifies com.shayan.medos,0.11.61/code77,min24,target36,
+the same signer certificate and essential JNI libraries. Installed QA bytes are
+pulled back and hash-equal to the inspected private x86 APK.
+
+| Artifact from3ee0ce5 | Bytes | SHA256 |
+| --- | --- | --- |
+| Private x86_64 QA | 55,124,430 | 6478a94bb07ae8536ac494ad616aa52e50730ba2f18628ef135a45d48dd8ac50 |
+| dist/MedOS-0.11.61.apk, arm64-v8a | 53,516,103 | 1deb4daca88d5fe8b7e4eb1c04718c698c719ed5a8df8ab2f6c40cb925b34d19 |
+
+Signer SHA256 is
+1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c.
+QA Gradle succeeds in14m54s (834 tasks,802 executed); owner Gradle succeeds
+in13m43s (910 tasks,195 executed). No app/source/HEAD edit occurred during either
+build, and unrelated untracked work hashes remain unchanged.
+
+Actual native acceptance uses one exclusive read-only/no-snapshot AVD overlay:
+
+- In-place upgrade preserves the observed41 synthetic patients. The initial
+  bounded boot wait expires, and the first app-tree assertion is blocked by
+  Android's System UI ANR. After actual boot completion, choosing the observed
+  Wait button exposes MedOS with its original PID3488; no MedOS fatal is found
+  in the bounded crash-buffer checks. This environmental interruption is not
+  reclassified as a crash-free start.
+- Create one general note with exact ASCII title/body, observe the note-specific
+  raw-save acknowledgment, publish, pin from its actual long-press menu, correct
+  the body, open history and restore the original created version. The corrected
+  body remains in history, and the original unpinned metadata returns. Delete
+  through both observed confirmations and restore its exact shown trash row.
+  Each action retains PID3488 with no matching observed MedOS fatal.
+- Intentional force-stop/cold deep link starts PID6621; the exact restored title
+  and body remain visible. This is process-death persistence after acknowledged
+  writes, not proof that every unacknowledged keystroke survives interruption.
+- Three owner-controlled full archives (before, deleted, cold final) authenticate
+  independently with Node AES-GCM/scrypt and are read by independent Python
+  SQLite. Every55 tables is compared:49 are identical. Every old note/version/
+  draft/audit row is retained; the only new clinical record is the synthetic note
+  with its original patient/encounter, four exact versions and two retired drafts.
+  Its audit sequence is versionRestored,deleted,restored. Backup runs/receipts/
+  backup-created audits and the unchanged zero unresolved-media receipt's cold
+  timestamp are explicit technical differences. SQLite integrity and foreign
+  keys pass; all34 media paths/sizes/authenticated content hashes are unchanged.
+- Direct private-SQL access was refused by this production AVD; no root bypass
+  or app instrumentation was added. The independent oracle uses authenticated
+  full archives instead. An initial decoder invocation without the known private
+  QA phrase fails honestly and is retried with the existing synthetic phrase.
+- Fresh native trees expose two helper assumptions: the note acknowledgment
+  differs from generic workspace wording, and flattened history rows do not
+  provide a unique parent container. Corrected selectors use the actual visible
+  marker/bounds. A first list read precedes hydration; a fresh tree observes the
+  correct row. None of those failed probes is counted as successful acceptance.
+- The owned AVD shuts down normally; its PIDs/serial disappear and both original
+  base-image hashes are unchanged. No other session's emulator/phone is touched.
+
+Private evidence is under validation-0.11.61: artifact-qa.json,
+artifact-owner.json, build-source/worker logs, install-qa.json,
+startup-boundary.json, native61-*-state.json, native61-independent-result.json,
+native61-*.medosbak/decoder reports, process/UI observations and shutdown-result.json.
+
+Separate next-slice proposals remain private and unintegrated: places/extensions
+recovery/device actions and content-free diagnostics. Primary independently
+reproduces their diagnostic canary/unhandled-share witnesses and runs75 focused
+candidate tests; that result is not evidence that .61 already contains the repair.
+
 Physical phone, complete timed40-patient shift, rich text, remaining notebook
 trash, fuller follow-up/outpatient workflows, native pressure/input issues,
 alarm delivery/OEM/Doze/reboot/provider/second-device recovery and physician

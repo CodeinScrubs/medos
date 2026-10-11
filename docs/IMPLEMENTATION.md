@@ -39,11 +39,16 @@ validates original patient/episode ownership. Delete and trash restore require
 their audit atomically. Retained card choices use compact immutable-version/
 lifecycle evidence plus original dataset, focus and mount; existing pagination
 and the33KB list bound remain unchanged. Full software check passes183 suites/
-2,759 app tests and five workflow checks, with zero lint warnings. Source push,
-hosted CI and frozen native/APK acceptance are pending at this source checkpoint;
-see [validation-0.11.61.md](validation-0.11.61.md). No migration/dependency/route
-or archive/key change is added. The .60 artifact below remains the owner APK
-until an inspected .61 artifact is delivered.
+2,759 app tests and five workflow checks, with zero lint warnings. Frozen3ee0ce5
+passes normal push and exact-source hosted CI. Both signed APKs pass actual
+version/code/ABI/signer/JNI inspection; dist/MedOS-0.11.61.apk is the newest
+owner artifact. Native create/pin/correction/version-restore/delete/trash-restore/
+cold persistence passes with independent three-archive/all55-table comparison;
+all41 original synthetic patients and34 media byte hashes remain. Initial boot/
+System UI ANR and selector assumptions are recorded separately. See
+[validation-0.11.61.md](validation-0.11.61.md). No migration/dependency/route
+or archive/key change is added. This is bounded native evidence, not phone or
+complete-shift acceptance.
 
 Application 0.11.60/code 76 on codex/permission-state-recovery is draft PR 11's
 candidate. Frozen source e34e79e passes 35 focused tests, the full 182-suite/
@@ -51,7 +56,7 @@ candidate. Frozen source e34e79e passes 35 focused tests, the full 182-suite/
 Actual installed QA bytes accept repaired no-credential disable, enrolled
 cancel/retry/disable and cold cancel/retry with the original synthetic patients.
 Both signed x86/arm64 APKs pass actual version/ABI/certificate/JNI inspection;
-dist/MedOS-0.11.60.apk is the newest owner artifact, not physical acceptance.
+dist/MedOS-0.11.60.apk is the prior owner artifact, not physical acceptance.
 First-source camera/grace observations, environmental failures and exact hashes
 remain separate in [validation-0.11.60.md](validation-0.11.60.md).
 
