@@ -33,6 +33,43 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Repair explicit lock removal after device credentials disappear
+
+**Agent:** GPT-6 via Codex; primary native investigation and integration.
+**Commits:** first .60 source 22ee485; this final-repair checkpoint.
+
+**Changed**
+- Allow explicit optional-lock removal when actual device enrollment is NONE;
+  enrolled authentication and acknowledgment failure behavior stay intact.
+- Add six regression/safety tests; no version/dependency/schema/permission change.
+
+**Verified**
+- First source passes the full 2,728-test check, normal push and exact hosted CI.
+- Actual installed bytes, native camera grant, cancel/retry, grace return and
+  cold lock pass in bounded emulator observations. Native no-credential disable
+  fails on 22ee485; one software witness also fails before the repair.
+- All 35 focused tests pass after repair (5.187s); full check passes
+  182 suites/2,734 tests/five workflow checks (Jest 233.077s), zero lint warnings.
+  The owned VM closes normally and both persistent base hashes remain unchanged.
+  Details are in .60 validation.
+
+**Not verified**
+- Repaired-source push/CI/new frozen QA/native/owner APK are pending.
+- Physical authentication/media/delivery/power/provider and complete long shifts.
+
+**Open threads**
+- Check/freeze/push this repair and accept actual no-credential removal, enrolled
+  cancel/retry/cold state on newly inspected QA bytes; build the owner arm64 APK.
+- Rich text, notebook recovery, full follow-up and measured shifts remain open.
+- Handle the places-list phone intent rejection; private next-slice proposals
+  are not integrated implementation or acceptance.
+
+**Gotchas**
+- The test VM had 60-second grace initially. Native radio selection is selected,
+  not checked; an uncompressed diagnostic tree includes hidden controls.
+- Initial boot wait/System UI ANR are preserved as environment evidence. They
+  do not justify calling the app crash-free or its cold-start time accepted.
+
 ## 2026-10-11 — Handle settings and optional-lock native failures
 
 **Agent:** GPT-6 via Codex; primary .60 implementation/integration. Two

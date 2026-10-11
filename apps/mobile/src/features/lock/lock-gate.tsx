@@ -180,12 +180,17 @@ export async function enableAppLock(): Promise<{ ok: boolean; reason?: string }>
 }
 
 export async function disableAppLock(): Promise<boolean> {
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: 'تأیید برای خاموش کردن قفل',
-    cancelLabel: 'انصراف',
-    disableDeviceFallback: false,
-  });
-  if (!result.success) return false;
+  // A restored or changed phone may have no screen lock. The cover already
+  // steps aside then; the owner must still be able to turn this setting off.
+  const level = await LocalAuthentication.getEnrolledLevelAsync();
+  if (level !== LocalAuthentication.SecurityLevel.NONE) {
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'تأیید برای خاموش کردن قفل',
+      cancelLabel: 'انصراف',
+      disableDeviceFallback: false,
+    });
+    if (!result.success) return false;
+  }
   await writeSetting(lockEnabled, false);
   await audit('lock.disabled');
   return true;

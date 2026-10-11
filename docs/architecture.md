@@ -22,6 +22,12 @@ and native prompts on a failed initial/refresh read, showing the existing retry
 notice without unmounting the clinical content. No new framework, feature,
 mandatory security flow or persistence format.
 
+Explicit lock removal also reads actual device enrollment. A phone whose
+screen credential disappeared cannot satisfy authentication; when the OS
+reports NONE, explicit removal writes/audits off without opening that impossible
+prompt. Enrolled phones still authenticate. Read/write/audit failures propagate
+through the same owned action; an API error is never treated as no enrollment.
+
 ## Current native permission state (0.11.59)
 
 PermissionsCard reads notification/camera/microphone grants again when Android

@@ -4,9 +4,12 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
 import { Button } from '@/components/ui';
+import { audit } from '@/db/audit';
+import { writeSetting } from '@/db/settings';
 import { logError } from '@/platform/error-log';
 
-import { LockGate } from './lock-gate';
+import { disableAppLock, LockGate } from './lock-gate';
+import { lockEnabled } from './settings';
 
 const mockLevel = jest.fn<() => Promise<number>>();
 const mockAuthenticate = jest.fn<() => Promise<{ success: boolean }>>();
@@ -71,6 +74,8 @@ async function unmount() {
 }
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(writeSetting).mockReset().mockResolvedValue(undefined);
+  jest.mocked(audit).mockReset().mockResolvedValue(undefined);
   mockLoaded = true;
   mockReadError = undefined;
   mockLevel.mockReset().mockResolvedValue(1);
@@ -192,5 +197,55 @@ describe('optional app lock native failure recovery', () => {
     });
     expect(alertError).not.toHaveBeenCalled();
     expect(logError).toHaveBeenCalledWith(failure, { source: 'handled', context: 'باز کردن قفل کامل نشد' });
+  });
+});
+
+describe('explicit optional-lock removal after device credentials change', () => {
+  it('turns off with no device screen lock instead of silently ignoring the owner', async () => {
+    mockLevel.mockResolvedValue(0);
+    mockAuthenticate.mockResolvedValue({ success: false });
+    await expect(disableAppLock()).resolves.toBe(true);
+    expect(mockAuthenticate).not.toHaveBeenCalled();
+    expect(writeSetting).toHaveBeenCalledWith(lockEnabled, false);
+    expect(audit).toHaveBeenCalledWith('lock.disabled');
+  });
+
+  it('still requires authentication on an enrolled phone and preserves a canceled change', async () => {
+    mockLevel.mockResolvedValue(1);
+    mockAuthenticate.mockResolvedValue({ success: false });
+    await expect(disableAppLock()).resolves.toBe(false);
+    expect(mockLevel).toHaveBeenCalledTimes(1);
+    expect(mockAuthenticate).toHaveBeenCalledTimes(1);
+    expect(writeSetting).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it('does not mistake an enrollment read failure for missing device credentials', async () => {
+    const failure = new Error('Device enrollment read failed');
+    mockLevel.mockRejectedValue(failure);
+    await expect(disableAppLock()).rejects.toBe(failure);
+    expect(mockAuthenticate).not.toHaveBeenCalled();
+    expect(writeSetting).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it('awaits the enrolled setting write and existing best-effort audit call', async () => {
+    await expect(disableAppLock()).resolves.toBe(true);
+    expect(mockAuthenticate).toHaveBeenCalledTimes(1);
+    expect(writeSetting).toHaveBeenCalledWith(lockEnabled, false);
+    expect(audit).toHaveBeenCalledWith('lock.disabled');
+  });
+
+  // Real audit() is best effort. A rejecting stand-in tests defensive propagation,
+  // not persisted audit rollback or stronger production acknowledgment.
+  it.each(['write', 'audit'] as const)('propagates an unexpected %s helper rejection', async (stage) => {
+    const failure = new Error('Lock acknowledgment failed');
+    mockLevel.mockResolvedValue(0);
+    if (stage === 'write') jest.mocked(writeSetting).mockRejectedValue(failure);
+    else jest.mocked(audit).mockRejectedValue(failure);
+    await expect(disableAppLock()).rejects.toBe(failure);
+    expect(mockAuthenticate).not.toHaveBeenCalled();
+    if (stage === 'write') expect(audit).not.toHaveBeenCalled();
+    else expect(writeSetting).toHaveBeenCalledWith(lockEnabled, false);
   });
 });

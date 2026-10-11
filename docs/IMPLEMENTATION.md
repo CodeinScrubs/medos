@@ -33,12 +33,13 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.60/code76 on `codex/permission-state-recovery` continues
-PR11's frozen .59 `b8820f9`. .60 handles optional settings/lock native failures,
-repeated/late callbacks and original dataset ownership. Its 29 focused tests
-pass; full check passes 182 suites/2,728 tests/five workflow checks. New frozen
-APK/native/CI remain pending in
-[validation-0.11.60.md](validation-0.11.60.md).
+Application 0.11.60/code76 on codex/permission-state-recovery remains
+PR11's candidate. First source 22ee485 passes the full 2,728-test check, push,
+exact-source CI and bounded native camera/lock observations. Native testing
+then reproduces silent disable after device credentials disappear. The repaired
+helper passes 35 focused tests and the full 2,734-test check; new frozen native/CI and owner
+artifact remain pending in [validation-0.11.60.md](validation-0.11.60.md).
+Do not borrow first-source acceptance for the repaired source.
 
 .59's 179-suite/2,699-test check, normal push and exact-source hosted CI pass.
 Its installed private x86 APK matches inspected bytes. Native camera-grant return
@@ -128,7 +129,7 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 | W04 | Patient deck | Existing first-tab episode and bedside snapshot lead with identity/location/impressions/allergies, timed observations/labs, running orders and open work. Physician review and measured40-patient shift acceptance remain. Do not add a dashboard maze. |
 | W05 | Clinical history | Separate encounters, timeline filters/bounded previews/keyset pages and direct record access exist. .56 adds bounded correction history and seven clinical restore kinds. Accept new-source native pagination/every kind/pressure; note and clinical history retain separate codecs. |
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
-| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Notebook tombstones still need appropriate recovery. Native contact/follow-up recovery, denied notification permission, retry and cold persistence pass in .58; actual alarm delivery remains separate. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
+| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Notebook tombstones still need appropriate recovery; the places-list phone intent needs a handled rejection. Native contact/follow-up recovery, denied notification permission, retry and cold persistence pass in .58; actual alarm delivery remains separate. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
 | W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
 | W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. .51 connects idea/topic raw recovery and exposes area-read rejection/retry; .55 connects the remaining notebook forms. Topic/reference checks and merged search commit with publication. Extension creation/editing rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. Complete broad edit/search acceptance and deleted-place recovery/move; bounded recovery checks do not finish every native workflow. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |
@@ -164,7 +165,7 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
   to zero. Actual delivery and OEM/Doze/reboot behavior remain separate.
 - .60 handles optional lock/settings native rejection and delayed callbacks with
   original dataset admission. Its focused software witnesses pass; new-source
-  frozen build, native route/lock checks and physical authentication remain open.
+  repaired-source full/native/CI/owner checks and physical authentication remain open.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.
