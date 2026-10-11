@@ -1,5 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/collapsible-section';
@@ -23,9 +25,9 @@ import {
 import { RATING_AXES, type Doctor, type DoctorProfile } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { topicsByTeacherQuery } from '@/features/knowledge/queries';
-import { openInMaps } from '@/features/places/actions';
+import { openInMaps, type PlaceDeviceOwner } from '@/features/places/actions';
 import { placeQuery } from '@/features/places/queries';
-import { withDatasetWrite } from '@/lib/dataset-write';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalali, formatJalaliLong } from '@/lib/jalali';
 import { formatPhone, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -99,7 +101,7 @@ export function DoctorScreen() {
           </Text>
         ) : null}
         <Header doctor={doctor} />
-        <QuickActions doctor={doctor} />
+        <QuickActions doctor={doctor} generation={generation} stale={stale || !!error} />
         <RatingSection doctor={doctor} />
         <OccasionsSection doctor={doctor} generation={generation} stale={stale || !!error} />
         <TaughtSection doctor={doctor} />
@@ -172,9 +174,53 @@ function Header({ doctor }: { doctor: Doctor }) {
   );
 }
 
-function QuickActions({ doctor }: { doctor: Doctor }) {
-  const { data: places } = useLive(placeQuery(doctor.primaryPlaceId ?? ''), [doctor.primaryPlaceId]);
+function QuickActions({ doctor, generation, stale }: { doctor: Doctor; generation: number; stale: boolean }) {
+  const navigation = useNavigation();
+  const {
+    data: places,
+    error: placeError,
+    retry: retryPlace,
+  } = useLive(placeQuery(doctor.primaryPlaceId), [doctor.primaryPlaceId]);
   const place = places?.[0];
+  const ready = !stale && !placeError && places !== undefined && !!place && place.id === doctor.primaryPlaceId;
+  const latest = useRef({ ready, place, doctorId: doctor.id });
+  useLayoutEffect(() => {
+    latest.current = { ready, place, doctorId: doctor.id };
+  }, [ready, place, doctor.id]);
+  const mounted = useRef(true);
+  const acting = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  function openShownMap(shown: NonNullable<typeof place>) {
+    const owns = () =>
+      mounted.current &&
+      generation === datasetGeneration() &&
+      navigation.isFocused() &&
+      latest.current.ready &&
+      latest.current.doctorId === doctor.id &&
+      latest.current.place?.id === shown.id &&
+      latest.current.place?.expectedBasis === shown.expectedBasis;
+    if (!owns() || acting.current) return;
+    acting.current = true;
+    const owner: PlaceDeviceOwner = { generation, expectedBasis: shown.expectedBasis, owns };
+    void withDatasetWrite(generation, async () => {
+      const currentDoctor = (await doctorQuery(doctor.id))[0];
+      if (!currentDoctor || currentDoctor.primaryPlaceId !== shown.id)
+        throw new Error('پزشک یا مکان اصلی تغییر کرده است؛ دوباره انتخاب کنید.');
+      if (owns()) await openInMaps(shown, owner);
+    })
+      .catch((error: unknown) => {
+        if (owns()) alertError('نقشه باز نشد', error);
+      })
+      .finally(() => {
+        acting.current = false;
+        if (mounted.current) retryPlace();
+      });
+  }
   const phone = doctor.phone || doctor.phoneAlt || doctor.officePhone;
 
   const actions: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }[] = [];
@@ -202,16 +248,20 @@ function QuickActions({ doctor }: { doctor: Doctor }) {
       label: 'کپی شماره',
       onPress: () => void copyText(phone).catch((e) => alertError('کپی نشد', e)),
     });
-  if (place) actions.push({ icon: 'map-outline', label: 'نقشه', onPress: () => void openInMaps(place) });
-
-  if (actions.length === 0) return null;
+  if (actions.length === 0 && !placeError && !place) return null;
 
   return (
-    <Row gap="sm" wrap>
-      {actions.map((a) => (
-        <ActionButton key={a.label} {...a} />
-      ))}
-    </Row>
+    <Column gap="xs">
+      <ErrorNotice error={placeError} what="مکان پزشک" onRetry={retryPlace} />
+      <Row gap="sm" wrap>
+        {actions.map((a) => (
+          <ActionButton key={a.label} {...a} />
+        ))}
+        {place && doctor.primaryPlaceId !== null ? (
+          <ActionButton icon="map-outline" label="نقشه" onPress={() => openShownMap(place)} />
+        ) : null}
+      </Row>
+    </Column>
   );
 }
 

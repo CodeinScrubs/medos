@@ -2633,3 +2633,41 @@ versioned evidence manifest with source/app/dataset lineage, selected scope,
 retention/completeness boundaries and an independent reader. Never label an
 unobserved interaction, lost segment or failed native action as successful.
 This decision introduces no recorder framework or patient export today.
+
+## Places recovery and original device choices (0.11.62)
+
+The existing trash adds one places/extensions section: bounded20+1 keyset
+pages, matching total and independent read errors. Sorting/counting reads short
+metadata. Only page rows hydrate their full SQLite basis by existing primary-key
+indexes; scans/temp sorting remain possible. Correlated lifecycle IDs and page
+IDs are explicitly qualified with fixed schema/alias identifiers. Actual table
+objects retain useLive subscriptions. No new schema or route is needed.
+
+The ephemeral basis preserves SQLite storage type/value, then uses the existing
+form canonicalization and SHA256. It includes all current row columns and the
+existing id-only deletion/restoration audit count; extensions include original
+parent name, switchboard, deletion and lifecycle. The switchboard matters for
+a retained dial destination, even when updatedAt does not advance. The basis is
+neither a clinical record codec nor a stored/archive format. Required audit and
+soft delete/restore commit in one synchronous transaction. Parent restore does
+not undelete separately deleted children. Search rebuild uses the restored row
+and the validated original parent's current name, without moving a child.
+
+Retained dialogs and native actions keep original dataset, shown basis, readable
+query result, mount/focus and a synchronous attempt latch. Device operations are
+admitted across native awaits so restore cannot replace their underlying source.
+The verified row supplies the actual destination. After copy/launcher acknowledgment,
+optional usage rechecks the original live row in SQL. Optional counter/haptic
+failure records literal technical context and does not report a successful copy
+as failed; synchronous native throws and Promise rejection are both handled.
+Closing/opening a chooser is not proof of call completion. The shared doctor map
+caller also validates its original doctor/place association.
+
+Extension star is parent-screen work, sharing that action latch and original
+intent. Its backend requires shown basis and explicit valid now; a tombstone,
+changed/missing parent or stale row cannot be starred by id alone. Ordinary
+place/extension form writers accept only declared runtime keys. Undefined
+corrections follow Drizzle's omission behavior, explicit null clears supported
+fields, and rename/search propagation commits with the row. Deliberate valid
+parent reassignment remains supported; no implicit move or generic notebook
+history layer is introduced. Other notebook/doctor actions are separate work.

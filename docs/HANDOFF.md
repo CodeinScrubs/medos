@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-12 — Recover places/extensions and retain original device choices
+
+**Agent:** GPT-6 via Codex; helper GPT-6.1 Sol/xhigh proposes privately; primary
+reviews, adds boundaries and owns all integrated verification.
+**Commits:** this source checkpoint, based on825ef23; codex/place-recovery.
+
+**Changed**
+- .62/code78: existing trash recovers places/extensions with bounded queries,
+  original parent/lifecycle and required transactional audit. Preserve .61 note
+  guards and separately deleted children. No route/schema/dependency change.
+- Copy/call/map and star retain original shown row/dataset/focus/mount/read/latch;
+  counters follow native acknowledgment, optional haptic failure stays optional.
+- Reject runtime form metadata keys; preserve supported fields/search/null and
+  explicit valid reassignment. Record limitations in validation-0.11.62.md.
+
+**Verified**
+- Source-backed private red witnesses, then primary's independent frozen98-test
+  proposal run. Additional24 runtime-key witnesses red before guard.
+- Integrated170 targeted tests, final88 after lint repair; full188-suite/2,879
+  app-test check, five workflow checks, typecheck/lint/format, zero lint warnings.
+- Source/WIP unchanged during checks; PR12's documentation825ef23 CI succeeds.
+
+**Not verified**
+- .62 push/hosted CI/native/APK pending at this source checkpoint. No real call,
+  message, native external app or physical phone test; .61 APK remains available.
+
+**Open threads**
+- Complete normal push/source CI. Accept .62 native copy/recovery with the next
+  frozen candidate if combining with diagnostic repair; do not reuse .61 proof.
+- Implement private content-free diagnostics, persistent incomplete-write signal
+  and bounded pending-safe share cache. Close explicit empty-place query filter.
+- Other notebook trash/doctor actions, rich text, full workflows, local agent use
+  evidence, native pressure/input and physical gates remain; see IMPLEMENTATION.
+
+**Gotchas**
+- Never copy an old mirrored TrashScreen over .61 note lifecycle guards.
+- Correlated page.id needs the fixed qualified alias; lifecycle qualification was
+  already correct. Native optional haptics can throw before returning a Promise.
+- Render map callback as an event-bound button, not a ref-reading closure pushed
+  into a render array; stable empty row constants avoid dependency warnings.
+
 ## 2026-10-12 — Deliver inspected .61 APK and native note acceptance
 
 **Agent:** GPT-6 via Codex; primary native integration and verification.

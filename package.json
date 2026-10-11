@@ -1,7 +1,7 @@
 {
   "name": "medos",
   "private": true,
-  "version": "0.11.61",
+  "version": "0.11.62",
   "description": "MedOS — personal clinical operating system",
   "workspaces": [
     "apps/*",

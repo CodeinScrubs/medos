@@ -10,6 +10,8 @@ import { useLive } from '@/db/use-live';
 import { deletedCapturesQuery, restoreCapture } from '@/features/capture/queries';
 import { NOTE_TYPE_LABELS } from '@/features/notes/labels';
 import { deletedNotesQuery, restoreNote } from '@/features/notes/queries';
+import { PlaceTrashPanel } from '@/features/places/trash-panel';
+import { deletedPlacesCountQuery } from '@/features/places/trash-queries';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
@@ -38,6 +40,7 @@ export function TrashScreen() {
   const noteRead = useLive(deletedNotesQuery(noteLimit + 1), [noteLimit]);
   const captureRead = useLive(deletedCapturesQuery(captureLimit + 1), [captureLimit]);
   const clinicalCount = useLive(deletedClinicalCountQuery());
+  const placeCount = useLive(deletedPlacesCountQuery());
   const rows = (patientRead.data ?? []).slice(0, patientLimit);
   const noteRows = (noteRead.data ?? []).slice(0, noteLimit);
   const captureRows = (captureRead.data ?? []).slice(0, captureLimit);
@@ -50,7 +53,7 @@ export function TrashScreen() {
       mounted.current = false;
     };
   }, []);
-  const ready = [patientRead, noteRead, captureRead, clinicalCount].every(
+  const ready = [patientRead, noteRead, captureRead, clinicalCount, placeCount].every(
     (read) => read.data !== undefined && !read.error,
   );
   const locked = busy || stale || !ready;
@@ -84,6 +87,7 @@ export function TrashScreen() {
         noteRead.retry();
         captureRead.retry();
         clinicalCount.retry();
+        placeCount.retry();
       }
     }
   }
@@ -99,7 +103,8 @@ export function TrashScreen() {
         <ErrorNotice error={noteRead.error} what="نوت‌های حذف‌شده" onRetry={noteRead.retry} />
         <ErrorNotice error={captureRead.error} what="ثبت‌های حذف‌شده" onRetry={captureRead.retry} />
         <ErrorNotice error={clinicalCount.error} what="سوابق حذف‌شده" onRetry={clinicalCount.retry} />
-        {[patientRead, noteRead, captureRead, clinicalCount].some((read) => read.loading) ? (
+        <ErrorNotice error={placeCount.error} what="مکان‌ها و داخلی‌های حذف‌شده" onRetry={placeCount.retry} />
+        {[patientRead, noteRead, captureRead, clinicalCount, placeCount].some((read) => read.loading) ? (
           <Text variant="caption" color="textMuted">
             در حال خواندن…
           </Text>
@@ -123,12 +128,17 @@ export function TrashScreen() {
         rows.length === 0 &&
         captureRows.length === 0 &&
         noteRows.length === 0 &&
-        clinicalCount.data?.[0]?.count === 0 ? (
+        clinicalCount.data?.[0]?.count === 0 &&
+        placeCount.data?.[0]?.count === 0 ? (
           <EmptyState icon="trash-outline" title="چیزی حذف نشده" />
         ) : null}
 
         {(clinicalCount.data?.[0]?.count ?? 0) > 0 ? (
           <ClinicalTrashPanel generation={generation} stale={stale} locked={locked} restore={restore} />
+        ) : null}
+
+        {(placeCount.data?.[0]?.count ?? 0) > 0 ? (
+          <PlaceTrashPanel generation={generation} stale={stale} locked={locked} restore={restore} />
         ) : null}
 
         {rows.length > 0 ? (

@@ -1,14 +1,27 @@
-import { and, asc, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, isNull, sql, type SQL } from 'drizzle-orm';
 
 import { db, type DbTransaction } from '@/db/client';
 import { extensions, places, type NewPlace, type Place } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
-import { newId, softDelete, stamps, touch } from '@/lib/ids';
+import { newId, stamps, touch } from '@/lib/ids';
 
 import { extensionSearchText, placeSearchText } from './logic';
+import { extensionActionBasis, placeActionBasis } from './trash-queries';
+
+export { deleteExtension, deletePlace } from './trash-queries';
 
 const alivePlace = isNull(places.deletedAt);
 const aliveExt = isNull(extensions.deletedAt);
+
+function requireInputFields(input: object, allowed: Readonly<Record<string, true>>): void {
+  if (
+    input === null ||
+    typeof input !== 'object' ||
+    Array.isArray(input) ||
+    Object.keys(input).some((key) => !Object.prototype.hasOwnProperty.call(allowed, key))
+  )
+    throw new Error('اطلاعات ویرایش معتبر نیست؛ مکان یا داخلی تغییر نکرد.');
+}
 
 /** Drizzle skips undefined updates; the merged search basis must skip them too. */
 function definedPatch<T extends object>(input: T): T {
@@ -24,27 +37,43 @@ export function placesQuery(filter: { search?: string; kind?: Place['kind'] } = 
   if (filter.kind) clauses.push(eq(places.kind, filter.kind));
   clauses.push(...matchesSearch(places.searchText, filter.search));
   return db
-    .select()
+    .select({ ...getTableColumns(places), expectedBasis: placeActionBasis() })
     .from(places)
     .where(and(...clauses))
     .orderBy(desc(places.starred), asc(places.name));
 }
 
-export function placeQuery(id: string) {
+export function placeQuery(id: string | null) {
   return db
-    .select()
+    .select({ ...getTableColumns(places), expectedBasis: placeActionBasis() })
     .from(places)
-    .where(and(alivePlace, eq(places.id, id)))
+    .where(and(alivePlace, id === null ? sql`0` : eq(places.id, id)))
     .limit(1);
 }
 
 export type PlaceInput = Omit<NewPlace, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'searchText'>;
+const placeFields: Record<keyof PlaceInput, true> = {
+  name: true,
+  kind: true,
+  city: true,
+  address: true,
+  lat: true,
+  lng: true,
+  mapUrl: true,
+  phone: true,
+  switchboard: true,
+  website: true,
+  notes: true,
+  tags: true,
+  starred: true,
+};
 
 export async function createPlace(input: PlaceInput): Promise<string> {
   return db.transaction((tx) => createPlaceInTransaction(tx, input, new Date()));
 }
 
 export function createPlaceInTransaction(tx: DbTransaction, input: PlaceInput, now: Date): string {
+  requireInputFields(input, placeFields);
   const id = newId();
   tx.insert(places)
     .values({ ...input, id, ...stamps(now), searchText: placeSearchText(input) })
@@ -57,6 +86,7 @@ export async function updatePlace(id: string, input: Partial<PlaceInput>): Promi
 }
 
 export function updatePlaceInTransaction(tx: DbTransaction, id: string, input: Partial<PlaceInput>, now: Date): void {
+  requireInputFields(input, placeFields);
   const patch = definedPatch(input);
   const current = requireLivePlace(tx, id);
   // Read children in this transaction too: a concurrent creation or edit
@@ -75,10 +105,6 @@ export function updatePlaceInTransaction(tx: DbTransaction, id: string, input: P
   }
 }
 
-export async function deletePlace(id: string): Promise<void> {
-  await db.update(places).set(softDelete()).where(eq(places.id, id));
-}
-
 /* -------------------------------------------------------------------------- */
 /*  Extensions (داخلی‌ها)                                                        */
 /* -------------------------------------------------------------------------- */
@@ -92,7 +118,7 @@ export function extensionsQuery(filter: { search?: string; placeId?: string } = 
   if (filter.placeId) clauses.push(eq(extensions.placeId, filter.placeId));
   clauses.push(...matchesSearch(extensions.searchText, filter.search));
   return db
-    .select({ extension: extensions, place: places })
+    .select({ extension: extensions, place: places, expectedBasis: extensionActionBasis() })
     .from(extensions)
     .innerJoin(places, eq(extensions.placeId, places.id))
     .where(and(...clauses))
@@ -126,6 +152,16 @@ export type ExtensionInput = {
   contactPerson?: string | null;
   notes?: string | null;
 };
+const extensionFields: Record<keyof ExtensionInput, true> = {
+  placeId: true,
+  department: true,
+  extension: true,
+  directLine: true,
+  floor: true,
+  availableHours: true,
+  contactPerson: true,
+  notes: true,
+};
 
 function requireLivePlace(tx: DbTransaction, placeId: string): Place {
   const current = tx
@@ -142,6 +178,7 @@ export async function createExtension(input: ExtensionInput): Promise<string> {
 }
 
 export function createExtensionInTransaction(tx: DbTransaction, input: ExtensionInput, now: Date): string {
+  requireInputFields(input, extensionFields);
   const place = requireLivePlace(tx, input.placeId);
   const id = newId();
   tx.insert(extensions)
@@ -160,6 +197,7 @@ export function updateExtensionInTransaction(
   input: Partial<ExtensionInput>,
   now: Date,
 ): void {
+  requireInputFields(input, extensionFields);
   const patch = definedPatch(input);
   const current = tx
     .select()
@@ -177,22 +215,61 @@ export function updateExtensionInTransaction(
 }
 
 /** Bumped on every call or copy, so the list learns what is actually used. */
-export async function recordExtensionUse(id: string): Promise<void> {
-  await db
-    .update(extensions)
-    .set({ usageCount: sql`${extensions.usageCount} + 1` })
-    .where(and(aliveExt, eq(extensions.id, id)));
+function requireExtensionDeviceChoice(reader: Pick<DbTransaction, 'select'>, id: string, expectedBasis: string) {
+  const row = reader
+    .select({ extension: extensions, place: places, basis: extensionActionBasis() })
+    .from(extensions)
+    .innerJoin(places, eq(extensions.placeId, places.id))
+    .where(and(aliveExt, alivePlace, eq(extensions.id, id)))
+    .get();
+  if (!row || typeof expectedBasis !== 'string' || !/^[a-f0-9]{64}$/.test(expectedBasis) || row.basis !== expectedBasis)
+    throw new Error('داخلی یا مکان اصلی تغییر کرده است؛ فهرست را دوباره بخوانید.');
+  return row;
 }
 
-export async function setExtensionStarred(id: string, starred: boolean): Promise<void> {
-  await db
-    .update(extensions)
-    .set({ starred, ...touch() })
-    .where(eq(extensions.id, id));
+/** Original native choice is checked before an irreversible device request. */
+export function assertExtensionDeviceChoice(id: string, expectedBasis: string) {
+  return requireExtensionDeviceChoice(db, id, expectedBasis);
 }
 
-export async function deleteExtension(id: string): Promise<void> {
-  await db.update(extensions).set(softDelete()).where(eq(extensions.id, id));
+export function assertPlaceDeviceChoice(id: string, expectedBasis: string) {
+  const row = placeQuery(id).get();
+  if (
+    !row ||
+    typeof expectedBasis !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(expectedBasis) ||
+    row.expectedBasis !== expectedBasis
+  )
+    throw new Error('مکان تغییر کرده است؛ فهرست را دوباره بخوانید.');
+  return row;
+}
+
+/** Optional counter acknowledges only the exact original live choice after native success. */
+export async function recordExtensionUse(id: string, expectedBasis: string): Promise<void> {
+  db.transaction((tx) => {
+    requireExtensionDeviceChoice(tx, id, expectedBasis);
+    tx.update(extensions)
+      .set({ usageCount: sql`${extensions.usageCount} + 1` })
+      .where(and(aliveExt, eq(extensions.id, id)))
+      .run();
+  });
+}
+
+export async function setExtensionStarred(
+  id: string,
+  starred: boolean,
+  expectedBasis: string,
+  now: Date,
+): Promise<void> {
+  if (typeof starred !== 'boolean' || !(now instanceof Date) || !Number.isFinite(now.getTime()))
+    throw new Error('انتخاب ستاره یا زمان ثبت معتبر نیست.');
+  db.transaction((tx) => {
+    requireExtensionDeviceChoice(tx, id, expectedBasis);
+    tx.update(extensions)
+      .set({ starred, ...touch(now) })
+      .where(and(aliveExt, eq(extensions.id, id)))
+      .run();
+  });
 }
 
 /** Rebuild the search index of every place and extension; see features/search/reindex.ts. */
