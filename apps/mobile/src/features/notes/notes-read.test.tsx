@@ -31,6 +31,7 @@ jest.mock('react-native', () => {
 });
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicon');
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));

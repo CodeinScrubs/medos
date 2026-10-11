@@ -1,6 +1,6 @@
 import { and, desc, eq, getTableColumns, isNotNull, isNull } from 'drizzle-orm';
 
-import { audit, auditInTransaction } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
 import {
   encounters,
@@ -17,6 +17,7 @@ import { withDatasetWrite } from '@/lib/dataset-write';
 import { requireDeletedRecord } from '@/lib/deleted-record';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
+import { noteLifecycle, requireNoteAction, type NoteActionBasis } from './action-queries';
 import { noteSearchText, sameNoteSnapshot } from './logic';
 import { writeNoteVersion } from './version-queries';
 
@@ -66,12 +67,54 @@ export type NoteInput = {
   isDraft?: boolean;
 };
 
+/** A correction never moves a note to a different patient or encounter. */
+export type NotePatch = Partial<Omit<NoteInput, 'patientId' | 'encounterId'>>;
+const editableFields: Record<keyof NotePatch, true> = {
+  type: true,
+  title: true,
+  body: true,
+  subjective: true,
+  objective: true,
+  assessment: true,
+  plan: true,
+  noteDate: true,
+  doctorId: true,
+  specialty: true,
+  isPinned: true,
+  isDraft: true,
+};
+
+function requireNoteParent(tx: DbTransaction, patientId: string, encounterId: string | null): void {
+  if (
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new Error('پروندهٔ بیمار در دسترس نیست؛ نوت تغییر نکرد.');
+  if (
+    encounterId !== null &&
+    !tx
+      .select({ id: encounters.id })
+      .from(encounters)
+      .where(and(eq(encounters.id, encounterId), eq(encounters.patientId, patientId), isNull(encounters.deletedAt)))
+      .get()
+  )
+    throw new Error('نوبت مربوط به این نوت در دسترس نیست؛ ارتباط نوت تغییر نکرد.');
+}
+
 export async function createNote(input: NoteInput): Promise<string> {
   return db.transaction((tx) => createNoteInTransaction(tx, input));
 }
 
 /** Also used when a capture and its new note must commit together. */
 export function createNoteInTransaction(tx: DbTransaction, input: NoteInput): string {
+  // Undefined selects the active episode inside this transaction; explicit null
+  // remains outpatient/unassociated even if another admission has since opened.
+  const encounterId =
+    input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx);
+  requireNoteParent(tx, input.patientId, encounterId);
   const id = newId();
   tx.insert(notes)
     .values({
@@ -79,7 +122,7 @@ export function createNoteInTransaction(tx: DbTransaction, input: NoteInput): st
       ...stamps(),
       patientId: input.patientId,
       // Undefined means "whatever admission is active"; null means explicitly none.
-      encounterId: input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx),
+      encounterId,
       type: input.type,
       title: input.title ?? null,
       body: input.body ?? null,
@@ -101,20 +144,29 @@ export function createNoteInTransaction(tx: DbTransaction, input: NoteInput): st
   return id;
 }
 
-export async function updateNote(id: string, input: Partial<NoteInput>): Promise<void> {
+export async function updateNote(id: string, input: NotePatch): Promise<void> {
   db.transaction((tx) => updateNoteInTransaction(tx, id, input));
 }
 
-export function updateNoteInTransaction(tx: DbTransaction, id: string, input: Partial<NoteInput>): void {
+export function updateNoteInTransaction(tx: DbTransaction, id: string, input: NotePatch): void {
+  // Types alone cannot protect imported/plugin/runtime calls or an object spread.
+  if ('patientId' in input || 'encounterId' in input)
+    throw new Error('بیمار و نوبت نوت هنگام اصلاح قابل تغییر نیستند.');
+  if (Object.keys(input).some((key) => !Object.prototype.hasOwnProperty.call(editableFields, key)))
+    throw new Error('اطلاعات اصلاح نوت معتبر نیست؛ نوت تغییر نکرد.');
+  // Drizzle skips undefined values. The search projection must skip them too;
+  // explicit null still clears a field and is recorded in clinical history.
+  const patch = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as NotePatch;
   const current = tx
     .select()
     .from(notes)
     .where(and(alive, eq(notes.id, id)))
     .get();
-  if (!current) throw new Error(`Note ${id} not found`);
+  if (!current) throw new Error('این نوت دیگر قابل تغییر نیست؛ فهرست را دوباره بخوانید.');
+  requireNoteParent(tx, current.patientId, current.encounterId);
 
   tx.update(notes)
-    .set({ ...input, ...touch(), searchText: noteSearchText({ ...current, ...input }) })
+    .set({ ...patch, ...touch(), searchText: noteSearchText({ ...current, ...patch }) })
     .where(and(alive, eq(notes.id, id)))
     .run();
 
@@ -148,29 +200,7 @@ export async function restoreNoteVersion(expected: NoteVersion, basis: Note, gen
         .get();
       if (!current || !sameNoteSnapshot(current, basis) || version.patientId !== current.patientId)
         throw new Error('این نوت تغییر کرده یا متعلق به این پرونده نیست؛ دوباره آن را بررسی کنید.');
-      if (
-        !tx
-          .select({ id: patients.id })
-          .from(patients)
-          .where(and(eq(patients.id, current.patientId), isNull(patients.deletedAt)))
-          .get()
-      )
-        throw new Error('پروندهٔ بیمار در دسترس نیست.');
-      if (
-        current.encounterId &&
-        !tx
-          .select({ id: encounters.id })
-          .from(encounters)
-          .where(
-            and(
-              eq(encounters.id, current.encounterId),
-              eq(encounters.patientId, current.patientId),
-              isNull(encounters.deletedAt),
-            ),
-          )
-          .get()
-      )
-        throw new Error('نوبت مراجعهٔ این نوت در دسترس نیست.');
+      requireNoteParent(tx, current.patientId, current.encounterId);
 
       const fields = {
         type: version.type,
@@ -217,19 +247,40 @@ export async function restoreNoteVersion(expected: NoteVersion, basis: Note, gen
   );
 }
 
-export async function setNotePinned(id: string, isPinned: boolean): Promise<void> {
-  await updateNote(id, { isPinned });
+export async function setNotePinned(id: string, isPinned: boolean, expected?: NoteActionBasis): Promise<void> {
+  db.transaction((tx) => {
+    requireNoteAction(tx, id, expected);
+    updateNoteInTransaction(tx, id, { isPinned });
+  });
 }
 
-export async function deleteNote(id: string): Promise<void> {
-  await db.update(notes).set(softDelete()).where(eq(notes.id, id));
-  await audit('note.deleted', { entityType: 'note', entityId: id });
+export async function deleteNote(id: string, expected?: NoteActionBasis): Promise<void> {
+  const now = new Date();
+  db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(notes)
+      .where(and(alive, eq(notes.id, id)))
+      .get();
+    if (!current) throw new Error('این نوت دیگر قابل تغییر نیست؛ فهرست را دوباره بخوانید.');
+    requireNoteParent(tx, current.patientId, current.encounterId);
+    requireNoteAction(tx, id, expected);
+    tx.update(notes)
+      .set(softDelete(now))
+      .where(and(alive, eq(notes.id, id)))
+      .run();
+    auditInTransaction(tx, 'note.deleted', { entityType: 'note', entityId: id }, now);
+  });
 }
 
 /** Deleted notes, newest first, with whose record they came from — for the trash. */
 export function deletedNotesQuery(limit = 50) {
   return db
-    .select({ note: notes, patient: { firstName: patients.firstName, lastName: patients.lastName } })
+    .select({
+      note: notes,
+      lifecycle: noteLifecycle,
+      patient: { firstName: patients.firstName, lastName: patients.lastName },
+    })
     .from(notes)
     .leftJoin(patients, eq(patients.id, notes.patientId))
     .where(isNotNull(notes.deletedAt))
@@ -238,37 +289,27 @@ export function deletedNotesQuery(limit = 50) {
 }
 
 /** Put a deleted note back in its record, exactly as it was. */
-export async function restoreNote(id: string, expected?: Note): Promise<void> {
+export async function restoreNote(id: string, expected?: Note, expectedLifecycle?: string): Promise<void> {
   const now = new Date();
   db.transaction((tx) => {
     const current = requireDeletedRecord(tx.select().from(notes).where(eq(notes.id, id)).get(), expected);
-    const patient = tx
-      .select({ id: patients.id })
-      .from(patients)
-      .where(and(eq(patients.id, current.patientId), isNull(patients.deletedAt)))
-      .get();
-    if (!patient) throw new Error('ابتدا پروندهٔ بیمار این نوت را برگردانید.');
+    requireNoteParent(tx, current.patientId, current.encounterId);
     if (
-      current.encounterId &&
-      !tx
-        .select({ id: encounters.id })
-        .from(encounters)
-        .where(
-          and(
-            eq(encounters.id, current.encounterId),
-            eq(encounters.patientId, current.patientId),
-            isNull(encounters.deletedAt),
-          ),
-        )
-        .get()
+      expectedLifecycle !== undefined &&
+      tx
+        .select({ lifecycle: noteLifecycle })
+        .from(notes)
+        .innerJoin(patients, eq(patients.id, notes.patientId))
+        .where(eq(notes.id, id))
+        .get()!.lifecycle !== expectedLifecycle
     )
-      throw new Error('نوبت مربوط به این نوت در دسترس نیست؛ ارتباط نوت تغییر نکرد.');
+      throw new Error('این نوت تغییر کرده است؛ فهرست را دوباره بخوانید و نسخهٔ جدید را بررسی کنید.');
     tx.update(notes)
       .set({ deletedAt: null, ...touch(now) })
       .where(and(eq(notes.id, id), isNotNull(notes.deletedAt)))
       .run();
+    auditInTransaction(tx, 'note.restored', { entityType: 'note', entityId: id }, now);
   });
-  await audit('note.restored', { entityType: 'note', entityId: id });
 }
 
 /** Rebuild every note's search index; see features/search/reindex.ts. */

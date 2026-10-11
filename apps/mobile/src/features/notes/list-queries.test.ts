@@ -214,7 +214,12 @@ describe('bounded patient note and highlight projections', () => {
   });
 
   it('subscribes to real owner tables and media, so deletion/pins/voices refresh', () => {
-    expect(tablesOf(patientNotePageQuery(patientId)).sort()).toEqual(['notes', 'patients']);
+    expect(tablesOf(patientNotePageQuery(patientId)).sort()).toEqual([
+      'audit_log',
+      'note_versions',
+      'notes',
+      'patients',
+    ]);
     expect(tablesOf(patientNoteTypesQuery(patientId)).sort()).toEqual(['notes', 'patients']);
     expect(tablesOf(patientHighlightedNotesQuery(patientId)).sort()).toEqual(['notes', 'patients']);
     expect(tablesOf(noteVoiceCountsQuery(patientId, ['synthetic'])).sort()).toEqual(['attachments']);

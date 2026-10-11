@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-
 import { db } from '@/db/client';
 import { attachments, notes, patients } from '@/db/schema';
 
+import { noteActionStamp } from './action-queries';
 import { NOTE_PAGE_SIZE, NOTE_PREVIEW_SIZE, type NoteListCursor, type NoteListFilter } from './list-logic';
 
 const alive = and(isNull(notes.deletedAt), isNull(patients.deletedAt));
@@ -37,7 +38,7 @@ export function patientNotePageQuery(patientId: string, filter: NoteListFilter =
           (${notes.noteDate} < ${cursor.at} OR (${notes.noteDate} = ${cursor.at} AND ${notes.id} > ${cursor.id}))))`
     : undefined;
   return db
-    .select(card)
+    .select({ ...card, action: noteActionStamp })
     .from(notes)
     .innerJoin(patients, eq(notes.patientId, patients.id))
     .where(and(alive, eq(notes.patientId, patientId), filter === 'all' ? undefined : eq(notes.type, filter), before))

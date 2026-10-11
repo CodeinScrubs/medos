@@ -33,6 +33,18 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+Application 0.11.61/code77 on codex/note-action-integrity builds on PR11's
+8ecaa67. Ordinary note creation/correction/deletion/version restoration now
+validates original patient/episode ownership. Delete and trash restore require
+their audit atomically. Retained card choices use compact immutable-version/
+lifecycle evidence plus original dataset, focus and mount; existing pagination
+and the33KB list bound remain unchanged. Full software check passes183 suites/
+2,759 app tests and five workflow checks, with zero lint warnings. Source push,
+hosted CI and frozen native/APK acceptance are pending at this source checkpoint;
+see [validation-0.11.61.md](validation-0.11.61.md). No migration/dependency/route
+or archive/key change is added. The .60 artifact below remains the owner APK
+until an inspected .61 artifact is delivered.
+
 Application 0.11.60/code 76 on codex/permission-state-recovery is draft PR 11's
 candidate. Frozen source e34e79e passes 35 focused tests, the full 182-suite/
 2,734-test check, five workflow checks, normal push and exact-source hosted CI.
@@ -122,6 +134,23 @@ failure/race/context/replay tests. Test retained forms and delayed callbacks,
 not just pure serialization. Keep raw invalid input separate from clinical truth.
 
 ## Priority1: finish everyday workflows
+
+Next diagnostic integrity slice: prove arbitrary-message/stack/context redaction
+with synthetic canaries; make default persisted/shared diagnostics content-free
+with stable technical evidence, strict legacy decoding and bounded size. Handle
+share availability/file/native rejection through the originating screen's
+mount/focus and a single-flight latch. A closed chooser is not delivery. Inspect
+interrupted backup scratch cleanup separately from restore safety journals.
+
+The owner's2026-10-11 pasted request adds local patient/settings/use history for
+coding agents across weeks. After the diagnostic repair, define a versioned,
+bounded local event/evidence contract alongside existing clinical history, then
+an explicit selected clinical export with app/source/dataset lineage, retention
+and missing-segment/completeness boundaries and an independent reader. Ordinary
+diagnostics cannot carry clinical bodies, credentials or colleague ratings;
+AGENTS.md now records the separate owner-controlled export exception. No
+automatic upload, duplicate chart or second navigation dashboard. This is
+pending implementation, not something the current100-error log already does.
 
 | ID | Deliverable | Remaining acceptance or implementation |
 |---|---|---|

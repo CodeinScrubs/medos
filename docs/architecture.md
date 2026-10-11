@@ -2582,3 +2582,54 @@ card's reminder retry, with one conditional notice rather than a false restore
 failure. Unsupported imported state remains intact and refused. Native receipt
 writes do not create fabricated clinical corrections. Draft publication receipts
 still return the original recovered id, never a duplicate record.
+
+## Note mutation boundaries and retained card choices (0.11.61)
+
+The ordinary note writers now require the original live patient and, whenever
+encounterId is non-null, its live matching encounter. Undefined creation context
+still resolves the active episode inside the transaction; explicit null stays
+unassociated. A closed but live original encounter remains valid. Imported empty
+IDs are checked as IDs rather than interpreted as null. Version restoration uses
+the same parent boundary. No association is guessed or repaired.
+
+NotePatch excludes patient/encounter identity. Runtime keys are checked against
+the editable fields, so a cast/object spread cannot alter tombstones, IDs or
+stored search metadata. Undefined patch fields are omitted from both the SQL
+write and merged search projection; explicit null clears the field. Content
+and meaningful versions still commit together. Delete and trash restore now
+require their audit in that same synchronous transaction. An audit failure
+rolls back the mutation; missing/alive/repeated requests are refused.
+
+A note card carries a short ephemeral SQLite tuple of note/episode identity,
+creation/update time, latest immutable note version and existing delete/restore
+audit count. The shown patient is supplied separately. Full bodies are not
+loaded into the list, and the existing 32+1-page/33KB regression bound is unchanged.
+Same-clock edits that change back and identical delete/restore cycles still
+invalidate the old choice. The scalar queries use qualified outer columns:
+their consumers retain a join because Drizzle's single-table projection would
+otherwise remove those qualifiers inside correlated SQL. Actual SQLite tests
+pin that behavior and the added live-query table dependencies.
+
+All retained note-card pin/delete callers pass this shown basis and original
+dataset admission, plus mount/focus and a synchronous single-flight latch.
+Trash restore passes both the exact shown tombstone and lifecycle count. Trusted
+immediate internal writers may omit a shown-card basis; this is not permission
+for a new retained UI callback to do so. No schema, stored codec, route, dependency,
+permission or encrypted archive change is introduced.
+
+## Owner-requested local development evidence (decision, not implemented)
+
+The 2026-10-11 supplied conversation requests enough local patient/settings/use
+history for a coding agent to investigate weeks later. Clinical truth remains in
+the existing records and immutable correction history. Developer activity must
+describe receipts/failures/settings and evidence gaps without duplicating note
+bodies or secrets. Default diagnostics and a deliberate selected clinical export
+have different contracts, now stated in AGENTS.md. There is no automatic upload.
+
+The current 100-entry error log does not provide that history, and parameter
+redaction does not prove that arbitrary messages/stacks are safe. Implement
+bounded content-free diagnostics and handled export failures first, then a local
+versioned evidence manifest with source/app/dataset lineage, selected scope,
+retention/completeness boundaries and an independent reader. Never label an
+unobserved interaction, lost segment or failed native action as successful.
+This decision introduces no recorder framework or patient export today.
