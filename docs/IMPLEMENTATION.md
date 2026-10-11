@@ -33,11 +33,19 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.59/code75 on `codex/permission-state-recovery` continues
-delivered PR10 `7d1dfc4`. .59 refreshes current grants after Android Settings,
-handles failed/repeated/late native choices and shortens misleading copy. Its
-179-suite/2,699-test software check passes; frozen APK/native acceptance remains
-pending in validation-0.11.59. .58 recovery evidence stays in its own report.
+Application 0.11.60/code76 on `codex/permission-state-recovery` continues
+PR11's frozen .59 `b8820f9`. .60 handles optional settings/lock native failures,
+repeated/late callbacks and original dataset ownership. Its 29 focused tests
+pass; full check passes 182 suites/2,728 tests/five workflow checks. New frozen
+APK/native/CI remain pending in
+[validation-0.11.60.md](validation-0.11.60.md).
+
+.59's 179-suite/2,699-test check, normal push and exact-source hosted CI pass.
+Its installed private x86 APK matches inspected bytes. Native camera-grant return
+keeps the original PID and updates the mounted card. Real exact-alarm special
+access changes two existing occasion requests from a one-hour window to zero;
+this is scheduling, not delivery. No .59 owner APK was built. See
+[validation-0.11.59.md](validation-0.11.59.md); .58 evidence stays in its own report.
 
 Permanent clinical correction history covers patient,
 companion, encounter, diagnosis, vital, whole lab panel, imaging, order, consult
@@ -103,7 +111,7 @@ The phone is not currently the sole remaining work.
 | D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. .56 adds audited restore for labs, imaging, vitals, orders, consults, diagnoses and historical/inactive encounters, with original full-row basis and patient/episode ownership. .58 adds companion/follow-up restore, clinical-sequence recovery tokens and retained delete/status/result/postpone intent. Lab deletion and required clinical audit/history share the write transaction. Notebook trash and broader interruption/device acceptance remain. Never infer a deleted encounter's former active state. |
 | D09 | Consistent rounds and active episode | New memberships validate live ownership, preserve reorder/handoff and use latest published clinical note independent of pins. .45 makes encounter readers consistent. Imported duplicate memberships/episodes are preserved; clinical duplicate resolution and broader native rounds acceptance remain open. |
 | D10 | Compatible verified backup/restore | Format/KDF remain frozen; verified destination strength governs pruning. Restore excludes admitted writers/file jobs and preserves original ownership of old forms. Independent old/current restore exists in versioned reports. Critical swap/commit interruption, low disk, provider grants and second-device recovery remain open. |
-| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. .58 recovery preserves outcome/status/deadline and reports native repair separately; retained row checks protect clinical choices across live refresh. Native denied-permission/retry/cold request acknowledgment passes in .58. Exact-alarm special access, actual alarm/reboot/Doze delivery and the complete received/reviewed/action/closed product flow remain open. |
+| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. .58 recovery preserves outcome/status/deadline and reports native repair separately; retained row checks protect clinical choices across live refresh. Native denied-permission/retry/cold request acknowledgment passes in .58. .59 separately accepts actual special access and the occasion-request window transition; alarm/reboot/Doze delivery and the complete received/reviewed/action/closed product flow remain open. |
 | D12 | Jalali occasions and communication | Leap-day edits/raw recovery, scheduled occurrence-year text, database-first reminder revision/repair and explicit sent confirmation are implemented in software. Test real lifecycle/delivery separately. Do not transmit messages during development tests. |
 
 Reproduce before changing. Each new persistence path needs migrated-SQLite
@@ -151,13 +159,12 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
   normalization schemes, golden keys and independent compatibility. Native
   keyboard-controller modal soft exceptions and audio dead-handler warnings
   remain diagnostic/acceptance work; retained processes do not prove harmlessness.
-- .59 corrects permission-card delay wording and handles rejected/stale native
-  reads and repeated/late settings actions. Accept actual native return and
-  exact-alarm special access separately from notification permission; .58's
-  observed OS window is one hour without special access.
-- Review the optional app-lock toggle's unhandled asynchronous callback and
-  delayed confirmation. Two private software probes reproduce rejected enable/disable
-  callbacks; this is not a phone crash witness.
+- .59 accepts actual mounted camera-grant return and the system exact-alarm
+  switch, including two observed occasion-request windows changing from one hour
+  to zero. Actual delivery and OEM/Doze/reboot behavior remain separate.
+- .60 handles optional lock/settings native rejection and delayed callbacks with
+  original dataset admission. Its focused software witnesses pass; new-source
+  frozen build, native route/lock checks and physical authentication remain open.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.

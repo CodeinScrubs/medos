@@ -39,12 +39,38 @@ or permission framework was introduced.
   StrictMode test observes both setups and rejects the first delayed snapshot.
   The actual final focused suite passes 15 tests (3.472s). Full check passes
   179 suites / 2,699 tests and five workflow checks (247.218s), with zero lint
-  warnings. Final-source push/CI and native evidence are recorded at delivery.
+  warnings. Normal final-source push passes the same 2,699 tests (235.314s). Exact
+  `b8820f9` hosted [CI succeeds](https://github.com/CodeinScrubs/medos/actions/runs/38147573121).
 
 ## Native and artifact evidence
 
-Pending a frozen build, actual installed-package inspection and native
-Settings round trip. This report does not attribute .58 acceptance to .59.
+Frozen application source: `b8820f955267a287714211921bc05368019b80bc`.
+The private signed x86_64 release APK is 55,120,066 bytes; SHA256
+`83299b6b5b2f5cf4674ecba70b7751711711b6b8350a2832c93a947e1116a82e`.
+Actual package/version/code/ABI, existing signer and essential native libraries
+pass inspection. The installed base.apk is byte-identical. No .59 owner arm64
+APK was built; the next owner artifact will be validated independently.
+
+On one owned read-only Android16 AVD, the actual Android app-info route opens.
+Changing the camera grant with adb while it is visible, then returning with Back,
+updates the camera row on the same Settings route and original PID. This is a
+native mounted-resume witness, not a camera capture or permission-dialog test.
+The stored folder displays a neutral selected badge. The inspected screenshot
+shows the current RTL copy and controls above the navigation bar.
+
+The actual Alarms & reminders link opens the system list. Selecting MedOS and
+turning on its observed switch yields appops allow. Two existing synthetic
+occasion requests retain their original occurrence instant and change from
+window=3600000 to window=0 with exactAllowReason=permission after returning.
+No reminder was sent and actual delivery was not tested.
+
+The crash buffer contains two pre-install UiAutomation startup failures, not
+MedOS exceptions; SystemUI also required Wait during AVD boot. App exit history
+shows the intentional package update, without a new application crash in this
+bounded session. The first bounded shutdown wait timed out; later observation
+confirms the owned PID/serial gone and both persistent base hashes unchanged.
+These environmental failures are retained in private evidence, not discarded.
+This report does not attribute .58 acceptance to .59.
 
 ## Boundaries and next work
 
@@ -59,6 +85,6 @@ provider-write access and second-device restore remain separate gates. Visual
 rich text, notebook trash, full follow-up loop and measured 40-patient shifts
 remain in IMPLEMENTATION.md. No crash-free or completed-product claim.
 
-Review the optional app-lock toggle separately: its current asynchronous
-onChange callback has no rejection handler in SettingsScreen, and the native
-helpers can reject. This is a source finding, not a reproduced phone failure.
+The optional app-lock callback rejection was reproduced in two private software
+probes, not on a phone. The follow-up repair and its independent evidence are
+in [validation-0.11.60.md](validation-0.11.60.md).

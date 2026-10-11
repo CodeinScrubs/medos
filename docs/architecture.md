@@ -5,6 +5,23 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Owned settings actions and optional lock failures (0.11.60)
+
+SettingsScreen captures its dataset generation once. Native confirmation and
+subsequent setting/audit work keep the existing withDatasetWrite admission
+through awaits; restore cannot replace that dataset halfway through. Retained
+old callbacks never obtain a new token. Lock taps are single-flight, cancellation
+is quiet, and UI feedback belongs only to the mounted focused screen. Stale
+settings ask for reopening rather than claiming there is a clinical draft.
+
+The global optional LockGate handles native enrollment/authentication rejection,
+retains its cover and exposes the existing retry button. Unmounted native work
+cannot open a prompt or publish UI; late errors use the redacted local logger.
+Typed settings expose live-query error/retry. LockGate withholds stale settings
+and native prompts on a failed initial/refresh read, showing the existing retry
+notice without unmounting the clinical content. No new framework, feature,
+mandatory security flow or persistence format.
+
 ## Current native permission state (0.11.59)
 
 PermissionsCard reads notification/camera/microphone grants again when Android

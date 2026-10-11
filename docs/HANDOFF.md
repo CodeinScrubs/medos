@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Handle settings and optional-lock native failures
+
+**Agent:** GPT-6 via Codex; primary .60 implementation/integration. Two
+GPT-6.1 Sol/xhigh helpers supplied private next-slice investigations only;
+no helper proposal is integrated or counted as verified implementation.
+**Commits:** this .60 source/checkpoint commit, following frozen .59 `b8820f9`.
+
+**Changed**
+- Catch existing settings/lock native failures; preserve retry, one prompt and
+  original dataset admission. Refuse retained old callbacks and orphaned UI.
+- Expose failed lock-setting reads through existing retry feedback; preserve
+  mounted content and withhold stale lock decisions.
+- Version .60/code76 only; no dependency/schema/route/permission/archive change.
+- Record .59's actual installed/native/CI evidence without borrowing it for .60.
+
+**Verified**
+- Actual original LockGate fails four regression witnesses before its repair;
+  all 29 focused settings/lock tests pass afterward (7.214s). Final full check:
+  182 suites/2,728 app tests/five workflow checks (236.423s), zero lint warnings.
+- .59 exact b8820f9 CI succeeds; installed QA bytes match. Same-PID camera-grant
+  return updates the mounted card; actual alarm switch changes two occasion
+  windows from one hour to zero. Owned AVD later closes, preserving both hashes.
+
+**Not verified**
+- .60 push/CI/frozen APK/native acceptance are pending at this entry.
+- Physical authentication/media/reminder delivery/power/provider and long shifts.
+
+**Open threads**
+- Push the checked .60 source, build frozen QA and owner APKs, then record
+  exact-source CI, installed bytes and actual native acceptance.
+- Rich text, notebook trash, full follow-up loop and measured shift gates remain
+  in IMPLEMENTATION. The physical phone is not the only remaining work.
+
+**Gotchas**
+- Native callback types can be void while async functions still reject. Catch
+  failures inside the action; do not assume a toggle awaits its callback.
+- .59 boot automation/SystemUI failures predate app installation. The initial
+  bounded shutdown wait timed out, but later PID/serial/hash checks pass.
+
 ## 2026-10-11 — Verify replay-safe permission cleanup without a lint warning
 
 **Agent:** GPT-6 via Codex; primary integration, no new delegation.
