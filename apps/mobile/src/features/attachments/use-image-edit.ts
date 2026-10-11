@@ -7,6 +7,7 @@ import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError, notify } from '@/components/feedback';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { assertDatasetWrite, datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 import {
   encodeImageDraft,
@@ -123,7 +124,7 @@ export function useImageEdit(seed: ImageEditSeed, expectedGeneration: number) {
       try {
         encodeImageDraft({ ...latest.current, image: next });
       } catch (error) {
-        notify('علامت اضافه نشد', error instanceof Error ? error.message : 'علامت معتبر نیست.');
+        notify('علامت اضافه نشد', safeErrorMessage(error, 'علامت معتبر نیست.'));
         return false;
       }
     }

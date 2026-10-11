@@ -129,6 +129,11 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
   `.catch((e) => alertError(...))` — a dropped promise looks like success to the user.
   A message with no choice is `notify(title, message)` (Persian button); ESLint rejects
   `Alert.alert` without buttons.
+- Default diagnostics use `errorDiagnostic` and a fixed technical context. Display
+  known operational notices through `safeErrorMessage(error, fallback)`; add a
+  reviewed exact notice when needed, never trust an arbitrary error prefix, path,
+  stack or `String(error)`. A log read failure is not an empty log. Explicit clinical
+  evidence exports remain separate from these technical diagnostics.
 - Header options inside a screen are `<ScreenOptions options={...} />`, never
   `<Stack.Screen options>` (ESLint enforces it). A native header that changes while its
   screen is being closed stops the app on Android; `ScreenOptions` only writes the header

@@ -46,9 +46,9 @@ export function SettingsScreen() {
 
   function reportFailure(title: string, error: unknown): void {
     if (!mounted.current || !navigation.isFocused()) {
-      logError(error, { source: 'handled', context: title });
+      logError(error, { source: 'handled', context: 'settings.preference' });
     } else if (error instanceof DatasetChangedError) {
-      logError(error, { source: 'handled', context: title });
+      logError(error, { source: 'handled', context: 'settings.preference' });
       notify(title, 'اطلاعات برنامه تغییر کرده؛ صفحهٔ تنظیمات را دوباره باز کنید.');
     } else {
       alertError(title, error);

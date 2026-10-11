@@ -445,7 +445,10 @@ describe('backup orchestration (real archive/authentication and migrated SQLite;
     t.sqlite.exec(
       "CREATE TRIGGER refuse_restore BEFORE INSERT ON patients BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;",
     );
-    await expect(restore()).rejects.toThrow('synthetic failure');
+    await expect(restore()).rejects.toMatchObject({
+      name: 'MediaRestoreError',
+      cause: expect.objectContaining({ message: expect.stringContaining('synthetic failure') }),
+    });
     expect(datasetGeneration()).toBe(generation);
     expect(name()).toBe('Current');
     expect(equalBytes(memoryFiles.get(mediaUri)!, new Uint8Array([8, 7, 6]))).toBe(true);
@@ -497,15 +500,17 @@ describe('backup orchestration (real archive/authentication and migrated SQLite;
     expect(result.warnings).toContain('نمایش پایان بازگردانی');
   });
 
-  it('redacts SQL parameters before persisting backup failure text', async () => {
-    jest.mocked(loadBackupKey).mockRejectedValueOnce(new Error('Failed query: select; params: synthetic-private-data'));
+  it('withholds arbitrary native/SQL text before persisting backup failure text', async () => {
+    jest
+      .mocked(loadBackupKey)
+      .mockRejectedValueOnce(new Error('Failed query: synthetic-private-data before params: synthetic-private-data'));
     await expect(createBackup({ includeMedia: true, trigger: 'manual' })).rejects.toThrow();
     const failed = t.db
       .select()
       .from(backupRuns)
       .all()
       .find((row) => row.status === 'failed')!;
-    expect(failed.errorText).toContain('[redacted]');
+    expect(failed.errorText).toBe('خطای فنی رخ داد؛ دوباره تلاش کنید.');
     expect(failed.errorText).not.toContain('synthetic-private-data');
   });
 

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 
 import { Button, Card, Column, Row, Text } from '@/components/ui';
-import { redactErrorText } from '@/lib/redact';
+import { diagnosticText, errorDiagnostic } from '@/lib/error-diagnostic';
 import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
 
@@ -26,7 +26,7 @@ export function ErrorNotice({
   const [details, setDetails] = useState(false);
 
   useEffect(() => {
-    if (error) logError(error, { source: 'handled', context: what });
+    if (error) logError(error, { source: 'handled', context: 'read.notice' });
   }, [error, what]);
 
   if (!error) return null;
@@ -54,7 +54,7 @@ export function ErrorNotice({
           </Row>
           {details ? (
             <Text variant="tiny" color="textFaint" ltr selectable style={{ marginTop: spacing.xxs }}>
-              {redactErrorText(error.message)}
+              {diagnosticText(errorDiagnostic(error))}
             </Text>
           ) : null}
         </Column>

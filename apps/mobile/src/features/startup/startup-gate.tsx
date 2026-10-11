@@ -10,7 +10,7 @@ import { reconcileAllPatientStatuses } from '@/features/encounters/status';
 import { reflagLabValuesIfNeeded } from '@/features/labs/reflag';
 import { backfillNoteVersionsIfNeeded } from '@/features/notes/version-queries';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
-import { redactErrorText } from '@/lib/redact';
+import { diagnosticText, errorDiagnostic, safeErrorMessage } from '@/lib/error-diagnostic';
 import { prepareAudioForPlayback } from '@/platform/audio';
 import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
@@ -62,7 +62,7 @@ export function StartupGate({ children }: { children: ReactNode }) {
         },
         (e: unknown) => {
           logError(e, { source: 'startup', fatal: true });
-          if (!cancelled) setState({ status: 'error', error: e instanceof Error ? e : new Error(String(e)) });
+          if (!cancelled) setState({ status: 'error', error: e instanceof Error ? e : new Error() });
         },
       )
       // Whatever happened, the splash screen comes down — otherwise a startup
@@ -98,10 +98,12 @@ function StartupFailure({ error }: { error: Error }) {
         پایگاه داده باز نشد
       </Text>
       <Text variant="body" color="textMuted" align="center" style={{ marginTop: spacing.md }}>
-        اطلاعات شما پاک نشده است. از این پیام عکس بگیرید و اپ را دوباره باز کنید.
+        شروع برنامه کامل نشد. از این پیام عکس بگیرید و اپ را دوباره باز کنید.
       </Text>
       <Text variant="caption" color="textFaint" ltr selectable style={{ marginTop: spacing.lg }}>
-        {redactErrorText(error.message)}
+        {safeErrorMessage(error)}
+        {'\n'}
+        {diagnosticText(errorDiagnostic(error))}
       </Text>
     </View>
   );

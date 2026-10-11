@@ -9,6 +9,7 @@ import { alertError, notify } from '@/components/feedback';
 import { useNow } from '@/components/use-now';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 
 import { decodeLabForm, initialLabForm, LabFormConflict, labFormValues, type LabFormFields } from './form-draft';
@@ -141,7 +142,7 @@ export function useLabForm(seed: LabFormRows, onReset: (rows: LabFormRows) => vo
         try {
           labFormValues(latest.current, new Date(now), hasPhoto);
         } catch (e) {
-          notify('آزمایش ثبت نشد', e instanceof Error ? e.message : 'ورودی‌ها را بررسی کنید.');
+          notify('آزمایش ثبت نشد', safeErrorMessage(e, 'ورودی‌ها را بررسی کنید.'));
           return;
         }
         saver.change(latest.current);

@@ -8,6 +8,7 @@ import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError, notify } from '@/components/feedback';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 
 import {
@@ -126,7 +127,7 @@ export function useContactForm(seed: ContactFormRow, onReset: (row: ContactFormR
         try {
           contactFormValues(latest.current);
         } catch (e) {
-          notify('شماره همراه ثبت نشد', e instanceof Error ? e.message : 'شماره تماس را بررسی کنید.');
+          notify('شماره همراه ثبت نشد', safeErrorMessage(e, 'شماره تماس را بررسی کنید.'));
           return;
         }
         saver.change(latest.current);

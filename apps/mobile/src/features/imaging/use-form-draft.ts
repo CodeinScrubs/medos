@@ -9,6 +9,7 @@ import { alertError, notify } from '@/components/feedback';
 import { useNow } from '@/components/use-now';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 
 import {
@@ -135,7 +136,7 @@ export function useImagingForm(seed: ImagingFormRow, onReset: (row: ImagingFormR
         try {
           imagingFormValues(latest.current, new Date(now));
         } catch (e) {
-          notify('تصویربرداری ثبت نشد', e instanceof Error ? e.message : 'تاریخ را بررسی کنید.');
+          notify('تصویربرداری ثبت نشد', safeErrorMessage(e, 'تاریخ را بررسی کنید.'));
           return;
         }
         await commitImagingFormDraft(

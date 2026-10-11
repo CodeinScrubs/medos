@@ -49,11 +49,10 @@ export class MediaRestoreError extends Error {
   readonly notPutBack: DisplacedMedia[];
 
   constructor(cause: unknown, notPutBack: DisplacedMedia[]) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
     super(
       notPutBack.length > 0
-        ? `فایل‌ها سر جایشان برنگشتند (${notPutBack.length} فایل کنار گذاشته شده). هیچ چیزی را پاک نکنید. خطا: ${detail}`
-        : `فایل‌های بکاپ جابه‌جا نشدند و همه چیز به حالت قبل برگشت. خطا: ${detail}`,
+        ? 'فایل‌ها سر جایشان برنگشتند. فایل‌های کنار گذاشته‌شده حفظ شده‌اند؛ هیچ چیزی را پاک نکنید.'
+        : 'فایل‌های بکاپ جابه‌جا نشدند و همه چیز به حالت قبل برگشت.',
     );
     this.name = 'MediaRestoreError';
     this.cause = cause;

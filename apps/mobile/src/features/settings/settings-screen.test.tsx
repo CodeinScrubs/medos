@@ -174,7 +174,7 @@ describe('settings native actions and original dataset ownership', () => {
     });
     expect(alertError).not.toHaveBeenCalled();
     expect(notify).not.toHaveBeenCalled();
-    expect(logError).toHaveBeenCalledWith(failure, { source: 'handled', context: 'تنظیم قفل کامل نشد' });
+    expect(logError).toHaveBeenCalledWith(failure, { source: 'handled', context: 'settings.preference' });
   });
 
   it('ignores a late enrollment explanation after navigation changes', async () => {
