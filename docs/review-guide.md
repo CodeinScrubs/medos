@@ -121,6 +121,13 @@ references/focus/dataset, including children first mounted after replacement.
 Explicit credential replacement/clear must also clear the legacy cipher/nonce;
 an unrelated edit must retain them. A raw draft never counts as publication.
 
+Draft [PR8](https://github.com/CodeinScrubs/medos/pull/8) contains this increment.
+Frozen application 948883a has inspected QA/owner packages and bounded native
+five-form recovery, invalid Save refusal, publication/list retrieval and old
+replacement witnesses. The report compares every prior application field and
+media hash. Keep the unresolved native typing/IME-pressure diagnosis and wider
+ledger gates separate from these passes; check exact current hosted status on PR8.
+
 Other P0 and product gates remain in IMPLEMENTATION. Versioned reports preserve
 older change/retest details; this guide is not a chronological release history.
 

@@ -33,6 +33,54 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Deliver five-form recovery with complete native state witnesses
+
+**Agent:** GPT-6 via Codex; primary verification, no additional delegation.
+**Commits:** application `bab597f` + `948883a`; evidence in this commit.
+
+**Changed**
+- Record exact-source .55 recovery, rejection, publication/retrieval and old
+  backup replacement in validation-0.11.55. Update current execution/review gates.
+- Push/attach incremental draft PR8 against PR7. Prior PR1–7 heads, bases and
+  draft states are unchanged; no existing PR is merged. Unrelated untracked
+  audit documents remain untouched and uncommitted.
+
+**Verified**
+- Full corrected source check passes 171 suites/2,474 app tests (221.402s),
+  five workflow checks and typecheck/lint/format. Normal source push repeats
+  the full check successfully (174.928s), without warnings or bypass.
+- Frozen 948883a inspected/installed x86_64 bytes match. Actual cold recovery,
+  invalid-date/partial-line refusal, five publications and list retrieval pass.
+  Independent authenticated archives preserve every prior field in 50 application
+  tables, 4,117 prior rows and 34 media hashes; all intended additions are checked.
+- Old-backup replacement retains original credential words read-only and exactly
+  restores the prior application state, without stale publication. Checked
+  PID 10736 survives; no fatal is observed for that process. Owned-emulator
+  shutdown preserves both original base hashes. Full details/hashes in the report.
+- Owner arm64-only .55/code71 APK built/inspected from 948883a: same signer,
+  actual version/ABI/essential JNI; SHA256 cb9f38f7…70f56c27. Not run on a phone.
+
+**Not verified**
+- Earlier synthetic typing mismatch under host native-build load remains
+  unexplained. Exact later input is not a root-cause result or pressure acceptance.
+- No physical phone, every-keystroke power-loss guarantee, full timed 40-patient
+  shift or completion of history/trash/rich-text and broader IMPLEMENTATION gates.
+
+**Open threads**
+- Prioritize native input/IME/event-time/pressure diagnosis, then remaining
+  integrity and everyday-workflow gates in IMPLEMENTATION. Phone is not the sole
+  remaining work. Hosted status is linked from PR8; verify its exact current SHA.
+
+**Gotchas**
+- Some native attempts fail in the observer: repeated/flattened labels, disabled
+  but readable inputs, scroll direction and assumed deep-link destinations.
+  Correct these with fresh XML/bounds; do not count failed attempts as app passes.
+- Raw fixtures start on intermediate bab597f; final 948883a recovery/publication/
+  replacement witnesses are separate. Neither the intermediate APK nor older
+  CI accepts a newer source. Later documentation leaves the tested app unchanged.
+
+---
+
 ## 2026-10-10 — Match notebook selectors to the retained form lock
 
 **Agent:** GPT-6 via Codex; primary integration, no additional delegation.

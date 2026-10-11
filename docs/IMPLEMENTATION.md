@@ -42,6 +42,15 @@ dependency, permission, SQL migration or backup scheme is added. See
 [validation-0.11.55.md](validation-0.11.55.md) for current-source checks and
 native/artifact acceptance, including the regressions caught during integration.
 
+Incremental draft [PR8](https://github.com/CodeinScrubs/medos/pull/8) reviews
+against PR7. Frozen 948883a passes bounded native cold recovery, invalid Save
+refusal, five publications/list retrieval and old-backup replacement. Complete
+authenticated-state comparisons preserve 4,117 prior rows in 50 application
+tables and 34 media hashes. The final arm64-only .55 APK is built/inspected from
+that same application source. PR8's live hosted checks are separate evidence;
+verify the exact head SHA. An earlier native typing mismatch under host load
+is still unexplained; successful idle input does not close that gate.
+
 The .54 parent extends that lifecycle with an explicit clinical parent key,
 preserving patient/episode ownership including null and imported empty keys.
 Its full software, bounded native recovery/publication/replacement and complete
@@ -122,6 +131,9 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
 
 ## Priority3: performance and delivery evidence
 
+- Diagnose the .55 native synthetic typing mismatch before accepting input under
+  pressure. Capture IME readiness/event-time/native ordering and host versus
+  target load separately; idle retries and process survival do not establish cause.
 - Reproduce the older .33 focus/pressure ANR with event-time scheduling/stack
   evidence; the recovered matching late stack does not establish its cause.
 - Measure restore/key-derivation phases and target-device cost; .50 synthetic
