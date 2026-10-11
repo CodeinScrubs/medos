@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Accept the frozen .58 recovery candidate and record exact artifact evidence
+
+**Agent:** GPT-6 via Codex; primary native/artifact integration, no further delegation.
+**Commits:** application `5304451` + `7d557fe`; this documentation-only delivery.
+
+**Changed**
+- Record exact-source .58 CI/APKs and real companion/follow-up recovery, retained
+  results, denied permission, retry and cold-start evidence. Update current gates.
+- No application/dependency/schema/route/permission/backup changes in this delivery.
+
+**Verified**
+- Full software check passes 178 suites/2,684 app tests/five workflow checks.
+  Normal source push passes 2,684 (225.755s); exact `7d557fe` hosted CI succeeds.
+- Four actual native archives pass independent comparisons of 51 application
+  tables, 4,225 prior rows, full history/audit, 32 migrations and 34 media files.
+  Final history has 69 versions; context/outcome remain intact and the completed
+  follow-up stays completed. See validation-0.11.58.
+- Actual signed arm64/x86 APK contents/code74/cert/JNI pass; installed QA bytes
+  match. Owned read-only AVD closes with base hashes unchanged. PR10 stays draft.
+
+**Not verified**
+- Physical phone; exact/on-time notification delivery, Doze/reboot, provider/low
+  space/power/second-device recovery, a full 40-patient shift or clinical review.
+- Notification grant alone is insufficient: the accepted synthetic AVD has an
+  inexact one-hour OS window. Historical SystemUI/input/ANR boundaries remain.
+
+**Open threads**
+- Tighten permission/settings failure handling and the understated alarm-delay
+  copy; native exact access/delivery is a separate gate. Then continue notebook
+  trash, visual rich text, fuller follow-up and measured shift work in IMPLEMENTATION.
+- Keep PRs incremental; no automatic merges or 'only phone remains' claim.
+
+**Gotchas**
+- Permission revoke restarts Android's app and changes two occasion OS receipts.
+  Explicitly verify those known receipt-only transitions; never exclude clinical
+  rows broadly. Final/cold occasion rows and media match the original fixture.
+- Do not edit source/HEAD during a build. Both final APKs belong to `7d557fe`,
+  not the earlier first-source .58 artifact or this later documentation commit.
+
 ## 2026-10-11 — Close an acknowledged outcome after leaving its screen
 
 **Agent:** GPT-6 via Codex; primary follow-on, no additional delegation.

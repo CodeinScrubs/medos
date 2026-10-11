@@ -104,6 +104,106 @@ and typecheck/lint/format without warnings. No other application behavior,
 dependency, schema or backup format changes. APK/native/CI evidence from
 `5304451` does not accept this later source; rebuild and inspect its candidate.
 
+## Frozen candidate and native acceptance
+
+Final application source `7d557feac023d0903bc813a8dd61d8143566f4f1` passes the normal push check with 178
+suites/2,684 app tests (225.755s), five workflow tests and typecheck/lint/format.
+[Hosted CI for that exact source](https://github.com/CodeinScrubs/medos/actions/runs/38126404863) succeeds. First-source `5304451`
+CI/APKs are historical evidence; this acceptance uses the later correction.
+
+Both actual signed APKs are 0.11.58/code74, package `com.shayan.medos`, min24/
+target36. `aapt`, `apksigner` and the essential-JNI checker verify their actual
+contents and owner signing certificate:
+
+| Artifact | ABI | Bytes | SHA-256 |
+|---|---|---|---|
+| Private QA APK | x86_64 | 55119594 | 7cbf048cfef7d1187eaf558445adb14d520b5904f759866bb909946e84993beb |
+| Owner `dist/MedOS-0.11.58.apk` | arm64-v8a | 53511267 | 4ed4c50b61426469c5ef03570cd58b57beb495e3abb1b2a212e7db68ca8b2045 |
+
+Certificate SHA-256: `1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+The source remained frozen throughout both builds. Only the generated app build
+was cleaned for the ABI switch; source and app data were not deleted. No physical
+phone was installed or driven. Native Gradle/bundler warnings are retained and
+are not described as a warning-free build.
+
+The primary agent upgraded the owned read-only Android16 x86 AVD in place and
+pulled its installed base APK: its bytes match the inspected QA artifact.
+The native fixture derives from the independently decrypted accepted .57 archive,
+retains every prior row/media file and adds four synthetic tombstones. Its
+SHA-256 is `7035c8217ba54d2f08716ecb67d3f605ad8fca715c38f94688d60083a8675716`.
+Actual full restore acknowledges 43 patients/34 files and the pre-restore safety
+copy; its 63.975 seconds include UI observation, not a restore-phase benchmark.
+
+Fresh UI trees bind patient/title/dialog/actions to observed native bounds.
+One journaled recovery each restores a companion, a future pending follow-up and
+a completed follow-up. The companion then is deleted and restored through its
+patient overview; the pending follow-up is deleted through its existing card and
+restored while notification permission is revoked. The restored clinical record
+remains, with one short truthful unavailable-reminder notice and existing retry.
+A return to the app after granting permission automatically repairs requests.
+A second denied/mounted/granted witness taps the actual retry once, observes its
+completion and retains the deadline/result. No call or message is transmitted.
+
+Independent AES-GCM/KDF/chunk decoding and raw-SQL comparisons inventory all 55
+SQLite tables and compare all 51 application tables.
+Device-specific settings and new backup-run bookkeeping are excluded from whole-row
+preservation; prior audit and migration rows are checked explicitly. Each archive
+retains 4,225 prior application rows, all 59 prior immutable versions, all 32
+migration rows and all 34
+media hashes. Prior audit rows remain; new full typed clinical snapshots and
+required audit exactly match the three records' actual operations. The separately
+deleted companion remains untouched. Completed follow-up status/result/completion
+and original patient/episode remain; it is not reopened. Pending deadline/status/
+result are preserved and desired/applied reminder generation ends at 10 with the
+same stable request id. Software witnesses cover original-dataset races separately.
+
+| Native archive stage | SHA-256 | Total clinical versions |
+|---|---|---|
+| restored | 2b6075c74439ec7d5bf5a3d65441bd76cb17542a4ed5ad736f658921517ba20a | 65 |
+| denied | 07de5e4c1ff3eb640214cbe58c1201f1ed37d7f197168e635e6b5c4e4a1ed25f | 69 |
+| final | c172b5e5a445b58574e31a12e5a2583c7519e5b2e1bca4bd445255bb22c23dab | 69 |
+| cold | ae071bff41bd4586814cfd1f54cb2e42dfdbfe62494e44d5b746081a42a8bb42 | 69 |
+
+The first denied-state strict comparison reports two occasion receipt changes,
+not clinical changes. Raw diff and the actual native permission state independently
+show exactly two original OS notification ids becoming null after `pm revoke`
+restarts the app and normal reminder upkeep runs. Their full content, clinical
+fields, timestamps and generations are unchanged. Only these two known ids allow
+that explicit receipt transition in the denied/intermediate oracle; no table-wide
+exclusion is introduced. Final and cold archives match both original occasion
+rows/receipts exactly. This initial rejected comparison is retained privately;
+it is not represented as a passed run.
+
+OS `dumpsys alarm` after the actual retry shows the follow-up's exact intended
+unix deadline and an Expo RTC_WAKEUP request. Because exact-alarm special access
+is not enabled in this synthetic Android16 state, its scheduling window is one
+hour. Notification permission and exact-alarm access are distinct. The manifest
+already declares exact-alarm access and Settings already links its Android page;
+Expo's native delegate deliberately falls back to inexact scheduling when access
+is absent. [Android's alarm documentation](https://developer.android.com/develop/background-work/services/alarms)
+confirms that inexact alarms can be delayed up to one hour on Android12+ when
+battery-saving restrictions are absent; those restrictions require separate tests. This evidence establishes request acknowledgment, **not exact/on-time
+notification delivery**. Verify both denied/granted special access and delivered
+alerts, Doze/reboot and the phone before accepting clinical timed reminders.
+The Settings explanation's current 'few minutes' wording understates the observed
+window; accurate concise wording and failure-aware permission refresh are follow-on
+work, not changes contained in this frozen .58 artifact.
+
+An intentional force-stop/cold launch creates a new app PID, reads the retained
+companion/pending follow-up and produces the independently accepted cold archive.
+The 14.511-second route observation includes process start/UI instrumentation and
+is not a startup or long-shift benchmark. The captured crash buffer has no native
+fatal entry; current app exit records show package upgrade, two intentional
+permission revocations and the explicit force-stop, not a MedOS crash/ANR.
+Pre-install SystemUI boot ANR is retained separately; this does not establish that
+all Android/UI/native soft-error behavior is healthy. The owned emulator is shut
+down, its PID/serial disappear and both persistent AVD base hashes are unchanged.
+
+Draft [PR10](https://github.com/CodeinScrubs/medos/pull/10) is incremental against
+PR9. No PR is merged. Existing unrelated untracked documents and scoped lockfile
+version edits remain unchanged. The application source is not altered by the
+later delivery documentation commit.
+
 ## Remaining boundaries
 
 This does not finish notebook trash, visual rich text, the full received/reviewed/
