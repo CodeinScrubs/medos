@@ -1,7 +1,8 @@
 import { z, type ZodType } from 'zod';
 
 /** Only shipped codecs belong here; adding a form does not require a new store. */
-export type WorkspaceFormKind = 'idea' | 'topic' | 'order';
+export type WorkspaceFormKind =
+  'idea' | 'topic' | 'order' | 'specialty-profile' | 'prescription' | 'place' | 'extension' | 'credential';
 
 export type FormDocument<T> = {
   version: 1;

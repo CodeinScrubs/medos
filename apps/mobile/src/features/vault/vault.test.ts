@@ -89,6 +89,19 @@ describe('saved logins', () => {
     expect(credentialSecret((await rawRow(id))!)).toEqual({ text: null, sealed: true });
   });
 
+  it('explicitly clearing or replacing a legacy secret cannot make its ciphertext reappear', async () => {
+    const id = await createCredential({ systemName: 'Synthetic legacy' });
+    await t.db
+      .update(credentials)
+      .set({ secretCipher: 'synthetic-cipher', secretNonce: 'synthetic-nonce' })
+      .where(eq(credentials.id, id));
+    await updateCredential(id, { username: 'synthetic-user' });
+    expect(credentialSecret((await rawRow(id))!)).toEqual({ text: null, sealed: true });
+    await updateCredential(id, { secret: '' });
+    expect(credentialSecret((await rawRow(id))!)).toEqual({ text: null, sealed: false });
+    expect((await rawRow(id))!.secretNonce).toBeNull();
+  });
+
   it('soft-deletes, like every other row', async () => {
     const id = await createCredential({ systemName: 'قدیمی' });
     await deleteCredential(id);

@@ -3,8 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { EditGate } from '@/components/edit-gate';
-import { alertError, notify } from '@/components/feedback';
+import { AutosaveScope } from '@/components/autosave-scope';
+import { ErrorNotice } from '@/components/error-notice';
+import { notify } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import {
@@ -20,28 +21,29 @@ import {
   Text,
   Toggle,
 } from '@/components/ui';
-import type { PrescriptionItem, PrescriptionTemplate, Specialty } from '@/db/schema';
+import type { PrescriptionTemplate, Specialty } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { specialtiesQuery } from '@/features/doctors/queries';
+import { WorkspaceFormGate } from '@/features/workspace-forms/form-gate';
+import { WorkspaceFormDiscard, WorkspaceFormStatus } from '@/features/workspace-forms/form-status';
+import type { FormSeed } from '@/features/workspace-forms/types';
+import { useWorkspaceForm } from '@/features/workspace-forms/use-form';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
+import {
+  initialPrescriptionFields,
+  prescriptionFormLine,
+  type PrescriptionFormFields,
+  type PrescriptionFormLine,
+} from './form-draft';
+import { describePrescription, prescriptionFormPort, specialtyFormReferenceQuery } from './form-draft-queries';
 import { AGE_GROUP_LABELS } from './labels';
-import { itemsOf } from './logic';
-import { createPrescription, prescriptionQuery, updatePrescription } from './prescriptions-queries';
 
 const AGE_OPTIONS = (Object.keys(AGE_GROUP_LABELS) as PrescriptionTemplate['ageGroup'][]).map((g) => ({
   value: g,
   label: AGE_GROUP_LABELS[g],
 }));
-
-const toList = (text: string) =>
-  text
-    .split(/[,،]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-const EMPTY_ITEM: PrescriptionItem = { drug: '' };
 
 /**
  * Write or edit one of the user's own prescription templates.
@@ -52,37 +54,51 @@ const EMPTY_ITEM: PrescriptionItem = { drug: '' };
  * Param: optional `templateId`.
  */
 export function PrescriptionFormScreen() {
-  const { templateId } = useLocalSearchParams<{ templateId?: string }>();
-  const { data, error, retry } = useLive(prescriptionQuery(templateId ?? ''), [templateId]);
+  const { templateId, draftId } = useLocalSearchParams<{ templateId?: string; draftId?: string }>();
   return (
-    <EditGate editing={Boolean(templateId)} rows={data} error={error} onRetry={retry} what="قالب نسخه">
-      {(template, readNotice) => <PrescriptionForm readNotice={readNotice} template={template} />}
-    </EditGate>
+    <AutosaveScope>
+      <WorkspaceFormGate port={prescriptionFormPort} recordId={templateId ?? null} draftId={draftId ?? null}>
+        {(seed, readNotice, unavailable) => (
+          <PrescriptionForm readNotice={readNotice} seed={seed} unavailable={unavailable} />
+        )}
+      </WorkspaceFormGate>
+    </AutosaveScope>
   );
 }
 
-function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; template: PrescriptionTemplate | null }) {
+function PrescriptionForm({
+  seed,
+  readNotice,
+  unavailable,
+}: {
+  readNotice: ReactNode;
+  seed: FormSeed<PrescriptionTemplate, PrescriptionFormFields>;
+  unavailable: boolean;
+}) {
   const router = useRouter();
   const { colors, spacing } = useTheme();
-
-  const [title, setTitle] = useState(template?.title ?? '');
-  const [condition, setCondition] = useState(template?.condition ?? '');
-  const [ageGroup, setAgeGroup] = useState<PrescriptionTemplate['ageGroup']>(template?.ageGroup ?? 'any');
-  const [specialtyId, setSpecialtyId] = useState<string | null>(template?.specialtyId ?? null);
-  const [items, setItems] = useState<PrescriptionItem[]>(() => {
-    const existing = template ? itemsOf(template) : [];
-    return existing.length > 0 ? existing : [{ ...EMPTY_ITEM }];
-  });
-  const [adviceText, setAdviceText] = useState(template?.adviceText ?? '');
-  const [cautionsText, setCautionsText] = useState(template?.cautionsText ?? '');
-  const [followUpText, setFollowUpText] = useState(template?.followUpText ?? '');
-  const [tags, setTags] = useState((template?.tags ?? []).join('، '));
-  const [starred, setStarred] = useState(template?.starred ?? false);
+  const isEditing = seed.document.recordId !== null;
+  const editing = useWorkspaceForm(prescriptionFormPort, seed, unavailable, () => router.back());
+  const { title, condition, ageGroup, specialtyId, items, adviceText, cautionsText, followUpText, tags, starred } =
+    editing.document.fields;
+  const setTitle = (title: string) => editing.change({ title });
+  const setCondition = (condition: string) => editing.change({ condition });
+  const setAgeGroup = (ageGroup: PrescriptionTemplate['ageGroup']) => editing.change({ ageGroup });
+  const setSpecialtyId = (specialtyId: string | null) => editing.change({ specialtyId });
+  const setAdviceText = (adviceText: string) => editing.change({ adviceText });
+  const setCautionsText = (cautionsText: string) => editing.change({ cautionsText });
+  const setFollowUpText = (followUpText: string) => editing.change({ followUpText });
+  const setTags = (tags: string) => editing.change({ tags });
+  const setStarred = (starred: boolean) => editing.change({ starred });
   const [picking, setPicking] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  const { data: specialtyRows } = useLive(specialtiesQuery());
-  const specialtyItems = useMemo(
+  const { data: specialtyRows, error: specialtyError, retry: retrySpecialties } = useLive(specialtiesQuery());
+  const {
+    data: referenceRows,
+    error: referenceError,
+    retry: retryReferences,
+  } = useLive(specialtyFormReferenceQuery(specialtyId), [specialtyId]);
+  const liveSpecialtyItems = useMemo(
     () =>
       (specialtyRows ?? []).map((s: Specialty) => ({
         id: s.id,
@@ -93,67 +109,102 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
     [specialtyRows],
   );
 
-  function patchItem(index: number, patch: Partial<PrescriptionItem>) {
-    setItems((current) => current.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  const selected = referenceRows?.[0]?.specialty;
+  const currentSpecialty = selected?.id === specialtyId ? selected : null;
+  const currentName = currentSpecialty
+    ? `${currentSpecialty.nameFa}${currentSpecialty.deletedAt ? ' (بایگانی‌شده)' : ''}`
+    : null;
+  // Only a display label is retained; replacement reads never accompany old fields.
+  const [retainedName, setRetainedName] = useState(() => (editing.stale ? null : currentName));
+  if (!editing.stale && retainedName !== currentName) setRetainedName(currentName);
+  const specialtyItems = editing.stale ? [] : liveSpecialtyItems;
+  const specialtyName = editing.stale ? retainedName : currentName;
+  function describeFields(fields: PrescriptionFormFields) {
+    return describePrescription(
+      fields,
+      (!editing.stale ? specialtyRows?.find((row) => row.id === fields.specialtyId)?.nameFa : undefined) ??
+        (fields.specialtyId === specialtyId ? (specialtyName ?? undefined) : undefined),
+    );
   }
 
-  async function save() {
-    if (!title.trim()) {
-      notify('عنوان لازم است');
+  function patchItem(key: string, patch: Partial<Omit<PrescriptionFormLine, 'key'>>) {
+    editing.change((fields) => ({
+      items: fields.items.map((item) => (item.key === key ? { ...item, ...patch } : item)),
+    }));
+  }
+
+  function save() {
+    if (editing.completed || editing.stale) {
+      editing.close();
       return;
     }
-    if (items.every((i) => !i.drug.trim())) {
-      notify('حداقل یک دارو بنویسید');
-      return;
-    }
-    setSaving(true);
-    const payload = {
-      title,
-      condition,
-      specialtyId,
-      ageGroup,
-      items,
-      adviceText,
-      cautionsText,
-      followUpText,
-      tags: toList(tags),
-      starred,
-    };
-    try {
-      if (template) await updatePrescription(template.id, payload);
-      else await createPrescription(payload);
-      router.back();
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      setSaving(false);
-    }
+    void editing.save((fields) => {
+      if (!fields.title.trim()) {
+        notify('عنوان لازم است');
+        return false;
+      }
+      if (fields.items.every((item) => !item.drug.trim())) {
+        notify('حداقل یک دارو بنویسید');
+        return false;
+      }
+      return true;
+    });
   }
 
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: template ? 'ویرایش نسخه' : 'نسخه‌ی جدید' }} />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <ScreenOptions options={{ title: isEditing ? 'ویرایش نسخه' : 'نسخه‌ی جدید' }} />
+      <Column
+        collapsable={false}
+        gap="md"
+        style={{ paddingTop: spacing.md }}
+        pointerEvents={editing.busy ? 'none' : 'auto'}
+      >
         {readNotice}
-        <Input label="عنوان" required value={title} onChangeText={setTitle} placeholder="مثلاً UTI ساده" />
+        <WorkspaceFormStatus
+          port={prescriptionFormPort}
+          editing={editing}
+          describeFields={describeFields}
+          describeRecord={(row) => describeFields(initialPrescriptionFields(row))}
+        />
         <Input
+          editable={!editing.locked}
+          label="عنوان"
+          required
+          value={title}
+          onChangeText={setTitle}
+          placeholder="مثلاً UTI ساده"
+        />
+        <Input
+          editable={!editing.locked}
           label="برای چه بیماری"
           value={condition}
           onChangeText={setCondition}
           placeholder="خانم بالغ، بدون تب و درد پهلو"
         />
-        <ChipSelect label="گروه سنی" options={AGE_OPTIONS} value={ageGroup} onChange={(v) => v && setAgeGroup(v)} />
+        <ChipSelect
+          label="گروه سنی"
+          disabled={editing.locked}
+          options={AGE_OPTIONS}
+          value={ageGroup}
+          onChange={(v) => v && setAgeGroup(v)}
+        />
+        <ErrorNotice error={specialtyError} what="تخصص‌ها" onRetry={retrySpecialties} />
+        <ErrorNotice error={referenceError} what="تخصص انتخاب‌شده" onRetry={retryReferences} />
         <SelectField
           label="تخصص"
+          disabled={editing.locked}
           icon="medkit-outline"
-          value={specialtyRows?.find((s) => s.id === specialtyId)?.nameFa ?? null}
-          onPress={() => setPicking(true)}
+          value={specialtyName}
+          onPress={() => {
+            if (!editing.locked) setPicking(true);
+          }}
           onClear={() => setSpecialtyId(null)}
         />
 
         <SectionHeader title="داروها" count={items.filter((i) => i.drug.trim()).length} />
         {items.map((item, index) => (
-          <Card key={index} tone="alt">
+          <Card key={item.key} tone="alt">
             <Column gap="sm">
               <Row gap="sm" justify="space-between">
                 <Text variant="captionStrong" color="textMuted">
@@ -161,28 +212,33 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
                 </Text>
                 {items.length > 1 ? (
                   <Pressable
+                    disabled={editing.locked}
                     accessibilityRole="button"
                     accessibilityLabel={`حذف قلم ${toPersianDigits(index + 1)}`}
                     hitSlop={10}
-                    onPress={() => setItems((current) => current.filter((_, i) => i !== index))}
+                    onPress={() =>
+                      editing.change((fields) => ({ items: fields.items.filter((line) => line.key !== item.key) }))
+                    }
                   >
                     <Ionicons name="close-circle" size={20} color={colors.textFaint} />
                   </Pressable>
                 ) : null}
               </Row>
               <Input
+                editable={!editing.locked}
                 label="دارو"
                 value={item.drug}
-                onChangeText={(v) => patchItem(index, { drug: v })}
+                onChangeText={(v) => patchItem(item.key, { drug: v })}
                 ltr
                 placeholder="Amoxicillin"
               />
               <Row gap="sm">
                 <View style={styles.grow}>
                   <Input
+                    editable={!editing.locked}
                     label="دوز"
                     value={item.dose ?? ''}
-                    onChangeText={(v) => patchItem(index, { dose: v })}
+                    onChangeText={(v) => patchItem(item.key, { dose: v })}
                     ltr
                     numericFold
                     placeholder="500 mg"
@@ -190,9 +246,10 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
                 </View>
                 <View style={styles.grow}>
                   <Input
+                    editable={!editing.locked}
                     label="شکل"
                     value={item.form ?? ''}
-                    onChangeText={(v) => patchItem(index, { form: v })}
+                    onChangeText={(v) => patchItem(item.key, { form: v })}
                     ltr
                     placeholder="cap"
                   />
@@ -201,18 +258,20 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
               <Row gap="sm">
                 <View style={styles.grow}>
                   <Input
+                    editable={!editing.locked}
                     label="راه"
                     value={item.route ?? ''}
-                    onChangeText={(v) => patchItem(index, { route: v })}
+                    onChangeText={(v) => patchItem(item.key, { route: v })}
                     ltr
                     placeholder="PO"
                   />
                 </View>
                 <View style={styles.grow}>
                   <Input
+                    editable={!editing.locked}
                     label="تعداد دفعات"
                     value={item.frequency ?? ''}
-                    onChangeText={(v) => patchItem(index, { frequency: v })}
+                    onChangeText={(v) => patchItem(item.key, { frequency: v })}
                     ltr
                     placeholder="TDS"
                   />
@@ -221,17 +280,19 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
               <Row gap="sm">
                 <View style={styles.grow}>
                   <Input
+                    editable={!editing.locked}
                     label="مدت"
                     value={item.duration ?? ''}
-                    onChangeText={(v) => patchItem(index, { duration: v })}
+                    onChangeText={(v) => patchItem(item.key, { duration: v })}
                     placeholder="۷ روز"
                   />
                 </View>
                 <View style={styles.grow}>
                   <Input
+                    editable={!editing.locked}
                     label="تعداد"
                     value={item.quantity ?? ''}
-                    onChangeText={(v) => patchItem(index, { quantity: v })}
+                    onChangeText={(v) => patchItem(item.key, { quantity: v })}
                     ltr
                     numericFold
                     placeholder="21"
@@ -239,16 +300,18 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
                 </View>
               </Row>
               <Input
+                editable={!editing.locked}
                 label="یا خط را خودتان بنویسید"
                 value={item.sig ?? ''}
-                onChangeText={(v) => patchItem(index, { sig: v })}
+                onChangeText={(v) => patchItem(item.key, { sig: v })}
                 ltr
                 hint="اگر پر باشد، همین عیناً نوشته می‌شود"
               />
               <Input
+                editable={!editing.locked}
                 label="توضیح این قلم"
                 value={item.notes ?? ''}
-                onChangeText={(v) => patchItem(index, { notes: v })}
+                onChangeText={(v) => patchItem(item.key, { notes: v })}
               />
             </Column>
           </Card>
@@ -258,30 +321,46 @@ function PrescriptionForm({ template, readNotice }: { readNotice: ReactNode; tem
           icon="add"
           variant="secondary"
           full
-          onPress={() => setItems((current) => [...current, { ...EMPTY_ITEM }])}
+          disabled={editing.locked}
+          onPress={() => editing.change((fields) => ({ items: [...fields.items, prescriptionFormLine()] }))}
         />
 
         <SectionHeader title="همراه نسخه" />
-        <Input label="توصیه‌ها" value={adviceText} onChangeText={setAdviceText} multiline />
+        <Input editable={!editing.locked} label="توصیه‌ها" value={adviceText} onChangeText={setAdviceText} multiline />
         <Input
+          editable={!editing.locked}
           label="هشدارها"
           value={cautionsText}
           onChangeText={setCautionsText}
           multiline
           hint="چه چیزی یعنی بیمار باید برگردد"
         />
-        <Input label="پیگیری" value={followUpText} onChangeText={setFollowUpText} multiline />
-        <Input label="برچسب‌ها" value={tags} onChangeText={setTags} hint="با ویرگول جدا کنید" />
-        <Toggle label="ستاره‌دار" value={starred} onChange={setStarred} />
+        <Input
+          editable={!editing.locked}
+          label="پیگیری"
+          value={followUpText}
+          onChangeText={setFollowUpText}
+          multiline
+        />
+        <Input
+          editable={!editing.locked}
+          label="برچسب‌ها"
+          value={tags}
+          onChangeText={setTags}
+          hint="با ویرگول جدا کنید"
+        />
+        <Toggle label="ستاره‌دار" value={starred} onChange={setStarred} disabled={editing.locked} />
 
         <Button
-          label={template ? 'ذخیره' : 'ثبت نسخه'}
+          label={editing.completed || editing.stale ? 'بستن' : isEditing ? 'ذخیره' : 'ثبت نسخه'}
           icon="checkmark"
           onPress={() => void save()}
-          loading={saving}
+          loading={editing.busy}
+          disabled={editing.busy || (editing.locked && !editing.completed && !editing.stale)}
           full
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="بستن" variant="ghost" disabled={editing.busy} onPress={editing.close} full haptic={false} />
+        <WorkspaceFormDiscard editing={editing} />
       </Column>
 
       <PickerModal

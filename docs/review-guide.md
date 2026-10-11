@@ -109,9 +109,19 @@ prerequisite PR6 and physical-phone acceptance.
 | Native close/navigation | components/screen-options.tsx, use-save-before-leave.ts; notes/media-editors.test.tsx; validation-0.11.33/.34/.48 | Retain scroll host/native stacking parents and header presence; late acknowledgments close only the originating focused route |
 | Deck/calendar/messages | shifts/queries.ts and workspace.tsx; doctors/occasion-form-queries.ts and greeting-composer.tsx; lib/jalali.ts and date-input.ts | Matching preview/count/destination scope, explicit priority, stable order; leap dates and raw partial input; prepared is not sent |
 
-Five other manual forms still need raw recovery; credentials must retain exact
-secret whitespace. .54 Order acceptance does not complete that broader gate.
-Other P0 and product gates are in IMPLEMENTATION. Versioned reports preserve
+The incremental `codex/remaining-form-recovery` starts at delivered PR7 `3d458ab`.
+Review its .55 diff against that parent: five notebook forms reuse the existing
+engine, with feature-owned codecs and transactional publishers. Read
+validation-0.11.55 for actual software/native/artifact boundaries. Principal
+files are `knowledge/notebook-form-drafts.test.ts`, both knowledge form screens,
+`places/form-draft*.ts`, `places/form-recovery.test.tsx`, `vault/form-draft*.ts`
+and `vault/form-recovery.test.tsx`. Check exact secret whitespace, expiry text,
+partial prescription lines, complete record basis, audit rollback and original
+references/focus/dataset, including children first mounted after replacement.
+Explicit credential replacement/clear must also clear the legacy cipher/nonce;
+an unrelated edit must retain them. A raw draft never counts as publication.
+
+Other P0 and product gates remain in IMPLEMENTATION. Versioned reports preserve
 older change/retest details; this guide is not a chronological release history.
 
 The following integration test accelerates a 24-hour shift in real SQLite. It is

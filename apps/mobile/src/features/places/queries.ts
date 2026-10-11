@@ -41,30 +41,38 @@ export function placeQuery(id: string) {
 export type PlaceInput = Omit<NewPlace, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'searchText'>;
 
 export async function createPlace(input: PlaceInput): Promise<string> {
+  return db.transaction((tx) => createPlaceInTransaction(tx, input, new Date()));
+}
+
+export function createPlaceInTransaction(tx: DbTransaction, input: PlaceInput, now: Date): string {
   const id = newId();
-  await db.insert(places).values({ ...input, id, ...stamps(), searchText: placeSearchText(input) });
+  tx.insert(places)
+    .values({ ...input, id, ...stamps(now), searchText: placeSearchText(input) })
+    .run();
   return id;
 }
 
 export async function updatePlace(id: string, input: Partial<PlaceInput>): Promise<void> {
+  db.transaction((tx) => updatePlaceInTransaction(tx, id, input, new Date()));
+}
+
+export function updatePlaceInTransaction(tx: DbTransaction, id: string, input: Partial<PlaceInput>, now: Date): void {
   const patch = definedPatch(input);
-  db.transaction((tx) => {
-    const current = requireLivePlace(tx, id);
-    // Read children in this transaction too: a concurrent creation or edit
-    // must not be skipped or rebuilt from an earlier search snapshot.
-    const renamed = patch.name !== undefined && patch.name !== current.name;
-    const exts = renamed ? tx.select().from(extensions).where(eq(extensions.placeId, id)).all() : [];
-    tx.update(places)
-      .set({ ...patch, ...touch(), searchText: placeSearchText({ ...current, ...patch }) })
-      .where(and(alivePlace, eq(places.id, id)))
+  const current = requireLivePlace(tx, id);
+  // Read children in this transaction too: a concurrent creation or edit
+  // must not be skipped or rebuilt from an earlier search snapshot.
+  const renamed = patch.name !== undefined && patch.name !== current.name;
+  const exts = renamed ? tx.select().from(extensions).where(eq(extensions.placeId, id)).all() : [];
+  tx.update(places)
+    .set({ ...patch, ...touch(now), searchText: placeSearchText({ ...current, ...patch }) })
+    .where(and(alivePlace, eq(places.id, id)))
+    .run();
+  for (const e of exts) {
+    tx.update(extensions)
+      .set({ searchText: extensionSearchText(e, patch.name) })
+      .where(eq(extensions.id, e.id))
       .run();
-    for (const e of exts) {
-      tx.update(extensions)
-        .set({ searchText: extensionSearchText(e, patch.name) })
-        .where(eq(extensions.id, e.id))
-        .run();
-    }
-  });
+  }
 }
 
 export async function deletePlace(id: string): Promise<void> {
@@ -99,6 +107,15 @@ export function extensionQuery(id: string) {
     .limit(1);
 }
 
+/** Read only the selected historical reference; archived places stay out of choices. */
+export function extensionPlaceQuery(placeId: string | null) {
+  return db
+    .select()
+    .from(places)
+    .where(placeId === null ? sql`0` : eq(places.id, placeId))
+    .limit(1);
+}
+
 export type ExtensionInput = {
   placeId: string;
   department: string;
@@ -121,33 +138,42 @@ function requireLivePlace(tx: DbTransaction, placeId: string): Place {
 }
 
 export async function createExtension(input: ExtensionInput): Promise<string> {
-  return db.transaction((tx) => {
-    const place = requireLivePlace(tx, input.placeId);
-    const id = newId();
-    tx.insert(extensions)
-      .values({ ...input, id, ...stamps(), searchText: extensionSearchText(input, place.name) })
-      .run();
-    return id;
-  });
+  return db.transaction((tx) => createExtensionInTransaction(tx, input, new Date()));
+}
+
+export function createExtensionInTransaction(tx: DbTransaction, input: ExtensionInput, now: Date): string {
+  const place = requireLivePlace(tx, input.placeId);
+  const id = newId();
+  tx.insert(extensions)
+    .values({ ...input, id, ...stamps(now), searchText: extensionSearchText(input, place.name) })
+    .run();
+  return id;
 }
 
 export async function updateExtension(id: string, input: Partial<ExtensionInput>): Promise<void> {
+  db.transaction((tx) => updateExtensionInTransaction(tx, id, input, new Date()));
+}
+
+export function updateExtensionInTransaction(
+  tx: DbTransaction,
+  id: string,
+  input: Partial<ExtensionInput>,
+  now: Date,
+): void {
   const patch = definedPatch(input);
-  db.transaction((tx) => {
-    const current = tx
-      .select()
-      .from(extensions)
-      .where(and(aliveExt, eq(extensions.id, id)))
-      .get();
-    if (!current) throw new Error('داخلی در دسترس نیست؛ ممکن است حذف شده باشد.');
-    requireLivePlace(tx, current.placeId);
-    const merged = { ...current, ...patch };
-    const place = requireLivePlace(tx, merged.placeId);
-    tx.update(extensions)
-      .set({ ...patch, ...touch(), searchText: extensionSearchText(merged, place.name) })
-      .where(and(aliveExt, eq(extensions.id, id)))
-      .run();
-  });
+  const current = tx
+    .select()
+    .from(extensions)
+    .where(and(aliveExt, eq(extensions.id, id)))
+    .get();
+  if (!current) throw new Error('داخلی در دسترس نیست؛ ممکن است حذف شده باشد.');
+  requireLivePlace(tx, current.placeId);
+  const merged = { ...current, ...patch };
+  const place = requireLivePlace(tx, merged.placeId);
+  tx.update(extensions)
+    .set({ ...patch, ...touch(now), searchText: extensionSearchText(merged, place.name) })
+    .where(and(aliveExt, eq(extensions.id, id)))
+    .run();
 }
 
 /** Bumped on every call or copy, so the list learns what is actually used. */

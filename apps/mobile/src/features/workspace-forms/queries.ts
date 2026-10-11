@@ -23,7 +23,19 @@ export const openFormScope = (kind: WorkspaceFormKind, recordId: string | null, 
   );
 
 export type WorkspaceDraftCursor = { id: string; updatedAt: Date };
+/** Only descriptive fields reach list previews; secret/body content is never projected. */
+const draftTitlePaths: Record<WorkspaceFormKind, string> = {
+  idea: '$.fields.title',
+  topic: '$.fields.title',
+  order: '$.fields.name',
+  'specialty-profile': '$.fields.nameText',
+  prescription: '$.fields.title',
+  place: '$.fields.name',
+  extension: '$.fields.department',
+  credential: '$.fields.systemName',
+};
 export function workspaceDraftsQuery(kind: WorkspaceFormKind, cursor: WorkspaceDraftCursor | null = null) {
+  const titlePath = draftTitlePaths[kind];
   return db
     .select({
       id: workspaceFormDrafts.id,
@@ -31,7 +43,7 @@ export function workspaceDraftsQuery(kind: WorkspaceFormKind, cursor: WorkspaceD
       updatedAt: workspaceFormDrafts.updatedAt,
       title: sql<
         string | null
-      >`case when json_valid(${workspaceFormDrafts.body}) then case when json_type(${workspaceFormDrafts.body}, '$.fields.title') = 'text' then substr(json_extract(${workspaceFormDrafts.body}, '$.fields.title'), 1, 100) end end`,
+      >`case when json_valid(${workspaceFormDrafts.body}) then case when json_type(${workspaceFormDrafts.body}, ${titlePath}) = 'text' then substr(json_extract(${workspaceFormDrafts.body}, ${titlePath}), 1, 100) end end`,
     })
     .from(workspaceFormDrafts)
     .where(
