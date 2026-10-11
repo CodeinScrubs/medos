@@ -1,12 +1,14 @@
 import { useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { ScreenOptions } from '@/components/screen-options';
 import { TrendChart, type TrendPoint } from '@/components/trend-chart';
 import { Card, Column, Divider, EmptyState, Row, Screen, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { FLAG_LABEL, flagTone, formatRange, parseLabValue } from '@/features/labs/flags';
 import { sameUnitSeries } from '@/features/labs/logic';
+import { patientLabOwnershipIssuesQuery } from '@/features/labs/ownership-queries';
 import { analyteSeriesQuery } from '@/features/labs/queries';
 import { formatJalali, formatJalaliDateTime, toJalali } from '@/lib/jalali';
 import { ltrIsolate, toPersianDigits } from '@/lib/persian';
@@ -16,7 +18,10 @@ import { useTheme } from '@/theme';
 export function TrendScreen() {
   const { id: patientId, analyte } = useLocalSearchParams<{ id: string; analyte: string }>();
   const { colors, spacing } = useTheme();
-  const { data } = useLive(analyteSeriesQuery(patientId, analyte), [patientId, analyte]);
+  const results = useLive(analyteSeriesQuery(patientId, analyte), [patientId, analyte]);
+  const issues = useLive(patientLabOwnershipIssuesQuery(patientId), [patientId]);
+  const failures = [results, issues].filter((source) => source.error);
+  const data = results.data;
   const rows = data ?? [];
 
   // Only results in the same unit share an axis; the rest are counted below.
@@ -63,8 +68,23 @@ export function TrendScreen() {
       <ScreenOptions options={{ title: analyte }} />
       <Screen scroll>
         <Column gap="md" style={{ paddingTop: spacing.md }}>
+          <ErrorNotice
+            error={failures[0]?.error}
+            what="روند آزمایش"
+            onRetry={() => failures.forEach((source) => source.retry())}
+          />
+          {(issues.data?.[0]?.count ?? 0) > 0 ? (
+            <Text variant="caption" color="warning">
+              ارتباط بیمار در بعضی برگه‌ها نیاز به بررسی دارد؛ نتایج آن‌ها در روند نمایش داده نمی‌شود.
+            </Text>
+          ) : null}
           {rows.length === 0 ? (
-            <EmptyState icon="analytics-outline" title="مقداری ثبت نشده" />
+            data && issues.data && !failures.length ? (
+              <EmptyState
+                icon="analytics-outline"
+                title={(issues.data?.[0]?.count ?? 0) > 0 ? 'مقدار قابل نمایش وجود ندارد' : 'مقداری ثبت نشده'}
+              />
+            ) : null
           ) : (
             <>
               <Card>

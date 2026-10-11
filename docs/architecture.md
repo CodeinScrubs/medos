@@ -2418,3 +2418,98 @@ requested episode and standing orders; null selects standing orders alone.
 Discharge's bulk order update requires both that episode and its patient. An
 inconsistent imported cross-patient link is retained unchanged rather than
 ending another patient's order or repairing/moving it implicitly.
+
+## Permanent clinical corrections and bounded recovery (0.11.56)
+
+`clinical_versions` is an additive, immutable history table for patient fields,
+companions, encounters, diagnoses, vitals, whole lab panels, imaging, orders,
+consultations and follow-ups. Notes retain their existing separate version codec.
+`db/clinical-history.ts` wraps a synchronous domain mutation inside its caller's
+transaction. Exact before/after snapshots, required audit and any draft receipt
+therefore commit or roll back together. Async callbacks and lazy thenables are
+rejected; SQL still terminates with `.run()`, `.all()` or `.get()` inside the tx.
+Do not bypass the wrapper when introducing another write to these records.
+
+The version1 document preserves published fields, nullable values, text whitespace,
+date-column metadata and every live lab value. It does not publish raw typing or
+native reminder receipts. Equality excludes search/touch metadata and regenerated
+lab child ids, so an unchanged clinical save does not grow history. Every actual
+change receives a unique increasing per-record sequence, even in the same ms or
+after clock rollback. History is not automatically pruned or soft-deleted.
+Before typed reads, bounded SQL checks reject noncanonical imported booleans,
+unsafe stored INTEGERs and dates outside JavaScript's exact Date range. Such rows stay
+unchanged; history must not silently normalize or round them. REAL lab columns
+retain SQLite's stored double alongside the original clinical text. SQLite
+INTEGER affinity also legitimately stores REAL fractional glucose; that must
+remain supported without rounding or a blanket integer-column restriction. This is a
+typed clinical snapshot, not a byte-for-byte copy of SQLite's physical encoding.
+
+An older record gets its actual prior baseline on the first meaningful mutation.
+The baseline's recordedAt is the time it was retained, not a fabricated original
+edit time. Existing history cannot reconstruct edits made before this feature.
+Unknown/future/misowned bodies remain intact; decoding and UI clinical rendering
+require matching kind, record and patient, including lab children. Unverified
+bodies have an explicit raw-text view instead of being interpreted as a patient's
+clinical facts. Original reference ids are retained; they do not assert what a
+referenced doctor's name was at the historical time.
+
+The existing timeline has one Corrections filter. It fetches at most21 short
+metadata rows for a20-row keyset page and loads the full body only on expansion.
+Lab before/after result lists each render at most20 rows. No new route, native
+header, editor, dependency, permission, graph store or server is introduced.
+
+The existing trash adds labs, imaging, vitals, orders, consults, diagnoses and
+encounters. The backend hashes the full SQLite row and shown patient identity;
+integers/reals retain their storage type and lossless text before hashing, rather
+than rounding through JSON numbers. Restore compares the original token inside
+the write transaction and requires live original patient/episode/note ownership.
+Wrong-patient lab values or live encounter children reject recovery. Separately
+deleted children/attachments are never revived. Restored encounters are always
+historical/inactive: they cannot reopen an admission, change patient status,
+complete/restart orders or replace the current encounter.
+
+List/count SQL filters before pagination. Full-row basis reads use indexed
+primary-key scalar lookups only after the bounded global page; count has no full
+clinical payload projection. Seven additive encounter-owner indexes bound the
+child-ownership probes. Sorting/counting short tombstone metadata can still scan
+the clinical tables; this is not a measured device performance guarantee.
+
+Trash confirmations retain the original screen generation, exact shown basis,
+focus, mount, readable-result and single-attempt ownership. A delayed confirmation
+cannot borrow a newly mounted child's dataset token. The outer dataset admission
+encloses the entire action. Read failures keep rows visible with retry but do not
+authorize restore. Parent recovery does not recover separately deleted children.
+
+Authenticated SQL restore replaces clinical history with the archived dataset;
+it does not replay ordinary mutation wrappers or merge two patients' histories.
+An old archive without this table clears newer-dataset clinical versions. The
+existing pre-restore safety copy remains the way back. Derived status/flag repairs
+may then append explicit reconciliation history. Ordinary mutations still reject
+a misowned lab value rather than copying it into another patient's history; .57
+startup repair isolates that explicitly inconsistent panel without blocking healthy
+records. Backup
+format/KDF compatibility is unchanged. Contact/follow-up trash, other notebook
+trash and broader product/device acceptance remain separate work.
+
+## Lab ownership is a read boundary as well as a write boundary (0.11.57)
+
+Foreign keys alone do not prove that a value and its panel belong to the same
+patient. Shared correlated SQL identifies any live wrong-owner child. A mixed
+panel's entire live result set is withheld from snapshot, flowsheet, trend and
+timeline hydration: startup cannot safely recalculate and retain its whole
+clinical snapshot, so its seemingly normal siblings may also carry stale flags.
+The original SQL remains in backup and storage, with no guessed repair or history.
+
+Reflag preflights ownership in its synchronous transaction and skips explicit
+mixed-owner groups. All real SQL/history errors still roll back the complete
+healthy pass. Deleted foreign children remain intact without hiding healthy
+siblings. Live result queries also require live panel and patient parents.
+Conditional owner-list/count notices distinguish withheld results from an empty
+panel; the count does not fetch either patient's clinical text. Actual table
+objects in the SQL tree preserve child-only useLive subscriptions.
+
+Raw editor joins remain unfiltered, so their existing basis check refuses a
+foreign row rather than creating an apparently clean form. Reload must validate
+the fetched basis and acknowledge the current draft before cancelling/resetting
+the saver. Keep the read-only ownership marker out of the stored CAS basis.
+No codec/schema/backup format change is needed for these boundaries.

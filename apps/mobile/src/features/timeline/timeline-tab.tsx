@@ -9,6 +9,7 @@ import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Button, Card, ChipSelect, Column, EmptyState, Row, Text } from '@/components/ui';
+import { ClinicalHistoryPanel } from '@/features/patients/clinical-history-panel';
 import { withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { toPersianDigits } from '@/lib/persian';
@@ -63,7 +64,7 @@ function TimelineBrowser({ patientId, onPageChange }: { patientId: string; onPag
     };
   }, []);
   const { spacing } = useTheme();
-  const [filter, setFilter] = useState<TimelineFilter>('all');
+  const [filter, setFilter] = useState<TimelineFilter | 'corrections'>('all');
   const [history, setHistory] = useState<TimelineCursor[]>([]);
   const cursor = history.at(-1);
   const open = (item: TimelineItem) => {
@@ -102,11 +103,12 @@ function TimelineBrowser({ patientId, onPageChange }: { patientId: string; onPag
   };
   return (
     <Column gap="sm" style={{ paddingTop: spacing.md }}>
-      <ChipSelect<TimelineFilter>
+      <ChipSelect<TimelineFilter | 'corrections'>
         layout="wrap"
         options={[
           { value: 'all', label: 'همه' },
           ...Object.entries(KIND_LABEL).map(([value, label]) => ({ value: value as TimelineKind, label })),
+          { value: 'corrections', label: 'اصلاحات' },
         ]}
         value={filter}
         onChange={(next) => {
@@ -116,26 +118,30 @@ function TimelineBrowser({ patientId, onPageChange }: { patientId: string; onPag
           onPageChange?.();
         }}
       />
-      <TimelinePage
-        key={`${filter}:${cursor?.at ?? ''}:${cursor?.id ?? ''}`}
-        patientId={patientId}
-        filter={filter}
-        cursor={cursor}
-        stale={stale}
-        onOpen={open}
-        onOlder={(next) => {
-          setHistory([...history, next]);
-          onPageChange?.();
-        }}
-        onNewer={
-          history.length
-            ? () => {
-                setHistory(history.slice(0, -1));
-                onPageChange?.();
-              }
-            : undefined
-        }
-      />
+      {filter === 'corrections' ? (
+        <ClinicalHistoryPanel patientId={patientId} stale={stale} />
+      ) : (
+        <TimelinePage
+          key={`${filter}:${cursor?.at ?? ''}:${cursor?.id ?? ''}`}
+          patientId={patientId}
+          filter={filter}
+          cursor={cursor}
+          stale={stale}
+          onOpen={open}
+          onOlder={(next) => {
+            setHistory([...history, next]);
+            onPageChange?.();
+          }}
+          onNewer={
+            history.length
+              ? () => {
+                  setHistory(history.slice(0, -1));
+                  onPageChange?.();
+                }
+              : undefined
+          }
+        />
+      )}
     </Column>
   );
 }

@@ -42,7 +42,9 @@ export function labFormQuery(patientId: string, panelId: string | null, reader: 
 export type LabFormRows = Awaited<ReturnType<typeof labFormQuery>>;
 export type LabFormComparison = { rows: LabFormRows; original: LabFormDraft | null };
 export function labFormBasis(rows: LabFormRows) {
-  if (!rows[0] || rows.some((r) => r.value && r.value.patientId !== rows[0]!.patient.id)) throw new LabFormConflict();
+  if (!rows[0]) throw new LabFormConflict();
+  if (rows.some((r) => r.value && r.value.patientId !== rows[0]!.patient.id))
+    throw new LabFormConflict('ارتباط بیمار در این برگه ناسازگار است؛ اطلاعات اصلی محفوظ است و آزمایش تغییر نکرد.');
   return rows[0].panel
     ? labFormBase(
         rows[0].panel,

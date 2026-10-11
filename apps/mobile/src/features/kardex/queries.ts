@@ -2,6 +2,7 @@ import { and, asc, desc, eq, getTableColumns, inArray, isNull, or, sql } from 'd
 
 import { auditInTransaction } from '@/db/audit';
 import { db, type Database, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import { encounters, orders, patients, type Order } from '@/db/schema';
 import { startsWith } from '@/db/search';
 import { currentEncounterQuery, resolveActiveEncounterId } from '@/features/encounters/queries';
@@ -131,29 +132,31 @@ export function createOrderInTransaction(
   if (context.patientId !== input.patientId) throw new Error('مسیر بیمار تغییر کرده است.');
   requireOrderContext(tx, context);
   const id = newId();
-  tx.insert(orders)
-    .values({
-      id,
-      ...stamps(now),
-      patientId: input.patientId,
-      encounterId: context.encounterId,
-      kind: input.kind,
-      name: input.name.trim(),
-      brandName: input.brandName ?? null,
-      dose: input.dose ?? null,
-      route: input.route ?? null,
-      frequency: input.frequency ?? null,
-      rate: input.rate ?? null,
-      duration: input.duration ?? null,
-      isPrn: input.isPrn ?? false,
-      prnCondition: input.prnCondition ?? null,
-      startAt: input.startAt === undefined ? now : input.startAt,
-      indication: input.indication ?? null,
-      notes: input.notes ?? null,
-      status: 'active',
-    })
-    .run();
-  return id;
+  return withClinicalHistory(tx, 'order', id, now, () => {
+    tx.insert(orders)
+      .values({
+        id,
+        ...stamps(now),
+        patientId: input.patientId,
+        encounterId: context.encounterId,
+        kind: input.kind,
+        name: input.name.trim(),
+        brandName: input.brandName ?? null,
+        dose: input.dose ?? null,
+        route: input.route ?? null,
+        frequency: input.frequency ?? null,
+        rate: input.rate ?? null,
+        duration: input.duration ?? null,
+        isPrn: input.isPrn ?? false,
+        prnCondition: input.prnCondition ?? null,
+        startAt: input.startAt === undefined ? now : input.startAt,
+        indication: input.indication ?? null,
+        notes: input.notes ?? null,
+        status: 'active',
+      })
+      .run();
+    return id;
+  });
 }
 
 export async function updateOrder(
@@ -177,10 +180,13 @@ export function updateOrderInTransaction(
   const current = requireOrderBasis(tx.select().from(orders).where(eq(orders.id, id)).get(), expected);
   if (current.deletedAt) throw new Error('این دستور حذف شده است.');
   requireOrderContext(tx, current);
-  tx.update(orders)
-    .set({ ...patch, ...touch(now) })
-    .where(eq(orders.id, id))
-    .run();
+  withClinicalHistory(tx, 'order', id, now, () =>
+    tx
+      .update(orders)
+      .set({ ...patch, ...touch(now) })
+      .where(eq(orders.id, id))
+      .run(),
+  );
 }
 
 export type OrderMutationOptions = {
@@ -260,11 +266,13 @@ export async function setOrderStatus(
       requireOrderContext(tx, current, options.currentPatientId);
       if (current.status === status) return;
       const now = options.now ?? new Date();
-      tx.update(orders)
-        .set({ status, endAt: endAtForStatus(status, now), ...touch(now) })
-        .where(eq(orders.id, id))
-        .run();
-      auditInTransaction(tx, 'order.statusChanged', { entityType: 'order', entityId: id }, now);
+      withClinicalHistory(tx, 'order', id, now, () => {
+        tx.update(orders)
+          .set({ status, endAt: endAtForStatus(status, now), ...touch(now) })
+          .where(eq(orders.id, id))
+          .run();
+        auditInTransaction(tx, 'order.statusChanged', { entityType: 'order', entityId: id }, now);
+      });
     }),
   );
 }
@@ -277,8 +285,10 @@ export async function deleteOrder(id: string, options: OrderMutationOptions = {}
       if (current.deletedAt) return;
       requireOrderContext(tx, current, options.currentPatientId);
       const now = options.now ?? new Date();
-      tx.update(orders).set(softDelete(now)).where(eq(orders.id, id)).run();
-      auditInTransaction(tx, 'order.deleted', { entityType: 'order', entityId: id }, now);
+      withClinicalHistory(tx, 'order', id, now, () => {
+        tx.update(orders).set(softDelete(now)).where(eq(orders.id, id)).run();
+        auditInTransaction(tx, 'order.deleted', { entityType: 'order', entityId: id }, now);
+      });
     }),
   );
 }

@@ -4,12 +4,13 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 
 import { Text } from '@/components/ui';
 import { tablesOf } from '@/db/query-tables';
-import { encounters, patients } from '@/db/schema';
+import { encounters, labValues, patients } from '@/db/schema';
 import { openEncounter } from '@/features/encounters/queries';
 import { createOrder, patientCurrentOrdersQuery, setOrderStatus } from '@/features/kardex/queries';
 import { createLabPanel } from '@/features/labs/queries';
 import { createNote } from '@/features/notes/queries';
 import { recordVital } from '@/features/vitals/queries';
+import { stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -85,6 +86,37 @@ afterEach(async () => {
 });
 
 describe('patient at a glance', () => {
+  it('refreshes a child-only ownership conflict without claiming all results are unflagged', async () => {
+    const panelId = await createLabPanel({
+      patientId,
+      source: 'manual',
+      collectedAt: hoursAgo(1),
+      values: [{ analyte: 'Synthetic sibling', value: '12', refLow: 10, refHigh: 17 }],
+    });
+    const other = await createPatient({ firstName: 'Other', lastName: 'Synthetic' });
+    await render();
+    expect(rowTexts().join(' ')).toContain('بدون H یا L');
+    database.db
+      .insert(labValues)
+      .values({
+        id: 'foreign-child',
+        patientId: other,
+        panelId,
+        analyte: 'Foreign result',
+        value: '99',
+        flag: 'high',
+        ...stamps(),
+      })
+      .run();
+    await act(async () => {
+      for (const listener of mockListeners) listener({ tableName: 'lab_values' });
+      await new Promise((resolve) => setTimeout(resolve, 110));
+    });
+    expect(rowTexts().join(' ')).toContain('ارتباط بیمار');
+    expect(rowTexts().join(' ')).not.toContain('بدون H یا L');
+    expect(rowTexts().join(' ')).not.toContain('Foreign result');
+    expect(rowTexts().join(' ')).not.toContain('Synthetic sibling');
+  });
   it('reads current-episode and standing orders together without including an older or foreign episode', async () => {
     await createOrder({ patientId, kind: 'drug', name: 'Synthetic standing order' });
     await openEncounter({ patientId, kind: 'admission', admittedAt: hoursAgo(48) });

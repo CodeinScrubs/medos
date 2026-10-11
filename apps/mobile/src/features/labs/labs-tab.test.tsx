@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { ImagePickerOptions, ImagePickerResult } from 'expo-image-picker';
-import { Dimensions, StyleSheet, Text as RNText } from 'react-native';
+import { Alert, Dimensions, StyleSheet, Text as RNText } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { alertError } from '@/components/feedback';
-import { Button, Text } from '@/components/ui';
+import { Badge, Button, EmptyState, Segmented, Text } from '@/components/ui';
 import { restoreDatabase } from '@/db/client';
-import { attachments, labPanels, photoImportBatches } from '@/db/schema';
+import { attachments, labPanels, labValues, photoImportBatches } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { fileJobsActive, FileWorkBusyError, reserveFileMaintenance } from '@/lib/file-work';
+import { stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { photoFiles, resetPhotoFiles } from '@/test/mocks/photo-files';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -120,6 +121,86 @@ afterEach(() => {
 });
 
 describe('lab photo callback', () => {
+  it('marks inconsistent panels without claiming their values were never entered or exposing them in a trend', async () => {
+    const other = await createPatient({ firstName: 'Other', lastName: 'Synthetic' });
+    const panelId = await createLabPanel({
+      patientId,
+      name: 'Synthetic panel',
+      collectedAt: new Date(1700000000000),
+      source: 'manual',
+      values: [{ analyte: 'Synthetic sibling hidden', value: '12', unit: 'g/dL' }],
+    });
+    t.db
+      .insert(labValues)
+      .values({
+        id: 'foreign-native-value',
+        patientId: other,
+        panelId,
+        analyte: 'Synthetic foreign hidden',
+        value: '99',
+        ...stamps(),
+      })
+      .run();
+    const before = t.db.select().from(labValues).all();
+    await act(async () => {
+      tree!.update(<LabsTab patientId={patientId} />);
+    });
+    const text = () =>
+      tree!.root
+        .findAllByType(Text)
+        .flatMap((n) => [n.props.children].flat().filter((c) => typeof c === 'string'))
+        .join(' ');
+    expect(text()).toContain('ارتباط بیمار');
+    expect(text()).not.toContain('Synthetic sibling hidden');
+    expect(text()).not.toContain('Synthetic foreign hidden');
+    expect(text()).not.toContain('فقط عکس');
+    await act(async () => {
+      tree!.root.findByType(Segmented).props.onChange('panels');
+    });
+    expect(tree!.root.findAllByType(Badge).map((n) => n.props.label)).toContain('ارتباط بیمار نیاز به بررسی دارد');
+    expect(tree!.root.findAllByType(Badge).map((n) => n.props.label)).not.toContain('مقادیر هنوز وارد نشده');
+    await act(async () => tree!.unmount());
+    mockTrendParams = { id: patientId, analyte: 'Synthetic sibling hidden' };
+    await act(async () => {
+      tree = create(<TrendScreen />);
+    });
+    expect(text()).toContain('ارتباط بیمار');
+    expect(tree!.root.findByType(EmptyState).props.title).toBe('مقدار قابل نمایش وجود ندارد');
+    expect(t.db.select().from(labValues).all()).toEqual(before);
+  });
+  it('keeps a healthy panel deletion bound to its stored fields despite the live integrity projection', async () => {
+    const panelId = await createLabPanel({
+      patientId,
+      collectedAt: new Date(1700000000000),
+      source: 'manual',
+      values: [{ analyte: 'Synthetic healthy', value: '12' }],
+    });
+    await act(async () => {
+      tree!.update(<LabsTab patientId={patientId} />);
+    });
+    await act(async () => {
+      tree!.root.findByType(Segmented).props.onChange('panels');
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      await act(async () => {
+        tree!.root.findAll((n) => typeof n.props.onLongPress === 'function')[0]!.props.onLongPress();
+      });
+      await act(async () => {
+        alert.mock.calls.at(-1)![2]![1]!.onPress!();
+      });
+      expect(
+        t.db
+          .select()
+          .from(labPanels)
+          .all()
+          .find((p) => p.id === panelId)!.deletedAt,
+      ).not.toBeNull();
+      expect(t.db.select().from(labValues).all()).toHaveLength(1);
+    } finally {
+      alert.mockRestore();
+    }
+  });
   it.each([1, 1.6])('fits actual numeric value and unit inside one aligned row at font scale %s', async (fontScale) => {
     const original = Dimensions.get('window');
     const dimension = jest.spyOn(Dimensions, 'get').mockReturnValue({ ...original, fontScale });

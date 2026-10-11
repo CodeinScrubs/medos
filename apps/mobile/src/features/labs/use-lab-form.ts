@@ -16,6 +16,7 @@ import {
   commitLabFormDraft,
   discardLabFormDraft,
   inspectLabForm,
+  labFormBasis,
   labFormQuery,
   replaceLabFormDraft,
   saveLabFormDraft,
@@ -198,9 +199,10 @@ export function useLabForm(seed: LabFormRows, onReset: (rows: LabFormRows) => vo
       'بارگذاری نسخهٔ ذخیره‌شده؟',
       'نوشتهٔ این فرم جایگزین می‌شود؛ پیش از ادامه آن را مرور یا کپی کنید.',
       async () => {
-        await saver.flush();
+        await flush();
         const rows = labFormQuery(patientId, panelId).all();
         if (!rows[0]) throw new LabFormConflict();
+        labFormBasis(rows);
         if (rows[0].draft) decodeLabForm(rows[0].draft.body);
         saver.cancel();
         acting.current = false;

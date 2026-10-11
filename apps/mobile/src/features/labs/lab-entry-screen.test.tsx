@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Alert, AppState, Pressable, TextInput, View, type AppStateStatus } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PromptModal } from '@/components/prompt-modal';
 import { ScreenOptions } from '@/components/screen-options';
@@ -12,6 +13,7 @@ import { labFormDrafts, labPanels, labValues } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { createPatient } from '@/features/patients/queries';
 import { DatasetBusyError, DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
+import { stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
@@ -145,6 +147,72 @@ afterEach(async () => {
 });
 
 describe('lab entry mounted intent and retained raw values', () => {
+  async function foreignChild() {
+    const other = await createPatient({ firstName: 'Other', lastName: 'Synthetic' });
+    t.db
+      .insert(labValues)
+      .values({
+        id: 'synthetic-foreign',
+        patientId: other,
+        panelId: mockParams.panelId!,
+        analyte: 'Foreign result must not seed form',
+        value: '99',
+        ...stamps(),
+      })
+      .run();
+  }
+  it('retains the raw draft and refuses to seed an editor from another patient result', async () => {
+    await render();
+    await invoke(() => input('یادداشت')!.props.onChangeText('Original draft stays exact'));
+    await invoke(() => jest.advanceTimersByTime(850));
+    await act(async () => tree!.unmount());
+    tree = undefined;
+    await foreignChild();
+    const before = current(),
+      body = t.db.select().from(labFormDrafts).get()!.body;
+    await render();
+    expect(tree!.root.findAllByType(Input)).toHaveLength(0);
+    expect(tree!.root.findByType(ErrorNotice).props.error.message).toContain('ارتباط بیمار');
+    expect(t.db.select().from(labFormDrafts).get()!.body).toBe(body);
+    expect(current()).toEqual(before);
+  });
+  async function showComparison() {
+    await render();
+    await invoke(() => input('یادداشت')!.props.onChangeText('Retain my current words'));
+    await queries.updateLabPanel(mockParams.panelId!, {
+      source: 'manual',
+      collectedAt: new Date('2025-03-01T12:00:00Z'),
+      notes: 'External corrected note',
+      values: [{ analyte: 'Hb', value: '15' }],
+    });
+    await invoke(() => save().props.onPress());
+    await invoke(() => button('بررسی نسخهٔ ذخیره‌شده').props.onPress());
+  }
+  it('checks the newly loaded clinical basis before cancelling or replacing the retained form', async () => {
+    await showComparison();
+    const load = button('بارگذاری نسخهٔ ذخیره‌شده').props.onPress;
+    await foreignChild();
+    const before = current(),
+      body = t.db.select().from(labFormDrafts).get()!.body;
+    await invoke(load);
+    await invoke(() => jest.mocked(Alert.alert).mock.calls.at(-1)![2]![1]!.onPress!());
+    expect(input('یادداشت')!.props.value).toBe('Retain my current words');
+    expect(t.db.select().from(labFormDrafts).get()!.body).toBe(body);
+    expect(current()).toEqual(before);
+    expect(jest.mocked(alertError).mock.calls.at(-1)![1]).toEqual(
+      expect.objectContaining({ message: expect.stringContaining('ارتباط بیمار') }),
+    );
+  });
+  it('does not replace unacknowledged typing when the final draft flush fails', async () => {
+    await showComparison();
+    const failed = jest.spyOn(drafts, 'saveLabFormDraft').mockRejectedValue(new Error('Synthetic draft failure'));
+    await invoke(() => input('یادداشت')!.props.onChangeText('Unacknowledged typing stays here'));
+    await invoke(() => button('بارگذاری نسخهٔ ذخیره‌شده').props.onPress());
+    await invoke(() => jest.mocked(Alert.alert).mock.calls.at(-1)![2]![1]!.onPress!());
+    expect(failed).toHaveBeenCalled();
+    expect(input('یادداشت')!.props.value).toBe('Unacknowledged typing stays here');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
   it('recovers and publishes a custom unit without changing the value or preset units', async () => {
     await render();
     await invoke(() => button('آنالیت دیگر').props.onPress());

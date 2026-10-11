@@ -33,6 +33,143 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Deliver lab isolation with independent native state witnesses
+
+**Agent:** GPT-6 via Codex; primary verification, no additional delegation.
+**Commits:** frozen application `36d4ff1`; this evidence-only follow-on.
+
+**Changed**
+- Record exact-source .57 native ownership/repair/refusal/cold-start and healthy
+  deletion/restore evidence, whole-state comparisons and both inspected APKs.
+  Update incremental draft PR9 against PR8 and the current execution gates.
+- No application source, dependencies, migrations, routes, permissions or backup
+  format change in this delivery. Unrelated untracked WIP remains untouched.
+
+**Verified**
+- Final evidence-only check passes177 suites/2,625 app tests (208.049s), five workflow
+  tests and typecheck/lint/format; normal push repeats checks without bypass.
+  Exact-source hosted CI38118700197 passes including migrations and bundling.
+- Installed inspected x86 bytes match. Mixed-owner native restore keeps original
+  rows, withholds results and preserves healthy access; strict editor refuses.
+  Independent repair/cold archives check4,217 rows in51 tables,55 exact prior
+  versions plus2 complete new versions,34 media hashes and32 migrations.
+- Healthy native delete/restore changes only its parent with required history/
+  audit; independent oracles check4,219/4,220 prior rows,59 final versions and
+  unchanged children/media. Owned emulator shutdown preserves both base hashes.
+- Actual signed arm64 .57/code73 in `dist/MedOS-0.11.57.apk` passes certificate,
+  package/ABI/essential-JNI inspection; hashes are in validation-0.11.57.
+
+**Not verified**
+- Physical phone/IME, complete timed40-patient shift, provider/interruption/
+  low-space/power behavior or clinical review. Native restore repairs version0;
+  subsequent cold start is version1, not native version0 first-start proof.
+- No MedOS fatal/ANR observed in the bounded window; Android System UI and other
+  boot ANRs occurred and are retained. Whole-session health is not established.
+
+**Open threads**
+- Rich text, contact/follow-up/notebook trash and complete follow-up flow remain
+  in IMPLEMENTATION. Finish prioritized software work without adding a maze.
+- Diagnose the original short .55 input mismatch and older focus ANR; do not
+  infer physical IME acceptance from later exact ASCII input or surviving PIDs.
+
+**Gotchas**
+- A displayed ownership marker must not enter the stored full-row deletion CAS.
+  Version0 restore housekeeping and version0 StartupGate are separate witnesses.
+- Freeze source through both ABI builds; the owner APK has a different hash
+  from private x86 QA. No existing PR is merged automatically.
+
+## 2026-10-11 — Isolate mixed-owner labs without blocking healthy records
+
+**Agent:** GPT-6 via Codex; primary implementation/verification and one read-only
+GPT-6.1 Sol/xhigh ownership audit.
+**Commits:** this source commit, based on .56 `8ee111a` and delivered PR8 `faa7160`.
+
+**Changed**
+- .57/code73 preserves inconsistent imported lab panels and withholds all their
+  results from snapshot/table/trend/timeline. Healthy reflag continues; real
+  SQL/history errors still roll back the full pass. Counts/short conditional
+  notices distinguish withheld data from an empty/photo-only panel.
+- Keep raw editor ownership refusal. Reload validates the new basis before
+  reset and requires acknowledged draft flush. Strip the read projection from
+  stored delete CAS. Existing indexes bound candidate ownership-count reads.
+- Record completed .56 native seven-kind restore/history pages and independent
+  whole-archive comparisons/artifacts. No dependency, route, migration, permission
+  or backup format change; unrelated WIP remains untouched.
+
+**Verified**
+- Resumed .56 check:175 suites/2,607 tests. Three new real-SQLite regressions
+  fail before the fix and pass after it. Focused integrated checks:165/9 suites;
+  corrected UI/startup:70/5. Final full check:177 suites/2,625 app tests in211.156s,
+  five workflow tests and typecheck/lint/format without warnings; no new migration.
+- .56 source8ee native: all seven restores; trash20/5;40 star edits; history
+ 20/20/15. Independent old/current archives retain full prior rows,55 typed
+  versions and34 media hashes. Both actual APKs inspect correctly; owned read-only
+  emulator shutdown preserves both base hashes. See validation-0.11.56.
+
+**Not verified**
+- New .57 native/whole-archive/owner artifact and exact pushed-head hosted CI.
+- Physical phone/IME/clinical review, full timed40-patient shift, provider/power/
+  interruption acceptance. .56 native evidence does not accept .57.
+
+**Open threads**
+- Freeze .57, build/inspect x86 QA, restore a synthetic mixed-owner archive,
+  accept healthy access/owner warnings/refused editor/cold start, and independently
+  compare the exported full state. Then inspect owner arm64 and exact-head CI.
+- Rich text, remaining trash kinds, complete follow-up and other gates remain
+  in IMPLEMENTATION. The phone is not the only remaining work.
+
+**Gotchas**
+- Foreign keys validate existence, not value/panel ownership. Do not silently
+  reparent, normalize, hard-delete or filter the raw editor basis into a clean form.
+- A derived ownership marker is not a stored CAS field. Reflag skips explicit
+  ownership defects only; never swallow arbitrary SQL/history failure.
+
+## 2026-10-11 — Preserve clinical corrections and restore seven record kinds
+
+**Agent:** GPT-6 via Codex; primary integration/verification with a reused backend reviewer.
+**Commits:** this source commit, based on delivered PR8 `faa7160`.
+
+**Changed**
+- Add immutable clinical snapshots for ten record kinds and audited recovery for
+  seven clinical tombstones. Keep bounded Corrections/trash views in existing
+  screens. Restore old encounters as historical/inactive; retain separately
+  deleted children and original patient/episode ownership. Version .56/code72.
+- Guard full SQLite restore basis, lossy imported numeric/boolean/date rows,
+  required audit/history rollback, retained read failures and old dataset dialogs.
+  Two additive migrations; no dependency, permission, route or backup format change.
+
+**Verified**
+- Baseline .55 check passes 171 suites/2,474 tests. First integrated check passes
+  175 suites/2,597 app tests and five workflow tests; three import warnings were
+  then corrected. Imported-value/date guard focused tests pass 117 tests/3 suites
+  and typecheck. A full follow-up caught an overbroad INTEGER-affinity guard
+  blocking fractional glucose; corrected with explicit history/unit regressions.
+  Corrected full check passes 175 suites/2,607 app tests (202.822s), five
+  workflow tests and typecheck/lint/format without warnings. Focused glucose/
+  history/form coverage passes 75 tests in four suites (16.324s).
+- Older frozen .55 input diagnostics reproduce native stale-event injection
+  failures for long ASCII batches; accepted prefixes survive cold recovery.
+  Raw reports and unchanged AVD base hashes are retained privately.
+
+**Not verified**
+- New .56 native UI/whole-state archive acceptance, APK inspection, hosted CI
+  and physical phone. Prior-source native acceptance does not accept .56.
+
+**Open threads**
+- Freeze only after the final full check; build/inspect x86 QA bytes, run the
+  seven-kind restore/history matrix and independent whole-archive comparisons,
+  then build/inspect owner arm64 bytes and check the exact pushed CI head.
+- Rich text, remaining trash kinds, full timed 40-patient shift, complete
+  follow-up/provider/interruption/physical acceptance remain in IMPLEMENTATION.
+  The original short .55 input mismatch and older focus ANR remain unresolved.
+
+**Gotchas**
+- A zero-exit `adb input text` command can drop stale native key events. Observe
+  exact EditText contents; do not reinterpret a missing injected suffix as an
+  app autosave loss, or use later exact input as a causal explanation.
+- History is a typed clinical snapshot; unsupported imported INTEGER/boolean/
+  timestamp rows are refused intact. REAL lab doubles retain original raw text.
+
 ## 2026-10-11 — Deliver five-form recovery with complete native state witnesses
 
 **Agent:** GPT-6 via Codex; primary verification, no additional delegation.

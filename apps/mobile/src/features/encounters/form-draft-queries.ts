@@ -265,8 +265,6 @@ export async function commitEncounterFormDraft(
       .run();
     return { id: publishedId, replay: false };
   });
-  if (mode === 'discharge' && !result.replay)
-    await audit('encounter.discharged', { entityType: 'encounter', entityId: result.id });
   return result.id;
 }
 export async function inspectEncounterForm(

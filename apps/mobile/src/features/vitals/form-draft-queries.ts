@@ -161,7 +161,6 @@ export async function commitVitalFormDraft(
         .run();
       return { id: destination, changed };
     });
-    if (result.changed) await audit('vital.updated', { entityType: 'vital', entityId: result.id });
     return result.id;
   });
 }

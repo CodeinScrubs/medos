@@ -1,7 +1,8 @@
 import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type Database, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import {
   consultations,
   diagnoses,
@@ -130,37 +131,50 @@ export function openEncounterInTransaction(tx: DbTransaction, input: EncounterIn
   if (input.admittedAt && !Number.isFinite(input.admittedAt.getTime())) throw new Error('تاریخ بستری معتبر نیست.');
   const id = newId();
   requirePatient(tx, input.patientId);
-  tx.update(encounters)
-    .set({ isActive: false, ...touch(now) })
-    .where(and(alive, eq(encounters.patientId, input.patientId), eq(encounters.isActive, true)))
-    .run();
+  return withClinicalHistory(tx, 'patient', input.patientId, now, () => {
+    const active = tx
+      .select({ id: encounters.id })
+      .from(encounters)
+      .where(and(alive, eq(encounters.patientId, input.patientId), eq(encounters.isActive, true)))
+      .all();
+    for (const prior of active)
+      withClinicalHistory(tx, 'encounter', prior.id, now, () =>
+        tx
+          .update(encounters)
+          .set({ isActive: false, ...touch(now) })
+          .where(eq(encounters.id, prior.id))
+          .run(),
+      );
 
-  tx.insert(encounters)
-    .values({
-      id,
-      ...stamps(now),
-      patientId: input.patientId,
-      kind: input.kind,
-      placeId: input.placeId ?? null,
-      ward: input.ward ?? null,
-      bed: input.bed ?? null,
-      service: input.service ?? null,
-      attendingId: input.attendingId ?? null,
-      chiefComplaint: input.chiefComplaint ?? null,
-      admittedAt: input.admittedAt ?? now,
-      admittedAtHasTime: input.admittedAtHasTime ?? true,
-      isActive: true,
-    })
-    .run();
+    return withClinicalHistory(tx, 'encounter', id, now, () => {
+      tx.insert(encounters)
+        .values({
+          id,
+          ...stamps(now),
+          patientId: input.patientId,
+          kind: input.kind,
+          placeId: input.placeId ?? null,
+          ward: input.ward ?? null,
+          bed: input.bed ?? null,
+          service: input.service ?? null,
+          attendingId: input.attendingId ?? null,
+          chiefComplaint: input.chiefComplaint ?? null,
+          admittedAt: input.admittedAt ?? now,
+          admittedAtHasTime: input.admittedAtHasTime ?? true,
+          isActive: true,
+        })
+        .run();
 
-  tx.update(patients)
-    .set({ status: statusForEncounterKind(input.kind), ...touch(now) })
-    .where(eq(patients.id, input.patientId))
-    .run();
+      tx.update(patients)
+        .set({ status: statusForEncounterKind(input.kind), ...touch(now) })
+        .where(eq(patients.id, input.patientId))
+        .run();
 
-  // Ward and bed are searchable while the patient is in them.
-  refreshPatientSearchText(input.patientId, tx);
-  return id;
+      // Ward and bed are searchable while the patient is in them.
+      refreshPatientSearchText(input.patientId, tx);
+      return id;
+    });
+  });
 }
 
 /**
@@ -183,19 +197,25 @@ export function updateEncounterInTransaction(
 ): void {
   if (patch.admittedAt && !Number.isFinite(patch.admittedAt.getTime())) throw new Error('تاریخ بستری معتبر نیست.');
   const current = requireEncounter(tx, id);
-  tx.update(encounters)
-    .set({ ...patch, ...touch(now) })
-    .where(and(alive, eq(encounters.id, id)))
-    .run();
+  withClinicalHistory(tx, 'encounter', id, now, () =>
+    tx
+      .update(encounters)
+      .set({ ...patch, ...touch(now) })
+      .where(and(alive, eq(encounters.id, id)))
+      .run(),
+  );
 
   if (current.isActive) {
     // Older/imported datasets can contain multiple active episodes. A
     // correction to one must follow the same newest episode as the header.
     const active = activeEncounterQuery(current.patientId, tx).get();
-    tx.update(patients)
-      .set({ status: statusFor(active ?? null, 'outpatient'), ...touch(now) })
-      .where(eq(patients.id, current.patientId))
-      .run();
+    withClinicalHistory(tx, 'patient', current.patientId, now, () =>
+      tx
+        .update(patients)
+        .set({ status: statusFor(active ?? null, 'outpatient'), ...touch(now) })
+        .where(eq(patients.id, current.patientId))
+        .run(),
+    );
   }
 
   refreshPatientSearchText(current.patientId, tx);
@@ -211,7 +231,6 @@ export type DischargeInput = {
 
 export async function dischargeEncounter(id: string, input: DischargeInput): Promise<void> {
   db.transaction((tx) => dischargeEncounterInTransaction(tx, id, input, new Date()));
-  await audit('encounter.discharged', { entityType: 'encounter', entityId: id });
 }
 
 export function dischargeEncounterInTransaction(tx: DbTransaction, id: string, input: DischargeInput, now: Date): void {
@@ -224,39 +243,54 @@ export function dischargeEncounterInTransaction(tx: DbTransaction, id: string, i
     .where(and(alive, eq(encounters.patientId, current.patientId), eq(encounters.isActive, true)))
     .get()?.n;
   if (activeCount !== 1) throw new Error('بیش از یک نوبت فعال وجود دارد؛ ابتدا نوبت‌های پرونده را بررسی کنید.');
-  tx.update(encounters)
-    .set({
-      isActive: false,
-      dischargedAt: input.dischargedAt,
-      dischargeType: input.dischargeType,
-      outcomeNotes: input.outcomeNotes ?? null,
-      ...touch(now),
-    })
-    .where(and(alive, eq(encounters.id, id)))
-    .run();
+  withClinicalHistory(tx, 'encounter', id, now, () => {
+    tx.update(encounters)
+      .set({
+        isActive: false,
+        dischargedAt: input.dischargedAt,
+        dischargeType: input.dischargeType,
+        outcomeNotes: input.outcomeNotes ?? null,
+        ...touch(now),
+      })
+      .where(and(alive, eq(encounters.id, id)))
+      .run();
 
-  // Inpatient orders end with the admission. Without this they stay
-  // "active" for ever and reappear on the next admission's kardex, day
-  // count and all — a drug the patient stopped months ago.
-  tx.update(orders)
-    .set({ status: 'completed', endAt: input.dischargedAt, ...touch(now) })
-    .where(
-      and(
-        eq(orders.patientId, current.patientId),
-        eq(orders.encounterId, id),
-        isNull(orders.deletedAt),
-        inArray(orders.status, ['active', 'held']),
-      ),
-    )
-    .run();
+    // Inpatient orders end with the admission. Without this they stay
+    // "active" for ever and reappear on the next admission's kardex, day
+    // count and all — a drug the patient stopped months ago.
+    const endingOrders = tx
+      .select({ id: orders.id })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.patientId, current.patientId),
+          eq(orders.encounterId, id),
+          isNull(orders.deletedAt),
+          inArray(orders.status, ['active', 'held']),
+        ),
+      )
+      .all();
+    for (const order of endingOrders)
+      withClinicalHistory(tx, 'order', order.id, now, () =>
+        tx
+          .update(orders)
+          .set({ status: 'completed', endAt: input.dischargedAt, ...touch(now) })
+          .where(eq(orders.id, order.id))
+          .run(),
+      );
 
-  tx.update(patients)
-    .set({ status: statusAfterDischarge(input.dischargeType, input.nextStatus), ...touch(now) })
-    .where(eq(patients.id, current.patientId))
-    .run();
+    withClinicalHistory(tx, 'patient', current.patientId, now, () =>
+      tx
+        .update(patients)
+        .set({ status: statusAfterDischarge(input.dischargeType, input.nextStatus), ...touch(now) })
+        .where(eq(patients.id, current.patientId))
+        .run(),
+    );
 
-  // The bed they left no longer finds them.
-  refreshPatientSearchText(current.patientId, tx);
+    // The bed they left no longer finds them.
+    refreshPatientSearchText(current.patientId, tx);
+    auditInTransaction(tx, 'encounter.discharged', { entityType: 'encounter', entityId: id }, now);
+  });
 }
 
 /** The encounter has notes, orders or results filed under it; see `deleteEncounter`. */
@@ -301,7 +335,7 @@ export function encounterRecordCount(id: string, reader: Pick<Database, 'select'
 export async function deleteEncounter(id: string): Promise<void> {
   const now = new Date();
 
-  const changed = db.transaction((tx) => {
+  db.transaction((tx) => {
     const current = tx
       .select()
       .from(encounters)
@@ -310,20 +344,25 @@ export async function deleteEncounter(id: string): Promise<void> {
     if (!current) return false;
     requirePatient(tx, current.patientId);
     if (encounterRecordCount(id, tx) > 0) throw new EncounterNotEmptyError();
-    tx.update(encounters)
-      .set({ ...softDelete(now), isActive: false })
-      .where(and(alive, eq(encounters.id, id)))
-      .run();
+    return withClinicalHistory(tx, 'encounter', id, now, () => {
+      tx.update(encounters)
+        .set({ ...softDelete(now), isActive: false })
+        .where(and(alive, eq(encounters.id, id)))
+        .run();
 
-    if (!current.isActive) return true;
-    // Any other open episode decides; otherwise the patient is not admitted.
-    const other = activeEncounterQuery(current.patientId, tx).get();
-    tx.update(patients)
-      .set({ status: statusFor(other ?? null, 'outpatient'), ...touch(now) })
-      .where(eq(patients.id, current.patientId))
-      .run();
-    refreshPatientSearchText(current.patientId, tx);
-    return true;
+      auditInTransaction(tx, 'encounter.deleted', { entityType: 'encounter', entityId: id }, now);
+      if (!current.isActive) return true;
+      // Any other open episode decides; otherwise the patient is not admitted.
+      const other = activeEncounterQuery(current.patientId, tx).get();
+      withClinicalHistory(tx, 'patient', current.patientId, now, () =>
+        tx
+          .update(patients)
+          .set({ status: statusFor(other ?? null, 'outpatient'), ...touch(now) })
+          .where(eq(patients.id, current.patientId))
+          .run(),
+      );
+      refreshPatientSearchText(current.patientId, tx);
+      return true;
+    });
   });
-  if (changed) await audit('encounter.deleted', { entityType: 'encounter', entityId: id });
 }
