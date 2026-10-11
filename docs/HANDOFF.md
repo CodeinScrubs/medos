@@ -33,6 +33,51 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Deliver lab isolation with independent native state witnesses
+
+**Agent:** GPT-6 via Codex; primary verification, no additional delegation.
+**Commits:** frozen application `36d4ff1`; this evidence-only follow-on.
+
+**Changed**
+- Record exact-source .57 native ownership/repair/refusal/cold-start and healthy
+  deletion/restore evidence, whole-state comparisons and both inspected APKs.
+  Update incremental draft PR9 against PR8 and the current execution gates.
+- No application source, dependencies, migrations, routes, permissions or backup
+  format change in this delivery. Unrelated untracked WIP remains untouched.
+
+**Verified**
+- Final evidence-only check passes177 suites/2,625 app tests (208.049s), five workflow
+  tests and typecheck/lint/format; normal push repeats checks without bypass.
+  Exact-source hosted CI38118700197 passes including migrations and bundling.
+- Installed inspected x86 bytes match. Mixed-owner native restore keeps original
+  rows, withholds results and preserves healthy access; strict editor refuses.
+  Independent repair/cold archives check4,217 rows in51 tables,55 exact prior
+  versions plus2 complete new versions,34 media hashes and32 migrations.
+- Healthy native delete/restore changes only its parent with required history/
+  audit; independent oracles check4,219/4,220 prior rows,59 final versions and
+  unchanged children/media. Owned emulator shutdown preserves both base hashes.
+- Actual signed arm64 .57/code73 in `dist/MedOS-0.11.57.apk` passes certificate,
+  package/ABI/essential-JNI inspection; hashes are in validation-0.11.57.
+
+**Not verified**
+- Physical phone/IME, complete timed40-patient shift, provider/interruption/
+  low-space/power behavior or clinical review. Native restore repairs version0;
+  subsequent cold start is version1, not native version0 first-start proof.
+- No MedOS fatal/ANR observed in the bounded window; Android System UI and other
+  boot ANRs occurred and are retained. Whole-session health is not established.
+
+**Open threads**
+- Rich text, contact/follow-up/notebook trash and complete follow-up flow remain
+  in IMPLEMENTATION. Finish prioritized software work without adding a maze.
+- Diagnose the original short .55 input mismatch and older focus ANR; do not
+  infer physical IME acceptance from later exact ASCII input or surviving PIDs.
+
+**Gotchas**
+- A displayed ownership marker must not enter the stored full-row deletion CAS.
+  Version0 restore housekeeping and version0 StartupGate are separate witnesses.
+- Freeze source through both ABI builds; the owner APK has a different hash
+  from private x86 QA. No existing PR is merged automatically.
+
 ## 2026-10-11 — Isolate mixed-owner labs without blocking healthy records
 
 **Agent:** GPT-6 via Codex; primary implementation/verification and one read-only

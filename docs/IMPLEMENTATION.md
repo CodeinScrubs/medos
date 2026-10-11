@@ -47,15 +47,20 @@ are recorded in [validation-0.11.56.md](validation-0.11.56.md). A later verified
 mixed-owner lab defect still blocks .56 startup. .57 preserves that panel,
 withholds its results with a conditional notice and repairs healthy data;
 strict publication/history and real SQL failure rollback remain unchanged.
-See [validation-0.11.57.md](validation-0.11.57.md) for the new-source checks and
-pending native/artifact/delivery gates. Older .55 input diagnosis
+Frozen .57 source `36d4ff1` passes the full software check and exact-source hosted
+CI. Its inspected signed x86/arm64 APKs, native mixed-owner restore/read/refusal/
+cold-start and healthy delete/restore pass with independent complete-state
+comparisons. See [validation-0.11.57.md](validation-0.11.57.md) for the actual
+artifact hashes, remaining boundaries and incremental draft PR9 against PR8.
+Native version0 first-start is not accepted by the restore/cold witnesses.
+Older .55 input diagnosis
 reproduces long-command native stale-event injection failures. The original
 short mismatch and older focus ANR remain unresolved; later exact input is not
 a causal explanation or physical-keyboard acceptance.
 
 Parent evidence stays attributed to its own frozen source: [.55 notebook forms](validation-0.11.55.md), [.54 clinical form context](validation-0.11.54.md),
 [.53 discharge](validation-0.11.53.md), [.52 Kardex](validation-0.11.52.md),
-[.51 workspace recovery](validation-0.11.51.md), [.50 note recovery](validation-0.11.50.md) and earlier HANDOFF entries. PR1–8 are not merged here.
+[.51 workspace recovery](validation-0.11.51.md), [.50 note recovery](validation-0.11.50.md) and earlier HANDOFF entries. PR1–9 are not merged here.
 
 Physical-phone acceptance, full timed 40-patient native shifts, pressure/restore
 costs, rich text, remaining trash kinds and fuller workflows remain open below.
