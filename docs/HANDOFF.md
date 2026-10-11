@@ -33,6 +33,38 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Refresh actual permission state and handle native settings failures
+
+**Agent:** GPT-6 via Codex; primary integration, no new delegation.
+**Commits:** this .59 application/checkpoint commit, following delivered `7d1dfc4`.
+
+**Changed**
+- Refresh current grants after returning from Android Settings; refuse stale read
+  results and retained/unmounted/repeated native actions. Handle native failures
+  with existing retry/error UI. Mark the stored backup folder as selected.
+- Shorten settings copy, remove exact-delivery and unmeasured image-size claims.
+  Version .59/code75 only; no dependency/schema/route/permission/archive changes.
+
+**Verified**
+- Unchanged .58 check: 178 suites/2,684 tests; source .59 check: 179 suites/2,698
+  tests and five workflow checks. Typecheck/lint/formatting pass (Jest 203.978s).
+- Before resume/grant witness fails, after passes; 14 focused failure/race/
+  focus/unmount/action/cleanup scenarios pass. Diff and lock-version scope checked.
+
+**Not verified**
+- .59 installed APK, native Settings return, exact access/delivery and physical
+  phone acceptance are pending; see validation-0.11.59, not the .58 report.
+
+**Open threads**
+- Build and inspect frozen .59 x86/owner APKs, test real settings return and
+  exact-alarm access separately, then record normal push/CI and keep PR11 draft.
+- Review optional app-lock callback rejection/late confirmation, then notebook
+  trash, rich text, full follow-up and measured shifts in IMPLEMENTATION.
+
+**Gotchas**
+- Use the existing expo-router/react-navigation export; do not add a separate
+  navigation dependency. Preserve unrelated untracked documents and frozen builds.
+
 ## 2026-10-11 — Accept the frozen .58 recovery candidate and record exact artifact evidence
 
 **Agent:** GPT-6 via Codex; primary native/artifact integration, no further delegation.

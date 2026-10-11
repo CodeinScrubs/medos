@@ -5,6 +5,21 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Current native permission state (0.11.59)
+
+PermissionsCard reads notification/camera/microphone grants again when Android
+returns the app to the foreground. A monotonic read token and mounted check
+prevent older results or rejections replacing a newer snapshot. Failed reads
+withhold old grant badges and use the existing error/retry notice. Native
+permission/settings actions are single-flight; retained unfocused/unmounted
+handlers refuse work and delayed failures do not show over a different route.
+
+A stored backup folder means selected, not verified provider access. Notification
+permission does not prove exact-alarm access or delivery. The card keeps the
+existing system-settings link and explains delay without promising an exact
+arrival or claiming it has queried special access. No database mutation,
+shared permission framework, route or new native dependency is required.
+
 ## Remaining notebook forms reuse raw recovery (0.11.55)
 
 Specialty profiles, personal prescription templates, places, extensions and

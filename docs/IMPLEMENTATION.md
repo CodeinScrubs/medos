@@ -33,8 +33,11 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.58/code74 on `codex/contact-followup-recovery` continues
-delivered PR9 `d1e9a5c`. Permanent clinical correction history covers patient,
+Application 0.11.59/code75 on `codex/permission-state-recovery` continues
+delivered PR10 `7d1dfc4`. .59 refreshes current grants after Android Settings,
+handles failed/repeated/late native choices and shortens misleading copy. Its
+179-suite/2,698-test software check passes; frozen APK/native acceptance remains
+pending in validation-0.11.59. .58 recovery evidence stays in its own report. Permanent clinical correction history covers patient,
 companion, encounter, diagnosis, vital, whole lab panel, imaging, order, consult
 and follow-up records. Nine clinical record kinds can be restored from the
 existing trash. Corrections appear in the existing patient timeline. Exact
@@ -146,7 +149,12 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
   normalization schemes, golden keys and independent compatibility. Native
   keyboard-controller modal soft exceptions and audio dead-handler warnings
   remain diagnostic/acceptance work; retained processes do not prove harmlessness.
-- Correct the permission card's understated inexact-delay wording; handle rejected permission/settings APIs and refresh current grants after returning from Android Settings without losing the mounted screen. Verify exact-alarm special access separately from notification permission; .58's actual OS window is one hour when access is disabled.
+- .59 corrects permission-card delay wording and handles rejected/stale native
+  reads and repeated/late settings actions. Accept actual native return and
+  exact-alarm special access separately from notification permission; .58's
+  observed OS window is one hour without special access.
+- Review the optional app-lock toggle's unhandled asynchronous callback and
+  delayed confirmation. This is a source finding, not a phone reproduction.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.
