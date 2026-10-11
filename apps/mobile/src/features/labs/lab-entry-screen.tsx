@@ -54,19 +54,19 @@ function LabEntryGate({ patientId, panelId }: { patientId: string; panelId: stri
   const [reset, setReset] = useState(0);
   if (!stale && !retained && query.data?.[0]) setRetained(query.data);
   const rows = retained ?? query.data;
-  let invalidDraft: Error | undefined;
+  let invalidContext: Error | undefined;
   if (rows?.[0]) {
     try {
       labFormBasis(rows);
       if (rows[0].draft) decodeLabForm(rows[0].draft.body);
     } catch (e) {
-      invalidDraft = e instanceof Error ? e : new Error('پیش‌نویس خوانده نشد.');
+      invalidContext = e instanceof Error ? e : new Error('آزمایش خوانده نشد.');
     }
   }
-  if (invalidDraft || (stale && !retained))
+  if (invalidContext || (stale && !retained))
     return (
       <Screen scroll>
-        <ErrorNotice error={invalidDraft} what="پیش‌نویس آزمایش" />
+        <ErrorNotice error={invalidContext} what="آزمایش" />
         {stale ? <Text color="danger">اطلاعات جایگزین شده؛ فرم را دوباره باز کنید.</Text> : null}
         <Text selectable>{rows?.[0]?.draft?.body}</Text>
         <Button

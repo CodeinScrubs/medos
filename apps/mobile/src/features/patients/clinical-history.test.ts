@@ -380,8 +380,10 @@ describe('failure and compatibility boundaries', () => {
       })
       .run();
     const before = databaseRows(t);
-    await expect(reflagLabValuesIfNeeded(now)).rejects.toThrow('مالک');
-    expect(databaseRows(t)).toEqual(before);
+    await expect(reflagLabValuesIfNeeded(now)).resolves.toBeUndefined();
+    const after = databaseRows(t);
+    for (const [table, rows] of Object.entries(before))
+      if (table !== 'settings' && table !== 'audit_log') expect(after[table]).toEqual(rows);
     expect(versions('lab', 'legacy-panel')).toEqual([]);
   });
   it('records a legacy status repair exactly once, with an explicit repair reason', async () => {

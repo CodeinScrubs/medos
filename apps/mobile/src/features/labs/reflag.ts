@@ -4,10 +4,11 @@ import { z } from 'zod';
 import { audit } from '@/db/audit';
 import { db } from '@/db/client';
 import { withClinicalHistory } from '@/db/clinical-history';
-import { labValues } from '@/db/schema';
+import { labPanels, labValues } from '@/db/schema';
 import { defineSetting, readSetting, writeSetting } from '@/db/settings';
 
 import { computeFlag, parseLabValue } from './flags';
+import { labPanelHasForeignValues } from './ownership-queries';
 
 /**
  * A lab row's H/L flag is worked out once, when the row is written, and stored.
@@ -34,11 +35,38 @@ export async function reflagLabValuesIfNeeded(now = new Date()): Promise<void> {
 
   let changed = 0;
   let cleared = 0;
+  let skippedValues = 0;
+  let blockedPanels = 0;
   db.transaction((tx) => {
     // Never apply the verdict of a pre-await snapshot to a corrected value.
+    const owners = new Map(
+      tx
+        .select({ id: labPanels.id, patientId: labPanels.patientId })
+        .from(labPanels)
+        .all()
+        .map((panel) => [panel.id, panel.patientId]),
+    );
+    const blocked = new Set(
+      tx
+        .select({ id: labPanels.id })
+        .from(labPanels)
+        .where(labPanelHasForeignValues())
+        .all()
+        .map((panel) => panel.id),
+    );
+    blockedPanels = blocked.size;
     const rows = tx.select().from(labValues).all();
     const corrections = new Map<string, { id: string; flag: typeof labValues.$inferSelect.flag }[]>();
     for (const row of rows) {
+      // Preserve explicit ownership defects, including every sibling. They are
+      // counted by live read queries and withheld from clinical displays. This
+      // is not a catch-all: SQL, history or storage failures still reject
+      // and roll back the complete pass. Separately deleted foreign children
+      // stay unchanged without quarantining their otherwise healthy panel.
+      if (blocked.has(row.panelId) || owners.get(row.panelId) !== row.patientId) {
+        skippedValues += 1;
+        continue;
+      }
       const next = computeFlag(parseLabValue(row.value), row.refLow, row.refHigh);
       if (next === row.flag) continue;
       const panel = corrections.get(row.panelId) ?? [];
@@ -62,7 +90,9 @@ export async function reflagLabValuesIfNeeded(now = new Date()): Promise<void> {
   });
   await writeSetting(flaggedVersion, LAB_FLAG_VERSION);
 
-  if (changed > 0) {
-    await audit('labs.reflagged', { detail: { from: current, to: LAB_FLAG_VERSION, changed, cleared } });
+  if (changed > 0 || skippedValues > 0) {
+    await audit('labs.reflagged', {
+      detail: { from: current, to: LAB_FLAG_VERSION, changed, cleared, blockedPanels, skippedValues },
+    });
   }
 }

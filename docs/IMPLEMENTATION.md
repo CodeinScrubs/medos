@@ -33,8 +33,8 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.56/code72 on `codex/clinical-history-recovery` continues
-delivered PR8 `faa7160`. Permanent clinical correction history now covers patient,
+Application 0.11.57/code73 on `codex/clinical-history-recovery` continues
+delivered PR8 `faa7160` and .56 source `8ee111a`. Permanent clinical correction history covers patient,
 companion, encounter, diagnosis, vital, whole lab panel, imaging, order, consult
 and follow-up records. Seven clinical record kinds can be restored from the
 existing trash. Corrections appear in the existing patient timeline. Exact
@@ -42,8 +42,13 @@ ownership, audit/history rollback, original dataset and bounded reads are
 required; no new route, dependency, permission or backup scheme is introduced.
 Two additive migrations create the history table and ownership indexes.
 
-See [validation-0.11.56.md](validation-0.11.56.md) for current software checks
-and the precise pending native/artifact/delivery gates. Older .55 input diagnosis
+The .56 seven-kind restore/history/archive/native matrix and both inspected APKs
+are recorded in [validation-0.11.56.md](validation-0.11.56.md). A later verified
+mixed-owner lab defect still blocks .56 startup. .57 preserves that panel,
+withholds its results with a conditional notice and repairs healthy data;
+strict publication/history and real SQL failure rollback remain unchanged.
+See [validation-0.11.57.md](validation-0.11.57.md) for the new-source checks and
+pending native/artifact/delivery gates. Older .55 input diagnosis
 reproduces long-command native stale-event injection failures. The original
 short mismatch and older focus ANR remain unresolved; later exact input is not
 a causal explanation or physical-keyboard acceptance.

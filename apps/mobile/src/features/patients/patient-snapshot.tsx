@@ -13,6 +13,7 @@ import { isRunning } from '@/features/kardex/logic';
 import { patientCurrentOrdersQuery } from '@/features/kardex/queries';
 import { FLAG_LABEL, flagTone, type LabFlag } from '@/features/labs/flags';
 import { labsToReview } from '@/features/labs/logic';
+import { patientLabOwnershipIssuesQuery } from '@/features/labs/ownership-queries';
 import { patientLabValuesQuery } from '@/features/labs/queries';
 import { NOTE_TYPE_LABELS } from '@/features/notes/labels';
 import { notePreview, SOAP_NOTE_TYPES } from '@/features/notes/logic';
@@ -43,6 +44,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
 
   const vitals = useLive(patientVitalsQuery(patientId, 1), [patientId]);
   const labs = useLive(patientLabValuesQuery(patientId), [patientId]);
+  const labIssues = useLive(patientLabOwnershipIssuesQuery(patientId), [patientId]);
   const orders = useLive(patientCurrentOrdersQuery(patientId), [patientId]);
   const notes = useLive(latestPatientNoteQuery(patientId), [patientId]);
 
@@ -52,6 +54,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
   const chips = lastVital ? vitalChips(lastVital) : [];
   const review = labsToReview(labs.data ?? []);
   const latestLabAge = review.latestAt ? formatRelativeTime(review.latestAt, now) : undefined;
+  const blockedLabs = labIssues.data?.[0]?.count ?? 0;
   const running = (orders.data ?? []).filter(isRunning);
   const lastNote = notes.data?.[0];
 
@@ -82,15 +85,20 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
     );
   }
 
-  if (review.analytes > 0 && review.latestAt) {
+  if ((review.analytes > 0 && review.latestAt) || blockedLabs > 0) {
     rows.push(
       <SnapshotRow
         key="labs"
         icon="flask-outline"
         title="آزمایش"
-        when={`آخرین نمونه: ${latestLabAge}`}
+        when={latestLabAge ? `آخرین نمونه: ${latestLabAge}` : undefined}
         onPress={() => open('labs')}
       >
+        {blockedLabs > 0 ? (
+          <Text variant="caption" color="warning">
+            ارتباط بیمار در {toPersianDigits(blockedLabs)} برگه نیاز به بررسی دارد؛ نتایج آن نمایش داده نمی‌شود.
+          </Text>
+        ) : null}
         {review.rows.length > 0 ? (
           <Row gap="md" wrap>
             {review.rows.slice(0, SHOWN).map((r) => {
@@ -108,13 +116,13 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
             })}
             <More count={review.rows.length - SHOWN} />
           </Row>
-        ) : (
+        ) : review.analytes > 0 ? (
           <Text variant="caption" color="textMuted">
-            {labs.error
+            {labs.error || labIssues.error
               ? 'نتایج قبلی؛ نیاز به بازخوانی'
               : `آخرین نتیجه‌ی ${toPersianDigits(review.analytes)} آزمایش: بدون H یا L`}
           </Text>
-        )}
+        ) : null}
       </SnapshotRow>,
     );
   }
@@ -156,7 +164,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
     );
   }
 
-  const sources = [vitals, labs, orders, notes];
+  const sources = [vitals, labs, labIssues, orders, notes];
   const error = sources.find((source) => source.error)?.error;
   if (rows.length === 0 && !error) return null;
 

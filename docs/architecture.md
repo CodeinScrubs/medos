@@ -2484,7 +2484,32 @@ Authenticated SQL restore replaces clinical history with the archived dataset;
 it does not replay ordinary mutation wrappers or merge two patients' histories.
 An old archive without this table clears newer-dataset clinical versions. The
 existing pre-restore safety copy remains the way back. Derived status/flag repairs
-may then append explicit reconciliation history; a misowned lab value rejects
-the correction rather than being copied into another patient's history. Backup
+may then append explicit reconciliation history. Ordinary mutations still reject
+a misowned lab value rather than copying it into another patient's history; .57
+startup repair isolates that explicitly inconsistent panel without blocking healthy
+records. Backup
 format/KDF compatibility is unchanged. Contact/follow-up trash, other notebook
 trash and broader product/device acceptance remain separate work.
+
+## Lab ownership is a read boundary as well as a write boundary (0.11.57)
+
+Foreign keys alone do not prove that a value and its panel belong to the same
+patient. Shared correlated SQL identifies any live wrong-owner child. A mixed
+panel's entire live result set is withheld from snapshot, flowsheet, trend and
+timeline hydration: startup cannot safely recalculate and retain its whole
+clinical snapshot, so its seemingly normal siblings may also carry stale flags.
+The original SQL remains in backup and storage, with no guessed repair or history.
+
+Reflag preflights ownership in its synchronous transaction and skips explicit
+mixed-owner groups. All real SQL/history errors still roll back the complete
+healthy pass. Deleted foreign children remain intact without hiding healthy
+siblings. Live result queries also require live panel and patient parents.
+Conditional owner-list/count notices distinguish withheld results from an empty
+panel; the count does not fetch either patient's clinical text. Actual table
+objects in the SQL tree preserve child-only useLive subscriptions.
+
+Raw editor joins remain unfiltered, so their existing basis check refuses a
+foreign row rather than creating an apparently clean form. Reload must validate
+the fetched basis and acknowledge the current draft before cancelling/resetting
+the saver. Keep the read-only ownership marker out of the stored CAS basis.
+No codec/schema/backup format change is needed for these boundaries.

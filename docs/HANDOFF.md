@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Isolate mixed-owner labs without blocking healthy records
+
+**Agent:** GPT-6 via Codex; primary implementation/verification and one read-only
+GPT-6.1 Sol/xhigh ownership audit.
+**Commits:** this source commit, based on .56 `8ee111a` and delivered PR8 `faa7160`.
+
+**Changed**
+- .57/code73 preserves inconsistent imported lab panels and withholds all their
+  results from snapshot/table/trend/timeline. Healthy reflag continues; real
+  SQL/history errors still roll back the full pass. Counts/short conditional
+  notices distinguish withheld data from an empty/photo-only panel.
+- Keep raw editor ownership refusal. Reload validates the new basis before
+  reset and requires acknowledged draft flush. Strip the read projection from
+  stored delete CAS. Existing indexes bound candidate ownership-count reads.
+- Record completed .56 native seven-kind restore/history pages and independent
+  whole-archive comparisons/artifacts. No dependency, route, migration, permission
+  or backup format change; unrelated WIP remains untouched.
+
+**Verified**
+- Resumed .56 check:175 suites/2,607 tests. Three new real-SQLite regressions
+  fail before the fix and pass after it. Focused integrated checks:165/9 suites;
+  corrected UI/startup:70/5. Final full check:177 suites/2,625 app tests in211.156s,
+  five workflow tests and typecheck/lint/format without warnings; no new migration.
+- .56 source8ee native: all seven restores; trash20/5;40 star edits; history
+ 20/20/15. Independent old/current archives retain full prior rows,55 typed
+  versions and34 media hashes. Both actual APKs inspect correctly; owned read-only
+  emulator shutdown preserves both base hashes. See validation-0.11.56.
+
+**Not verified**
+- New .57 native/whole-archive/owner artifact and exact pushed-head hosted CI.
+- Physical phone/IME/clinical review, full timed40-patient shift, provider/power/
+  interruption acceptance. .56 native evidence does not accept .57.
+
+**Open threads**
+- Freeze .57, build/inspect x86 QA, restore a synthetic mixed-owner archive,
+  accept healthy access/owner warnings/refused editor/cold start, and independently
+  compare the exported full state. Then inspect owner arm64 and exact-head CI.
+- Rich text, remaining trash kinds, complete follow-up and other gates remain
+  in IMPLEMENTATION. The phone is not the only remaining work.
+
+**Gotchas**
+- Foreign keys validate existence, not value/panel ownership. Do not silently
+  reparent, normalize, hard-delete or filter the raw editor basis into a clean form.
+- A derived ownership marker is not a stored CAS field. Reflag skips explicit
+  ownership defects only; never swallow arbitrary SQL/history failure.
+
 ## 2026-10-11 — Preserve clinical corrections and restore seven record kinds
 
 **Agent:** GPT-6 via Codex; primary integration/verification with a reused backend reviewer.

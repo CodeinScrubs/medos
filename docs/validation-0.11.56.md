@@ -13,7 +13,9 @@ No existing PR was merged or rebased. Unrelated untracked audit files are retain
   Lab history includes the actual live result rows; note history remains separate.
 - Preserve null/empty/false/zero, text whitespace and dates. No automatic pruning.
   First changes to old records retain a real baseline, without inventing earlier
-  edits. Same-ms/backward-clock ordering uses per-record sequence. Raw typing,
+  edits. Each record's sequence increases across same-ms/backward-clock edits;
+  the global list still sorts recorded wall time and cannot infer true event order.
+  Raw typing,
   reminder receipts, index rebuilds and unchanged clinical saves do not create
   permanent clinical changes. Async/thenable callbacks are rejected.
 - Refuse wrong-patient lab children, reparenting, lossy imported INTEGER/boolean/
@@ -89,11 +91,63 @@ keyboard composition and physical typing are not accepted by ASCII injection.
 Only owned read-only `emulator-5558` was driven; shutdown preserves both AVD base
 hashes. Private raw witnesses are in `private/validation-0.11.56/native-diagnostics/`.
 
-## Native, artifact and delivery gates
+## Native and artifact evidence
 
-New .56 native upgrade, clinical restore/history UI, independent authenticated
-archive comparisons, final owner arm64 artifact inspection and exact-head hosted
-CI are pending at this source checkpoint. Do not reuse .55 acceptance for .56.
+Both artifacts are frozen to `8ee111a2537f89f22f88b3215154e2dbe4154bab`,
+version .56/code72, the existing package/signer and essential JNI libraries.
+The owner APK is arm64 only; QA is x86_64 and is not copied to dist.
+
+| Artifact | Bytes | SHA256 |
+|---|---:|---|
+| QA x86_64 | 55,108,206 | `865d6f14c77d69bcef0caafe4262a8666ecf0f40ee0ea53669e0c3ce640d998e` |
+| Owner arm64 | 53,499,879 | `d69c99ff020825ddc7a4428817caec532c98163f108af4db9305cbd908415e02` |
+
+The signing certificate SHA256 is
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+Both inspect as min SDK24/target36. QA builds in 14m30s; owner in 7m44s.
+Gradle's retained hardlink/deprecation/metaspace warnings do not indicate build
+failure or establish runtime acceptance. No source/HEAD changed during either build.
+
+The owned read-only emulator upgrades in place; its pulled installed bytes match.
+Native UI restores all seven record kinds with shown patient/title confirmation.
+Separately deleted lab children remain deleted; an old encounter returns inactive
+without changing the active episode, running orders or patient status.
+Twenty-five diagnosis tombstones page as20/5; all ids are unique and complete.
+Forty acknowledged star toggles produce55 full clinical versions; native history
+pages as20/20/15, with an observed exact before/after field change. This is bounded
+interaction/pagination evidence, not a timed40-patient shift.
+
+Independent authenticated archives compare every application field and media hash:
+
+| Stage | Exact retained state | Intended differences |
+|---|---|---|
+| Old-format fixture restored | 4,156 rows /50 tables;34 media hashes | Two additive migrations; no invented clinical versions |
+| Seven restores +40 toggles | All4,156 prior rows and34 media | Exactly8 clinical rows changed;55 exact typed versions and required restore audits |
+| Actual older .55 backup | All4,117 prior rows /50 tables and34 media | New-dataset clinical history cleared |
+| Actual .56 history roundtrip | All4,211 rows /51 tables and34 media | All55 version rows unchanged |
+
+All independently decoded databases pass integrity/FK checks;32 migrations are
+present. Archive SHA256 witnesses, full-row comparisons and raw captures remain
+in `private/validation-0.11.56/`. The old-backup observer briefly lost accessibility
+output; the operation was not repeated. A later fresh dump observed its explicit
+completion, and the exported whole-state archive independently verified it.
+
+PID2989 survives the acceptance actions. No MedOS fatal/ANR is observed in the
+retained window. A real SystemUI-not-responding boot dialog was captured and its
+observed Wait button used; an empty later counter does not erase that event.
+The owned serial/launcher are absent after shutdown; both original AVD base hashes
+are unchanged. No physical phone was used. .56 was not pushed/accepted by hosted CI.
+
+## Confirmed blocker found after native acceptance
+
+A valid-FK imported lab value may name a different patient from its panel.
+The strict history wrapper correctly refuses copying it into another patient's
+history, but .56 startup treats the resulting reflag rejection as fatal.
+Restore catches housekeeping failure, leaving the next cold start blocked.
+The .56 result/trend readers also lack complete ownership checks. Three real-SQLite
+regressions reproduce the failures before the .57 fix. Therefore these native
+witnesses do **not** make .56 ready for phone acceptance. See
+[validation-0.11.57.md](validation-0.11.57.md) for the separate corrected source.
 
 ## Still separate work
 

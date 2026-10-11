@@ -8,7 +8,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, EmptyState, Row, Segmented, Text } from '@/components/ui';
 import { useNow } from '@/components/use-now';
-import type { LabPanel, LabValue } from '@/db/schema';
+import type { LabValue } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { askPhotoSource, attachLabPhotoPanel } from '@/features/attachments/capture';
 import { PhotoRecovery } from '@/features/attachments/photo-recovery';
@@ -21,6 +21,7 @@ import { useTheme } from '@/theme';
 
 import { FLAG_LABEL, flagTone } from './flags';
 import { isUnreadableNumber } from './logic';
+import { patientLabOwnershipIssuesQuery } from './ownership-queries';
 import { ANALYTE_ORDER } from './presets';
 import { deleteLabPanel, patientLabPanelsQuery, patientLabValuesQuery } from './queries';
 
@@ -41,9 +42,16 @@ export function LabsTab({ patientId }: { patientId: string }) {
   const [capturing, setCapturing] = useState(false);
   const captureActive = useRef(false);
 
-  const { data: values, error } = useLive(patientLabValuesQuery(patientId), [patientId]);
-  const { data: panels } = useLive(patientLabPanelsQuery(patientId), [patientId]);
-  const { data: sheets } = useLive(patientMediaQuery(patientId, ['lab_sheet']), [patientId]);
+  const valueRead = useLive(patientLabValuesQuery(patientId), [patientId]);
+  const panelRead = useLive(patientLabPanelsQuery(patientId), [patientId]);
+  const sheetRead = useLive(patientMediaQuery(patientId, ['lab_sheet']), [patientId]);
+  const issueRead = useLive(patientLabOwnershipIssuesQuery(patientId), [patientId]);
+  const values = valueRead.data,
+    panels = panelRead.data,
+    sheets = sheetRead.data;
+  const failures = [valueRead, panelRead, sheetRead, issueRead].filter((source) => source.error);
+  const issues = issueRead.data?.[0]?.count ?? 0;
+  const reading = panels === undefined || issueRead.data === undefined;
 
   const hasAnything = (panels?.length ?? 0) > 0;
 
@@ -69,7 +77,11 @@ export function LabsTab({ patientId }: { patientId: string }) {
 
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
-      <ErrorNotice error={error} what="آزمایش‌ها" />
+      <ErrorNotice
+        error={failures[0]?.error}
+        what="آزمایش‌ها"
+        onRetry={() => failures.forEach((source) => source.retry())}
+      />
       <PhotoRecovery patientId={patientId} generation={generation} />
       <Row gap="sm">
         <View style={styles.grow}>
@@ -92,13 +104,25 @@ export function LabsTab({ patientId }: { patientId: string }) {
           />
         </View>
       </Row>
+      {issues > 0 ? (
+        <Text variant="caption" color="warning">
+          ارتباط بیمار در {toPersianDigits(issues)} برگه نیاز به بررسی دارد؛ نتایج آن در خلاصه و روند نمایش داده
+          نمی‌شود.
+        </Text>
+      ) : null}
 
-      {!hasAnything ? (
-        <EmptyState
-          icon="flask-outline"
-          title="آزمایشی ثبت نشده"
-          description="مقادیر را دستی یا با چسباندن از اکسل وارد کنید، یا از برگه عکس بگیرید و بعداً مقادیر را از روی عکس بنویسید."
-        />
+      {reading ? (
+        failures.length ? null : (
+          <ActivityIndicator />
+        )
+      ) : !hasAnything ? (
+        issues || failures.length ? null : (
+          <EmptyState
+            icon="flask-outline"
+            title="آزمایشی ثبت نشده"
+            description="مقادیر را دستی یا با چسباندن از اکسل وارد کنید، یا از برگه عکس بگیرید و بعداً مقادیر را از روی عکس بنویسید."
+          />
+        )
       ) : (
         <>
           <Segmented
@@ -180,7 +204,7 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
     return (
       <Card tone="alt">
         <Text variant="caption" color="textFaint">
-          هنوز مقداری وارد نشده؛ فقط عکس برگه ثبت شده است. از «نوبت‌ها» وارد برگه شوید و مقادیر را بنویسید.
+          مقدار قابل نمایش وجود ندارد. از «نوبت‌ها» برگهٔ آزمایش را باز کنید.
         </Text>
       </Card>
     );
@@ -334,7 +358,7 @@ function PanelList({
   sheets,
 }: {
   patientId: string;
-  panels: LabPanel[];
+  panels: Awaited<ReturnType<typeof patientLabPanelsQuery>>;
   values: ValueRow[];
   sheets: { id: string; entityId: string; thumbnailPath: string | null; relativePath: string }[];
 }) {
@@ -362,24 +386,29 @@ function PanelList({
   return (
     <Column gap="sm">
       {panels.map((p) => {
+        // The live projection's warning is not part of the stored CAS basis.
+        const { ownershipIssue, ...storedPanel } = p;
         const counts = countByPanel.get(p.id);
         const sheet = sheetByPanel.get(p.id);
         return (
           <Pressable
             key={p.id}
             onPress={() => router.push({ pathname: '/patient/[id]/lab', params: { id: patientId, panelId: p.id } })}
-            onLongPress={() =>
-              Alert.alert('حذف این نوبت آزمایش؟', formatJalaliDateTime(p.collectedAt), [
-                { text: 'انصراف', style: 'cancel' },
-                {
-                  text: 'حذف',
-                  style: 'destructive',
-                  onPress: () =>
-                    void withDatasetWrite(generation, () => deleteLabPanel(p.id, p)).catch((e) =>
-                      alertError('حذف نشد', e),
-                    ),
-                },
-              ])
+            onLongPress={
+              ownershipIssue
+                ? undefined
+                : () =>
+                    Alert.alert('حذف این نوبت آزمایش؟', formatJalaliDateTime(p.collectedAt), [
+                      { text: 'انصراف', style: 'cancel' },
+                      {
+                        text: 'حذف',
+                        style: 'destructive',
+                        onPress: () =>
+                          void withDatasetWrite(generation, () => deleteLabPanel(p.id, storedPanel)).catch((e) =>
+                            alertError('حذف نشد', e),
+                          ),
+                      },
+                    ])
             }
             style={({ pressed }) => [pressed && styles.pressed]}
           >
@@ -400,7 +429,9 @@ function PanelList({
                     {joinLabels([formatJalali(p.collectedAt), formatTime(p.collectedAt), p.labName])}
                   </Text>
                   <Row gap="xs" wrap style={{ marginTop: spacing.xxs }}>
-                    {counts ? (
+                    {ownershipIssue ? (
+                      <Badge label="ارتباط بیمار نیاز به بررسی دارد" tone="warning" />
+                    ) : counts ? (
                       <Badge label={`${toPersianDigits(counts.total)} مقدار`} tone="neutral" />
                     ) : (
                       <Badge label="مقادیر هنوز وارد نشده" tone="warning" icon="create-outline" />

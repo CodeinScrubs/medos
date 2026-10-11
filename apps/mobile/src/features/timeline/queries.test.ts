@@ -297,7 +297,7 @@ describe('bounded lab hydration', () => {
       'patients',
     ]);
   });
-  it('bounds pathological field length and excludes cross-owner lab values', async () => {
+  it('bounds pathological fields and withholds the whole panel after a live ownership conflict', async () => {
     const other = await createPatient({ firstName: 'Other', lastName: 'Synthetic' });
     t.db
       .insert(labPanels)
@@ -315,6 +315,12 @@ describe('bounded lab hydration', () => {
         ...stamps(at),
       })
       .run();
+    const row = timelineLabPreviewQuery(patientId, ['panel']).all()[0]!;
+    expect(row.analyte).toHaveLength(65);
+    expect(row.value).toHaveLength(129);
+    expect(row.unit).toHaveLength(65);
+    expect(row.truncated).toBe(1);
+    expect(row.total).toBe(1);
     t.db
       .insert(labValues)
       .values({
@@ -327,11 +333,7 @@ describe('bounded lab hydration', () => {
         ...stamps(at),
       })
       .run();
-    const row = timelineLabPreviewQuery(patientId, ['panel']).all()[0]!;
-    expect(row.analyte).toHaveLength(65);
-    expect(row.value).toHaveLength(129);
-    expect(row.unit).toHaveLength(65);
-    expect(row.truncated).toBe(1);
-    expect(row.total).toBe(1);
+    expect(timelineLabPreviewQuery(patientId, ['panel']).all()).toEqual([]);
+    expect(timelineLabsQuery(patientId).all()[0]!.summary).toContain('ارتباط بیمار');
   });
 });

@@ -82,8 +82,8 @@ export type LabFormFields = z.infer<typeof fieldsSchema>;
 export type LabFormDocument = z.infer<typeof schema>;
 
 export class LabFormConflict extends Error {
-  constructor() {
-    super('پیش‌نویس یا آزمایش در صفحهٔ دیگری تغییر کرده است؛ نوشتهٔ این صفحه نگه داشته شد.');
+  constructor(message = 'پیش‌نویس یا آزمایش در صفحهٔ دیگری تغییر کرده است؛ نوشتهٔ این صفحه نگه داشته شد.') {
+    super(message);
     this.name = 'LabFormConflict';
   }
 }

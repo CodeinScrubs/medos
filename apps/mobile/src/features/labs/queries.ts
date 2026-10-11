@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, isNull, ne, not, sql } from 'drizzle-orm';
 
 import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
@@ -9,31 +9,47 @@ import { formBasis } from '@/lib/form-document';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { computeFlag, parseLabValue } from './flags';
+import { labPanelHasForeignValues } from './ownership-queries';
 
 const panelAlive = isNull(labPanels.deletedAt);
 const valueAlive = isNull(labValues.deletedAt);
 
 export function patientLabPanelsQuery(patientId: string) {
   return db
-    .select()
+    .select({
+      ...getTableColumns(labPanels),
+      ownershipIssue: sql<number>`case when ${labPanelHasForeignValues()} then 1 else 0 end`,
+    })
     .from(labPanels)
-    .where(and(panelAlive, eq(labPanels.patientId, patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(and(panelAlive, isNull(patients.deletedAt), eq(labPanels.patientId, patientId)))
     .orderBy(desc(labPanels.collectedAt));
 }
 
 export function labPanelQuery(panelId: string) {
   return db
-    .select()
+    .select(getTableColumns(labPanels))
     .from(labPanels)
-    .where(and(panelAlive, eq(labPanels.id, panelId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(and(panelAlive, isNull(patients.deletedAt), eq(labPanels.id, panelId)))
     .limit(1);
 }
 
 export function panelValuesQuery(panelId: string) {
   return db
-    .select()
+    .select(getTableColumns(labValues))
     .from(labValues)
-    .where(and(valueAlive, eq(labValues.panelId, panelId)))
+    .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(
+      and(
+        valueAlive,
+        panelAlive,
+        isNull(patients.deletedAt),
+        not(labPanelHasForeignValues()),
+        eq(labPanels.id, panelId),
+      ),
+    )
     .orderBy(asc(labValues.sortOrder));
 }
 
@@ -42,8 +58,17 @@ export function patientLabValuesQuery(patientId: string) {
   return db
     .select({ value: labValues, collectedAt: labPanels.collectedAt, panelId: labPanels.id })
     .from(labValues)
-    .innerJoin(labPanels, eq(labValues.panelId, labPanels.id))
-    .where(and(valueAlive, panelAlive, eq(labValues.patientId, patientId)))
+    .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(
+      and(
+        valueAlive,
+        panelAlive,
+        isNull(patients.deletedAt),
+        not(labPanelHasForeignValues()),
+        eq(labPanels.patientId, patientId),
+      ),
+    )
     .orderBy(desc(labPanels.collectedAt), asc(labValues.sortOrder));
 }
 
@@ -52,12 +77,15 @@ export function analyteSeriesQuery(patientId: string, analyte: string) {
   return db
     .select({ value: labValues, collectedAt: labPanels.collectedAt })
     .from(labValues)
-    .innerJoin(labPanels, eq(labValues.panelId, labPanels.id))
+    .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
     .where(
       and(
         valueAlive,
         panelAlive,
-        eq(labValues.patientId, patientId),
+        isNull(patients.deletedAt),
+        not(labPanelHasForeignValues()),
+        eq(labPanels.patientId, patientId),
         sql`lower(${labValues.analyte}) = lower(${analyte})`,
       ),
     )
