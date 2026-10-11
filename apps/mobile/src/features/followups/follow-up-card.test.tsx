@@ -191,6 +191,28 @@ describe('follow-up card save and retry', () => {
     expect(action('تلاش مجدد')).toBeUndefined();
     expect(current().reminderAppliedRevision).toBe(current().reminderRevision);
   });
+
+  it('closes an acknowledged outcome after focus is lost while native receipt is pending', async () => {
+    await render();
+    await invoke(action('انجام شد').props.onPress);
+    await act(async () => tree!.root.findByType(Input).props.onChangeText('Durable result while leaving'));
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    jest.spyOn(notifications, 'cancelReminderRequired').mockImplementationOnce(() => pending);
+    await invoke(button('ثبت').props.onPress);
+    expect(prompt().props.visible).toBe(true);
+    expect(current()).toMatchObject({ status: 'done', outcome: 'Durable result while leaving' });
+    mockFocused = false;
+    await act(async () => {
+      release();
+      await settle();
+    });
+    expect(prompt().props.visible).toBe(false);
+    expect(current().reminderAppliedRevision).toBe(current().reminderRevision);
+    expect(alertError).not.toHaveBeenCalled();
+  });
 });
 
 describe('follow-up card dataset intent', () => {

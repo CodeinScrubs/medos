@@ -33,6 +33,40 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Close an acknowledged outcome after leaving its screen
+
+**Agent:** GPT-6 via Codex; primary follow-on, no additional delegation.
+**Commits:** this follow-on to .58 source `5304451`.
+
+**Changed**
+- A final retained-screen probe finds that completed outcome input could remain
+  open after focus loss during native receipt acknowledgment. Close the local
+  acknowledged prompt while mounted; haptics remain limited to the focused
+  origin. Failed/refused input stays intact. No navigation/header change.
+
+**Verified**
+- The new witness fails before the fix; corrected card/list tests pass31/2.
+  Full check passes178 suites/2,684 app tests (209.541s), five workflow tests and
+  typecheck/lint/format without warnings. Normal first-source push passes2,683;
+  draft incremental PR10 is attached, based on PR9. No PR is merged.
+
+**Not verified**
+- New-source APK/native/hosted-CI acceptance. The private inspected x86 APK of
+  `5304451` predates this last UI correction and is not the final .58 candidate.
+- Physical phone, measured long shifts, provider/interruption/power or clinical
+  review. Emulator System UI has a pre-install boot ANR; keep that evidence.
+
+**Open threads**
+- Freeze this source, rebuild/inspect x86, accept contact/follow-up recovery with
+  independent whole archives, build/inspect owner arm64, push and verify exact-head
+  CI. Native receipt delivery remains separate from SQL acknowledgment.
+- Notebook trash, rich text, full follow-up and other IMPLEMENTATION gates remain.
+
+**Gotchas**
+- Closing a mounted local outcome prompt is different from popping a route or
+  presenting feedback on another screen. Focus loss must not leave completed
+  input blocked; mount/dataset ownership still apply.
+
 ## 2026-10-11 — Recover companions and follow-ups without accepting stale choices
 
 **Agent:** GPT-6 via Codex; primary implementation/verification with one read-only

@@ -277,9 +277,12 @@ export function FollowUpCard({
               throw new Error('پیگیری مربوط به این نتیجه در دسترس نیست؛ متن نگه داشته شد.');
             await completeFollowUp(basis.id, text || null, new Date(now), basis);
             outcomeBasis.current = null;
-            if (mounted.current && navigation.isFocused()) {
+            // Closing this acknowledged local prompt is not a navigation action.
+            // Leave no completed input dialog behind when the owner returns.
+            if (mounted.current) {
               setPrompting(false);
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+              if (navigation.isFocused())
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
             }
           });
         }}

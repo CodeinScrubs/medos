@@ -88,6 +88,22 @@ Frozen .58 APKs, native acceptance and exact-source hosted CI are pending at
 this source checkpoint. Their results must be recorded before treating them as
 completed evidence.
 
+## Follow-on acknowledged outcome and focus loss
+
+First source `5304451` passes the normal push check with2,683 tests (203.605s)
+and its private x86 APK passes package/code74/signature/essential-library
+inspection. A later retained-card witness exposes an additional UI regression:
+the outcome is durable, but its prompt remains open when focus is lost during
+native acknowledgment. That witness fails before the correction. Acknowledged
+local modal state now closes while mounted; haptics remain limited to the
+focused origin. Refused or failed outcome text remains available.
+
+The corrected card/list run passes31 tests/two suites (14.872s). The full
+follow-on check passes178 suites/2,684 app tests in209.541s, five workflow tests
+and typecheck/lint/format without warnings. No other application behavior,
+dependency, schema or backup format changes. APK/native/CI evidence from
+`5304451` does not accept this later source; rebuild and inspect its candidate.
+
 ## Remaining boundaries
 
 This does not finish notebook trash, visual rich text, the full received/reviewed/

@@ -49,10 +49,12 @@ completion and postponement retain the shown clinical decision. Native reminder
 receipt changes alone do not invalidate it. Recovery preserves original context/
 status/result and acknowledges native reminder work separately from committed
 clinical data. Focused software evidence is recorded in
-[validation-0.11.58.md](validation-0.11.58.md). Full check passes178 suites/2,683
+[validation-0.11.58.md](validation-0.11.58.md). Full check passes178 suites/2,684
 app tests, five workflow tests and typecheck/lint/format; no migration changes.
 New-source native acceptance, owner artifact and exact-source hosted CI are
 pending at this source checkpoint.
+The last retained-screen correction closes an acknowledged outcome after focus
+loss; an earlier private .58 x86 APK predates it and is not the final candidate.
 
 The .56 seven-kind restore/history/archive/native matrix and both inspected APKs
 are recorded in [validation-0.11.56.md](validation-0.11.56.md). A later verified
