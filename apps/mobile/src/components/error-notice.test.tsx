@@ -24,13 +24,13 @@ const visibleText = () =>
 
 describe('compact read failure notice', () => {
   it('offers retry and reveals only redacted diagnostics on request', async () => {
-    const error = new Error('Failed query: example params: synthetic-secret\ncontinued');
+    const error = new Error('Failed query: synthetic-secret before params: synthetic-secret\ncontinued');
     const retry = jest.fn();
     await act(async () => {
       tree = create(<ErrorNotice error={error} what="فهرست" onRetry={retry} />);
     });
     expect(visibleText()).not.toContain('Failed query');
-    expect(logError).toHaveBeenCalledWith(error, { source: 'handled', context: 'فهرست' });
+    expect(logError).toHaveBeenCalledWith(error, { source: 'handled', context: 'read.notice' });
     await act(async () => {
       tree.root
         .findAllByType(Button)
@@ -44,7 +44,7 @@ describe('compact read failure notice', () => {
         .find((b) => b.props.label === 'جزئیات')!
         .props.onPress();
     });
-    expect(visibleText()).toContain('Failed query: example params: [redacted]');
+    expect(visibleText()).toContain('Arbitrary error text omitted.');
     expect(visibleText()).not.toContain('synthetic-secret');
     expect(visibleText()).not.toContain('continued');
     await act(async () => {

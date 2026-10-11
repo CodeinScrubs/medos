@@ -8,6 +8,7 @@ import { useNow } from '@/components/use-now';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 
 import {
@@ -146,7 +147,7 @@ export function useEncounterFormDraft(
       encounterFormDate(latest.current, new Date(now));
     } catch (error) {
       end();
-      notify('اطلاعات کامل نیست', error instanceof Error ? error.message : 'ورودی‌ها را بررسی کنید.');
+      notify('اطلاعات کامل نیست', safeErrorMessage(error, 'ورودی‌ها را بررسی کنید.'));
       return;
     }
     try {

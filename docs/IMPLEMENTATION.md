@@ -33,6 +33,18 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+Application 0.11.63/code79 on codex/diagnostic-boundaries adds bounded technical
+projection, known actionable notices, safe legacy reads, persistent incomplete-
+write signals and handled share/clear/copy/retry with original screen ownership.
+Temporary share files have a 20-file/10-MiB cap, 24-hour grace and pending URI
+protection. Installed Android trailing-slash behavior is pinned. Existing startup
+SQL tests remain. Final65 targeted tests and full197-suite/2,939-app-test check
+plus five workflow checks pass, with zero lint warnings. Normal push/CI/native/APK
+are pending at this source checkpoint. See [validation-0.11.63.md](validation-0.11.63.md).
+No new dependency/schema/route/permission/clinical rule/archive/key. The requested
+local selected clinical evidence export and weeks of use history are separate
+open work; default diagnostics do not implement them.
+
 Application0.11.62/code78 on codex/place-recovery follows PR12's documented
 825ef23. Existing trash now recovers places/extensions with exact original
 row/parent/lifecycle and required audit. Device copy/call/map and extension
@@ -41,8 +53,8 @@ single-flight admission. Optional feedback does not redefine acknowledged
 native success; runtime form metadata keys cannot bypass dedicated mutations.
 Full software check passes188 suites/2,879 app tests plus five workflow checks,
 zero lint warnings. See [validation-0.11.62.md](validation-0.11.62.md).
-Normal push/hosted CI and native/APK acceptance are pending at this source
-checkpoint; .61 remains the inspected owner artifact. No dependency/schema/
+Normal push and exact-source hosted CI succeed on159c996. Native/APK acceptance
+will be recorded on the frozen .63 candidate; .61 remains the inspected owner artifact. No dependency/schema/
 route/permission/clinical rule or archive/key change is added.
 
 Application 0.11.61/code77 on codex/note-action-integrity builds on PR11's

@@ -115,7 +115,7 @@ export function updatePlaceInTransaction(tx: DbTransaction, id: string, input: P
  */
 export function extensionsQuery(filter: { search?: string; placeId?: string } = {}) {
   const clauses: (SQL | undefined)[] = [aliveExt, alivePlace];
-  if (filter.placeId) clauses.push(eq(extensions.placeId, filter.placeId));
+  if (filter.placeId !== undefined) clauses.push(eq(extensions.placeId, filter.placeId));
   clauses.push(...matchesSearch(extensions.searchText, filter.search));
   return db
     .select({ extension: extensions, place: places, expectedBasis: extensionActionBasis() })

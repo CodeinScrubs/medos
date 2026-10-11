@@ -2671,3 +2671,30 @@ corrections follow Drizzle's omission behavior, explicit null clears supported
 fields, and rename/search propagation commits with the row. Deliberate valid
 parent reassignment remains supported; no implicit move or generic notebook
 history layer is introduced. Other notebook/doctor actions are separate work.
+
+## Default technical diagnostic boundary (.63)
+
+Default diagnostic data is a closed projection in lib/error-diagnostic.ts, not
+an attempt to scrub arbitrary error text. Known kinds/codes, fixed contexts,
+trusted app identity and bounded canonical Android bundle coordinates suffice
+for routine technical reports. Hermes offsets are distinct from source columns.
+Exact reviewed notices preserve useful recovery/validation instructions; unknown
+messages use a fixed fallback. Sensitive selected clinical evidence has the
+separate owner-authorized contract above and is not implicitly included here.
+
+The platform log uses strict version-2 JSONL with bounded native byte reads and
+explicit incomplete/read-failure states. Its persistent write marker protects
+honesty about interruption, not lossless atomic replacement or power durability.
+Legacy objects are projected before display/rewrite/export. Share snapshots are
+immutable, capped at20 files/10MiB with24-hour grace, and pinned until their
+native await ends even when the screen departs. Only exact direct owned UUID
+files may be retired; lack of an eligible victim refuses allocation. Android
+Directory.uri ends in slash, so retention uses File.name and exact reconstructed
+owner comparison. Recipient reading is not established by chooser completion.
+
+Report UI and route boundaries retain focus/mount/effect-lifetime and one action
+latch, and handle read/write/share/copy failures. Only the previous JS handler's
+explicit handoff is sanitized; other native exception routes can bypass it.
+The installed share module's retained pending state after a launch failure needs
+physical/provider acceptance; no fake Promise retry guarantee is made. This
+bounded100-error window is not the requested complete weeks-long use history.

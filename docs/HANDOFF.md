@@ -33,6 +33,47 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-12 — Bound default diagnostics and handle report actions
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh helpers provide private
+proposals/reviews. Primary owns integration, repairs and verification.
+**Commits:** this source checkpoint, based on159c996; codex/diagnostic-boundaries.
+
+**Changed**
+- .63/code79: content-free default technical projection, exact useful notices,
+  strict bounded legacy log reads, persistent incomplete-write signal and
+  bounded immutable share files pinned through native awaits.
+- Catch share/clear/copy/retry errors; retain original screen lifetime/focus and
+  single-flight intent. Keep clinical export separate. No new module/dependency/
+  schema/permission/archive scheme. Preserve .62; fix explicit empty-place filter.
+- Preserve both original startup SQL tests. Repair installed Android's trailing
+  directory slash mismatch and strengthen the cache stand-in, not its assertions.
+
+**Verified**
+- Private source-backed red witnesses; integrated146 tests, final65 targeted
+  tests and installed-contract URI witness red3/green8. See validation-0.11.63.md.
+- Full197-suite/2,939-app-test check and five workflow checks pass, with
+  typecheck/lint/format and zero lint warnings. Checked bytes stay unchanged.
+- Independent installed-contract in-memory review finds no additional issue;
+  this is not device/filesystem execution.
+- .62 normal push and exact-source hosted CI succeed on159c996.
+
+**Not verified**
+- .63 normal push/CI/APK/native pending at this source checkpoint.
+  No physical phone; .61 remains the inspected owner APK.
+
+**Open threads**
+- Complete frozen software check/push and native .62/.63 acceptance, then owner APK.
+- Other notebook recovery/doctor actions, rich text, full shifts/workflows, local
+  agent evidence and physical gates remain; phone is not the only open work.
+
+**Gotchas**
+- A proposal must not replace existing tests with unrelated new ones.
+- Directory.uri ends in slash on Android; use File.name plus exact owner check.
+- Native move is not atomic overwrite; chooser closure is not recipient reading.
+- User steering may interrupt PTY sessions: use an owned hidden worker and its
+  completion/source manifest, not a partial log, as long-running check evidence.
+
 ## 2026-10-12 — Recover places/extensions and retain original device choices
 
 **Agent:** GPT-6 via Codex; helper GPT-6.1 Sol/xhigh proposes privately; primary
