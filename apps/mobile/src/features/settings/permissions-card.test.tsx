@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { StrictMode } from 'react';
 import { AppState, type AppStateStatus, Linking } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
@@ -113,6 +114,27 @@ describe('current permission state and native action ownership', () => {
     mockNotificationRead.mockResolvedValue(refused);
     await resume();
     expect(buttons('اجازه بده')).toHaveLength(1);
+  });
+
+  it('keeps the latest permission state when React replays setup and cleanup', async () => {
+    const older = deferred<Grant>();
+    mockNotificationRead.mockReturnValueOnce(older.promise).mockResolvedValueOnce(refused);
+    await act(async () => {
+      tree = create(
+        <StrictMode>
+          <PermissionsCard />
+        </StrictMode>,
+      );
+      await settle();
+    });
+    expect(mockNotificationRead).toHaveBeenCalledTimes(2);
+    expect(buttons('اجازه بده')).toHaveLength(1);
+    await act(async () => {
+      older.resolve(allowed);
+      await settle();
+    });
+    expect(buttons('اجازه بده')).toHaveLength(1);
+    expect(notice().props.error).toBeUndefined();
   });
 
   it('does not read for inactive events and reads all native grants on return', async () => {

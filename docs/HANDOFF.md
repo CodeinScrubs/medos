@@ -33,6 +33,35 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Verify replay-safe permission cleanup without a lint warning
+
+**Agent:** GPT-6 via Codex; primary integration, no new delegation.
+**Commits:** initial .59 `f2fecac`; this cleanup/checkpoint commit.
+
+**Changed**
+- Remove the redundant cleanup counter increment; mounted lifetime and each new
+  read fence old responses. Add real StrictMode setup/cleanup replay coverage.
+- Keep the existing UI and fix checkpoint wrapping; no further runtime feature.
+
+**Verified**
+- Actual focused suite: 15 tests (3.472s); final full check: 179 suites/2,699
+  app tests/five workflow checks (247.218s), zero lint warnings. Initial source
+  normal push and exact f2fecac hosted CI succeed. PR11 is attached and draft.
+
+**Not verified**
+- Frozen .59 APK/native return/special access/delivery and the physical phone.
+
+**Open threads**
+- Push this exact source, build private x86 QA and inspect installed bytes;
+  witness real native settings return before any acceptance/owner artifact claim.
+- Optional lock callback rejection is now reproduced in two private software
+  probes; it is not a phone crash witness. Continue that repair, notebook trash,
+  rich text, follow-up loop and measured shift gates in IMPLEMENTATION.
+
+**Gotchas**
+- Native permission reads have no cancel API. Do not remove the mounted/latest
+  result checks or suppress the hook warning with a copied old counter.
+
 ## 2026-10-11 — Refresh actual permission state and handle native settings failures
 
 **Agent:** GPT-6 via Codex; primary integration, no new delegation.

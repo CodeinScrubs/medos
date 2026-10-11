@@ -87,7 +87,6 @@ export function PermissionsCard() {
     });
     return () => {
       mounted.current = false;
-      readVersion.current++;
       subscription.remove();
     };
   }, [refresh]);

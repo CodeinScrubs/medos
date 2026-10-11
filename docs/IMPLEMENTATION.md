@@ -36,8 +36,10 @@ integration and verification. A passing milestone does not complete the product.
 Application 0.11.59/code75 on `codex/permission-state-recovery` continues
 delivered PR10 `7d1dfc4`. .59 refreshes current grants after Android Settings,
 handles failed/repeated/late native choices and shortens misleading copy. Its
-179-suite/2,698-test software check passes; frozen APK/native acceptance remains
-pending in validation-0.11.59. .58 recovery evidence stays in its own report. Permanent clinical correction history covers patient,
+179-suite/2,699-test software check passes; frozen APK/native acceptance remains
+pending in validation-0.11.59. .58 recovery evidence stays in its own report.
+
+Permanent clinical correction history covers patient,
 companion, encounter, diagnosis, vital, whole lab panel, imaging, order, consult
 and follow-up records. Nine clinical record kinds can be restored from the
 existing trash. Corrections appear in the existing patient timeline. Exact
@@ -154,7 +156,8 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
   exact-alarm special access separately from notification permission; .58's
   observed OS window is one hour without special access.
 - Review the optional app-lock toggle's unhandled asynchronous callback and
-  delayed confirmation. This is a source finding, not a phone reproduction.
+  delayed confirmation. Two private software probes reproduce rejected enable/disable
+  callbacks; this is not a phone crash witness.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.

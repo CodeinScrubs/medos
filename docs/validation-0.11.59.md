@@ -27,12 +27,19 @@ or permission framework was introduced.
   lint, formatting and five workflow checks (Jest 204.898s).
 - The original external-grant/resume witness fails before this patch, then
   passes on the actual changed card. The native-module stand-ins are explicit.
-- The new focused suite passes 14 tests (5.962s): resume, inactive lifecycle,
+- The initial focused suite passes 14 tests (5.962s): resume, inactive lifecycle,
   read failure/retry, stale result/rejection, repeated native action, focus loss,
   unmount, retained handlers, intent/fallback failure, selected folder and cleanup.
-- Full changed-source `npm run check` passes typecheck, lint, formatting,
+- The initial changed-source `npm run check` passes typecheck, lint, formatting,
   179 suites / 2,698 app tests and five workflow checks (Jest 203.978s).
-  Exact-source hosted CI is recorded after the normal push.
+  Normal source push passes the same 2,698 tests (202.89s). Exact initial
+  `f2fecac` hosted [CI succeeds](https://github.com/CodeinScrubs/medos/actions/runs/38146514714).
+- Final cleanup removes an unnecessary counter increment in effect cleanup;
+  mounted lifetime and the next read already fence old results. The added real
+  StrictMode test observes both setups and rejects the first delayed snapshot.
+  The actual final focused suite passes 15 tests (3.472s). Full check passes
+  179 suites / 2,699 tests and five workflow checks (247.218s), with zero lint
+  warnings. Final-source push/CI and native evidence are recorded at delivery.
 
 ## Native and artifact evidence
 
