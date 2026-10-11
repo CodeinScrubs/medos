@@ -33,6 +33,18 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+Application0.11.62/code78 on codex/place-recovery follows PR12's documented
+825ef23. Existing trash now recovers places/extensions with exact original
+row/parent/lifecycle and required audit. Device copy/call/map and extension
+star retain the shown choice, original dataset, mount/focus/read state and
+single-flight admission. Optional feedback does not redefine acknowledged
+native success; runtime form metadata keys cannot bypass dedicated mutations.
+Full software check passes188 suites/2,879 app tests plus five workflow checks,
+zero lint warnings. See [validation-0.11.62.md](validation-0.11.62.md).
+Normal push/hosted CI and native/APK acceptance are pending at this source
+checkpoint; .61 remains the inspected owner artifact. No dependency/schema/
+route/permission/clinical rule or archive/key change is added.
+
 Application 0.11.61/code77 on codex/note-action-integrity builds on PR11's
 8ecaa67. Ordinary note creation/correction/deletion/version restoration now
 validates original patient/episode ownership. Delete and trash restore require
@@ -156,6 +168,13 @@ diagnostics cannot carry clinical bodies, credentials or colleague ratings;
 AGENTS.md now records the separate owner-controlled export exception. No
 automatic upload, duplicate chart or second navigation dashboard. This is
 pending implementation, not something the current100-error log already does.
+
+.62 closes place/extension deletion recovery and original device/star choices;
+remaining notebook kinds require their own parent/private-field contracts.
+Doctor's other communication and star/delete callbacks still need the same
+retained-choice review; the shared map fix does not certify them. An explicit
+empty-place filter in the ordinary extensions query remains a small API boundary
+follow-up (the current native list uses search, not this filter).
 
 | ID | Deliverable | Remaining acceptance or implementation |
 |---|---|---|

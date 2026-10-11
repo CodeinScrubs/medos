@@ -68,6 +68,10 @@ export type AuditAction =
   | 'greeting.sentConfirmed'
   | 'greeting.skipped'
   | 'doctor.deleted'
+  | 'place.deleted'
+  | 'place.restored'
+  | 'extension.deleted'
+  | 'extension.restored'
   | 'backup.created'
   | 'backup.restored'
   // A restore that was cut short and had its files put back.

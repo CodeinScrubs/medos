@@ -1,19 +1,25 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Card, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Extension, Place } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { callExtension, copyExtension } from '@/features/places/actions';
+import { callExtension, copyExtension, type PlaceDeviceOwner } from '@/features/places/actions';
 import { deleteExtension, extensionsQuery, setExtensionStarred } from '@/features/places/queries';
 import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
+
+type ExtensionRowData = Awaited<ReturnType<typeof extensionsQuery>>[number];
+const EMPTY_ROWS: ExtensionRowData[] = [];
 
 /**
  * Every hospital's internal extensions in one searchable list. Type "سونو" and
@@ -22,11 +28,116 @@ import { MIN_TOUCH, useTheme } from '@/theme';
  */
 export function ExtensionsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { generation, stale } = useDatasetIntent();
   const { colors, radii, spacing, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const { data, error, retry } = useLive(extensionsQuery({ search }), [search]);
-  const rows = data ?? [];
+  const rows = data ?? EMPTY_ROWS;
+  const [busy, setBusy] = useState(false);
+  const [deviceBusy, setDeviceBusy] = useState(false);
+  const deviceActing = useRef(false);
+  const readable = !stale && !error && data !== undefined;
+  const ready = !busy && !deviceBusy && readable;
+  const latest = useRef({ ready, readable, rows });
+  useLayoutEffect(() => {
+    latest.current = { ready, readable, rows };
+  }, [ready, readable, rows]);
+  const mounted = useRef(true);
+  const attempt = useRef<symbol | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      attempt.current = null;
+    };
+  }, []);
+
+  function rowAction(row: ExtensionRowData, kind: 'copy' | 'call' | 'star') {
+    const owns = () =>
+      mounted.current &&
+      generation === datasetGeneration() &&
+      navigation.isFocused() &&
+      latest.current.readable &&
+      latest.current.rows.some((p) => p.extension.id === row.extension.id && p.expectedBasis === row.expectedBasis);
+    if (!owns() || deviceActing.current || attempt.current || busy) return;
+    deviceActing.current = true;
+    setDeviceBusy(true);
+    const owner: PlaceDeviceOwner = { generation, expectedBasis: row.expectedBasis, owns };
+    const work =
+      kind === 'copy'
+        ? copyExtension(row.extension, owner)
+        : kind === 'call'
+          ? callExtension(row.extension, row.place, owner)
+          : withDatasetWrite(generation, () =>
+              setExtensionStarred(row.extension.id, !row.extension.starred, row.expectedBasis, new Date()),
+            );
+    void work
+      .catch((error: unknown) => {
+        if (owns())
+          alertError(kind === 'copy' ? 'کپی نشد' : kind === 'call' ? 'برنامهٔ تماس باز نشد' : 'تغییر ثبت نشد', error);
+      })
+      .finally(() => {
+        deviceActing.current = false;
+        if (mounted.current) {
+          setDeviceBusy(false);
+          retry();
+        }
+      });
+  }
+
+  function confirmDelete(row: ExtensionRowData) {
+    const currentChoice = () =>
+      latest.current.rows.some((p) => p.extension.id === row.extension.id && p.expectedBasis === row.expectedBasis);
+    const ownsScreen = () => mounted.current && generation === datasetGeneration() && navigation.isFocused();
+    if (!ownsScreen() || attempt.current || deviceActing.current || !latest.current.ready || !currentChoice()) return;
+    const token = Symbol('extension delete');
+    attempt.current = token;
+    let used = false;
+    const release = () => {
+      if (attempt.current === token) attempt.current = null;
+    };
+    Alert.alert(
+      'حذف داخلی؟',
+      `${row.place.name} — ${row.extension.department} — ${row.extension.extension}\nاز سطل زباله می‌توانید آن را برگردانید.`,
+      [
+        { text: 'انصراف', style: 'cancel', onPress: release },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: () => {
+            if (used) return;
+            used = true;
+            if (
+              !ownsScreen() ||
+              attempt.current !== token ||
+              deviceActing.current ||
+              !latest.current.ready ||
+              !currentChoice()
+            ) {
+              release();
+              retry();
+              return;
+            }
+            setBusy(true);
+            void withDatasetWrite(generation, () => deleteExtension(row.extension.id, row.expectedBasis, new Date()))
+              .catch((e: unknown) => {
+                if (ownsScreen()) alertError('حذف نشد', e);
+              })
+              .finally(() => {
+                release();
+                if (mounted.current) {
+                  setBusy(false);
+                  retry();
+                }
+              });
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: release },
+    );
+  }
 
   return (
     <SafeAreaView edges={[]} style={[styles.flex, { backgroundColor: colors.background }]}>
@@ -80,7 +191,17 @@ export function ExtensionsScreen() {
             gap: spacing.sm,
           }}
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => <ExtensionRow extension={item.extension} place={item.place} />}
+          renderItem={({ item }) => (
+            <ExtensionRow
+              extension={item.extension}
+              place={item.place}
+              onDelete={() => confirmDelete(item)}
+              onCopy={() => rowAction(item, 'copy')}
+              onCall={() => rowAction(item, 'call')}
+              onStar={() => rowAction(item, 'star')}
+              locked={!ready}
+            />
+          )}
         />
       )}
 
@@ -89,7 +210,23 @@ export function ExtensionsScreen() {
   );
 }
 
-function ExtensionRow({ extension, place }: { extension: Extension; place: Place }) {
+function ExtensionRow({
+  extension,
+  place,
+  onDelete,
+  onCopy,
+  onCall,
+  onStar,
+  locked,
+}: {
+  extension: Extension;
+  place: Place;
+  onDelete: () => void;
+  onCopy: () => void;
+  onCall: () => void;
+  onStar: () => void;
+  locked: boolean;
+}) {
   const router = useRouter();
   const { colors, radii, spacing } = useTheme();
 
@@ -97,8 +234,7 @@ function ExtensionRow({ extension, place }: { extension: Extension; place: Place
     Alert.alert(extension.department, place.name, [
       {
         text: extension.starred ? 'برداشتن ستاره' : 'ستاره‌دار',
-        onPress: () =>
-          void setExtensionStarred(extension.id, !extension.starred).catch((e) => alertError('تغییر ثبت نشد', e)),
+        onPress: onStar,
       },
       {
         text: 'ویرایش',
@@ -107,7 +243,9 @@ function ExtensionRow({ extension, place }: { extension: Extension; place: Place
       {
         text: 'حذف',
         style: 'destructive',
-        onPress: () => void deleteExtension(extension.id).catch((e) => alertError('حذف نشد', e)),
+        onPress: () => {
+          if (!locked) onDelete();
+        },
       },
     ]);
   }
@@ -140,7 +278,8 @@ function ExtensionRow({ extension, place }: { extension: Extension; place: Place
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`کپی داخلی ${extension.extension}`}
-            onPress={() => void copyExtension(extension)}
+            disabled={locked}
+            onPress={onCopy}
             style={({ pressed }) => [
               {
                 paddingHorizontal: spacing.md,
@@ -163,7 +302,8 @@ function ExtensionRow({ extension, place }: { extension: Extension; place: Place
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="تماس"
-            onPress={() => void callExtension(extension, place)}
+            disabled={locked}
+            onPress={onCall}
             style={({ pressed }) => [
               styles.call,
               { borderRadius: radii.full, backgroundColor: colors.primary, opacity: pressed ? 0.6 : 1 },
