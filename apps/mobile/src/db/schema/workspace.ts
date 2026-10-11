@@ -8,7 +8,9 @@ export const workspaceFormDrafts = sqliteTable(
   'workspace_form_drafts',
   {
     ...baseColumns,
-    kind: text('kind', { enum: ['idea', 'topic', 'order'] }).notNull(),
+    kind: text('kind', {
+      enum: ['idea', 'topic', 'order', 'specialty-profile', 'prescription', 'place', 'extension', 'credential'],
+    }).notNull(),
     parentId: text('parent_id'),
     recordId: text('record_id'),
     scope: text('scope').notNull(),

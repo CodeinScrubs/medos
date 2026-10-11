@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { audit, auditInTransaction } from '@/db/audit';
+import { db, type DbTransaction } from '@/db/client';
 import { credentials, type Credential } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -90,41 +90,61 @@ function values(input: CredentialInput) {
   };
 }
 
-export async function createCredential(input: CredentialInput): Promise<string> {
+export function createCredentialInTransaction(tx: DbTransaction, input: CredentialInput, now: Date): string {
   const id = newId();
   const row = values(input);
-  await db.insert(credentials).values({
-    id,
-    ...stamps(),
-    ...row,
-    // Never trimmed: a password is whatever the other system accepts, and the
-    // spaces at its edges may be part of it.
-    secretText: input.secret || null,
-    searchText: credentialSearchText(row),
-  });
-  await audit('vault.created', { summary: row.systemName });
+  if (!row.systemName) throw new Error('نام سامانه لازم است.');
+  tx.insert(credentials)
+    .values({
+      id,
+      ...stamps(now),
+      ...row,
+      // Never trimmed: a password is whatever the other system accepts, and the
+      // spaces at its edges may be part of it.
+      secretText: input.secret || null,
+      searchText: credentialSearchText(row),
+    })
+    .run();
+  auditInTransaction(tx, 'vault.created', { entityType: 'credential', entityId: id }, now);
   return id;
 }
-
-export async function updateCredential(id: string, patch: Partial<CredentialInput>): Promise<void> {
-  const current = (await credentialQuery(id))[0];
-  if (!current) throw new Error(`Credential ${id} not found`);
+export async function createCredential(input: CredentialInput): Promise<string> {
+  return db.transaction((tx) => createCredentialInTransaction(tx, input, new Date()));
+}
+export function updateCredentialInTransaction(
+  tx: DbTransaction,
+  id: string,
+  patch: Partial<CredentialInput>,
+  now: Date,
+): void {
+  const current = tx
+    .select()
+    .from(credentials)
+    .where(and(alive, eq(credentials.id, id)))
+    .get();
+  if (!current) throw new Error('این رمز در دسترس نیست.');
 
   const row = values({ ...current, ...patch } as CredentialInput);
+  if (!row.systemName) throw new Error('نام سامانه لازم است.');
   // `secret: undefined` means "leave the stored one alone"; an empty string
   // means "remove it".
   const secretGiven = patch.secret !== undefined;
 
-  await db
-    .update(credentials)
+  tx.update(credentials)
     .set({
       ...row,
-      ...(secretGiven ? { secretText: patch.secret || null } : {}),
+      // Explicit replacement/clear retires the legacy secret too. An unrelated
+      // edit preserves every legacy byte; clearing must never reveal it again.
+      ...(secretGiven ? { secretText: patch.secret || null, secretCipher: null, secretNonce: null } : {}),
       searchText: credentialSearchText(row),
-      ...touch(),
+      ...touch(now),
     })
-    .where(eq(credentials.id, id));
-  await audit('vault.updated', { summary: row.systemName });
+    .where(and(alive, eq(credentials.id, id)))
+    .run();
+  auditInTransaction(tx, 'vault.updated', { entityType: 'credential', entityId: id }, now);
+}
+export async function updateCredential(id: string, patch: Partial<CredentialInput>): Promise<void> {
+  db.transaction((tx) => updateCredentialInTransaction(tx, id, patch, new Date()));
 }
 
 /**

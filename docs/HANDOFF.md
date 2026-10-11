@@ -33,6 +33,137 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Deliver five-form recovery with complete native state witnesses
+
+**Agent:** GPT-6 via Codex; primary verification, no additional delegation.
+**Commits:** application `bab597f` + `948883a`; evidence in this commit.
+
+**Changed**
+- Record exact-source .55 recovery, rejection, publication/retrieval and old
+  backup replacement in validation-0.11.55. Update current execution/review gates.
+- Push/attach incremental draft PR8 against PR7. Prior PR1–7 heads, bases and
+  draft states are unchanged; no existing PR is merged. Unrelated untracked
+  audit documents remain untouched and uncommitted.
+
+**Verified**
+- Full corrected source check passes 171 suites/2,474 app tests (221.402s),
+  five workflow checks and typecheck/lint/format. Normal source push repeats
+  the full check successfully (174.928s), without warnings or bypass.
+- Frozen 948883a inspected/installed x86_64 bytes match. Actual cold recovery,
+  invalid-date/partial-line refusal, five publications and list retrieval pass.
+  Independent authenticated archives preserve every prior field in 50 application
+  tables, 4,117 prior rows and 34 media hashes; all intended additions are checked.
+- Old-backup replacement retains original credential words read-only and exactly
+  restores the prior application state, without stale publication. Checked
+  PID 10736 survives; no fatal is observed for that process. Owned-emulator
+  shutdown preserves both original base hashes. Full details/hashes in the report.
+- Owner arm64-only .55/code71 APK built/inspected from 948883a: same signer,
+  actual version/ABI/essential JNI; SHA256 cb9f38f7…70f56c27. Not run on a phone.
+
+**Not verified**
+- Earlier synthetic typing mismatch under host native-build load remains
+  unexplained. Exact later input is not a root-cause result or pressure acceptance.
+- No physical phone, every-keystroke power-loss guarantee, full timed 40-patient
+  shift or completion of history/trash/rich-text and broader IMPLEMENTATION gates.
+
+**Open threads**
+- Prioritize native input/IME/event-time/pressure diagnosis, then remaining
+  integrity and everyday-workflow gates in IMPLEMENTATION. Phone is not the sole
+  remaining work. Hosted status is linked from PR8; verify its exact current SHA.
+
+**Gotchas**
+- Some native attempts fail in the observer: repeated/flattened labels, disabled
+  but readable inputs, scroll direction and assumed deep-link destinations.
+  Correct these with fresh XML/bounds; do not count failed attempts as app passes.
+- Raw fixtures start on intermediate bab597f; final 948883a recovery/publication/
+  replacement witnesses are separate. Neither the intermediate APK nor older
+  CI accepts a newer source. Later documentation leaves the tested app unchanged.
+
+---
+
+## 2026-10-10 — Match notebook selectors to the retained form lock
+
+**Agent:** GPT-6 via Codex; primary integration, no additional delegation.
+**Commits:** implementation in this commit; remaining-form parent `bab597f`.
+
+**Changed**
+- Pass the existing editing lock to both knowledge specialty selectors,
+  including their clear controls and accessibility state. No new workflow.
+- Extend mounted completion, dataset-replacement and read-retry checks.
+
+**Verified**
+- Six assertions fail on the parent source (10.672s): locked selectors still
+  present as enabled. Corrected full root check passes 171 suites/2,474 app
+  tests (221.402s), five workflow checks, typecheck/lint/format without warnings.
+- Intermediate bab597f native recovery passes for all five new raw forms after
+  actual process death. Independently authenticated archives retain all 4,117
+  prior rows in 50 application tables and 34 media hashes, plus the intended
+  raw drafts and one explicitly created parent fixture. No domain publication.
+
+**Not verified**
+- This newer source still needs its own frozen native publication/replacement
+  and owner artifact. Intermediate native results do not accept the change.
+- A native synthetic typing attempt produced two characters instead of the
+  requested string; a later idle retry matches. Cause remains unestablished.
+- No physical phone or full 40-patient shift; IMPLEMENTATION gates remain open.
+
+**Open threads**
+- Freeze, build, inspect and accept this source, then deliver an incremental
+  draft PR against PR7. Keep the input/IME/pressure diagnostic gate explicit.
+
+**Gotchas**
+- Empty Android EditText exposes its hint, and flattened columns require actual
+  label/bounds association. These observer defects do not explain the typing
+  mismatch. A first System UI ANR was observed and explicitly acknowledged.
+- Avoid needless app-clean for JS-only rebuilds; inspect actual ABI/JNI before
+  installation and clean/rebuild only when inspection shows it is necessary.
+
+---
+
+## 2026-10-10 — Recover the remaining notebook forms without a new workflow
+
+**Agent:** GPT-6 via Codex; two authorized GPT-6.1 Sol extra-high agents
+implement knowledge/place ports; primary owns vault, integration and verification.
+**Commits:** implementation in this commit; delivered parent PR7 `3d458ab`.
+
+**Changed**
+- Connect specialty profile, prescription, place, extension and credential to
+  the existing raw document/recovery/publication engine and feature lists.
+- Keep exact partial input, secret whitespace and invalid expiry separate from
+  published records. Refuse dropping a partial prescription line on Save.
+- Commit complete-basis comparison, feature/index writes, receipt/retirement
+  and required audit together. Explicit secret clear/replacement clears legacy
+  cipher/nonce; unrelated edits preserve them and unchanged expiry milliseconds.
+- Preserve original references, dataset/focus and native parents, including
+  children first mounted after replacement. Invalid imported ratings remain
+  editable until explicitly corrected. No new dependency/route/permission/SQL.
+
+**Verified**
+- Pre-change vault probes reproduce absent raw recovery and secret resurrection.
+  Integration probes reproduce two late-child labels and an uneditable rating;
+  corrected focused tests pass. Final root check passes 171 suites/2,474 app
+  tests (203.895s) and five workflow checks, without lint/act warnings.
+- Schema regeneration reports no changes; scoped version/lock edits checked.
+
+**Not verified**
+- Frozen .55 native recovery/publication/restore and owner artifact are pending
+  at this source checkpoint; .54 evidence does not accept the new source.
+- No physical phone, every-keystroke power guarantee, full timed 40-patient shift
+  or completion of history/trash/rich-text and other IMPLEMENTATION gates.
+
+**Open threads**
+- Freeze this source, test actual Android/complete authenticated archives, then
+  build/inspect the owner arm64 APK and deliver an incremental draft PR against PR7.
+- Continue the other priority gates; phone testing is not the only remaining work.
+
+**Gotchas**
+- Do not initialize retained labels from replacement rows on a late child mount.
+  Raw codecs must retain invalid finite imported ratings; publication validates.
+- Keep all tracked files and HEAD unchanged during native builds. QA x86_64
+  artifacts stay private; no real credential or private fixture enters the repo.
+
+---
+
 ## 2026-10-10 — Deliver reviewed .54 evidence with exact hosted checks
 
 **Agent:** GPT-6 via Codex; primary verification, no new delegation.

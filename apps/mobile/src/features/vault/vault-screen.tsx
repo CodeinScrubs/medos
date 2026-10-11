@@ -8,6 +8,7 @@ import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Screen, Text } f
 import type { Credential } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { SearchBar } from '@/features/knowledge/search-bar';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -41,7 +42,7 @@ function CredentialList() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
 
-  const { data, error } = useLive(credentialsQuery({ search, category: category === 'all' ? null : category }), [
+  const { data, error, retry } = useLive(credentialsQuery({ search, category: category === 'all' ? null : category }), [
     search,
     category,
   ]);
@@ -60,7 +61,16 @@ function CredentialList() {
       <Column gap="sm" style={{ paddingTop: spacing.md }}>
         <SearchBar value={search} onChange={setSearch} placeholder="نام سامانه، یوزرنیم…" />
         <ChipSelect options={options} value={category} onChange={(v) => v && setCategory(v)} />
-        <ErrorNotice error={error} what="رمزها" />
+        <ErrorNotice error={error} what="رمزها" onRetry={retry} />
+        <UnfinishedWorkspaceForms
+          kind="credential"
+          onOpen={(recordId, draftId) =>
+            router.push({
+              pathname: '/vault/edit',
+              params: { ...(recordId !== null ? { credentialId: recordId } : {}), draftId },
+            })
+          }
+        />
 
         {rows.length === 0 && data !== undefined ? (
           <EmptyState

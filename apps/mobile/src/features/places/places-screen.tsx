@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Place } from '@/db/schema';
@@ -11,6 +12,7 @@ import { useLive } from '@/db/use-live';
 import { openInMaps } from '@/features/places/actions';
 import { PLACE_KIND_LABELS } from '@/features/places/labels';
 import { deletePlace, placesQuery } from '@/features/places/queries';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { formatPhone, normalizePhone } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
@@ -21,7 +23,7 @@ export function PlacesScreen() {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
   const [kind, setKind] = useState<KindFilter>('all');
-  const { data } = useLive(placesQuery({ kind: kind === 'all' ? undefined : kind }), [kind]);
+  const { data, error, retry } = useLive(placesQuery({ kind: kind === 'all' ? undefined : kind }), [kind]);
   const rows = data ?? [];
 
   return (
@@ -38,9 +40,16 @@ export function PlacesScreen() {
             })),
           ]}
         />
+        <ErrorNotice error={error} what="مکان‌ها" onRetry={retry} />
+        <UnfinishedWorkspaceForms
+          kind="place"
+          onOpen={(placeId, draftId) =>
+            router.push({ pathname: '/places/edit', params: { ...(placeId === null ? {} : { placeId }), draftId } })
+          }
+        />
       </View>
 
-      {rows.length === 0 && data !== undefined ? (
+      {rows.length === 0 && data !== undefined && !error ? (
         <EmptyState
           icon="location-outline"
           title="مکانی ثبت نشده"

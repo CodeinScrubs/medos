@@ -5,6 +5,53 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Remaining notebook forms reuse raw recovery (0.11.55)
+
+Specialty profiles, personal prescription templates, places, extensions and
+credentials now use the existing workspace-form lifecycle. They have strict
+feature-owned version1 codecs and synchronous publishers; no new SQL table,
+route, dependency or permission. Editable specialty/place selections are fields
+of a notebook document, unlike Kardex's immutable clinical parent key.
+
+Raw acknowledgment retains exact text, separators, incomplete dates/coordinates
+and prescription lines without publishing a record. Prescription lines carry
+stable editor keys, removed from the published format. A line with other text
+but no drug must be completed or explicitly removed; Save cannot silently drop
+it. An imported invalid personal-fit rating stays recoverable and correctable,
+but cannot publish until the owner chooses a valid rating or clears it.
+Place digit normalization and map-coordinate derivation happen only on Save.
+
+Publication compares the complete original record, including secret/legacy
+payload, usage metadata and unchanged timestamps, and commits the feature
+write/search index, raw receipt and required audits together. Place renaming
+also rebuilds child extension indexes in that transaction. The existing live
+place requirement remains; a deleted parent does not become an implicit move.
+An unchanged archived specialty can remain in a historical profile/template;
+a newly selected missing or archived reference refuses publication.
+
+Credentials remain an ordinary organized notebook. Blank replacement input
+preserves the current password and legacy bytes. Explicit replacement/removal
+clears the legacy ciphertext/nonce as well, so an old secret cannot reappear as
+sealed after removal. Password whitespace is never normalized. Previews and
+comparison descriptions never echo secrets; the raw document remains inside
+the existing local database/encrypted backup contract. An unchanged expiry
+preserves its exact stored time; invalid visible text cannot publish a cached
+valid date. No extra unlock or strength lecture is added.
+
+Every screen keeps one original AutosaveScope/removal guard, native parents,
+route, dataset generation and publication focus. Display labels retain only
+original-dataset reads; a child first mounted after replacement cannot seed
+itself with a replacement specialty/place name. Recovery links use three-row
+pages inside existing lists, projecting only an allowlisted descriptive field.
+
+**Rejected: five copied draft engines, autosaving invalid input directly into
+published records, silently dropping a partial prescription line, and normalizing
+passwords or phone/coordinate input while typing.** Raw drafts and id-only audits
+are not permanent clinical correction history. Validation boundaries and the
+remaining product/device gates are in validation-0.11.55 and IMPLEMENTATION.
+
+---
+
 ## Raw Kardex recovery with explicit clinical ownership (0.11.54)
 
 The shared lifecycle now accepts an immutable feature-owned parent key; its

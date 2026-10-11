@@ -8,6 +8,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { PrescriptionTemplate } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
@@ -38,7 +39,10 @@ export function PrescriptionsList() {
   const [search, setSearch] = useState('');
   const [age, setAge] = useState<AgeFilter>('all');
 
-  const { data, error } = useLive(prescriptionsQuery({ search, ageGroup: age === 'all' ? null : age }), [search, age]);
+  const { data, error, retry } = useLive(prescriptionsQuery({ search, ageGroup: age === 'all' ? null : age }), [
+    search,
+    age,
+  ]);
   const rows = data ?? [];
 
   return (
@@ -46,7 +50,16 @@ export function PrescriptionsList() {
       <Column gap="sm" style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
         <SearchBar value={search} onChange={setSearch} placeholder="عنوان، شکایت، نام دارو…" />
         <ChipSelect options={AGE_FILTERS} value={age} onChange={(v) => v && setAge(v)} />
-        <ErrorNotice error={error} what="فهرست نسخه‌ها" />
+        <ErrorNotice error={error} what="فهرست نسخه‌ها" onRetry={retry} />
+        <UnfinishedWorkspaceForms
+          kind="prescription"
+          onOpen={(recordId, draftId) =>
+            router.push({
+              pathname: '/knowledge/rx/edit',
+              params: { ...(recordId === null ? {} : { templateId: recordId }), draftId },
+            })
+          }
+        />
       </Column>
 
       {rows.length === 0 && data !== undefined ? (

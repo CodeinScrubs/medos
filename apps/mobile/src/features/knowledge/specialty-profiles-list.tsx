@@ -7,6 +7,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Card, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { SpecialtyProfile } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
@@ -19,14 +20,23 @@ export function SpecialtyProfilesList() {
   const { spacing } = useTheme();
   const [search, setSearch] = useState('');
 
-  const { data, error } = useLive(specialtyProfilesQuery({ search }), [search]);
+  const { data, error, retry } = useLive(specialtyProfilesQuery({ search }), [search]);
   const rows = data ?? [];
 
   return (
     <View style={styles.flex}>
       <Column gap="sm" style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
         <SearchBar value={search} onChange={setSearch} placeholder="رشته، بازار کار، نظر شخصی…" />
-        <ErrorNotice error={error} what="فهرست رشته‌ها" />
+        <ErrorNotice error={error} what="فهرست رشته‌ها" onRetry={retry} />
+        <UnfinishedWorkspaceForms
+          kind="specialty-profile"
+          onOpen={(recordId, draftId) =>
+            router.push({
+              pathname: '/knowledge/specialty/edit',
+              params: { ...(recordId === null ? {} : { profileId: recordId }), draftId },
+            })
+          }
+        />
       </Column>
 
       {rows.length === 0 && data !== undefined ? (
