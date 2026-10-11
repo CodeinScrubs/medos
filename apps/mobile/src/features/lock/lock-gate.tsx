@@ -3,12 +3,14 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, BackHandler, StyleSheet, View } from 'react-native';
 
-import { notify } from '@/components/feedback';
+import { ErrorNotice } from '@/components/error-notice';
+import { alertError, notify } from '@/components/feedback';
 import { Button, Column, Text } from '@/components/ui';
 import { audit } from '@/db/audit';
 import { writeSetting } from '@/db/settings';
 import { useSetting } from '@/db/use-setting';
 import { RLM } from '@/lib/persian';
+import { logError } from '@/platform/error-log';
 import { useTheme } from '@/theme';
 
 import { lockEnabled, lockGraceSeconds } from './settings';
@@ -31,23 +33,33 @@ export function LockGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const backgroundedAt = useRef<number | null>(null);
   const authenticating = useRef(false);
+  const mounted = useRef(false);
 
   // Reactive, so switching the lock on or off in settings applies at once.
   const enabled = useSetting(lockEnabled);
   const grace = useSetting(lockGraceSeconds);
   const graceMs = grace.value * 1000;
 
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const unlock = useCallback(async () => {
     // One prompt at a time: the lock screen opens it automatically, and the
     // button can be tapped while it is still coming up.
-    if (authenticating.current) return;
+    if (!mounted.current || authenticating.current) return;
     authenticating.current = true;
     try {
       // With no screen lock on the phone there is nothing to authenticate
       // against, and the lock would shut its owner out for good — which
       // happens after restoring a backup onto a phone without a PIN. The lock
       // cannot protect anything on such a phone, so it steps aside and says so.
-      if ((await LocalAuthentication.getEnrolledLevelAsync()) === LocalAuthentication.SecurityLevel.NONE) {
+      const level = await LocalAuthentication.getEnrolledLevelAsync();
+      if (!mounted.current) return;
+      if (level === LocalAuthentication.SecurityLevel.NONE) {
         setLocked(false);
         notify(
           'قفل MedOS کار نمی‌کند',
@@ -61,10 +73,13 @@ export function LockGate({ children }: { children: ReactNode }) {
         cancelLabel: 'انصراف',
         disableDeviceFallback: false,
       });
-      if (result.success) setLocked(false);
+      if (mounted.current && result.success) setLocked(false);
+    } catch (error) {
+      if (mounted.current) alertError('باز کردن قفل کامل نشد', error);
+      else logError(error, { source: 'handled', context: 'باز کردن قفل کامل نشد' });
     } finally {
       authenticating.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }, []);
 
@@ -72,15 +87,16 @@ export function LockGate({ children }: { children: ReactNode }) {
   // rendering. Turning the lock on later from settings does not lock at once:
   // the user has just authenticated to do it.
   const [decided, setDecided] = useState(false);
-  if (!decided && enabled.loaded) {
+  if (!decided && enabled.loaded && !enabled.error) {
     setDecided(true);
     if (enabled.value) setLocked(true);
   }
 
   // Prompt as soon as the lock screen appears, rather than waiting for a tap.
   useEffect(() => {
-    if (locked) void unlock();
-  }, [locked, unlock]);
+    // A native binding may throw synchronously; don't update state in this effect.
+    if (locked && !enabled.error) void Promise.resolve().then(unlock);
+  }, [locked, enabled.error, unlock]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -98,7 +114,7 @@ export function LockGate({ children }: { children: ReactNode }) {
 
   // Until the setting has loaded, cover everything: a locked app must never
   // flash patient data for the few milliseconds before it knows it is locked.
-  const covered = !enabled.loaded || (enabled.value && locked);
+  const covered = !enabled.loaded || !!enabled.error || (enabled.value && locked);
 
   // The hardware back button does not go through the cover — it would pop the
   // screen underneath, so the app would come back unlocked onto a different
@@ -126,7 +142,11 @@ export function LockGate({ children }: { children: ReactNode }) {
           importantForAccessibility="yes"
           style={[StyleSheet.absoluteFill, styles.center, { backgroundColor: colors.background }]}
         >
-          {enabled.loaded ? (
+          {enabled.error ? (
+            <Column gap="md" style={{ padding: spacing.xxl }}>
+              <ErrorNotice error={enabled.error} what="تنظیم قفل اپ" onRetry={enabled.retry} />
+            </Column>
+          ) : enabled.loaded ? (
             <Column gap="md" style={{ alignItems: 'center', padding: spacing.xxl }}>
               <Ionicons name="lock-closed" size={48} color={colors.primary} />
               <Text variant="title">{RLM}MedOS قفل است</Text>
@@ -160,12 +180,17 @@ export async function enableAppLock(): Promise<{ ok: boolean; reason?: string }>
 }
 
 export async function disableAppLock(): Promise<boolean> {
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: 'تأیید برای خاموش کردن قفل',
-    cancelLabel: 'انصراف',
-    disableDeviceFallback: false,
-  });
-  if (!result.success) return false;
+  // A restored or changed phone may have no screen lock. The cover already
+  // steps aside then; the owner must still be able to turn this setting off.
+  const level = await LocalAuthentication.getEnrolledLevelAsync();
+  if (level !== LocalAuthentication.SecurityLevel.NONE) {
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'تأیید برای خاموش کردن قفل',
+      cancelLabel: 'انصراف',
+      disableDeviceFallback: false,
+    });
+    if (!result.success) return false;
+  }
   await writeSetting(lockEnabled, false);
   await audit('lock.disabled');
   return true;

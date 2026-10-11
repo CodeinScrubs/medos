@@ -5,6 +5,44 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Owned settings actions and optional lock failures (0.11.60)
+
+SettingsScreen captures its dataset generation once. Native confirmation and
+subsequent setting/audit work keep the existing withDatasetWrite admission
+through awaits; restore cannot replace that dataset halfway through. Retained
+old callbacks never obtain a new token. Lock taps are single-flight, cancellation
+is quiet, and UI feedback belongs only to the mounted focused screen. Stale
+settings ask for reopening rather than claiming there is a clinical draft.
+
+The global optional LockGate handles native enrollment/authentication rejection,
+retains its cover and exposes the existing retry button. Unmounted native work
+cannot open a prompt or publish UI; late errors use the redacted local logger.
+Typed settings expose live-query error/retry. LockGate withholds stale settings
+and native prompts on a failed initial/refresh read, showing the existing retry
+notice without unmounting the clinical content. No new framework, feature,
+mandatory security flow or persistence format.
+
+Explicit lock removal also reads actual device enrollment. A phone whose
+screen credential disappeared cannot satisfy authentication; when the OS
+reports NONE, explicit removal writes/audits off without opening that impossible
+prompt. Enrolled phones still authenticate. Read/write/audit failures propagate
+through the same owned action; an API error is never treated as no enrollment.
+
+## Current native permission state (0.11.59)
+
+PermissionsCard reads notification/camera/microphone grants again when Android
+returns the app to the foreground. A monotonic read token and mounted check
+prevent older results or rejections replacing a newer snapshot. Failed reads
+withhold old grant badges and use the existing error/retry notice. Native
+permission/settings actions are single-flight; retained unfocused/unmounted
+handlers refuse work and delayed failures do not show over a different route.
+
+A stored backup folder means selected, not verified provider access. Notification
+permission does not prove exact-alarm access or delivery. The card keeps the
+existing system-settings link and explains delay without promising an exact
+arrival or claiming it has queried special access. No database mutation,
+shared permission framework, route or new native dependency is required.
+
 ## Remaining notebook forms reuse raw recovery (0.11.55)
 
 Specialty profiles, personal prescription templates, places, extensions and

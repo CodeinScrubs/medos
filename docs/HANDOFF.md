@@ -33,6 +33,189 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Deliver verified .60 optional-lock repair and owner APK
+
+**Agent:** GPT-6 via Codex; primary integration and native verification.
+**Commits:** application source e34e79e; this documentation checkpoint.
+
+**Changed**
+- Record the final no-credential repair independently of first-source evidence.
+- Deliver the signed arm64 dist/MedOS-0.11.60.apk; no additional app change.
+
+**Verified**
+- Full source check: 182 suites/2,734 app tests, five workflow checks,
+  typecheck/lint/format, zero lint warnings. Normal push repeats it (Jest 221.912s).
+- Exact-source hosted CI succeeds. Both APKs pass actual version/code/ABI/signer/
+  essential-JNI inspection; installed QA bytes match. Exact hashes and build
+  warnings are in validation-0.11.60.md.
+- Actual no-enrollment refusal, enable cancel/retry, repaired disable after PIN
+  removal, enrolled disable cancel/success and cold cancel/retry pass on final
+  QA bytes. The original 41 synthetic patients remain. No MedOS fatal is observed
+  in this bounded run. Owned VM closes normally; persistent base hashes stay intact.
+
+**Not verified**
+- Physical phone, general native failure injection, alarm delivery/reboot/Doze,
+  media/IME/provider/power and full timed heavy shifts. The product is not finished.
+- Private next-slice proposals are not integrated app features or acceptance.
+
+**Open threads**
+- Handle places/extension phone, clipboard, usage-write and haptic failures with
+  original dataset and current source-screen ownership. A failed optional counter
+  must not turn an acknowledged copy into a reported copy failure.
+- Extend existing trash to notebook records, preserving original parent context
+  and separately deleted children; test stale callbacks, required audit rollback
+  and complete compatible archives. This is not permanent notebook edit history.
+- Prove rich-editor native IME/selection/snapshot drain before schema integration;
+  retain the single AutosaveScope and exact plain/NULL/history/export compatibility.
+- Complete the follow-up loop and measured 40-patient native shifts; physical and
+  physician acceptance remain separate. Do not claim that only phone testing remains.
+
+**Gotchas**
+- Boot wait and initial UI probe fail because of delayed boot/System UI ANR;
+  observed Wait exposes the same app PID. A too-early retry snapshot is also
+  retained. Use bounded fresh snapshots; do not invent app fixes for those failures.
+- The normal compressed hierarchy hides the covered clinical list; uncompressed
+  diagnostic nodes are not ordinary accessibility exposure.
+- App source/HEAD stay frozen throughout checks/builds. Unrelated untracked
+  review documents remain unchanged. PR 11 stays draft; no PR is merged here.
+
+## 2026-10-11 — Repair explicit lock removal after device credentials disappear
+
+**Agent:** GPT-6 via Codex; primary native investigation and integration.
+**Commits:** first .60 source 22ee485; this final-repair checkpoint.
+
+**Changed**
+- Allow explicit optional-lock removal when actual device enrollment is NONE;
+  enrolled authentication and acknowledgment failure behavior stay intact.
+- Add six regression/safety tests; no version/dependency/schema/permission change.
+
+**Verified**
+- First source passes the full 2,728-test check, normal push and exact hosted CI.
+- Actual installed bytes, native camera grant, cancel/retry, grace return and
+  cold lock pass in bounded emulator observations. Native no-credential disable
+  fails on 22ee485; one software witness also fails before the repair.
+- All 35 focused tests pass after repair (5.187s); full check passes
+  182 suites/2,734 tests/five workflow checks (Jest 233.077s), zero lint warnings.
+  The owned VM closes normally and both persistent base hashes remain unchanged.
+  Details are in .60 validation.
+
+**Not verified**
+- Repaired-source push/CI/new frozen QA/native/owner APK are pending.
+- Physical authentication/media/delivery/power/provider and complete long shifts.
+
+**Open threads**
+- Check/freeze/push this repair and accept actual no-credential removal, enrolled
+  cancel/retry/cold state on newly inspected QA bytes; build the owner arm64 APK.
+- Rich text, notebook recovery, full follow-up and measured shifts remain open.
+- Handle the places-list phone intent rejection; private next-slice proposals
+  are not integrated implementation or acceptance.
+
+**Gotchas**
+- The test VM had 60-second grace initially. Native radio selection is selected,
+  not checked; an uncompressed diagnostic tree includes hidden controls.
+- Initial boot wait/System UI ANR are preserved as environment evidence. They
+  do not justify calling the app crash-free or its cold-start time accepted.
+
+## 2026-10-11 — Handle settings and optional-lock native failures
+
+**Agent:** GPT-6 via Codex; primary .60 implementation/integration. Two
+GPT-6.1 Sol/xhigh helpers supplied private next-slice investigations only;
+no helper proposal is integrated or counted as verified implementation.
+**Commits:** this .60 source/checkpoint commit, following frozen .59 `b8820f9`.
+
+**Changed**
+- Catch existing settings/lock native failures; preserve retry, one prompt and
+  original dataset admission. Refuse retained old callbacks and orphaned UI.
+- Expose failed lock-setting reads through existing retry feedback; preserve
+  mounted content and withhold stale lock decisions.
+- Version .60/code76 only; no dependency/schema/route/permission/archive change.
+- Record .59's actual installed/native/CI evidence without borrowing it for .60.
+
+**Verified**
+- Actual original LockGate fails four regression witnesses before its repair;
+  all 29 focused settings/lock tests pass afterward (7.214s). Final full check:
+  182 suites/2,728 app tests/five workflow checks (236.423s), zero lint warnings.
+- .59 exact b8820f9 CI succeeds; installed QA bytes match. Same-PID camera-grant
+  return updates the mounted card; actual alarm switch changes two occasion
+  windows from one hour to zero. Owned AVD later closes, preserving both hashes.
+
+**Not verified**
+- .60 push/CI/frozen APK/native acceptance are pending at this entry.
+- Physical authentication/media/reminder delivery/power/provider and long shifts.
+
+**Open threads**
+- Push the checked .60 source, build frozen QA and owner APKs, then record
+  exact-source CI, installed bytes and actual native acceptance.
+- Rich text, notebook trash, full follow-up loop and measured shift gates remain
+  in IMPLEMENTATION. The physical phone is not the only remaining work.
+
+**Gotchas**
+- Native callback types can be void while async functions still reject. Catch
+  failures inside the action; do not assume a toggle awaits its callback.
+- .59 boot automation/SystemUI failures predate app installation. The initial
+  bounded shutdown wait timed out, but later PID/serial/hash checks pass.
+
+## 2026-10-11 — Verify replay-safe permission cleanup without a lint warning
+
+**Agent:** GPT-6 via Codex; primary integration, no new delegation.
+**Commits:** initial .59 `f2fecac`; this cleanup/checkpoint commit.
+
+**Changed**
+- Remove the redundant cleanup counter increment; mounted lifetime and each new
+  read fence old responses. Add real StrictMode setup/cleanup replay coverage.
+- Keep the existing UI and fix checkpoint wrapping; no further runtime feature.
+
+**Verified**
+- Actual focused suite: 15 tests (3.472s); final full check: 179 suites/2,699
+  app tests/five workflow checks (247.218s), zero lint warnings. Initial source
+  normal push and exact f2fecac hosted CI succeed. PR11 is attached and draft.
+
+**Not verified**
+- Frozen .59 APK/native return/special access/delivery and the physical phone.
+
+**Open threads**
+- Push this exact source, build private x86 QA and inspect installed bytes;
+  witness real native settings return before any acceptance/owner artifact claim.
+- Optional lock callback rejection is now reproduced in two private software
+  probes; it is not a phone crash witness. Continue that repair, notebook trash,
+  rich text, follow-up loop and measured shift gates in IMPLEMENTATION.
+
+**Gotchas**
+- Native permission reads have no cancel API. Do not remove the mounted/latest
+  result checks or suppress the hook warning with a copied old counter.
+
+## 2026-10-11 — Refresh actual permission state and handle native settings failures
+
+**Agent:** GPT-6 via Codex; primary integration, no new delegation.
+**Commits:** this .59 application/checkpoint commit, following delivered `7d1dfc4`.
+
+**Changed**
+- Refresh current grants after returning from Android Settings; refuse stale read
+  results and retained/unmounted/repeated native actions. Handle native failures
+  with existing retry/error UI. Mark the stored backup folder as selected.
+- Shorten settings copy, remove exact-delivery and unmeasured image-size claims.
+  Version .59/code75 only; no dependency/schema/route/permission/archive changes.
+
+**Verified**
+- Unchanged .58 check: 178 suites/2,684 tests; source .59 check: 179 suites/2,698
+  tests and five workflow checks. Typecheck/lint/formatting pass (Jest 203.978s).
+- Before resume/grant witness fails, after passes; 14 focused failure/race/
+  focus/unmount/action/cleanup scenarios pass. Diff and lock-version scope checked.
+
+**Not verified**
+- .59 installed APK, native Settings return, exact access/delivery and physical
+  phone acceptance are pending; see validation-0.11.59, not the .58 report.
+
+**Open threads**
+- Build and inspect frozen .59 x86/owner APKs, test real settings return and
+  exact-alarm access separately, then record normal push/CI and keep PR11 draft.
+- Review optional app-lock callback rejection/late confirmation, then notebook
+  trash, rich text, full follow-up and measured shifts in IMPLEMENTATION.
+
+**Gotchas**
+- Use the existing expo-router/react-navigation export; do not add a separate
+  navigation dependency. Preserve unrelated untracked documents and frozen builds.
+
 ## 2026-10-11 — Accept the frozen .58 recovery candidate and record exact artifact evidence
 
 **Agent:** GPT-6 via Codex; primary native/artifact integration, no further delegation.

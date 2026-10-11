@@ -1,9 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 
+import { useDatasetIntent } from '@/components/dataset-intent';
 import { alertError, notify } from '@/components/feedback';
 import { Card, Column, DataRow, Divider, Row, Screen, SectionHeader, Segmented, Text, Toggle } from '@/components/ui';
 import { databaseSizeBytes } from '@/db/files';
@@ -13,13 +15,20 @@ import { keepOriginalsMode, type KeepOriginalsMode } from '@/features/attachment
 import { disableAppLock, enableAppLock } from '@/features/lock/lock-gate';
 import { lockEnabled, lockGraceSeconds } from '@/features/lock/settings';
 import { PermissionsCard } from '@/features/settings/permissions-card';
+import { DatasetChangedError, withDatasetWrite } from '@/lib/dataset-write';
 import { formatBytes } from '@/lib/format';
 import { toPersianDigits } from '@/lib/persian';
+import { logError } from '@/platform/error-log';
 import { mediaFolderSize } from '@/platform/media';
 import { useTheme } from '@/theme';
 
 export function SettingsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { generation } = useDatasetIntent();
+  const mounted = useRef(false);
+  const lockAction = useRef(false);
+  const [lockBusy, setLockBusy] = useState(false);
   const { colors, spacing } = useTheme();
   const lockOn = useSetting(lockEnabled).value;
   const grace = useSetting(lockGraceSeconds).value;
@@ -27,6 +36,55 @@ export function SettingsScreen() {
 
   // Measured once when the screen opens; both are quick, synchronous reads.
   const [storage] = useState(() => ({ db: databaseSizeBytes(), media: mediaFolderSize() }));
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  function reportFailure(title: string, error: unknown): void {
+    if (!mounted.current || !navigation.isFocused()) {
+      logError(error, { source: 'handled', context: title });
+    } else if (error instanceof DatasetChangedError) {
+      logError(error, { source: 'handled', context: title });
+      notify(title, 'اطلاعات برنامه تغییر کرده؛ صفحهٔ تنظیمات را دوباره باز کنید.');
+    } else {
+      alertError(title, error);
+    }
+  }
+
+  async function changeLock(next: boolean): Promise<void> {
+    if (!mounted.current || !navigation.isFocused() || lockAction.current) return;
+    lockAction.current = true;
+    setLockBusy(true);
+    try {
+      await withDatasetWrite(generation, async () => {
+        if (next) {
+          const result = await enableAppLock();
+          if (!result.ok && result.reason && mounted.current && navigation.isFocused())
+            notify('فعال نشد', result.reason);
+        } else {
+          await disableAppLock();
+        }
+      });
+    } catch (error) {
+      reportFailure('تنظیم قفل کامل نشد', error);
+    } finally {
+      lockAction.current = false;
+      if (mounted.current) setLockBusy(false);
+    }
+  }
+
+  async function changePreference(title: string, write: () => Promise<void>): Promise<void> {
+    if (!mounted.current || !navigation.isFocused()) return;
+    try {
+      await withDatasetWrite(generation, write);
+    } catch (error) {
+      reportFailure(title, error);
+    }
+  }
 
   return (
     <Screen scroll>
@@ -38,14 +96,8 @@ export function SettingsScreen() {
               label="قفل اپ"
               description="با اثر انگشت یا قفل صفحه‌ی گوشی باز شود"
               value={lockOn}
-              onChange={async (next) => {
-                if (next) {
-                  const result = await enableAppLock();
-                  if (!result.ok && result.reason) notify('فعال نشد', result.reason);
-                } else {
-                  await disableAppLock();
-                }
-              }}
+              disabled={lockBusy}
+              onChange={changeLock}
             />
             {lockOn && (
               <>
@@ -54,7 +106,7 @@ export function SettingsScreen() {
                   label="قفل دوباره بعد از"
                   value={String(grace)}
                   onChange={(v) =>
-                    void writeSetting(lockGraceSeconds, Number(v)).catch((e) => alertError('تنظیم ثبت نشد', e))
+                    void changePreference('تنظیم ثبت نشد', () => writeSetting(lockGraceSeconds, Number(v)))
                   }
                   options={[
                     { value: '30', label: '۳۰ ثانیه' },
@@ -82,7 +134,7 @@ export function SettingsScreen() {
             label="نگه داشتن اصل عکس‌ها"
             value={keepOriginals}
             onChange={(v) =>
-              void writeSetting(keepOriginalsMode, v as KeepOriginalsMode).catch((e) => alertError('تنظیم ثبت نشد', e))
+              void changePreference('تنظیم ثبت نشد', () => writeSetting(keepOriginalsMode, v as KeepOriginalsMode))
             }
             options={[
               { value: 'clinical', label: 'عکس بالینی' },
@@ -91,8 +143,7 @@ export function SettingsScreen() {
             ]}
           />
           <Text variant="tiny" color="textFaint">
-            هر عکس برای پرونده به ۲۴۰۰ پیکسل فشرده می‌شود. اصلِ عکس حدود ۸ تا ۱۰ برابر جا می‌گیرد، ولی برای زوم روی
-            ضایعه و مقایسه‌ی نوار قلب لازم است. این تنظیم روی عکس‌های قبلی اثری ندارد.
+            نگه‌داشتن اصل عکس فضای بیشتری می‌گیرد؛ برای زوم و مقایسه مفید است. این تنظیم فقط روی عکس‌های جدید اثر دارد.
           </Text>
         </Card>
 

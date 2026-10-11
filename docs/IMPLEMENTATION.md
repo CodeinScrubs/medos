@@ -33,8 +33,24 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.58/code74 on `codex/contact-followup-recovery` continues
-delivered PR9 `d1e9a5c`. Permanent clinical correction history covers patient,
+Application 0.11.60/code 76 on codex/permission-state-recovery is draft PR 11's
+candidate. Frozen source e34e79e passes 35 focused tests, the full 182-suite/
+2,734-test check, five workflow checks, normal push and exact-source hosted CI.
+Actual installed QA bytes accept repaired no-credential disable, enrolled
+cancel/retry/disable and cold cancel/retry with the original synthetic patients.
+Both signed x86/arm64 APKs pass actual version/ABI/certificate/JNI inspection;
+dist/MedOS-0.11.60.apk is the newest owner artifact, not physical acceptance.
+First-source camera/grace observations, environmental failures and exact hashes
+remain separate in [validation-0.11.60.md](validation-0.11.60.md).
+
+.59's 179-suite/2,699-test check, normal push and exact-source hosted CI pass.
+Its installed private x86 APK matches inspected bytes. Native camera-grant return
+keeps the original PID and updates the mounted card. Real exact-alarm special
+access changes two existing occasion requests from a one-hour window to zero;
+this is scheduling, not delivery. No .59 owner APK was built. See
+[validation-0.11.59.md](validation-0.11.59.md); .58 evidence stays in its own report.
+
+Permanent clinical correction history covers patient,
 companion, encounter, diagnosis, vital, whole lab panel, imaging, order, consult
 and follow-up records. Nine clinical record kinds can be restored from the
 existing trash. Corrections appear in the existing patient timeline. Exact
@@ -98,7 +114,7 @@ The phone is not currently the sole remaining work.
 | D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. .56 adds audited restore for labs, imaging, vitals, orders, consults, diagnoses and historical/inactive encounters, with original full-row basis and patient/episode ownership. .58 adds companion/follow-up restore, clinical-sequence recovery tokens and retained delete/status/result/postpone intent. Lab deletion and required clinical audit/history share the write transaction. Notebook trash and broader interruption/device acceptance remain. Never infer a deleted encounter's former active state. |
 | D09 | Consistent rounds and active episode | New memberships validate live ownership, preserve reorder/handoff and use latest published clinical note independent of pins. .45 makes encounter readers consistent. Imported duplicate memberships/episodes are preserved; clinical duplicate resolution and broader native rounds acceptance remain open. |
 | D10 | Compatible verified backup/restore | Format/KDF remain frozen; verified destination strength governs pruning. Restore excludes admitted writers/file jobs and preserves original ownership of old forms. Independent old/current restore exists in versioned reports. Critical swap/commit interruption, low disk, provider grants and second-device recovery remain open. |
-| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. .58 recovery preserves outcome/status/deadline and reports native repair separately; retained row checks protect clinical choices across live refresh. Native denied-permission/retry/cold request acknowledgment passes in .58. Exact-alarm special access, actual alarm/reboot/Doze delivery and the complete received/reviewed/action/closed product flow remain open. |
+| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. .58 recovery preserves outcome/status/deadline and reports native repair separately; retained row checks protect clinical choices across live refresh. Native denied-permission/retry/cold request acknowledgment passes in .58. .59 separately accepts actual special access and the occasion-request window transition; alarm/reboot/Doze delivery and the complete received/reviewed/action/closed product flow remain open. |
 | D12 | Jalali occasions and communication | Leap-day edits/raw recovery, scheduled occurrence-year text, database-first reminder revision/repair and explicit sent confirmation are implemented in software. Test real lifecycle/delivery separately. Do not transmit messages during development tests. |
 
 Reproduce before changing. Each new persistence path needs migrated-SQLite
@@ -115,7 +131,7 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 | W04 | Patient deck | Existing first-tab episode and bedside snapshot lead with identity/location/impressions/allergies, timed observations/labs, running orders and open work. Physician review and measured40-patient shift acceptance remain. Do not add a dashboard maze. |
 | W05 | Clinical history | Separate encounters, timeline filters/bounded previews/keyset pages and direct record access exist. .56 adds bounded correction history and seven clinical restore kinds. Accept new-source native pagination/every kind/pressure; note and clinical history retain separate codecs. |
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
-| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Notebook tombstones still need appropriate recovery. Native contact/follow-up recovery, denied notification permission, retry and cold persistence pass in .58; actual alarm delivery remains separate. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
+| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Notebook tombstones still need appropriate recovery; the places-list phone intent needs a handled rejection. Native contact/follow-up recovery, denied notification permission, retry and cold persistence pass in .58; actual alarm delivery remains separate. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
 | W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
 | W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. .51 connects idea/topic raw recovery and exposes area-read rejection/retry; .55 connects the remaining notebook forms. Topic/reference checks and merged search commit with publication. Extension creation/editing rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. Complete broad edit/search acceptance and deleted-place recovery/move; bounded recovery checks do not finish every native workflow. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |
@@ -146,7 +162,13 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
   normalization schemes, golden keys and independent compatibility. Native
   keyboard-controller modal soft exceptions and audio dead-handler warnings
   remain diagnostic/acceptance work; retained processes do not prove harmlessness.
-- Correct the permission card's understated inexact-delay wording; handle rejected permission/settings APIs and refresh current grants after returning from Android Settings without losing the mounted screen. Verify exact-alarm special access separately from notification permission; .58's actual OS window is one hour when access is disabled.
+- .59 accepts actual mounted camera-grant return and the system exact-alarm
+  switch, including two observed occasion-request windows changing from one hour
+  to zero. Actual delivery and OEM/Doze/reboot behavior remain separate.
+- .60 accepts handled lock/settings failures in software and bounded actual
+  no-credential/enrolled/cold behavior on frozen installed QA bytes. Its full
+  check, source CI and both inspected APKs pass. Physical authentication and
+  broader native failure/lifecycle cases remain separate.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.

@@ -1,13 +1,15 @@
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
-import { useEffect, useState } from 'react';
-import { Linking } from 'react-native';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Linking } from 'react-native';
 
+import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { Badge, Button, Card, Column, Divider, Row, Text } from '@/components/ui';
 import { useSetting } from '@/db/use-setting';
 import { backupFolderUri } from '@/features/backup/settings';
-import { RLM } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 /*
@@ -24,7 +26,7 @@ import { useTheme } from '@/theme';
  * the system settings page, because that is genuinely where it is decided.
  */
 
-type Status = 'granted' | 'denied' | 'ask' | 'unknown';
+type Status = 'granted' | 'denied' | 'ask' | 'unknown' | 'chosen';
 
 type Line = {
   key: string;
@@ -51,27 +53,71 @@ async function read(): Promise<Grants> {
 }
 
 export function PermissionsCard() {
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
+  const navigation = useNavigation();
   const [state, setState] = useState<Grants | null>(null);
-  const [reload, setReload] = useState(0);
+  const [error, setError] = useState<Error>();
+  const [busy, setBusy] = useState(false);
+  const mounted = useRef(false);
+  const readVersion = useRef(0);
+  const actionRunning = useRef(false);
   const folder = useSetting(backupFolderUri).value;
 
-  useEffect(() => {
-    void read().then(setState);
-  }, [reload]);
+  const refresh = useCallback(() => {
+    if (!mounted.current) return;
+    // Native reads cannot be cancelled; only the newest mounted read may publish.
+    const version = ++readVersion.current;
+    setState(null);
+    setError(undefined);
+    void read()
+      .then((grants) => {
+        if (mounted.current && version === readVersion.current) setState(grants);
+      })
+      .catch((failure: unknown) => {
+        if (mounted.current && version === readVersion.current)
+          setError(failure instanceof Error ? failure : new Error('وضعیت دسترسی‌ها بررسی نشد.'));
+      });
+  }, []);
 
-  const again = () => setReload((n) => n + 1);
+  useEffect(() => {
+    mounted.current = true;
+    refresh();
+    const subscription = AppState.addEventListener('change', (status) => {
+      if (status === 'active') refresh();
+    });
+    return () => {
+      mounted.current = false;
+      subscription.remove();
+    };
+  }, [refresh]);
+
+  async function perform(action: () => Promise<void>): Promise<void> {
+    if (!mounted.current || actionRunning.current || !navigation.isFocused()) return;
+    // React state alone cannot reject two taps before the next render.
+    actionRunning.current = true;
+    setBusy(true);
+    try {
+      await action();
+    } catch (failure) {
+      if (mounted.current && navigation.isFocused()) alertError('تنظیم دسترسی کامل نشد', failure);
+    } finally {
+      actionRunning.current = false;
+      if (mounted.current) {
+        setBusy(false);
+        refresh();
+      }
+    }
+  }
 
   const lines: Line[] = [
     {
       key: 'notifications',
       title: 'اعلان‌ها',
-      why: 'بدون این، یادآور پیگیری‌ها هیچ‌وقت روی گوشی ظاهر نمی‌شود',
+      why: 'نمایش یادآورها',
       status: state?.notifications.status ?? 'unknown',
       fix: async () => {
         if (state?.notifications.canAsk) await Notifications.requestPermissionsAsync();
         else await Linking.openSettings();
-        again();
       },
     },
     {
@@ -82,31 +128,30 @@ export function PermissionsCard() {
       fix: async () => {
         if (state?.camera.canAsk) await ImagePicker.requestCameraPermissionsAsync();
         else await Linking.openSettings();
-        again();
       },
     },
     {
       key: 'microphone',
       title: 'میکروفون',
-      why: 'برای وویس‌نوت روی پرونده',
+      why: 'ضبط وویس‌نوت',
       status: state?.microphone.status ?? 'unknown',
       fix: async () => {
         if (state?.microphone.canAsk) await requestRecordingPermissionsAsync();
         else await Linking.openSettings();
-        again();
       },
     },
     {
       key: 'folder',
       title: 'پوشه‌ی بکاپ',
-      why: 'اجازه‌ی نوشتن در پوشه‌ای که خودتان انتخاب می‌کنید؛ بدون آن بکاپ خودکار جایی نوشته نمی‌شود',
-      status: folder ? 'granted' : 'ask',
+      why: 'پوشهٔ انتخابی بکاپ خودکار',
+      status: folder ? 'chosen' : 'ask',
     },
   ];
 
   return (
     <Card>
       <Column gap="sm">
+        <ErrorNotice error={error} what="وضعیت دسترسی‌ها" onRetry={refresh} />
         {lines.map((line, i) => (
           <Column key={line.key} gap="xs">
             {i > 0 ? <Divider /> : null}
@@ -117,8 +162,11 @@ export function PermissionsCard() {
                   {line.why}
                 </Text>
               </Column>
-              {line.status === 'granted' ? (
-                <Badge label="داده شده" tone="success" />
+              {line.status === 'granted' || line.status === 'chosen' ? (
+                <Badge
+                  label={line.status === 'chosen' ? 'انتخاب شده' : 'داده شده'}
+                  tone={line.status === 'granted' ? 'success' : undefined}
+                />
               ) : line.status === 'unknown' ? (
                 <Badge label="…" />
               ) : line.fix ? (
@@ -126,7 +174,8 @@ export function PermissionsCard() {
                   label={line.status === 'denied' ? 'در تنظیمات' : 'اجازه بده'}
                   size="sm"
                   variant="secondary"
-                  onPress={() => void line.fix!()}
+                  disabled={busy}
+                  onPress={() => void perform(line.fix!)}
                 />
               ) : (
                 <Badge label="انتخاب نشده" tone="warning" />
@@ -137,8 +186,7 @@ export function PermissionsCard() {
 
         <Divider />
         <Text variant="tiny" color="textFaint" style={{ marginTop: spacing.xxs }}>
-          برای اینکه یادآورها سر ساعت برسند، در صفحه‌ی «Alarms & reminders» اندروید، MedOS را روشن کنید. بدون آن اندروید
-          اجازه دارد یادآور را تا چند دقیقه عقب بیندازد.
+          زمان‌بندی دقیق‌تر به دسترسی «Alarms & reminders» نیاز دارد؛ بدون آن اعلان ممکن است با تأخیر برسد.
         </Text>
         {/*
          * Straight to the list where the switch lives. It shows every app; one
@@ -146,22 +194,23 @@ export function PermissionsCard() {
          * MedOS's own page, but Linking cannot set intent data.)
          */}
         <Button
-          label="باز کردن «Alarms & reminders»"
+          label="تنظیم یادآور دقیق"
           icon="alarm-outline"
           variant="ghost"
+          disabled={busy}
           onPress={() =>
-            void Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM').catch(() => Linking.openSettings())
+            void perform(() =>
+              Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM').catch(() => Linking.openSettings()),
+            )
           }
         />
         <Button
           label="باز کردن تنظیمات اپ در اندروید"
           icon="open-outline"
           variant="ghost"
-          onPress={() => void Linking.openSettings()}
+          disabled={busy}
+          onPress={() => void perform(() => Linking.openSettings())}
         />
-        <Text variant="tiny" style={{ color: colors.textFaint }}>
-          {RLM}MedOS به حافظه‌ی گوشی دسترسی کلی نمی‌خواهد؛ فقط همان پوشه‌ای که خودتان برای بکاپ انتخاب می‌کنید.
-        </Text>
       </Column>
     </Card>
   );
