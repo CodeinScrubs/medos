@@ -33,6 +33,120 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Accept the frozen .58 recovery candidate and record exact artifact evidence
+
+**Agent:** GPT-6 via Codex; primary native/artifact integration, no further delegation.
+**Commits:** application `5304451` + `7d557fe`; this documentation-only delivery.
+
+**Changed**
+- Record exact-source .58 CI/APKs and real companion/follow-up recovery, retained
+  results, denied permission, retry and cold-start evidence. Update current gates.
+- No application/dependency/schema/route/permission/backup changes in this delivery.
+
+**Verified**
+- Full software check passes 178 suites/2,684 app tests/five workflow checks.
+  Normal source push passes 2,684 (225.755s); exact `7d557fe` hosted CI succeeds.
+- Four actual native archives pass independent comparisons of 51 application
+  tables, 4,225 prior rows, full history/audit, 32 migrations and 34 media files.
+  Final history has 69 versions; context/outcome remain intact and the completed
+  follow-up stays completed. See validation-0.11.58.
+- Actual signed arm64/x86 APK contents/code74/cert/JNI pass; installed QA bytes
+  match. Owned read-only AVD closes with base hashes unchanged. PR10 stays draft.
+
+**Not verified**
+- Physical phone; exact/on-time notification delivery, Doze/reboot, provider/low
+  space/power/second-device recovery, a full 40-patient shift or clinical review.
+- Notification grant alone is insufficient: the accepted synthetic AVD has an
+  inexact one-hour OS window. Historical SystemUI/input/ANR boundaries remain.
+
+**Open threads**
+- Tighten permission/settings failure handling and the understated alarm-delay
+  copy; native exact access/delivery is a separate gate. Then continue notebook
+  trash, visual rich text, fuller follow-up and measured shift work in IMPLEMENTATION.
+- Keep PRs incremental; no automatic merges or 'only phone remains' claim.
+
+**Gotchas**
+- Permission revoke restarts Android's app and changes two occasion OS receipts.
+  Explicitly verify those known receipt-only transitions; never exclude clinical
+  rows broadly. Final/cold occasion rows and media match the original fixture.
+- Do not edit source/HEAD during a build. Both final APKs belong to `7d557fe`,
+  not the earlier first-source .58 artifact or this later documentation commit.
+
+## 2026-10-11 — Close an acknowledged outcome after leaving its screen
+
+**Agent:** GPT-6 via Codex; primary follow-on, no additional delegation.
+**Commits:** this follow-on to .58 source `5304451`.
+
+**Changed**
+- A final retained-screen probe finds that completed outcome input could remain
+  open after focus loss during native receipt acknowledgment. Close the local
+  acknowledged prompt while mounted; haptics remain limited to the focused
+  origin. Failed/refused input stays intact. No navigation/header change.
+
+**Verified**
+- The new witness fails before the fix; corrected card/list tests pass31/2.
+  Full check passes178 suites/2,684 app tests (209.541s), five workflow tests and
+  typecheck/lint/format without warnings. Normal first-source push passes2,683;
+  draft incremental PR10 is attached, based on PR9. No PR is merged.
+
+**Not verified**
+- New-source APK/native/hosted-CI acceptance. The private inspected x86 APK of
+  `5304451` predates this last UI correction and is not the final .58 candidate.
+- Physical phone, measured long shifts, provider/interruption/power or clinical
+  review. Emulator System UI has a pre-install boot ANR; keep that evidence.
+
+**Open threads**
+- Freeze this source, rebuild/inspect x86, accept contact/follow-up recovery with
+  independent whole archives, build/inspect owner arm64, push and verify exact-head
+  CI. Native receipt delivery remains separate from SQL acknowledgment.
+- Notebook trash, rich text, full follow-up and other IMPLEMENTATION gates remain.
+
+**Gotchas**
+- Closing a mounted local outcome prompt is different from popping a route or
+  presenting feedback on another screen. Focus loss must not leave completed
+  input blocked; mount/dataset ownership still apply.
+
+## 2026-10-11 — Recover companions and follow-ups without accepting stale choices
+
+**Agent:** GPT-6 via Codex; primary implementation/verification with one read-only
+GPT-6.1 Sol/xhigh review.
+**Commits:** this source commit, based on delivered PR9 `d1e9a5c`.
+
+**Changed**
+- .58/code74 adds companions and follow-ups to the existing bounded clinical
+  trash. Original context/status/result remain; reminder intent is durable before
+  native reconciliation, with a short conditional retry notice.
+- Include clinical sequence in every recovery basis. Companion delete checks
+  shown row/sequence; follow-up status/delete/postpone/result check original
+  clinical intent. Keep typed outcomes on refusal; retain focus/dataset ownership
+  and consume native choices once. No new dependency, migration or route.
+
+**Verified**
+- Four failing stale-action/cycle witnesses reproduce before fixes. Corrected
+  integrated recovery/UI run passes198/6; expanded receipt/import tests53/3;
+  final follow-up retained-action/card/query tests46/2. See validation-0.11.58.
+- Final full check passes178 suites/2,683 app tests (213.035s), five workflow
+  tests and typecheck/lint/format without warnings. No new migration; scoped
+  lockfile edits and unrelated WIP hashes are verified.
+
+**Not verified**
+- New-source native acceptance, owner .58 APK and hosted CI remain pending at
+  this source checkpoint. .57 evidence does not accept .58.
+- Physical phone/IME/alarm delivery, complete timed40-patient shifts, provider/
+  interruption/power acceptance or clinical review.
+
+**Open threads**
+- Finish frozen-source .58 checks, native whole-archive acceptance, inspected
+  owner artifact and exact-head CI. Keep notebook trash/rich text/full follow-up
+  workflow and remaining IMPLEMENTATION gates open; phone is not the sole work.
+- Diagnose original short .55 input mismatch and older focus ANR separately.
+
+**Gotchas**
+- Drizzle strips ordinary column qualification inside a single-table SQL
+  expression. Explicit schema-derived identifiers keep a correlated outer id
+  from binding to the inner history id. Native receipt-only changes are not a
+  different clinical decision; desired reminder revision still is.
+
 ## 2026-10-11 — Deliver lab isolation with independent native state witnesses
 
 **Agent:** GPT-6 via Codex; primary verification, no additional delegation.

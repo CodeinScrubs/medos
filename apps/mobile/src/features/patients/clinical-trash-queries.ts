@@ -4,7 +4,7 @@ import { and, eq, getTableColumns, isNull, ne, or, sql, type SQL } from 'drizzle
 
 import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { withClinicalHistory } from '@/db/clinical-history';
+import { clinicalHistorySequence, withClinicalHistory } from '@/db/clinical-history';
 import {
   consultations,
   diagnoses,
@@ -15,17 +15,31 @@ import {
   labValues,
   notes,
   orders,
+  patientContacts,
   patients,
   tasks,
   vitals,
 } from '@/db/schema';
+import { reconcileFollowUpReminder } from '@/features/followups/reminder-queries';
 import { formBasis } from '@/lib/form-document';
 import { touch } from '@/lib/ids';
+import { logError } from '@/platform/error-log';
 
 import { refreshPatientSearchText } from './search-index';
 
-export const CLINICAL_TRASH_KINDS = ['lab', 'imaging', 'vital', 'order', 'consult', 'diagnosis', 'encounter'] as const;
+export const CLINICAL_TRASH_KINDS = [
+  'lab',
+  'imaging',
+  'vital',
+  'order',
+  'consult',
+  'diagnosis',
+  'encounter',
+  'contact',
+  'followup',
+] as const;
 export type ClinicalTrashKind = (typeof CLINICAL_TRASH_KINDS)[number];
+export type ClinicalRestoreNotice = { reminderIssue: 'dirty' | 'unavailable' };
 export type ClinicalTrashFilter = { patientId?: string; kind?: ClinicalTrashKind };
 export type ClinicalTrashCursor = { deletedAt: Date; kind: ClinicalTrashKind; id: string };
 
@@ -49,6 +63,12 @@ const sources = {
     title: sql`coalesce(nullif(trim(${encounters.chiefComplaint}), ''), nullif(trim(${encounters.service}), ''), 'نوبت درمانی')`,
     at: encounters.admittedAt,
   },
+  contact: {
+    table: patientContacts,
+    title: sql`coalesce(nullif(trim(${patientContacts.name}), ''), ${patientContacts.phone})`,
+    at: patientContacts.createdAt,
+  },
+  followup: { table: followUps, title: sql`${followUps.reason}`, at: followUps.dueAt },
 } as const;
 
 function requireKind(value: unknown): asserts value is ClinicalTrashKind {
@@ -73,7 +93,7 @@ function basisProjection(kind: ClinicalTrashKind) {
     ),
     sql`, `,
   );
-  return sql<string>`json_object('kind', ${kind}, 'record', json_object(${record}), 'patient', json_object('id', ${patients.id}, 'firstName', ${patients.firstName}, 'lastName', ${patients.lastName}))`;
+  return sql<string>`json_object('kind', ${kind}, 'record', json_object(${record}), 'historySequence', cast(${clinicalHistorySequence(kind, sources[kind].table.id)} as text), 'patient', json_object('id', ${patients.id}, 'firstName', ${patients.firstName}, 'lastName', ${patients.lastName}))`;
 }
 
 function digest(raw: string): string {
@@ -215,7 +235,7 @@ export async function restoreClinicalRecord(
   id: string,
   expectedBasis: string,
   now: Date,
-): Promise<void> {
+): Promise<void | ClinicalRestoreNotice> {
   requireKind(kind);
   if (typeof id !== 'string' || typeof expectedBasis !== 'string' || !/^[a-f0-9]{64}$/.test(expectedBasis))
     throw new Error('انتخاب سابقه معتبر نیست؛ فهرست را دوباره بخوانید.');
@@ -257,13 +277,48 @@ export async function restoreClinicalRecord(
       )
         throw new Error('یادداشت اصلی مشاوره در دسترس نیست یا به این نوبت تعلق ندارد.');
     }
+    if (kind === 'followup' && 'reminderRevision' in current) {
+      if (
+        !Number.isSafeInteger(current.reminderRevision) ||
+        current.reminderRevision < 0 ||
+        current.reminderRevision >= Number.MAX_SAFE_INTEGER
+      )
+        throw new Error('نسل یادآور معتبر نیست؛ پیگیری بدون تغییر نگه داشته شد.');
+      if (
+        !['pending', 'done', 'missed', 'cancelled'].includes(current.status) ||
+        !['call', 'sms', 'visit', 'message', 'lab', 'other'].includes(current.channel) ||
+        !['low', 'normal', 'high'].includes(current.priority)
+      )
+        throw new Error('وضعیت پیگیری معتبر نیست؛ اطلاعات اصلی بدون تغییر نگه داشته شد.');
+    }
     withClinicalHistory(tx, kind, id, now, () => {
       tx.update(table)
-        .set({ deletedAt: null, ...touch(now), ...(kind === 'encounter' ? { isActive: false } : {}) })
+        .set({
+          deletedAt: null,
+          ...touch(now),
+          ...(kind === 'encounter' ? { isActive: false } : {}),
+          ...(kind === 'followup' && 'reminderRevision' in current
+            ? { reminderRevision: current.reminderRevision + 1, reminderAppliedRevision: -1 }
+            : {}),
+        })
         .where(eq(table.id, id))
         .run();
       if (kind === 'diagnosis') refreshPatientSearchText(current.patientId, tx);
       auditInTransaction(tx, `${kind}.restored`, { entityType: kind, entityId: id }, now);
     });
   });
+  if (kind === 'followup') {
+    // SQL/history/audit are already durable. Native failure must not report that
+    // the recovered clinical record was lost, or request permission implicitly.
+    await reconcileFollowUpReminder(id);
+    try {
+      const row = db.select().from(followUps).where(eq(followUps.id, id)).get();
+      if (row && row.reminderRevision !== row.reminderAppliedRevision) return { reminderIssue: 'dirty' };
+      if (row && row.deletedAt === null && row.status === 'pending' && row.dueAt > now && !row.notificationId)
+        return { reminderIssue: 'unavailable' };
+    } catch (error) {
+      logError(error, { source: 'handled', context: 'follow-up restore reminder receipt' });
+      return { reminderIssue: 'dirty' };
+    }
+  }
 }

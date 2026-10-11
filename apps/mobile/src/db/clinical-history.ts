@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, getTableColumns, isNull, or, sql, type SQL } from 'drizzle-orm';
-import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+import { and, asc, desc, eq, getTableColumns, getTableName, isNull, or, sql, type SQL } from 'drizzle-orm';
+import type { AnySQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import {
   clinicalSnapshot,
@@ -40,6 +40,20 @@ const clinicalTables = {
   consult: consultations,
   followup: followUps,
 } as const;
+
+/** A retained choice must distinguish even an identical same-millisecond edit cycle. */
+export function clinicalHistorySequence(kind: ClinicalHistoryKind, recordId: string | AnySQLiteColumn): SQL<number> {
+  // A single-table Drizzle SELECT strips column qualifiers inside SQL expressions.
+  // Keep the outer key explicitly qualified or SQLite binds it to the inner id.
+  // Both identifiers come from the schema, never from input.
+  const ownerKey =
+    typeof recordId === 'string'
+      ? recordId
+      : sql`${sql.identifier(getTableName(recordId.table))}.${sql.identifier(recordId.name)}`;
+  return sql<number>`coalesce((select max(${clinicalVersions.sequence}) from ${clinicalVersions} where ${clinicalVersions.kind} = ${kind} and ${clinicalVersions.recordId} = ${ownerKey}), 0)`.mapWith(
+    Number,
+  );
+}
 
 /** Refuse a lossy imported row before Drizzle maps int64/booleans/dates into JS. */
 function requireExactStoredRows(tx: DbTransaction, table: SQLiteTable, where: SQL) {

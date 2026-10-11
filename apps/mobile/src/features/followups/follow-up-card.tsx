@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router/react-navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet } from 'react-native';
 
@@ -48,12 +49,22 @@ export function FollowUpCard({
   onPromptChange?: (id: string, open: boolean) => void;
 }) {
   const router = useRouter();
+  const navigation = useNavigation();
+  const mounted = useRef(true);
   const { generation } = useDatasetIntent();
   const { colors, spacing } = useTheme();
   const [prompting, setPrompting] = useState(false);
   const [working, setWorking] = useState(false);
   const busy = useRef(false);
+  const outcomeBasis = useRef<FollowUp | null>(null);
   const now = new Date(useNow());
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     onPromptChange?.(followUp.id, prompting);
@@ -70,61 +81,89 @@ export function FollowUpCard({
   const tone = overdue ? 'danger' : dueToday ? 'warning' : 'neutral';
 
   async function perform(action: () => Promise<unknown>) {
-    if (busy.current) return;
+    if (busy.current || !mounted.current || !navigation.isFocused()) return;
     busy.current = true;
     setWorking(true);
     try {
       await withDatasetWrite(generation, action);
     } catch (error) {
-      alertError('عملیات انجام نشد', error);
+      if (mounted.current && navigation.isFocused()) alertError('عملیات انجام نشد', error);
     } finally {
       busy.current = false;
-      setWorking(false);
+      if (mounted.current) setWorking(false);
     }
   }
 
   function postpone() {
+    if (!mounted.current || busy.current || !navigation.isFocused()) return;
+    let used = false;
+    const choose = (days: number) => {
+      if (used) return;
+      used = true;
+      void perform(() => updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, days) }, followUp));
+    };
     Alert.alert(
       'تعویق پیگیری',
       undefined,
       [
         {
           text: 'فردا',
-          onPress: () =>
-            void perform(() => updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 1) })),
+          onPress: () => choose(1),
         },
         {
           text: '۳ روز',
-          onPress: () =>
-            void perform(() => updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 3) })),
+          onPress: () => choose(3),
         },
         {
           text: '۱ هفته',
-          onPress: () =>
-            void perform(() => updateFollowUp(followUp.id, { dueAt: postponedDueDate(followUp.dueAt, 7) })),
+          onPress: () => choose(7),
         },
       ],
-      { cancelable: true },
+      {
+        cancelable: true,
+        onDismiss: () => {
+          used = true;
+        },
+      },
     );
   }
 
   function more() {
+    if (!mounted.current || busy.current || !navigation.isFocused()) return;
+    let used = false;
+    const choose = (work: () => Promise<void>) => {
+      if (used) return;
+      used = true;
+      void perform(work);
+    };
     Alert.alert(
       followUp.reason,
       undefined,
       [
         {
           text: pending ? 'انجام نشد' : 'دوباره فعال شود',
-          onPress: () => void perform(() => setFollowUpStatus(followUp.id, pending ? 'missed' : 'pending')),
+          onPress: () =>
+            choose(() => setFollowUpStatus(followUp.id, pending ? 'missed' : 'pending', new Date(now), followUp)),
         },
         {
           text: 'حذف',
           style: 'destructive',
-          onPress: () => void perform(() => deleteFollowUp(followUp.id)),
+          onPress: () => choose(() => deleteFollowUp(followUp.id, followUp)),
         },
-        { text: 'انصراف', style: 'cancel' },
+        {
+          text: 'انصراف',
+          style: 'cancel',
+          onPress: () => {
+            used = true;
+          },
+        },
       ],
-      { cancelable: true },
+      {
+        cancelable: true,
+        onDismiss: () => {
+          used = true;
+        },
+      },
     );
   }
 
@@ -195,7 +234,16 @@ export function FollowUpCard({
 
             {pending && (
               <Row gap="sm" wrap style={{ marginTop: spacing.xs }}>
-                <Action icon="checkmark" label="انجام شد" tone="success" onPress={() => setPrompting(true)} />
+                <Action
+                  icon="checkmark"
+                  label="انجام شد"
+                  tone="success"
+                  onPress={() => {
+                    if (!mounted.current || busy.current || !navigation.isFocused()) return;
+                    outcomeBasis.current = followUp;
+                    setPrompting(true);
+                  }}
+                />
                 <Action icon="time-outline" label="تعویق" onPress={postpone} />
                 {phone && followUp.channel === 'call' ? (
                   <Action
@@ -217,13 +265,25 @@ export function FollowUpCard({
         message="در یک خط بنویسید چه شد (اختیاری)."
         placeholder="مثلاً حالش خوب است، آزمایش نرمال"
         onCancel={() => {
-          if (!busy.current) setPrompting(false);
+          if (!busy.current) {
+            outcomeBasis.current = null;
+            setPrompting(false);
+          }
         }}
         onSubmit={(text) => {
           void perform(async () => {
-            await completeFollowUp(followUp.id, text || null);
-            setPrompting(false);
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+            const basis = outcomeBasis.current;
+            if (!basis || basis.id !== followUp.id)
+              throw new Error('پیگیری مربوط به این نتیجه در دسترس نیست؛ متن نگه داشته شد.');
+            await completeFollowUp(basis.id, text || null, new Date(now), basis);
+            outcomeBasis.current = null;
+            // Closing this acknowledged local prompt is not a navigation action.
+            // Leave no completed input dialog behind when the owner returns.
+            if (mounted.current) {
+              setPrompting(false);
+              if (navigation.isFocused())
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+            }
           });
         }}
       />
