@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
+import { Alert } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { ErrorNotice } from '@/components/error-notice';
 import { alertError, notify } from '@/components/feedback';
-import { Button, EmptyState, SectionHeader } from '@/components/ui';
-import { auditLog, notes, patients } from '@/db/schema';
+import { Button, ChipSelect, EmptyState, SectionHeader } from '@/components/ui';
+import { auditLog, encounters, labPanels, notes, patients } from '@/db/schema';
 import * as captures from '@/features/capture/queries';
 import * as noteQueries from '@/features/notes/queries';
+import { stamps } from '@/lib/ids';
 import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -34,6 +36,7 @@ jest.mock('@/components/feedback', () => ({ alertError: jest.fn(), notify: jest.
 jest.mock('@/components/ui', () => ({
   Button: 'Button',
   Card: 'Card',
+  ChipSelect: 'ChipSelect',
   Column: 'Column',
   EmptyState: 'EmptyState',
   Row: 'Row',
@@ -64,6 +67,140 @@ beforeEach(async () => {
   mockFocused = true;
   t = useTestDatabase(await createTestDatabase());
   patientId = await patientQueries.createPatient({ firstName: 'Synthetic', lastName: 'Trash' });
+});
+
+describe('clinical trash in the existing screen', () => {
+  function seedLab(id = 'deleted-lab') {
+    t.db
+      .insert(labPanels)
+      .values({
+        id,
+        patientId,
+        name: `Synthetic ${id}`,
+        source: 'manual',
+        collectedAt: new Date(1),
+        ...stamps(new Date(1)),
+        deletedAt: new Date(2),
+      })
+      .run();
+  }
+  async function ask() {
+    await act(async () => {
+      buttons('برگرداندن سابقه')[0]!.props.onPress();
+      await settle();
+    });
+    return jest.mocked(Alert.alert).mock.calls.at(-1)!;
+  }
+  async function confirm(dialog: ReturnType<typeof jest.mocked<typeof Alert.alert>>['mock']['calls'][number]) {
+    await act(async () => {
+      dialog[2]!.find((b) => b.text === 'برگردان')!.onPress?.();
+      await settle();
+    });
+  }
+  beforeEach(() => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+  it('does not claim global empty when only clinical tombstones exist and restores the real shown row once', async () => {
+    seedLab();
+    await render();
+    expect(tree!.root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(buttons('برگرداندن سابقه')).toHaveLength(1);
+    const dialog = await ask();
+    expect(dialog[1]).toContain('Synthetic Trash');
+    expect(dialog[1]).toContain('Synthetic deleted-lab');
+    await confirm(dialog);
+    await confirm(dialog);
+    expect(t.db.select().from(labPanels).get()!.deletedAt).toBeNull();
+    expect(
+      t.db
+        .select()
+        .from(auditLog)
+        .all()
+        .filter((r) => r.action === 'lab.restored'),
+    ).toHaveLength(1);
+  });
+  it('replaces bounded pages and resets pagination when the clinical kind changes', async () => {
+    for (let i = 0; i < 45; i++) seedLab(`lab-${String(i).padStart(3, '0')}`);
+    await render();
+    expect(buttons('برگرداندن سابقه')).toHaveLength(20);
+    await act(async () => {
+      buttons('سوابق قدیمی‌تر')[0]!.props.onPress();
+      await settle();
+    });
+    expect(buttons('برگرداندن سابقه')).toHaveLength(20);
+    await act(async () => {
+      buttons('سوابق قدیمی‌تر')[0]!.props.onPress();
+      await settle();
+    });
+    expect(buttons('برگرداندن سابقه')).toHaveLength(5);
+    await act(async () => {
+      tree!.root.findByType(ChipSelect).props.onChange('vital');
+      await settle();
+    });
+    expect(buttons('برگرداندن سابقه')).toHaveLength(0);
+    expect(buttons('سوابق جدیدتر')).toHaveLength(0);
+    await act(async () => {
+      tree!.root.findByType(ChipSelect).props.onChange('lab');
+      await settle();
+    });
+    expect(buttons('برگرداندن سابقه')).toHaveLength(20);
+  });
+  it.each(['focus', 'replacement', 'changed-row'] as const)('refuses delayed confirmation after %s', async (change) => {
+    seedLab();
+    await render();
+    const dialog = await ask();
+    if (change === 'focus') mockFocused = false;
+    if (change === 'replacement') await act(async () => snapshotDataset(t)());
+    if (change === 'changed-row')
+      t.db.update(labPanels).set({ name: 'Different same-time result' }).where(eq(labPanels.id, 'deleted-lab')).run();
+    const before = databaseRows(t);
+    await confirm(dialog);
+    expect(databaseRows(t)).toEqual(before);
+    if (change === 'changed-row') expect(alertError).toHaveBeenCalled();
+  });
+  it('makes historical-only encounter recovery explicit and leaves current patient status alone', async () => {
+    t.db
+      .insert(encounters)
+      .values({
+        id: 'old-episode',
+        patientId,
+        kind: 'admission',
+        isActive: true,
+        chiefComplaint: 'Synthetic old admission',
+        ...stamps(new Date(1)),
+        deletedAt: new Date(2),
+      })
+      .run();
+    await render();
+    const status = t.db.select().from(patients).get()!.status;
+    const dialog = await ask();
+    expect(dialog[1]).toContain('غیرفعال');
+    expect(dialog[1]).toContain('جداگانه حذف‌شده برنمی‌گردند');
+    await confirm(dialog);
+    expect(t.db.select().from(encounters).get()!.isActive).toBe(false);
+    expect(t.db.select().from(patients).get()!.status).toBe(status);
+  });
+  it('refuses an outstanding confirmation after a retained list refresh fails', async () => {
+    seedLab();
+    await render();
+    const dialog = await ask();
+    const prepare = t.sqlite.prepare.bind(t.sqlite);
+    let broken = true;
+    jest.spyOn(t.sqlite, 'prepare').mockImplementation((sql, params) => {
+      if (broken && sql.includes('union all')) throw new Error('Synthetic clinical refresh');
+      return prepare(sql, params);
+    });
+    await act(async () => {
+      for (const listener of mockListeners) listener({ tableName: 'lab_panels' });
+      await new Promise((resolve) => setTimeout(resolve, 90));
+      await settle();
+    });
+    expect(buttons('برگرداندن سابقه')[0]!.props.disabled).toBe(true);
+    const before = databaseRows(t);
+    await confirm(dialog);
+    expect(databaseRows(t)).toEqual(before);
+    broken = false;
+  });
 });
 afterEach(async () => {
   await act(async () => {

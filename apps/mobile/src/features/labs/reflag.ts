@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { audit } from '@/db/audit';
 import { db } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import { labValues } from '@/db/schema';
 import { defineSetting, readSetting, writeSetting } from '@/db/settings';
 
@@ -27,7 +28,7 @@ export const LAB_FLAG_VERSION = 1;
 
 const flaggedVersion = defineSetting('labs.flagVersion', z.number().int().min(0), 0);
 
-export async function reflagLabValuesIfNeeded(): Promise<void> {
+export async function reflagLabValuesIfNeeded(now = new Date()): Promise<void> {
   const current = await readSetting(flaggedVersion);
   if (current === LAB_FLAG_VERSION) return;
 
@@ -36,14 +37,28 @@ export async function reflagLabValuesIfNeeded(): Promise<void> {
   db.transaction((tx) => {
     // Never apply the verdict of a pre-await snapshot to a corrected value.
     const rows = tx.select().from(labValues).all();
+    const corrections = new Map<string, { id: string; flag: typeof labValues.$inferSelect.flag }[]>();
     for (const row of rows) {
       const next = computeFlag(parseLabValue(row.value), row.refLow, row.refHigh);
       if (next === row.flag) continue;
-      // Derived metadata only: the clinical edit time must remain untouched.
-      tx.update(labValues).set({ flag: next }).where(eq(labValues.id, row.id)).run();
+      const panel = corrections.get(row.panelId) ?? [];
+      panel.push({ id: row.id, flag: next });
+      corrections.set(row.panelId, panel);
       changed += 1;
       if (next == null) cleared += 1;
     }
+    for (const [panelId, changes] of corrections)
+      withClinicalHistory(
+        tx,
+        'lab',
+        panelId,
+        now,
+        () => {
+          // Preserve both derived verdicts without changing the clinical edit time.
+          for (const row of changes) tx.update(labValues).set({ flag: row.flag }).where(eq(labValues.id, row.id)).run();
+        },
+        'reconciled',
+      );
   });
   await writeSetting(flaggedVersion, LAB_FLAG_VERSION);
 

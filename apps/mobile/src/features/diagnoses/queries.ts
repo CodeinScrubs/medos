@@ -1,8 +1,9 @@
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
-import { db } from '@/db/client';
-import { diagnoses, type Diagnosis } from '@/db/schema';
+import { auditInTransaction } from '@/db/audit';
+import { db, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
+import { diagnoses, patients, encounters, type Diagnosis } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { refreshPatientSearchText } from '@/features/patients/search-index';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -51,48 +52,88 @@ export type DiagnosisInput = {
 export async function addDiagnosis(input: DiagnosisInput): Promise<string> {
   if (!input.title.trim()) throw new Error('A diagnosis needs a title');
   const id = newId();
-  const [last] = await db
-    .select({ sortOrder: diagnoses.sortOrder })
-    .from(diagnoses)
-    .where(and(alive, eq(diagnoses.patientId, input.patientId)))
-    .orderBy(desc(diagnoses.sortOrder))
-    .limit(1);
+  const now = new Date();
+  return db.transaction((tx) => {
+    const encounterId =
+      input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx);
+    requireContext(tx, input.patientId, encounterId);
+    const last = tx
+      .select({ sortOrder: diagnoses.sortOrder })
+      .from(diagnoses)
+      .where(and(alive, eq(diagnoses.patientId, input.patientId)))
+      .orderBy(desc(diagnoses.sortOrder))
+      .get();
 
-  await db.insert(diagnoses).values({
-    id,
-    ...stamps(),
-    patientId: input.patientId,
-    // Undefined means "whatever admission is active"; null means explicitly none.
-    encounterId: input.encounterId !== undefined ? input.encounterId : await resolveActiveEncounterId(input.patientId),
-    title: input.title.trim(),
-    icdCode: input.icdCode?.trim() || null,
-    kind: input.kind ?? 'secondary',
-    status: input.status ?? 'active',
-    onsetDate: input.onsetDate ?? null,
-    notes: input.notes?.trim() || null,
-    sortOrder: input.sortOrder ?? (last?.sortOrder ?? 0) + 1,
+    return withClinicalHistory(tx, 'diagnosis', id, now, () => {
+      tx.insert(diagnoses)
+        .values({
+          id,
+          ...stamps(now),
+          patientId: input.patientId,
+          // Undefined means "whatever admission is active"; null means explicitly none.
+          encounterId,
+          title: input.title.trim(),
+          icdCode: input.icdCode?.trim() || null,
+          kind: input.kind ?? 'secondary',
+          status: input.status ?? 'active',
+          onsetDate: input.onsetDate ?? null,
+          notes: input.notes?.trim() || null,
+          sortOrder: input.sortOrder ?? (last?.sortOrder ?? 0) + 1,
+        })
+        .run();
+      // A patient is found by their problems too ("CHF", "cellulitis").
+      refreshPatientSearchText(input.patientId, tx);
+      return id;
+    });
   });
-  // A patient is found by their problems too ("CHF", "cellulitis").
-  refreshPatientSearchText(input.patientId);
-  return id;
+}
+
+function requireContext(tx: DbTransaction, patientId: string, encounterId: string | null) {
+  if (
+    !tx
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .get()
+  )
+    throw new Error('پروندهٔ بیمار در دسترس نیست.');
+  if (
+    encounterId !== null &&
+    !tx
+      .select({ id: encounters.id })
+      .from(encounters)
+      .where(and(eq(encounters.id, encounterId), eq(encounters.patientId, patientId), isNull(encounters.deletedAt)))
+      .get()
+  )
+    throw new Error('نوبت تشخیص به این بیمار تعلق ندارد یا حذف شده است.');
 }
 
 export async function updateDiagnosis(id: string, patch: Omit<Partial<DiagnosisInput>, 'patientId'>): Promise<void> {
   if (patch.title !== undefined && !patch.title.trim()) throw new Error('A diagnosis needs a title');
-  const current = (await diagnosisQuery(id))[0];
-  if (!current) throw new Error(`Diagnosis ${id} not found`);
-  await db
-    .update(diagnoses)
-    .set({
-      ...patch,
-      title: patch.title === undefined ? undefined : patch.title.trim(),
-      icdCode: patch.icdCode === undefined ? undefined : patch.icdCode?.trim() || null,
-      notes: patch.notes === undefined ? undefined : patch.notes?.trim() || null,
-      ...touch(),
-    })
-    .where(and(alive, eq(diagnoses.id, id)));
-  refreshPatientSearchText(current.patientId);
-  await audit('diagnosis.updated', { entityType: 'diagnosis', entityId: id });
+  const now = new Date();
+  db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(diagnoses)
+      .where(and(alive, eq(diagnoses.id, id)))
+      .get();
+    if (!current) throw new Error('تشخیص در دسترس نیست.');
+    requireContext(tx, current.patientId, patch.encounterId === undefined ? current.encounterId : patch.encounterId);
+    withClinicalHistory(tx, 'diagnosis', id, now, () => {
+      tx.update(diagnoses)
+        .set({
+          ...patch,
+          title: patch.title === undefined ? undefined : patch.title.trim(),
+          icdCode: patch.icdCode === undefined ? undefined : patch.icdCode?.trim() || null,
+          notes: patch.notes === undefined ? undefined : patch.notes?.trim() || null,
+          ...touch(now),
+        })
+        .where(and(alive, eq(diagnoses.id, id)))
+        .run();
+      refreshPatientSearchText(current.patientId, tx);
+      auditInTransaction(tx, 'diagnosis.updated', { entityType: 'diagnosis', entityId: id }, now);
+    });
+  });
 }
 
 /**
@@ -106,13 +147,24 @@ export async function setDiagnosisStatus(id: string, status: Diagnosis['status']
 }
 
 export async function deleteDiagnosis(id: string): Promise<void> {
-  const current = (await diagnosisQuery(id))[0];
-  await db
-    .update(diagnoses)
-    .set(softDelete())
-    .where(and(alive, eq(diagnoses.id, id)));
-  if (current) refreshPatientSearchText(current.patientId);
-  await audit('diagnosis.deleted', { entityType: 'diagnosis', entityId: id });
+  const now = new Date();
+  db.transaction((tx) => {
+    const current = tx
+      .select()
+      .from(diagnoses)
+      .where(and(alive, eq(diagnoses.id, id)))
+      .get();
+    if (!current) return;
+    requireContext(tx, current.patientId, current.encounterId);
+    withClinicalHistory(tx, 'diagnosis', id, now, () => {
+      tx.update(diagnoses)
+        .set(softDelete(now))
+        .where(and(alive, eq(diagnoses.id, id)))
+        .run();
+      refreshPatientSearchText(current.patientId, tx);
+      auditInTransaction(tx, 'diagnosis.deleted', { entityType: 'diagnosis', entityId: id }, now);
+    });
+  });
 }
 
 /** What is being carried right now, for the summary line on a record. */

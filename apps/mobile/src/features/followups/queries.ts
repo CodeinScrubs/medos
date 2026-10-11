@@ -1,7 +1,8 @@
 import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import { encounters, followUps, patients, type FollowUp } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -71,7 +72,7 @@ export function createFollowUpInTransaction(
   requirePatient(tx, input.patientId);
   const encounterId = context ? context.encounterId : resolveActiveEncounterId(input.patientId, tx);
   if (
-    encounterId &&
+    encounterId !== null &&
     !tx
       .select({ id: encounters.id })
       .from(encounters)
@@ -82,23 +83,26 @@ export function createFollowUpInTransaction(
   )
     throw new Error('نوبت مربوط به پیش‌نویس پیدا نشد؛ پیگیری ثبت نشد.');
   const id = newId();
-  tx.insert(followUps)
-    .values({
-      id,
-      ...stamps(now),
-      patientId: input.patientId,
-      encounterId,
-      dueAt: input.dueAt,
-      reason: input.reason.trim(),
-      channel: input.channel,
-      priority: input.priority,
-      status: 'pending',
-    })
-    .run();
-  return id;
+  return withClinicalHistory(tx, 'followup', id, now, () => {
+    tx.insert(followUps)
+      .values({
+        id,
+        ...stamps(now),
+        patientId: input.patientId,
+        encounterId,
+        dueAt: input.dueAt,
+        reason: input.reason.trim(),
+        channel: input.channel,
+        priority: input.priority,
+        status: 'pending',
+      })
+      .run();
+    return id;
+  });
 }
 
 export async function updateFollowUp(id: string, patch: Partial<Omit<FollowUpInput, 'patientId'>>): Promise<void> {
+  const now = new Date();
   db.transaction((tx) => {
     const current = requireFollowUp(tx, id);
     const merged = {
@@ -109,17 +113,20 @@ export async function updateFollowUp(id: string, patch: Partial<Omit<FollowUpInp
       priority: patch.priority ?? current.priority,
     };
     validate(merged);
-    tx.update(followUps)
-      .set({
-        reason: merged.reason.trim(),
-        dueAt: merged.dueAt,
-        channel: merged.channel,
-        priority: merged.priority,
-        reminderRevision: current.reminderRevision + 1,
-        ...touch(),
-      })
-      .where(eq(followUps.id, id))
-      .run();
+    withClinicalHistory(tx, 'followup', id, now, () =>
+      tx
+        .update(followUps)
+        .set({
+          reason: merged.reason.trim(),
+          dueAt: merged.dueAt,
+          channel: merged.channel,
+          priority: merged.priority,
+          reminderRevision: current.reminderRevision + 1,
+          ...touch(now),
+        })
+        .where(eq(followUps.id, id))
+        .run(),
+    );
   });
   await reconcileFollowUpReminder(id);
 }
@@ -167,30 +174,40 @@ export async function setFollowUpStatus(
 async function changeStatus(id: string, status: FollowUp['status'], now: Date, outcome?: string | null): Promise<void> {
   db.transaction((tx) => {
     const current = requireFollowUp(tx, id);
-    tx.update(followUps)
-      .set({
-        status,
-        ...(outcome !== undefined ? { outcome } : {}),
-        completedAt: status === 'pending' ? null : now,
-        reminderRevision: current.reminderRevision + 1,
-        ...touch(now),
-      })
-      .where(eq(followUps.id, id))
-      .run();
+    withClinicalHistory(tx, 'followup', id, now, () => {
+      tx.update(followUps)
+        .set({
+          status,
+          ...(outcome !== undefined ? { outcome } : {}),
+          completedAt: status === 'pending' ? null : now,
+          reminderRevision: current.reminderRevision + 1,
+          ...touch(now),
+        })
+        .where(eq(followUps.id, id))
+        .run();
+      auditInTransaction(
+        tx,
+        'followup.statusChanged',
+        { entityType: 'followUp', entityId: id, detail: { status } },
+        now,
+      );
+    });
   });
-  await audit('followup.statusChanged', { entityType: 'followUp', entityId: id, detail: { status } });
   await reconcileFollowUpReminder(id);
 }
 
 export async function deleteFollowUp(id: string): Promise<void> {
+  const now = new Date();
   db.transaction((tx) => {
     const current = requireFollowUp(tx, id);
-    tx.update(followUps)
-      .set({ ...softDelete(), reminderRevision: current.reminderRevision + 1 })
-      .where(eq(followUps.id, id))
-      .run();
+    withClinicalHistory(tx, 'followup', id, now, () => {
+      tx.update(followUps)
+        .set({ ...softDelete(now), reminderRevision: current.reminderRevision + 1 })
+        .where(eq(followUps.id, id))
+        .run();
+      auditInTransaction(tx, 'followup.deleted', { entityType: 'followUp', entityId: id }, now);
+    });
   });
-  await audit('followup.deleted', { entityType: 'followUp', entityId: id });
   await reconcileFollowUpReminder(id);
 }
 

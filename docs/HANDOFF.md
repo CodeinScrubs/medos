@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Preserve clinical corrections and restore seven record kinds
+
+**Agent:** GPT-6 via Codex; primary integration/verification with a reused backend reviewer.
+**Commits:** this source commit, based on delivered PR8 `faa7160`.
+
+**Changed**
+- Add immutable clinical snapshots for ten record kinds and audited recovery for
+  seven clinical tombstones. Keep bounded Corrections/trash views in existing
+  screens. Restore old encounters as historical/inactive; retain separately
+  deleted children and original patient/episode ownership. Version .56/code72.
+- Guard full SQLite restore basis, lossy imported numeric/boolean/date rows,
+  required audit/history rollback, retained read failures and old dataset dialogs.
+  Two additive migrations; no dependency, permission, route or backup format change.
+
+**Verified**
+- Baseline .55 check passes 171 suites/2,474 tests. First integrated check passes
+  175 suites/2,597 app tests and five workflow tests; three import warnings were
+  then corrected. Imported-value/date guard focused tests pass 117 tests/3 suites
+  and typecheck. A full follow-up caught an overbroad INTEGER-affinity guard
+  blocking fractional glucose; corrected with explicit history/unit regressions.
+  Corrected full check passes 175 suites/2,607 app tests (202.822s), five
+  workflow tests and typecheck/lint/format without warnings. Focused glucose/
+  history/form coverage passes 75 tests in four suites (16.324s).
+- Older frozen .55 input diagnostics reproduce native stale-event injection
+  failures for long ASCII batches; accepted prefixes survive cold recovery.
+  Raw reports and unchanged AVD base hashes are retained privately.
+
+**Not verified**
+- New .56 native UI/whole-state archive acceptance, APK inspection, hosted CI
+  and physical phone. Prior-source native acceptance does not accept .56.
+
+**Open threads**
+- Freeze only after the final full check; build/inspect x86 QA bytes, run the
+  seven-kind restore/history matrix and independent whole-archive comparisons,
+  then build/inspect owner arm64 bytes and check the exact pushed CI head.
+- Rich text, remaining trash kinds, full timed 40-patient shift, complete
+  follow-up/provider/interruption/physical acceptance remain in IMPLEMENTATION.
+  The original short .55 input mismatch and older focus ANR remain unresolved.
+
+**Gotchas**
+- A zero-exit `adb input text` command can drop stale native key events. Observe
+  exact EditText contents; do not reinterpret a missing injected suffix as an
+  app autosave loss, or use later exact input as a causal explanation.
+- History is a typed clinical snapshot; unsupported imported INTEGER/boolean/
+  timestamp rows are refused intact. REAL lab doubles retain original raw text.
+
 ## 2026-10-11 — Deliver five-form recovery with complete native state witnesses
 
 **Agent:** GPT-6 via Codex; primary verification, no additional delegation.

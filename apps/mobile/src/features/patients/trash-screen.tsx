@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useNavigation } from 'expo-router/react-navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
@@ -15,6 +15,8 @@ import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
+import { ClinicalTrashPanel } from './clinical-trash-panel';
+import { deletedClinicalCountQuery } from './clinical-trash-queries';
 import { deletedPatientsQuery, restorePatient } from './queries';
 
 /**
@@ -35,6 +37,7 @@ export function TrashScreen() {
   const patientRead = useLive(deletedPatientsQuery(patientLimit + 1), [patientLimit]);
   const noteRead = useLive(deletedNotesQuery(noteLimit + 1), [noteLimit]);
   const captureRead = useLive(deletedCapturesQuery(captureLimit + 1), [captureLimit]);
+  const clinicalCount = useLive(deletedClinicalCountQuery());
   const rows = (patientRead.data ?? []).slice(0, patientLimit);
   const noteRows = (noteRead.data ?? []).slice(0, noteLimit);
   const captureRows = (captureRead.data ?? []).slice(0, captureLimit);
@@ -47,13 +50,19 @@ export function TrashScreen() {
       mounted.current = false;
     };
   }, []);
-  const ready = [patientRead, noteRead, captureRead].every((read) => read.data !== undefined && !read.error);
+  const ready = [patientRead, noteRead, captureRead, clinicalCount].every(
+    (read) => read.data !== undefined && !read.error,
+  );
   const locked = busy || stale || !ready;
+  const admission = useRef(!locked);
+  useLayoutEffect(() => {
+    admission.current = !locked;
+  }, [locked]);
 
   async function restore(work: () => Promise<void>) {
     // State alone cannot block two presses in the same render. Retain original
     // admission through reminders and audit, not just the first SQL statement.
-    if (acting.current || !mounted.current || !ready || !navigation.isFocused()) return;
+    if (acting.current || !mounted.current || !admission.current || !navigation.isFocused()) return;
     acting.current = true;
     setBusy(true);
     try {
@@ -67,6 +76,7 @@ export function TrashScreen() {
         patientRead.retry();
         noteRead.retry();
         captureRead.retry();
+        clinicalCount.retry();
       }
     }
   }
@@ -81,7 +91,8 @@ export function TrashScreen() {
         <ErrorNotice error={patientRead.error} what="بیماران حذف‌شده" onRetry={patientRead.retry} />
         <ErrorNotice error={noteRead.error} what="نوت‌های حذف‌شده" onRetry={noteRead.retry} />
         <ErrorNotice error={captureRead.error} what="ثبت‌های حذف‌شده" onRetry={captureRead.retry} />
-        {[patientRead, noteRead, captureRead].some((read) => read.loading) ? (
+        <ErrorNotice error={clinicalCount.error} what="سوابق حذف‌شده" onRetry={clinicalCount.retry} />
+        {[patientRead, noteRead, captureRead, clinicalCount].some((read) => read.loading) ? (
           <Text variant="caption" color="textMuted">
             در حال خواندن…
           </Text>
@@ -100,8 +111,17 @@ export function TrashScreen() {
             />
           </Column>
         ) : null}
-        {ready && !stale && rows.length === 0 && captureRows.length === 0 && noteRows.length === 0 ? (
+        {ready &&
+        !stale &&
+        rows.length === 0 &&
+        captureRows.length === 0 &&
+        noteRows.length === 0 &&
+        clinicalCount.data?.[0]?.count === 0 ? (
           <EmptyState icon="trash-outline" title="چیزی حذف نشده" />
+        ) : null}
+
+        {(clinicalCount.data?.[0]?.count ?? 0) > 0 ? (
+          <ClinicalTrashPanel generation={generation} stale={stale} locked={locked} restore={restore} />
         ) : null}
 
         {rows.length > 0 ? (

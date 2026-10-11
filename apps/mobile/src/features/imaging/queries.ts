@@ -1,7 +1,8 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import { encounters, imagingStudies, patients, type ImagingStudy } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -75,7 +76,7 @@ export function createImagingInTransaction(
 ): string {
   requirePatient(tx, input.patientId);
   const capturedEncounter = encounterId === undefined ? resolveActiveEncounterId(input.patientId, tx) : encounterId;
-  if (capturedEncounter) {
+  if (capturedEncounter !== null) {
     const encounter = tx
       .select()
       .from(encounters)
@@ -91,15 +92,18 @@ export function createImagingInTransaction(
   }
   if (input.studyDate && !Number.isFinite(input.studyDate.getTime())) throw new Error('تاریخ تصویربرداری معتبر نیست.');
   const id = newId();
-  tx.insert(imagingStudies)
-    .values({
-      ...input,
-      id,
-      ...stamps(),
-      encounterId: capturedEncounter,
-    })
-    .run();
-  return id;
+  const now = new Date();
+  return withClinicalHistory(tx, 'imaging', id, now, () => {
+    tx.insert(imagingStudies)
+      .values({
+        ...input,
+        id,
+        ...stamps(now),
+        encounterId: capturedEncounter,
+      })
+      .run();
+    return id;
+  });
 }
 
 export async function updateImagingStudy(id: string, patch: Partial<Omit<ImagingInput, 'patientId'>>): Promise<void> {
@@ -119,25 +123,31 @@ export function updateImagingInTransaction(
   requirePatient(tx, row.patientId);
   if (patch.studyDate && !Number.isFinite(patch.studyDate.getTime())) throw new Error('تاریخ تصویربرداری معتبر نیست.');
   if (!Object.keys(patch).length) return;
-  tx.update(imagingStudies)
-    .set({ ...patch, ...touch() })
-    .where(eq(imagingStudies.id, id))
-    .run();
+  const now = new Date();
+  withClinicalHistory(tx, 'imaging', id, now, () =>
+    tx
+      .update(imagingStudies)
+      .set({ ...patch, ...touch(now) })
+      .where(eq(imagingStudies.id, id))
+      .run(),
+  );
 }
 
 export async function deleteImagingStudy(id: string): Promise<void> {
-  const changed = db.transaction((tx) => {
+  const now = new Date();
+  db.transaction((tx) => {
     const row = tx
       .select()
       .from(imagingStudies)
       .where(and(alive, eq(imagingStudies.id, id)))
       .get();
-    if (!row) return false;
+    if (!row) return;
     requirePatient(tx, row.patientId);
-    tx.update(imagingStudies).set(softDelete()).where(eq(imagingStudies.id, id)).run();
-    return true;
+    withClinicalHistory(tx, 'imaging', id, now, () => {
+      tx.update(imagingStudies).set(softDelete(now)).where(eq(imagingStudies.id, id)).run();
+      auditInTransaction(tx, 'imaging.deleted', { entityType: 'imaging_study', entityId: id }, now);
+    });
   });
-  if (changed) await audit('imaging.deleted', { entityType: 'imaging_study', entityId: id });
 }
 function requirePatient(tx: DbTransaction, patientId: string) {
   if (

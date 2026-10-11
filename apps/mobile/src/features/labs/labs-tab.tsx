@@ -375,7 +375,7 @@ function PanelList({
                   text: 'حذف',
                   style: 'destructive',
                   onPress: () =>
-                    void withDatasetWrite(generation, () => deleteLabPanel(p.id)).catch((e) =>
+                    void withDatasetWrite(generation, () => deleteLabPanel(p.id, p)).catch((e) =>
                       alertError('حذف نشد', e),
                     ),
                 },

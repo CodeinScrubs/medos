@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 
-import { db, type Database } from '@/db/client';
+import { db, type Database, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import { encounters, patients, type PatientStatus } from '@/db/schema';
 import { touch } from '@/lib/ids';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
@@ -100,17 +101,25 @@ export async function reconcilePatientStatus(patientId: string): Promise<Patient
 
 /** Repair is an inference from current rows, never an awaited stale snapshot. */
 function reconcileStoredStatus(
-  handle: Pick<Database, 'select' | 'update'>,
+  handle: DbTransaction,
   patient: { id: string; status: PatientStatus },
   now: Date,
 ): PatientStatus {
   const next = statusFor(activeEncounterQuery(patient.id, handle).get() ?? null, patient.status);
   if (next !== patient.status)
-    handle
-      .update(patients)
-      .set({ status: next, ...touch(now) })
-      .where(eq(patients.id, patient.id))
-      .run();
+    withClinicalHistory(
+      handle,
+      'patient',
+      patient.id,
+      now,
+      () =>
+        handle
+          .update(patients)
+          .set({ status: next, ...touch(now) })
+          .where(eq(patients.id, patient.id))
+          .run(),
+      'reconciled',
+    );
   return next;
 }
 

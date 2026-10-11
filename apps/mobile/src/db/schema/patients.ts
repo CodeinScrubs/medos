@@ -227,7 +227,10 @@ export const diagnoses = sqliteTable(
       .notNull()
       .$default(() => 0),
   },
-  (t) => [index('diagnoses_patient_idx').on(t.patientId, t.encounterId)],
+  (t) => [
+    index('diagnoses_patient_idx').on(t.patientId, t.encounterId),
+    index('diagnoses_encounter_owner_idx').on(t.encounterId, t.deletedAt, t.patientId),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -478,7 +481,10 @@ export const vitals = sqliteTable(
     urineOutput: text('urine_output'),
     notes: text('notes'),
   },
-  (t) => [index('vitals_patient_idx').on(t.patientId, t.measuredAt)],
+  (t) => [
+    index('vitals_patient_idx').on(t.patientId, t.measuredAt),
+    index('vitals_encounter_owner_idx').on(t.encounterId, t.deletedAt, t.patientId),
+  ],
 );
 
 /** Raw bedside input, including incomplete numbers/time; never a clinical observation. */
@@ -525,7 +531,10 @@ export const labPanels = sqliteTable(
     labName: text('lab_name'),
     notes: text('notes'),
   },
-  (t) => [index('lab_panels_patient_idx').on(t.patientId, t.collectedAt)],
+  (t) => [
+    index('lab_panels_patient_idx').on(t.patientId, t.collectedAt),
+    index('lab_panels_encounter_owner_idx').on(t.encounterId, t.deletedAt, t.patientId),
+  ],
 );
 
 /** Unpublished raw lab input; clinical queries never read this table. */
@@ -612,7 +621,10 @@ export const imagingStudies = sqliteTable(
       .$default(() => 'done' as const),
     notes: text('notes'),
   },
-  (t) => [index('imaging_patient_idx').on(t.patientId, t.studyDate)],
+  (t) => [
+    index('imaging_patient_idx').on(t.patientId, t.studyDate),
+    index('imaging_encounter_owner_idx').on(t.encounterId, t.deletedAt, t.patientId),
+  ],
 );
 
 /** Exact, unvalidated imaging input with the original encounter and editable basis. */
@@ -669,7 +681,11 @@ export const followUps = sqliteTable(
     reminderRevision: integer('reminder_revision').notNull().default(0),
     reminderAppliedRevision: integer('reminder_applied_revision').notNull().default(-1),
   },
-  (t) => [index('follow_ups_due_idx').on(t.status, t.dueAt), index('follow_ups_patient_idx').on(t.patientId)],
+  (t) => [
+    index('follow_ups_due_idx').on(t.status, t.dueAt),
+    index('follow_ups_patient_idx').on(t.patientId),
+    index('follow_ups_encounter_owner_idx').on(t.encounterId, t.deletedAt, t.patientId),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -757,6 +773,7 @@ export const consultations = sqliteTable(
     index('consultations_patient_idx').on(t.patientId, t.requestedAt),
     index('consultations_status_idx').on(t.status),
     index('consultations_search_idx').on(t.searchText),
+    index('consultations_encounter_owner_idx').on(t.encounterId, t.deletedAt, t.patientId),
   ],
 );
 
@@ -923,6 +940,7 @@ export const tasks = sqliteTable(
     index('tasks_patient_idx').on(t.patientId),
     index('tasks_shift_idx').on(t.shiftId),
     index('tasks_search_idx').on(t.searchText),
+    index('tasks_encounter_owner_idx').on(t.encounterId, t.deletedAt, t.patientId),
   ],
 );
 
