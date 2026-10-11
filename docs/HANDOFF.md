@@ -33,6 +33,52 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-11 — Deliver verified .60 optional-lock repair and owner APK
+
+**Agent:** GPT-6 via Codex; primary integration and native verification.
+**Commits:** application source e34e79e; this documentation checkpoint.
+
+**Changed**
+- Record the final no-credential repair independently of first-source evidence.
+- Deliver the signed arm64 dist/MedOS-0.11.60.apk; no additional app change.
+
+**Verified**
+- Full source check: 182 suites/2,734 app tests, five workflow checks,
+  typecheck/lint/format, zero lint warnings. Normal push repeats it (Jest 221.912s).
+- Exact-source hosted CI succeeds. Both APKs pass actual version/code/ABI/signer/
+  essential-JNI inspection; installed QA bytes match. Exact hashes and build
+  warnings are in validation-0.11.60.md.
+- Actual no-enrollment refusal, enable cancel/retry, repaired disable after PIN
+  removal, enrolled disable cancel/success and cold cancel/retry pass on final
+  QA bytes. The original 41 synthetic patients remain. No MedOS fatal is observed
+  in this bounded run. Owned VM closes normally; persistent base hashes stay intact.
+
+**Not verified**
+- Physical phone, general native failure injection, alarm delivery/reboot/Doze,
+  media/IME/provider/power and full timed heavy shifts. The product is not finished.
+- Private next-slice proposals are not integrated app features or acceptance.
+
+**Open threads**
+- Handle places/extension phone, clipboard, usage-write and haptic failures with
+  original dataset and current source-screen ownership. A failed optional counter
+  must not turn an acknowledged copy into a reported copy failure.
+- Extend existing trash to notebook records, preserving original parent context
+  and separately deleted children; test stale callbacks, required audit rollback
+  and complete compatible archives. This is not permanent notebook edit history.
+- Prove rich-editor native IME/selection/snapshot drain before schema integration;
+  retain the single AutosaveScope and exact plain/NULL/history/export compatibility.
+- Complete the follow-up loop and measured 40-patient native shifts; physical and
+  physician acceptance remain separate. Do not claim that only phone testing remains.
+
+**Gotchas**
+- Boot wait and initial UI probe fail because of delayed boot/System UI ANR;
+  observed Wait exposes the same app PID. A too-early retry snapshot is also
+  retained. Use bounded fresh snapshots; do not invent app fixes for those failures.
+- The normal compressed hierarchy hides the covered clinical list; uncompressed
+  diagnostic nodes are not ordinary accessibility exposure.
+- App source/HEAD stay frozen throughout checks/builds. Unrelated untracked
+  review documents remain unchanged. PR 11 stays draft; no PR is merged here.
+
 ## 2026-10-11 — Repair explicit lock removal after device credentials disappear
 
 **Agent:** GPT-6 via Codex; primary native investigation and integration.

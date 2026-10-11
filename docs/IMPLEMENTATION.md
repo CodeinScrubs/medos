@@ -33,13 +33,15 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application 0.11.60/code76 on codex/permission-state-recovery remains
-PR11's candidate. First source 22ee485 passes the full 2,728-test check, push,
-exact-source CI and bounded native camera/lock observations. Native testing
-then reproduces silent disable after device credentials disappear. The repaired
-helper passes 35 focused tests and the full 2,734-test check; new frozen native/CI and owner
-artifact remain pending in [validation-0.11.60.md](validation-0.11.60.md).
-Do not borrow first-source acceptance for the repaired source.
+Application 0.11.60/code 76 on codex/permission-state-recovery is draft PR 11's
+candidate. Frozen source e34e79e passes 35 focused tests, the full 182-suite/
+2,734-test check, five workflow checks, normal push and exact-source hosted CI.
+Actual installed QA bytes accept repaired no-credential disable, enrolled
+cancel/retry/disable and cold cancel/retry with the original synthetic patients.
+Both signed x86/arm64 APKs pass actual version/ABI/certificate/JNI inspection;
+dist/MedOS-0.11.60.apk is the newest owner artifact, not physical acceptance.
+First-source camera/grace observations, environmental failures and exact hashes
+remain separate in [validation-0.11.60.md](validation-0.11.60.md).
 
 .59's 179-suite/2,699-test check, normal push and exact-source hosted CI pass.
 Its installed private x86 APK matches inspected bytes. Native camera-grant return
@@ -163,9 +165,10 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
 - .59 accepts actual mounted camera-grant return and the system exact-alarm
   switch, including two observed occasion-request windows changing from one hour
   to zero. Actual delivery and OEM/Doze/reboot behavior remain separate.
-- .60 handles optional lock/settings native rejection and delayed callbacks with
-  original dataset admission. Its focused software witnesses pass; new-source
-  repaired-source full/native/CI/owner checks and physical authentication remain open.
+- .60 accepts handled lock/settings failures in software and bounded actual
+  no-credential/enrolled/cold behavior on frozen installed QA bytes. Its full
+  check, source CI and both inspected APKs pass. Physical authentication and
+  broader native failure/lifecycle cases remain separate.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.

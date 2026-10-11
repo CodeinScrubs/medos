@@ -6,8 +6,9 @@ No dependency, schema, route, permission, clinical rule or archive/key change.
 
 ## Implementation
 
-SettingsScreen handles native authentication, setting and audit rejection. A
-lock action is admitted once through its original dataset intent across native
+SettingsScreen handles native authentication and setting failures. Unexpected
+helper rejection reaches its existing error handling; audit remains best effort.
+A lock action is admitted once through its original dataset intent across native
 awaits. Cancellation stays quiet; failures retain retry. A delayed failure logs
 through the existing redacted logger when its screen is unmounted/unfocused.
 Grace/image preferences use the same original intent. A stale dataset gets short
@@ -45,8 +46,9 @@ Unexpected helper rejection propagates; no required audit rollback is introduced
   only: the actual audit helper is best effort. Native modules are stand-ins.
 - The repaired source passes the full check: 182 suites/2,734 app tests, five
   workflow checks, typecheck/lint/format and zero lint warnings (Jest 233.077s).
-  Its normal push and exact hosted CI remain pending; first-source results do
-  not substitute for them.
+  Its normal source push repeats the same checks and succeeds (Jest 221.912s).
+  Exact e34e79e hosted [CI also succeeds](https://github.com/CodeinScrubs/medos/actions/runs/38156900313/job/114521630990).
+  First-source results do not substitute for these final-source gates.
 
 ## First-source native evidence: 22ee485
 
@@ -90,11 +92,54 @@ UI diagnostics also include hidden nodes. Correct selected/compressed reads and
 actual blocked-touch behavior supply the accepted evidence; no speculative
 code change was made for those observer differences.
 
-## Final-source artifact/native gates
+## Final-source artifact and native evidence
 
-Pending a newly frozen repaired-source QA build, actual no-credential disable
-and enrolled cancel/retry/cold observations, owner arm64 APK and exact hashes.
-No .60 owner APK has yet been built. .58 remains the latest owner artifact.
+Frozen application source: e34e79edaadbf499e28277b36bba9f0ec6c7612e.
+Tracked source remains unchanged during both builds; the original unrelated
+untracked documents retain their exact hashes.
+
+| Artifact | Bytes | SHA-256 |
+|---|---|---|
+| Private x86_64 QA APK | 55,121,658 | 0c2a7f2250457a48a22bb75c51483bc4488de6932ecd65235191eec19f4def22 |
+| Owner arm64 APK: dist/MedOS-0.11.60.apk | 53,513,331 | e35aa27b8405c3e45aa361150f0e2c1a00632dd659c3fd4bfdfce3985bdcbc09 |
+
+Both actual packages report com.shayan.medos, 0.11.60/code 76, min 24/target 36,
+the expected single ABI and the unchanged certificate above. Essential JNI
+inspection passes. The installed QA base.apk matches the inspected bytes;
+the owner dist file matches its separately retained frozen copy. x86 QA is not
+copied into dist. The owner APK has not been installed on a physical phone.
+
+QA builds in 3m 2s (834 tasks: 24 executed, 810 up to date). After normal Gradle
+stop, the generated app build is cleaned for the ABI switch; the owner release
+builds in 10m 55s (910 tasks: 195 executed, 715 up to date). Native deprecation,
+CMake path and color-environment warnings remain nonfatal; this is not a claim
+that native builds have no warnings.
+
+On the owned read-only emulator, the final installed bytes demonstrate:
+
+- No-enrollment enable refusal preserves a ready off control. Actual native
+  enable cancellation and retry work.
+- After removing the ephemeral VM credential, explicit disable now acknowledges
+  a ready off control without an impossible prompt: the reproduced defect is fixed.
+- With enrollment present, disable requires native authentication; cancellation
+  preserves the ready on state, and successful authentication turns it off.
+- Intentional force-stop creates a new process. Cold-start cancellation retains
+  the opaque cover and explicit retry opens the original 41 synthetic patients.
+  The inspected cover screenshot and normal compressed hierarchy contain no
+  patient-list content. This is not a full timed 40-patient shift.
+
+The first bounded boot wait expires. Actual boot completion is subsequently
+verified before UI automation. System UI ANR blocks the initial installed-UI
+probe; its observed Wait action reveals MedOS with the original PID 3143.
+A retry snapshot is taken before its native PIN field appears; bounded fresh
+snapshots observe it and the retry completes. These observer/environment
+failures remain in private evidence; no app fix is invented for them.
+
+The cold process is PID 5542; the crash buffer contains no MedOS fatal in this
+bounded run. Ephemeral credentials are removed, the owned emulator closes
+normally and both persistent base hashes remain unchanged. Final Gradle stop
+also succeeds. Actual camera/grace observations above belong to the first source;
+they are not relabeled as final-source observations or physical-device evidence.
 
 ## Boundaries and next work
 
