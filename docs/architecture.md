@@ -2708,3 +2708,12 @@ live-child/original-parent SQL validator runs under dataset admission immediatel
 before routing. This catches hidden changes that a retained cached UI cannot see,
 without writing a record to open its editor. No new route or schema is required.
 An old native menu callback cannot navigate after the screen or dataset changes.
+
+## Birth identity versus derived age (.65)
+
+Normal patient raw publication already refuses future birth dates, while imported
+base snapshots preserve historical raw identity. Age display/calculation must not
+turn that uncertainty into a newborn, negative years or NaN. The pure helpers
+use civil-calendar day difference and withhold an unestablished result. A later
+unknown hour on the same birth date remains valid. No stored record is rewritten,
+manual fallback without DOB remains usable and existing leap-day behavior stays.

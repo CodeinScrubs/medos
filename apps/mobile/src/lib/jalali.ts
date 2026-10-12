@@ -244,6 +244,10 @@ export function formatRelativeTime(value: DateInput, now: Date = new Date()): st
 export function formatAge(birthDate: DateInput, fallbackYears?: number | null, now: Date = new Date()): string {
   const date = coerce(birthDate);
   if (!date) return fallbackYears != null ? `${toPersianDigits(fallbackYears)} ساله` : '—';
+  // An imported future date or an invalid clock cannot establish an age.
+  // Birthday identity is a civil date: a later hour on the same day is valid.
+  const totalDays = daysBetween(now, date);
+  if (totalDays === null || totalDays < 0) return '—';
 
   let years = now.getFullYear() - date.getFullYear();
   let months = now.getMonth() - date.getMonth();
@@ -258,7 +262,6 @@ export function formatAge(birthDate: DateInput, fallbackYears?: number | null, n
   if (years >= 2) return `${toPersianDigits(years)} ساله`;
   const totalMonths = years * 12 + months;
   if (totalMonths >= 2) return `${toPersianDigits(totalMonths)} ماهه`;
-  const totalDays = Math.max(0, daysBetween(now, date) ?? 0);
   return `${toPersianDigits(totalDays)} روزه`;
 }
 
@@ -266,6 +269,8 @@ export function formatAge(birthDate: DateInput, fallbackYears?: number | null, n
 export function ageInYears(birthDate: DateInput, fallbackYears?: number | null, now: Date = new Date()): number | null {
   const date = coerce(birthDate);
   if (!date) return fallbackYears ?? null;
+  const elapsedDays = daysBetween(now, date);
+  if (elapsedDays === null || elapsedDays < 0) return null;
   let years = now.getFullYear() - date.getFullYear();
   const m = now.getMonth() - date.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < date.getDate())) years -= 1;

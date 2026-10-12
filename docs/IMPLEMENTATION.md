@@ -33,13 +33,24 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+Application .65/code81 on codex/age-certainty withholds derived age for future
+imported birth identity/invalid supplied clock. Normal form rejection already
+existed; no stored record changes. Civil-date/same-day/manual-fallback/leap-day
+behavior remains. Private witnesses four red then five green; integrated119
+tests plus35 doctor/occasion tests and full197-suite/2,949-app-test check/five
+workflow checks pass, zero lint warnings. Normal push/CI/artifact/native remains
+pending at this source checkpoint. See [validation-0.11.65.md](validation-0.11.65.md).
+Inherit .64 menu/edit changes and accept them on the .65 artifact to avoid an
+intermediate build; .63 remains the inspected owner APK until then.
+
 Application .64/code80 on codex/extension-menu-continuity closes the native
 extension-menu Back trap and fences its retained editor choice through existing
 original row/dataset/focus/read/latch and SQL admission. No extra UI/dependency/
 schema/route/permission/archive scheme. Private six navigation witnesses are
 red before repair and green after; integrated101 places tests and the full
 197-suite/2,945-app-test check plus five workflow checks pass, zero lint warnings.
-Normal push/CI/artifact/native acceptance remains pending at this checkpoint. See
+Normal push and exact-source hosted CI succeed on94b43c0. Native acceptance is
+combined with the next frozen .65 candidate; no .64 APK is claimed. See
 [validation-0.11.64.md](validation-0.11.64.md). The unfinished private doctor/
 occasion recovery proposal is not integrated.
 

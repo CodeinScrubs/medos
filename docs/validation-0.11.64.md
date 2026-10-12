@@ -27,8 +27,12 @@ Menu dismissal itself needs actual Android acceptance, not a mock flag assertion
 
 Full `npm run check` passes197 suites/2,945 app tests and five workflow checks,
 typecheck/lint/format and zero lint warnings; Jest takes335.655 seconds. Checked
-source/document bytes stay unchanged. Normal push/source CI, frozen APK and
-native dismissal/edit/cold acceptance are pending at this source checkpoint. Prior .63 evidence remains
+source/document bytes stay unchanged. Normal push repeats the same197 suites/
+2,945 tests and five workflow checks, zero lint warnings; Jest286.603 seconds.
+Frozen94b43c0 succeeds in
+[exact-source CI](https://github.com/CodeinScrubs/medos/actions/runs/38194337674/job/114633604748).
+Native dismissal/edit/cold acceptance is combined with the next frozen .65
+candidate; no standalone .64 APK/native pass is claimed. Prior .63 evidence remains
 attributed to57ae67e and does not substitute for the final .64 artifact. Current
 source/docs are frozen during checks/builds. Unrelated review files remain untracked.
 
