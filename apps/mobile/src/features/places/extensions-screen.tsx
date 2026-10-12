@@ -12,7 +12,12 @@ import { Card, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Extension, Place } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { callExtension, copyExtension, type PlaceDeviceOwner } from '@/features/places/actions';
-import { deleteExtension, extensionsQuery, setExtensionStarred } from '@/features/places/queries';
+import {
+  assertExtensionDeviceChoice,
+  deleteExtension,
+  extensionsQuery,
+  setExtensionStarred,
+} from '@/features/places/queries';
 import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { joinLabels, toPersianDigits } from '@/lib/persian';
@@ -54,7 +59,7 @@ export function ExtensionsScreen() {
     };
   }, []);
 
-  function rowAction(row: ExtensionRowData, kind: 'copy' | 'call' | 'star') {
+  function rowAction(row: ExtensionRowData, kind: 'copy' | 'call' | 'star' | 'edit') {
     const owns = () =>
       mounted.current &&
       generation === datasetGeneration() &&
@@ -66,17 +71,31 @@ export function ExtensionsScreen() {
     setDeviceBusy(true);
     const owner: PlaceDeviceOwner = { generation, expectedBasis: row.expectedBasis, owns };
     const work =
-      kind === 'copy'
-        ? copyExtension(row.extension, owner)
-        : kind === 'call'
-          ? callExtension(row.extension, row.place, owner)
-          : withDatasetWrite(generation, () =>
-              setExtensionStarred(row.extension.id, !row.extension.starred, row.expectedBasis, new Date()),
-            );
+      kind === 'edit'
+        ? withDatasetWrite(generation, async () => {
+            const current = assertExtensionDeviceChoice(row.extension.id, row.expectedBasis);
+            if (owns()) router.push({ pathname: '/extensions/edit', params: { extensionId: current.extension.id } });
+          })
+        : kind === 'copy'
+          ? copyExtension(row.extension, owner)
+          : kind === 'call'
+            ? callExtension(row.extension, row.place, owner)
+            : withDatasetWrite(generation, () =>
+                setExtensionStarred(row.extension.id, !row.extension.starred, row.expectedBasis, new Date()),
+              );
     void work
       .catch((error: unknown) => {
         if (owns())
-          alertError(kind === 'copy' ? 'کپی نشد' : kind === 'call' ? 'برنامهٔ تماس باز نشد' : 'تغییر ثبت نشد', error);
+          alertError(
+            kind === 'copy'
+              ? 'کپی نشد'
+              : kind === 'call'
+                ? 'برنامهٔ تماس باز نشد'
+                : kind === 'edit'
+                  ? 'فرم ویرایش باز نشد'
+                  : 'تغییر ثبت نشد',
+            error,
+          );
       })
       .finally(() => {
         deviceActing.current = false;
@@ -199,6 +218,7 @@ export function ExtensionsScreen() {
               onCopy={() => rowAction(item, 'copy')}
               onCall={() => rowAction(item, 'call')}
               onStar={() => rowAction(item, 'star')}
+              onEdit={() => rowAction(item, 'edit')}
               locked={!ready}
             />
           )}
@@ -217,6 +237,7 @@ function ExtensionRow({
   onCopy,
   onCall,
   onStar,
+  onEdit,
   locked,
 }: {
   extension: Extension;
@@ -225,29 +246,34 @@ function ExtensionRow({
   onCopy: () => void;
   onCall: () => void;
   onStar: () => void;
+  onEdit: () => void;
   locked: boolean;
 }) {
-  const router = useRouter();
   const { colors, radii, spacing } = useTheme();
 
   function more() {
-    Alert.alert(extension.department, place.name, [
-      {
-        text: extension.starred ? 'برداشتن ستاره' : 'ستاره‌دار',
-        onPress: onStar,
-      },
-      {
-        text: 'ویرایش',
-        onPress: () => router.push({ pathname: '/extensions/edit', params: { extensionId: extension.id } }),
-      },
-      {
-        text: 'حذف',
-        style: 'destructive',
-        onPress: () => {
-          if (!locked) onDelete();
+    Alert.alert(
+      extension.department,
+      place.name,
+      [
+        {
+          text: extension.starred ? 'برداشتن ستاره' : 'ستاره‌دار',
+          onPress: onStar,
         },
-      },
-    ]);
+        {
+          text: 'ویرایش',
+          onPress: onEdit,
+        },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: () => {
+            if (!locked) onDelete();
+          },
+        },
+      ],
+      { cancelable: true },
+    );
   }
 
   return (

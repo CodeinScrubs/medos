@@ -33,14 +33,28 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+Application .64/code80 on codex/extension-menu-continuity closes the native
+extension-menu Back trap and fences its retained editor choice through existing
+original row/dataset/focus/read/latch and SQL admission. No extra UI/dependency/
+schema/route/permission/archive scheme. Private six navigation witnesses are
+red before repair and green after; integrated101 places tests and the full
+197-suite/2,945-app-test check plus five workflow checks pass, zero lint warnings.
+Normal push/CI/artifact/native acceptance remains pending at this checkpoint. See
+[validation-0.11.64.md](validation-0.11.64.md). The unfinished private doctor/
+occasion recovery proposal is not integrated.
+
 Application 0.11.63/code79 on codex/diagnostic-boundaries adds bounded technical
 projection, known actionable notices, safe legacy reads, persistent incomplete-
 write signals and handled share/clear/copy/retry with original screen ownership.
 Temporary share files have a 20-file/10-MiB cap, 24-hour grace and pending URI
 protection. Installed Android trailing-slash behavior is pinned. Existing startup
 SQL tests remain. Final65 targeted tests and full197-suite/2,939-app-test check
-plus five workflow checks pass, with zero lint warnings. Normal push/CI/native/APK
-are pending at this source checkpoint. See [validation-0.11.63.md](validation-0.11.63.md).
+plus five workflow checks, normal push and exact-source hosted CI pass, with zero
+lint warnings. Frozen57ae67e has both inspected APKs and bounded native .62/.63
+acceptance: original recovery/copy/star, local report URI read/clear/cold, and four
+complete archives preserve41 patients/34 media hashes with all55 tables checked.
+Initial System UI ANR/failed probes and remaining phone/full-workflow gates stay
+explicit. See [validation-0.11.63.md](validation-0.11.63.md).
 No new dependency/schema/route/permission/clinical rule/archive/key. The requested
 local selected clinical evidence export and weeks of use history are separate
 open work; default diagnostics do not implement them.

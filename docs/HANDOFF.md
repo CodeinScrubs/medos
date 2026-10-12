@@ -33,6 +33,45 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-12 — Dismiss extension menus and retain the original edit choice
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint, based on57ae67e; codex/extension-menu-continuity.
+
+**Changed**
+- .64/code80: existing extension menu dismisses on Back/outside. Its retained
+  editor choice reuses original row/dataset/focus/read/latch admission and SQL
+  validation. No new control/module/dependency/schema/archive/key.
+- Complete .63 validation documentation; keep the unfinished doctor/occasion
+  proposal private. Clinical data, .61 note and .62/.63 recovery guards remain.
+
+**Verified**
+- Original six navigation witnesses red with29 earlier tests passing;35 pass
+  after repair. Integrated101 places tests, final35 and types pass; first full
+  check stops on the Promise callback contract, repaired without weakened tests.
+  Final full197-suite/2,945-app-test check and five workflow checks pass, with
+  typecheck/lint/format, zero lint warnings and unchanged checked bytes.
+- .63 normal push/exact-source CI/both inspected APKs, native recovery/copy/star/
+  report chooser/local URI read/clear/cold and four complete authenticated archives
+  pass. All55 tables compared,49 identical;41 patients/34 media hashes preserved.
+  See validation-0.11.63.md; initial System UI ANR and failed probes remain explicit.
+
+**Not verified**
+- .64 normal push/CI/APKs/native pending. No physical phone, timed full shift
+  or clinical validation. The read-only AVD remains owned for the next acceptance.
+
+**Open threads**
+- Finish frozen .64 software/native dismissal/edit/cold and shutdown/base hashes.
+- Other notebook recovery/doctor actions, rich text, full workflows/local agent
+  evidence and physical gates remain; see IMPLEMENTATION. Avoid blind integration
+  of the interrupted private doctor/occasion proposal or claims of completion.
+
+**Gotchas**
+- A three-choice Android Alert without cancelable:true cannot escape on Back.
+- Validate edit navigation with the existing SQL basis, not only cached UI rows.
+- Native trees can precede hydration; require fresh acknowledged markers before
+  declaring a missing row. Coordinates must come from observed bounds.
+
 ## 2026-10-12 — Bound default diagnostics and handle report actions
 
 **Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh helpers provide private

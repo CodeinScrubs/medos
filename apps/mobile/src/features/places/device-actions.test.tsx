@@ -22,6 +22,7 @@ const mockListeners = new Set<(event: { tableName: string }) => void>();
 let mockFocused = true;
 let mockDoctorId = '';
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 jest.mock('expo-sqlite', () => ({
   addDatabaseChangeListener: (listener: (event: { tableName: string }) => void) => {
     mockListeners.add(listener);
@@ -31,7 +32,7 @@ jest.mock('expo-sqlite', () => ({
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: mockDoctorId }),
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: mockBack }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: mockBack }),
 }));
 jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
 jest.mock('@/components/error-notice', () => ({ ErrorNotice: 'ErrorNotice' }));
@@ -455,5 +456,78 @@ describe('retained rendered places device choices', () => {
     expect(Linking.openURL).not.toHaveBeenCalled();
     expect(alertError).toHaveBeenCalledTimes(1);
     expect(mockBack).not.toHaveBeenCalled();
+  });
+});
+
+async function askEdit() {
+  await askStar();
+  return jest
+    .mocked(Alert.alert)
+    .mock.calls.at(-1)![2]!
+    .find((item) => item.text === 'ویرایش')!.onPress!;
+}
+describe('original extension edit navigation choice', () => {
+  it('a fresh repeated native callback opens one original editor without changing records', async () => {
+    await render('copy');
+    const before = databaseRows(t);
+    await press(await askEdit(), true);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/extensions/edit', params: { extensionId } });
+    expect(databaseRows(t)).toEqual(before);
+    expect(alertError).not.toHaveBeenCalled();
+    expect(replacementFailure()).toBeNull();
+  });
+  it.each(['dataset', 'focus', 'unmount', 'edit'] as const)(
+    'a retained edit does not open a new route after %s loss',
+    async (loss) => {
+      await render('copy');
+      const callback = await askEdit();
+      if (loss === 'dataset') {
+        const replace = snapshotDataset(t);
+        await act(async () => {
+          replace();
+          await settle();
+        });
+      } else if (loss === 'focus') mockFocused = false;
+      else if (loss === 'unmount')
+        await act(async () => {
+          tree!.unmount();
+          tree = undefined;
+          await settle();
+        });
+      else
+        t.db
+          .update(extensions)
+          .set({ notes: 'Synthetic concurrent correction' })
+          .where(eq(extensions.id, extensionId))
+          .run();
+      const before = databaseRows(t);
+      await press(callback);
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(databaseRows(t)).toEqual(before);
+      expect(alertError).toHaveBeenCalledTimes(loss === 'edit' ? 1 : 0);
+    },
+  );
+  it('a retained edit is refused after a cached read fails', async () => {
+    await render('copy');
+    const callback = await askEdit();
+    const prepare = t.sqlite.prepare.bind(t.sqlite);
+    let broken = true;
+    jest.spyOn(t.sqlite, 'prepare').mockImplementation((sql, params) => {
+      if (broken && sql.includes('from "extensions"')) throw Error('Synthetic read failure');
+      return prepare(sql, params);
+    });
+    await act(async () => {
+      for (const listener of mockListeners) listener({ tableName: 'extensions' });
+      await new Promise((resolve) => setTimeout(resolve, 90));
+      await settle();
+    });
+    expect(tree!.root.findAllByType(ErrorNotice).some((n) => n.props.error)).toBe(true);
+    broken = false;
+    const before = databaseRows(t);
+    await press(callback);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(databaseRows(t)).toEqual(before);
+    expect(alertError).not.toHaveBeenCalled();
   });
 });

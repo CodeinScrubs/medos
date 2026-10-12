@@ -2698,3 +2698,13 @@ explicit handoff is sanitized; other native exception routes can bypass it.
 The installed share module's retained pending state after a launch failure needs
 physical/provider acceptance; no fake Promise retry guarantee is made. This
 bounded100-error window is not the requested complete weeks-long use history.
+
+## Original extension menu navigation (.64)
+
+The existing star/edit/delete menu permits native Back/outside dismissal. It
+adds no fourth button. Edit navigation uses the parent row's original shown
+basis, dataset, focus/mount/read and shared synchronous action latch. The existing
+live-child/original-parent SQL validator runs under dataset admission immediately
+before routing. This catches hidden changes that a retained cached UI cannot see,
+without writing a record to open its editor. No new route or schema is required.
+An old native menu callback cannot navigate after the screen or dataset changes.
