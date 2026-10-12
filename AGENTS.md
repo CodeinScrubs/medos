@@ -134,6 +134,11 @@ literals outside `src/theme/` are an error. A wrong-direction import fails `npm 
   reviewed exact notice when needed, never trust an arbitrary error prefix, path,
   stack or `String(error)`. A log read failure is not an empty log. Explicit clinical
   evidence exports remain separate from these technical diagnostics.
+- An action menu needs a dismissal path. Android Back/outside dismissal must not
+  force a mutation; use `cancelable: true` when there is no explicit cancel choice.
+  Delayed edit/navigation choices need the same original row/dataset/focus/read
+  and single-flight checks as mutations; validate the shown basis before opening
+  an editor, rather than routing an old ID into a newly restored dataset.
 - Header options inside a screen are `<ScreenOptions options={...} />`, never
   `<Stack.Screen options>` (ESLint enforces it). A native header that changes while its
   screen is being closed stops the app on Android; `ScreenOptions` only writes the header

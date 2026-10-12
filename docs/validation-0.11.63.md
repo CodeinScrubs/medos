@@ -94,16 +94,87 @@ does not establish native recovery from that library state.
 
 Private proposals and probes are separate from integrated source. Query/backup
 tests use migrated real sql.js and independent archive authentication; native
-file/share tests pin installed contracts with stand-ins. Normal push/source CI
-and APK/native evidence are pending at this source checkpoint.
+file/share tests pin installed contracts with stand-ins. Normal push repeats all
+197 suites/2,939 app tests and five workflow checks, zero lint warnings. Frozen
+`57ae67eebd3dac02d2888849a68cf8f52389a06f` succeeds in
+[exact-source hosted CI](https://github.com/CodeinScrubs/medos/actions/runs/38179731830/job/114589541033).
+The change is draft PR14 against PR13, not public main.
+
+## Frozen artifacts and native evidence
+
+Both actual packages are version0.11.63/code79, `com.shayan.medos`, minSDK24,
+targetSDK36. Both pass ABI/essential-JNI and signature verification with the
+existing signer SHA256
+`1119f776e6e31fdea3f2b514dc564b430e67b85d11aab984b6b500c89be87e0c`.
+
+| Artifact | Bytes | SHA256 |
+|---|---:|---|
+| Private x86_64 QA | 55,182,966 | `0cc965e64215cdd0bf5725c3b607a7d93fe2906b4bf72c93dba401f2a8d441aa` |
+| `dist/MedOS-0.11.63.apk`, arm64 | 53,574,639 | `a1a7f3f74ac55ec31b8f5d8426ecb0b33ca16ea447bd8e97cd3682132f15e306` |
+
+QA builds in18m41s (834 tasks,802 executed); owner builds in14m37s (910 tasks,
+148 executed). Source and foreign WIP stay frozen. Prebuild regenerates native
+files; no explicit app-clean flag is used. Actual native libraries are checked
+despite successful Gradle output. Pulled installed QA bytes match the inspected
+private APK exactly. The generated Gradle daemon is stopped normally afterward.
+
+Acceptance runs on the exclusively owned read-only AVD/serial5558. The first
+launch later disappears without app acceptance; its process is absent and both
+base hashes remain unchanged, but the departure's cause is not established.
+A persistent owned launcher starts a second read-only instance. Cold boot is
+slow and the first app tree is blocked by a System UI ANR. Fresh observed `Wait`
+exposes MedOS with the same PID3929; the initial bounded crash buffer has no
+MedOS fatal. These are recorded environmental observations, not accepted app
+performance measurements. The AVD remains owned for the next menu acceptance;
+final shutdown/base-hash evidence is recorded after that work.
+
+Actual native actions accepted on these installed bytes:
+
+- Resume/publish a raw place draft after leaving; create two children on its
+  original parent. Copy2345 and verify exact native paste. Star and unstar are
+  observed from the changed menu. A subsequent explicit star leaves it starred.
+- Delete one child separately, then its parent. Both become hidden. Restore the
+  parent: the live sibling returns and the separate tombstone stays deleted.
+  Explicitly restore that child to the original parent. No call/message is sent.
+- Open the projected legacy error log. Cancel the native chooser and return.
+  A separate local-only, no-permission QA recipient reads the granted JSON URI
+  completely; it is not part of MedOS or a phone dependency. Independent strict
+  JSON validation covers20 legacy events/201 bounded coordinates,18,163 bytes,
+  without raw message/stack/path/function fields or invented legacy app identity.
+  Receipt SHA256 is
+  `f3a8975f4a92adb925bb353eef70c413541edc21869448707bd00e43bf0f176f`.
+- Cancel log deletion:20 events remain. Confirm: empty log is acknowledged.
+  An intentional force-stop starts PID9217; empty log and both recovered children
+  survive. Bounded crash checks find no MedOS fatal for the observed action PIDs.
+- Four complete app-created encrypted archives (before/deleted/restored/cold)
+  each authenticate16 chunks and pass independent SQLite integrity/FK checks.
+  Every one of55 tables is compared:49 are identical,41 original live patients,
+  34 original media byte hashes and257 original audit rows remain. The three new
+  records retain original context; one copy increments usage once, publication/
+  deletion/restoration audits are exact, and all three retired drafts remain.
+  Technical deltas are three new backup runs plus acknowledgment of the running
+  before-snapshot run, backup receipts and a cold-start timestamp touch of the
+  unchanged zero unresolved-media receipt. No clinical exclusion is hidden.
+
+Probe limitations/failures are kept distinct: an extra automated Back exited an
+already keyboard-closed form, whose raw draft then resumed; starred icons changed
+the aggregate row descriptor, requiring an observed text-child selector; flattened
+trash wrappers required an unambiguous nearest control from fresh native bounds;
+one immediate post-navigation tree preceded row hydration. The independent JSON
+oracle initially assumed only one legacy code, then explicitly validates the
+three reviewed codes present. The audit oracle includes existing publication
+events before the required delete/restore pair. None of those first attempts is
+reported as passed.
 
 ## Native and product boundaries
 
-Accept .62 recovery/copy/star and .63 sharing/clear on the exact frozen APK;
-do not substitute .61's native evidence. Physical phone, timed 40-patient shift,
+The bounded .62 recovery/copy/star and .63 sharing/clear acceptance above belongs
+to frozen57ae67e. Native testing also exposes an existing extension action menu
+that cannot dismiss on Back; fix/accept it separately, with retained edit ownership.
+Physical phone, timed 40-patient shift,
 rich text, other notebook trash/doctor actions, broader follow-up/outpatient
 flows and local selected coding-agent evidence remain open. This 100-event log
 does not implement weeks of complete clinical use history. No technical report
-or patient data is automatically uploaded. `dist/MedOS-0.11.61.apk` remains the
-inspected owner artifact until a newer frozen artifact is built and inspected.
+or patient data is automatically uploaded. `dist/MedOS-0.11.63.apk` is an
+inspected owner artifact, with these explicit acceptance boundaries.
 This is not a finished-product or crash-free claim.
