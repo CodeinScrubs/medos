@@ -33,6 +33,42 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-10-12 — Withhold unestablished imported age and freeze combined acceptance
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint, based on94b43c0; codex/age-certainty.
+
+**Changed**
+- .65/code81: future imported DOB/invalid clock cannot display newborn age or
+  calculate negative/NaN years. Use civil days, preserve same-day unknown hour,
+  manual fallback and leap-day boundaries. No stored identity or schema changes.
+- Inherit .64 menu/edit repair; accept both on one frozen .65 APK. No standalone
+  .64 APK/native pass. Reports preserve exact source attribution and remaining gates.
+
+**Verified**
+- Private actual-source age witnesses four red/one green, then all five green.
+- Five integrated suites/119 tests plus actual doctor/occasion suites35 tests pass.
+- Full197-suite/2,949-app-test check and five workflow checks pass, with
+  typecheck/lint/format, zero lint warnings and unchanged checked bytes.
+- .64 normal push repeats197 suites/2,945 app tests and five workflow checks,
+  zero lint warnings; exact-source hosted CI succeeds on94b43c0.
+
+**Not verified**
+- .65 normal push/CI/APKs/native pending at this source checkpoint.
+  No physical phone/full timed shift; .63 remains the inspected owner artifact.
+
+**Open threads**
+- Finish .65 software and frozen artifacts; native inherited menu dismissal/edit/
+  cold and honest age display, then owned AVD shutdown/base-image verification.
+- Private doctor/occasion recovery is unfinished and unintegrated. Other notebook
+  recovery/rich text/full workflows/local agent evidence and physical gates remain.
+
+**Gotchas**
+- Normal form rejects future DOB already. Preserve imported records but withhold
+  derived age; do not silently invent0 days or replace a conflicting DOB with fallback.
+- Birthday is a civil date, not an inferred hour. Keep same-date later hour valid.
+- Source tests/CI do not prove an intermediate version was installed or tested.
+
 ## 2026-10-12 — Dismiss extension menus and retain the original edit choice
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.

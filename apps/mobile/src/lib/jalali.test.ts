@@ -222,6 +222,31 @@ describe('age', () => {
     expect(ageInYears('2000-06-01', null, now)).toBe(24);
     expect(ageInYears(null, 30, now)).toBe(30);
   });
+
+  it('withholds age from a future imported birth date without substituting a fallback', () => {
+    const current = d(2026, 10, 12, 10, 0);
+    expect(formatAge('2026-10-13', 42, current)).toBe('—');
+    expect(ageInYears('2026-10-13', 42, current)).toBeNull();
+  });
+
+  it('withholds a calculated age when the supplied clock is invalid', () => {
+    expect(formatAge('2026-10-01', null, new Date(NaN))).toBe('—');
+    expect(ageInYears('2026-10-01', null, new Date(NaN))).toBeNull();
+  });
+
+  it('uses the birth civil date without inferring its unknown hour', () => {
+    const current = d(2026, 10, 12, 10, 0);
+    const sameDate = d(2026, 10, 12, 20, 0);
+    expect(formatAge(sameDate, null, current)).toBe('۰ روزه');
+    expect(ageInYears(sameDate, null, current)).toBe(0);
+  });
+
+  it('preserves a leap-day birthday and recorded-age fallback at the boundaries', () => {
+    expect(ageInYears('2000-02-29', null, d(2025, 2, 28))).toBe(24);
+    expect(ageInYears('2000-02-29', null, d(2025, 3, 1))).toBe(25);
+    expect(formatAge(null, 40, new Date(NaN))).toBe('۴۰ ساله');
+    expect(ageInYears(null, 40, new Date(NaN))).toBe(40);
+  });
 });
 
 describe('recurring Jalali occasions', () => {
