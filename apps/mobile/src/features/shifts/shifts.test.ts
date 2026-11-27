@@ -27,7 +27,7 @@ import {
   updateShiftPatient,
 } from './queries';
 import { deleteEncounter, openEncounter } from '../encounters/queries';
-import { createPatient, deletedPatientsQuery, deletePatient, updatePatient } from '../patients/queries';
+import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
 import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
