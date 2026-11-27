@@ -233,7 +233,9 @@ describe('a shift', () => {
     const firstPatient = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
     const secondPatient = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
     const thirdPatient = await createPatient({ firstName: 'Third', lastName: 'Patient', status: 'admitted' });
+    await openEncounter({ patientId: firstPatient, kind: 'admission', ward: 'Ward A' });
     const episode = await openEncounter({ patientId: secondPatient, kind: 'admission', ward: 'PICU' });
+    await openEncounter({ patientId: thirdPatient, kind: 'admission', ward: 'Ward B' });
     const existing = await addPatientToShift(shiftId, firstPatient, { shiftSummary: 'Original handoff' });
     const ids = await addPatientsToShift(shiftId, [firstPatient, secondPatient, thirdPatient]);
     expect(ids[0]).toBe(existing);
@@ -250,6 +252,8 @@ describe('a shift', () => {
     const shiftId = await startShift();
     const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
     const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
+    await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
     await updatePatient(second, { status: 'outpatient' });
     await expect(addPatientsToShift(shiftId, [first, second])).rejects.toThrow();
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
