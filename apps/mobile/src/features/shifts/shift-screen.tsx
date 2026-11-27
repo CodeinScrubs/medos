@@ -18,7 +18,14 @@ import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { matchesShiftDeck } from './deck';
-import { addPatientToShift, addPatientsToShift, endShift, reorderShiftPatients, shiftProgress, startShift } from './queries';
+import {
+  addPatientToShift,
+  addPatientsToShift,
+  endShift,
+  reorderShiftPatients,
+  shiftProgress,
+  startShift,
+} from './queries';
 import { ShiftPatientRow } from './shift-patient-row';
 import { ShiftWorkspaceNotice, useShiftWorkspace } from './workspace';
 
