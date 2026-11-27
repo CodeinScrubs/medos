@@ -36,7 +36,8 @@ wrong, never rewrite them to look better.
 ## 2026-11-27 — Require a current discharge preflight before publication
 
 **Agent:** GPT-6 via Codex.
-**Commits:** `codex/discharge-preflight` follows `2ad3231` (PR 22).
+**Commits:** `4f96f82` on `codex/discharge-preflight` (PR 23) follows
+`2ad3231` (PR 22).
 
 **Changed**
 - Read the discharge consequences in one episode-scoped snapshot. Keep
@@ -49,14 +50,17 @@ wrong, never rewrite them to look better.
 - Both original mounted-screen regressions reproduced on .68. The fix
   preserves the draft and blocks discharge until explicit retry.
 - Full `npm run check` passes 2,959 app tests and five workflow tests.
+- Exact-source hosted CI and both signed APK inspections pass. Native
+  .50-to-.69 upgrade, 40-to-41 shift intake, cold draft recovery and
+  discharge with an outstanding task pass on the read-only synthetic AVD.
 
 **Not verified**
-- .69 native upgrade and physical workflow acceptance remain open.
-  Per-item result reconciliation is future work.
+- Physical phone, timed native shift, and .69 full-archive comparison remain
+  open. Per-item result reconciliation is future work.
 
 **Open threads**
-- Finish Android acceptance for the current candidate and the timed
-  40-patient phone shift.
+- Test the signed .69 owner artifact on the phone, including the timed
+  40-patient shift, image markup, alarms and recovery.
 - Continue the issue 21 specimen/context and ward transfer findings before
   expanding clinical features. Confirm active versus historical encounter
   presentation for existing shift members.
@@ -64,6 +68,8 @@ wrong, never rewrite them to look better.
 **Gotchas**
 - Drizzle's method form of `unionAll` takes one branch per call.
   The real SQLite projection test covers all four branches.
+- Use a short Windows checkout for clean release builds. The longer review
+  path generated a 352-character Ninja object path and failed.
 
 ## 2026-11-27 — Reconcile review branches and protect ward batch intake
 
