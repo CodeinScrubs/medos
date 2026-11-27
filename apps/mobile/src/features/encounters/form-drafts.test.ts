@@ -16,7 +16,7 @@ import { createConsult } from '@/features/consults/queries';
 import { createFollowUp } from '@/features/followups/queries';
 import { createOrder } from '@/features/kardex/queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
-import { createTask } from '@/features/tasks/queries';
+import { createTask, updateTask } from '@/features/tasks/queries';
 import { newId, softDelete } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -87,10 +87,10 @@ describe('unpublished episode input on migrated SQLite', () => {
     expect(work).toHaveLength(4);
     expect(work).toEqual(
       expect.arrayContaining([
-        { kind: 'order', id: order },
-        { kind: 'task', id: task },
-        { kind: 'consult', id: consult },
-        { kind: 'followup', id: followup },
+        expect.objectContaining({ kind: 'order', id: order, title: 'Synthetic current order' }),
+        expect.objectContaining({ kind: 'task', id: task, title: 'Synthetic patient-level task' }),
+        expect.objectContaining({ kind: 'consult', id: consult, title: 'Synthetic open consult' }),
+        expect.objectContaining({ kind: 'followup', id: followup, title: 'Synthetic pending follow-up', dueAt: now }),
       ]),
     );
     const doc = await document('discharge', target);
@@ -104,6 +104,22 @@ describe('unpublished episode input on migrated SQLite', () => {
     expect(t.db.select().from(tasks).where(eq(tasks.id, task)).get()?.status).toBe('open');
     expect(t.db.select().from(consultations).where(eq(consultations.id, consult)).get()?.status).toBe('pending');
     expect(t.db.select().from(followUps).where(eq(followUps.id, followup)).get()?.status).toBe('pending');
+  });
+  it('requires a fresh preview after an existing task changes while retaining the written discharge draft', async () => {
+    const target = await openEncounter({ patientId, kind: 'admission', admittedAt: now });
+    const task = await createTask({ patientId, encounterId: target, title: 'Synthetic old deadline', dueAt: now });
+    const shown = await dischargeWorkQuery(patientId, target);
+    const doc = await document('discharge', target);
+    setText(doc, 'Keep original draft');
+    await save(doc, 0, target);
+    await updateTask(task, { title: 'Synthetic new deadline', dueAt: new Date(now.getTime() + 3600000) });
+    await expect(commitEncounterFormDraft(id, 'discharge', patientId, target, 1, doc, now, shown)).rejects.toThrow(
+      'کارهای باز تغییر کرده‌اند',
+    );
+    expect(episodes()[0]?.isActive).toBe(true);
+    expect(stored()).toMatchObject({ revision: 1, deletedAt: null, body: encodeEncounterForm(doc) });
+    await expect(commit(doc, 1, target)).resolves.toBe(target);
+    expect(t.db.select().from(tasks).where(eq(tasks.id, task)).get()?.status).toBe('open');
   });
   it('records one discharge action when publication is retried with the same token', async () => {
     const target = await openEncounter({ patientId, kind: 'admission', admittedAt: now });

@@ -58,8 +58,8 @@ function formatTick(v: number): string {
  * app: time series read that way in every lab report and textbook, and flipping
  * it would make a rising creatinine look like it is falling.
  *
- * Points are spaced by draw order rather than by real time, so four draws on
- * day one and one a week later stay readable instead of piling up in a corner.
+ * Horizontal positions represent elapsed time. Equal timestamps share a
+ * position without drawing a line that suggests change or an ordering.
  */
 export function TrendChart({
   points,
@@ -105,17 +105,26 @@ export function TrendChart({
   const plotW = Math.max(width - PAD.left - PAD.right, 1);
   const plotH = height - PAD.top - PAD.bottom;
 
-  const x = (i: number) => PAD.left + (points.length === 1 ? plotW / 2 : (i / (points.length - 1)) * plotW);
+  const ordered = [...points].sort((a, b) => a.at.getTime() - b.at.getTime());
+  const times = ordered.map((p) => p.at.getTime());
+  const first = times[0]!;
+  const elapsed = times.at(-1)! - first;
+  const xs = times.map((at) => PAD.left + (elapsed ? ((at - first) / elapsed) * plotW : plotW / 2));
   const y = (v: number) => PAD.top + (1 - (v - yMin) / (yMax - yMin)) * plotH;
 
-  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const uniqueTime = (i: number) => times[i - 1] !== times[i] && times[i + 1] !== times[i];
+  const path = ordered
+    .map((p, i) => {
+      const connect = i > 0 && uniqueTime(i - 1) && uniqueTime(i);
+      return `${connect ? 'L' : 'M'}${xs[i]!.toFixed(1)},${y(p.value).toFixed(1)}`;
+    })
+    .join(' ');
   const ticks = niceTicks(yMin, yMax);
 
-  // Budget for the actual date format: vitals include the year; labs use
-  // shorter month/day labels. Native glyph layout still needs visual review.
-  const dateLabels = points.map((p) => formatDate(p.at));
-  const labelWidth = Math.max(...dateLabels.map((label) => Array.from(label).length), 1) * 6.5;
-  const dateIndices = width >= labelWidth + PAD.right ? chartDateIndices(points.length, plotW, labelWidth) : [];
+  const dateLabels = ordered.map((p) => formatDate(p.at));
+  const labelWidth = dateLabels.reduce((longest, label) => Math.max(longest, Array.from(label).length), 1) * 6.5;
+  const dateIndices =
+    (elapsed ? width - PAD.right : width - PAD.left - PAD.right) >= labelWidth ? chartDateIndices(xs, labelWidth) : [];
 
   const pointColor = (flag: TrendPoint['flag']) =>
     flag === 'high' || flag === 'critical_high'
@@ -164,9 +173,9 @@ export function TrendChart({
            * round is a measured value, a triangle pointing away from the axis
            * is a bound — and hollow means the unit was assumed.
            */}
-          {points.map((p, i) => {
+          {ordered.map((p, i) => {
             const tone = pointColor(p.flag);
-            const cx = x(i);
+            const cx = xs[i]!;
             const cy = y(p.value);
             const fill = p.assumedUnit ? colors.surface : tone;
             const stroke = p.assumedUnit ? tone : colors.surface;
@@ -188,14 +197,12 @@ export function TrendChart({
           {dateIndices.map((i) => (
             <SvgText
               key={`d${i}`}
-              x={x(i)}
+              x={xs[i]}
               y={height - 8}
               fontSize={10}
               fontFamily={typography.tiny.fontFamily}
               fill={colors.textFaint}
-              textAnchor={
-                points.length === 1 ? 'middle' : i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'
-              }
+              textAnchor={!elapsed ? 'middle' : i === 0 ? 'start' : i === ordered.length - 1 ? 'end' : 'middle'}
             >
               {dateLabels[i]}
             </SvgText>

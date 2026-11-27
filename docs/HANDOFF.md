@@ -33,6 +33,26 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-27 — Verify ward follow-through and same-day lab trends
+
+**Agent:** GPT-6 via Codex.
+**Commits:** Branch `codex/ward-release-followthrough` from the .70 merge.
+
+**Changed**
+- Space chart points by elapsed time, preserve ties without implying a change,
+  and show sample clocks for one-day lab series.
+- List discharge consequences by record. Reject stale titles, deadlines or
+  changed rows at publication while preserving the draft and open work.
+- Catch and redact failed automatic backup checks on startup and foreground.
+- Candidate version 0.11.71/code 87. No schema or backup format change.
+
+**Verification**
+- Record candidate and A52s evidence before marking PR ready for merge.
+  The isolated QA package uses only synthetic records.
+
+**Open threads**
+- Track remaining clinical workflow choices and device gates in issue 21.
+
 ## 2026-11-27 — Keep the active shift and lab trends scoped to current evidence
 
 **Agent:** GPT-6 via Codex.

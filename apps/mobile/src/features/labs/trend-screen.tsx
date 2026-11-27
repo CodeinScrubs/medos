@@ -14,6 +14,7 @@ import { patientLabOwnershipIssuesQuery } from '@/features/labs/ownership-querie
 import { analyteSeriesQuery } from '@/features/labs/queries';
 import { formatJalali, formatJalaliDateTime, toJalali } from '@/lib/jalali';
 import { joinLabels, ltrIsolate, toPersianDigits } from '@/lib/persian';
+import { formatClock, sameDay } from '@/lib/time';
 import { useTheme } from '@/theme';
 
 /** One analyte's history for one patient. Params: `id` (patient), `analyte`. */
@@ -69,6 +70,10 @@ function Trend({ patientId, analyte }: { patientId: string; analyte: string }) {
   const latest = series.at(-1)?.value;
   const unit = latest?.unit?.trim();
   const excluded = rows.length - series.length;
+  const firstPoint = numeric[0]?.at;
+  const lastPoint = numeric.at(-1)?.at;
+  const oneDay = firstPoint && lastPoint && sameDay(firstPoint, lastPoint);
+  const spansYears = firstPoint && lastPoint && toJalali(firstPoint).jy !== toJalali(lastPoint).jy;
 
   return (
     <>
@@ -123,6 +128,8 @@ function Trend({ patientId, analyte }: { patientId: string; analyte: string }) {
                     refLow={latest?.refLow}
                     refHigh={latest?.refHigh}
                     formatDate={(d) => {
+                      if (oneDay) return formatClock(d);
+                      if (spansYears) return formatJalali(d);
                       const { jm, jd } = toJalali(d);
                       return toPersianDigits(`${jm}/${jd}`);
                     }}

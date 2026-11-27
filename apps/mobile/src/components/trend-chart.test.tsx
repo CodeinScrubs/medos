@@ -79,6 +79,28 @@ describe('numeric chart stability (SVG stand-ins)', () => {
   const points = (...values: number[]) => values.map((value) => ({ value, at: new Date('2026-10-01T08:00:00Z') }));
   const axis = (tree: ReactTestRenderer) => tree.root.findAllByType(SvgText).filter((node) => !node.props.fontFamily);
 
+  it('spaces points by elapsed time and breaks ties without a misleading connecting segment', async () => {
+    const start = new Date(2026, 10, 27, 10).getTime();
+    const make = (minutes: number, value: number) => ({ at: new Date(start + minutes * 60000), value });
+    const tree = await render([make(60, 6), make(1, 2), make(0, 1), make(1, 3), make(30, 4)]);
+    try {
+      const positions = tree.root.findAllByType(Circle).map((mark) => mark.props.cx as number);
+      expect(positions[0]).toBe(44);
+      expect(positions[4]).toBe(264);
+      expect(positions[3]).toBe(154);
+      expect(positions[1]).toBeCloseTo(44 + 220 / 60);
+      expect(positions[2]).toBe(positions[1]);
+      expect(
+        tree.root
+          .findByType(Path)
+          .props.d.split(' ')
+          .map((point: string) => point[0]),
+      ).toEqual(['M', 'M', 'M', 'M', 'L']);
+    } finally {
+      await act(async () => tree.unmount());
+    }
+  });
+
   it('finishes when a nice step is smaller than the spacing of adjacent large floats', async () => {
     const tree = await render(points(1e20, 1e20 + 16384));
     try {
