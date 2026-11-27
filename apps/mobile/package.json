@@ -61,7 +61,7 @@
     "jest-expo": "~57.0.5",
     "prettier": "^3.9.8",
     "sql.js": "^1.14.2",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vazirmatn": "^33.0.3"
   },
   "scripts": {
