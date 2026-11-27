@@ -8,7 +8,7 @@ updates:
     groups:
       production-and-tooling:
         patterns:
-          - "*"
+          - '*'
         update-types:
           - minor
           - patch
