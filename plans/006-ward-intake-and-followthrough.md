@@ -25,7 +25,7 @@ The implementation task is therefore integration and closure of workflow gaps, n
 - Create a new patient with the minimum identity available at the bedside: name and an explicitly approximate age are sufficient. Sex, DOB, national identifier, contacts and permanent history may be unknown.
 - Do not fabricate a DOB from an age. Preserve the distinction between approximate age, exact civil DOB and unknown.
 - A minimal patient must still be uniquely retrievable. Warn on likely duplicates but never merge records automatically.
-- Patient identity is longitudinal; each admission/transfer is a separate encounter. Moving from PICU to a ward updates the correct episode/location, not the patient's permanent identity or earlier episode.
+- Patient identity is longitudinal. A new admission gets a separate encounter. A location change during the same hospitalization preserves the admission clock and records the transfer in context.
 - Bulk intake must preserve the shown order and either commit the whole selected set or none. A partial list after an error is unacceptable.
 - Do not require the full medical history before the patient can appear on the active shift.
 
@@ -103,7 +103,7 @@ Examples include a timed bedside review, a VBG, a repeat CXR, a pending culture,
 - Reuse the existing doctor, place, extension and knowledge notebook modules.
 - Store laboratory/facility name, phone, address, map location, website and a short private brief. Allow a clinical record to reference the place where a test was performed.
 - Keep professional contact and personal communication notes private and searchable; never expose colleague ratings or private profiles in clinical exports by default.
-- A future greeting workflow may schedule a reminder and prepare a message. Actual automatic sending is a separate integration requiring an explicitly configured provider, permissions, recipient confirmation and delivery receipts. Do not claim a message was sent merely because a reminder fired or a messaging app opened.
+- The greeting workflow already schedules a reminder, prepares text and records sent status on explicit confirmation. Verify these transitions on the phone, including opening and cancelling the composer. Actual automatic sending would require a separate owner-configured integration with recipient confirmation and delivery receipts.
 
 **Acceptance:** create a synthetic lab location, link a synthetic report to it, retrieve the facility by name and address, and verify that private colleague notes are not included in ordinary diagnostics or clinical exports.
 
@@ -129,7 +129,7 @@ Examples include a timed bedside review, a VBG, a repeat CXR, a pending culture,
 
 ## Implementation sequence
 
-1. **Atomic ward batch addition** — PR #18; verify hosted CI before merge.
+1. **Atomic ward batch addition** — PR #18 plus the stale census repair. Review the existing all-admitted shortcut and its evidence in [validation-0.11.68](../docs/validation-0.11.68.md). Ward filters and a selected-subset picker are later workflow changes.
 2. **Minimal patient intake** — progressive identity (name + approximate age), duplicate warning, create encounter and shift membership safely, and preserve drafts. Reuse existing patient/encounter forms and transaction helpers.
 3. **Patient-context quick actions** — text/voice/photo capture and direct filing, retaining original media and a clear patient/encounter target.
 4. **Task/result lifecycle** — unify consultant instructions, due work and pending-result follow-through without confusing notification state with clinical state.

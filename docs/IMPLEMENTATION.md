@@ -33,138 +33,46 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Application .65/code81 on codex/age-certainty withholds derived age for future
-imported birth identity/invalid supplied clock. Normal form rejection already
-existed; no stored record changes. Civil-date/same-day/manual-fallback/leap-day
-behavior remains. Private witnesses four red then five green; integrated119
-tests plus35 doctor/occasion tests and full197-suite/2,949-app-test check/five
-workflow checks pass, zero lint warnings. Normal push/CI/artifact/native remains
-pending at this source checkpoint. See [validation-0.11.65.md](validation-0.11.65.md).
-Inherit .64 menu/edit changes and accept them on the .65 artifact to avoid an
-intermediate build; .63 remains the inspected owner APK until then.
+The 0.11.68/code 84 candidate combines the calendar and ward intake changes in
+PRs 17–19 with an intake consistency fix. A batch retains every displayed
+candidate's admission and checks it against the full current census in one
+transaction. A new, discharged or readmitted patient invalidates the old choice.
+See [validation-0.11.68.md](validation-0.11.68.md) for current evidence and limits.
 
-Application .64/code80 on codex/extension-menu-continuity closes the native
-extension-menu Back trap and fences its retained editor choice through existing
-original row/dataset/focus/read/latch and SQL admission. No extra UI/dependency/
-schema/route/permission/archive scheme. Private six navigation witnesses are
-red before repair and green after; integrated101 places tests and the full
-197-suite/2,945-app-test check plus five workflow checks pass, zero lint warnings.
-Normal push and exact-source hosted CI succeed on94b43c0. Native acceptance is
-combined with the next frozen .65 candidate; no .64 APK is claimed. See
-[validation-0.11.64.md](validation-0.11.64.md). The unfinished private doctor/
-occasion recovery proposal is not integrated.
+Frozen 0.11.65/code 81 (`58642e8`, PR 16) retains its own signed APK, hosted
+CI and bounded emulator evidence. GitHub's default branch remains at 0.11.50
+while the application stack is in review.
 
-Application 0.11.63/code79 on codex/diagnostic-boundaries adds bounded technical
-projection, known actionable notices, safe legacy reads, persistent incomplete-
-write signals and handled share/clear/copy/retry with original screen ownership.
-Temporary share files have a 20-file/10-MiB cap, 24-hour grace and pending URI
-protection. Installed Android trailing-slash behavior is pinned. Existing startup
-SQL tests remain. Final65 targeted tests and full197-suite/2,939-app-test check
-plus five workflow checks, normal push and exact-source hosted CI pass, with zero
-lint warnings. Frozen57ae67e has both inspected APKs and bounded native .62/.63
-acceptance: original recovery/copy/star, local report URI read/clear/cold, and four
-complete archives preserve41 patients/34 media hashes with all55 tables checked.
-Initial System UI ANR/failed probes and remaining phone/full-workflow gates stay
-explicit. See [validation-0.11.63.md](validation-0.11.63.md).
-No new dependency/schema/route/permission/clinical rule/archive/key. The requested
-local selected clinical evidence export and weeks of use history are separate
-open work; default diagnostics do not implement them.
+- Future imported DOB/invalid calculation clock cannot invent newborn age or
+  negative/NaN years. Stored identity remains unchanged; normal form rejection
+  already existed. Same-day unknown hour/manual fallback/leap boundaries remain.
+- The inherited .64 extension menu dismisses with Back and a verified
+  above-dialog tap. Original-choice Edit and unchanged-form Close work. The
+  header and filtered deck withhold unestablished age on the warm launch. The
+  separate cold launch repeats the header and menu checks.
+- Native .50-to-.65 in-place upgrade checks all53-to55 tables,41 original
+  patients/248 notes and34 exact media hashes. A separate42-patient synthetic
+  fixture and before/after cold archives check all55 tables with52 unchanged;
+  only enumerated backup/audit/startup receipts differ. No private data is pushed.
+- The owned read-only AVD is shut down normally; PID/serial are absent and both
+  base-image hashes match. System UI ANR, interrupted host work and failed probes
+  remain explicit; no app fatal was observed in the bounded accepted intervals.
 
-Application0.11.62/code78 on codex/place-recovery follows PR12's documented
-825ef23. Existing trash now recovers places/extensions with exact original
-row/parent/lifecycle and required audit. Device copy/call/map and extension
-star retain the shown choice, original dataset, mount/focus/read state and
-single-flight admission. Optional feedback does not redefine acknowledged
-native success; runtime form metadata keys cannot bypass dedicated mutations.
-Full software check passes188 suites/2,879 app tests plus five workflow checks,
-zero lint warnings. See [validation-0.11.62.md](validation-0.11.62.md).
-Normal push and exact-source hosted CI succeed on159c996. Native/APK acceptance
-will be recorded on the frozen .63 candidate; .61 remains the inspected owner artifact. No dependency/schema/
-route/permission/clinical rule or archive/key change is added.
+See [validation-0.11.65.md](validation-0.11.65.md) for exact hashes, independent
+oracles, failed attempts and limits; [validation-0.11.64.md](validation-0.11.64.md)
+attributes its inherited menu repair. Prior [.63 diagnostics and place recovery](validation-0.11.63.md),
+[.61 notes](validation-0.11.61.md), [.58 clinical recovery](validation-0.11.58.md),
+[.57 mixed-owner import](validation-0.11.57.md) and earlier reports retain their
+own source/artifact boundaries. Do not treat historical checkpoints as current
+pending work or re-run every old matrix for an unrelated edit.
 
-Application 0.11.61/code77 on codex/note-action-integrity builds on PR11's
-8ecaa67. Ordinary note creation/correction/deletion/version restoration now
-validates original patient/episode ownership. Delete and trash restore require
-their audit atomically. Retained card choices use compact immutable-version/
-lifecycle evidence plus original dataset, focus and mount; existing pagination
-and the33KB list bound remain unchanged. Full software check passes183 suites/
-2,759 app tests and five workflow checks, with zero lint warnings. Frozen3ee0ce5
-passes normal push and exact-source hosted CI. Both signed APKs pass actual
-version/code/ABI/signer/JNI inspection; dist/MedOS-0.11.61.apk is the newest
-owner artifact. Native create/pin/correction/version-restore/delete/trash-restore/
-cold persistence passes with independent three-archive/all55-table comparison;
-all41 original synthetic patients and34 media byte hashes remain. Initial boot/
-System UI ANR and selector assumptions are recorded separately. See
-[validation-0.11.61.md](validation-0.11.61.md). No migration/dependency/route
-or archive/key change is added. This is bounded native evidence, not phone or
-complete-shift acceptance.
-
-Application 0.11.60/code 76 on codex/permission-state-recovery is draft PR 11's
-candidate. Frozen source e34e79e passes 35 focused tests, the full 182-suite/
-2,734-test check, five workflow checks, normal push and exact-source hosted CI.
-Actual installed QA bytes accept repaired no-credential disable, enrolled
-cancel/retry/disable and cold cancel/retry with the original synthetic patients.
-Both signed x86/arm64 APKs pass actual version/ABI/certificate/JNI inspection;
-dist/MedOS-0.11.60.apk is the prior owner artifact, not physical acceptance.
-First-source camera/grace observations, environmental failures and exact hashes
-remain separate in [validation-0.11.60.md](validation-0.11.60.md).
-
-.59's 179-suite/2,699-test check, normal push and exact-source hosted CI pass.
-Its installed private x86 APK matches inspected bytes. Native camera-grant return
-keeps the original PID and updates the mounted card. Real exact-alarm special
-access changes two existing occasion requests from a one-hour window to zero;
-this is scheduling, not delivery. No .59 owner APK was built. See
-[validation-0.11.59.md](validation-0.11.59.md); .58 evidence stays in its own report.
-
-Permanent clinical correction history covers patient,
-companion, encounter, diagnosis, vital, whole lab panel, imaging, order, consult
-and follow-up records. Nine clinical record kinds can be restored from the
-existing trash. Corrections appear in the existing patient timeline. Exact
-ownership, audit/history rollback, original dataset and bounded reads are
-required; no new route, dependency, permission or backup scheme is introduced.
-The earlier two additive migrations create the history table and ownership
-indexes; .58 adds no migration.
-
-.58 adds companion/follow-up recovery and protects all nine trash kinds from
-identical same-millisecond edit cycles. Companion deletion and follow-up status,
-completion and postponement retain the shown clinical decision. Native reminder
-receipt changes alone do not invalidate it. Recovery preserves original context/
-status/result and acknowledges native reminder work separately from committed
-clinical data. Focused software evidence is recorded in
-[validation-0.11.58.md](validation-0.11.58.md). Full check passes178 suites/2,684
-app tests, five workflow tests and typecheck/lint/format; no migration changes.
-The last retained-screen correction closes an acknowledged outcome after focus
-loss. Frozen source `7d557fe` passes exact-source hosted CI. Both signed .58 APKs
-pass actual version/ABI/certificate/JNI inspection. Native contact/follow-up
-restore/delete/denied-permission/retry/cold-start and four complete archive
-comparisons pass; a completed follow-up is not reopened and originals remain.
-Only native request acknowledgment is accepted: the synthetic AVD's disabled
-exact-alarm access produces an inexact one-hour OS window. See the .58 report.
-Earlier first-source x86 evidence does not substitute for this final candidate.
-
-The .56 seven-kind restore/history/archive/native matrix and both inspected APKs
-are recorded in [validation-0.11.56.md](validation-0.11.56.md). A later verified
-mixed-owner lab defect still blocks .56 startup. .57 preserves that panel,
-withholds its results with a conditional notice and repairs healthy data;
-strict publication/history and real SQL failure rollback remain unchanged.
-Frozen .57 source `36d4ff1` passes the full software check and exact-source hosted
-CI. Its inspected signed x86/arm64 APKs, native mixed-owner restore/read/refusal/
-cold-start and healthy delete/restore pass with independent complete-state
-comparisons. See [validation-0.11.57.md](validation-0.11.57.md) for the actual
-artifact hashes, remaining boundaries and incremental draft PR9 against PR8.
-Native version0 first-start is not accepted by the restore/cold witnesses.
-Older .55 input diagnosis
-reproduces long-command native stale-event injection failures. The original
-short mismatch and older focus ANR remain unresolved; later exact input is not
-a causal explanation or physical-keyboard acceptance.
-
-Parent evidence stays attributed to its own frozen source: [.55 notebook forms](validation-0.11.55.md), [.54 clinical form context](validation-0.11.54.md),
-[.53 discharge](validation-0.11.53.md), [.52 Kardex](validation-0.11.52.md),
-[.51 workspace recovery](validation-0.11.51.md), [.50 note recovery](validation-0.11.50.md) and earlier HANDOFF entries. PR1–9 are not merged here.
-
-Physical-phone acceptance, full timed 40-patient native shifts, pressure/restore
-costs, rich text, remaining trash kinds and fuller workflows remain open below.
-The phone is not currently the sole remaining work.
+The private doctor/occasion recovery proposal is not integrated. Primary review
+finds incomplete retained completed-screen identity/action handling; prove and
+fix those before adoption. Other notebook recovery, visual rich text, selected
+local coding-agent evidence, fuller outpatient/follow-up workflows and a timed
+40-patient native shift remain implementation/acceptance work. Physical media,
+providers, notifications/reboot/Doze/power, second-device recovery and physician
+clinical review are additional gates. The phone is not the sole remaining work.
 
 ## Priority0: finish integrity and recovery
 
@@ -189,15 +97,14 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 
 ## Priority1: finish everyday workflows
 
-Next diagnostic integrity slice: prove arbitrary-message/stack/context redaction
-with synthetic canaries; make default persisted/shared diagnostics content-free
-with stable technical evidence, strict legacy decoding and bounded size. Handle
-share availability/file/native rejection through the originating screen's
-mount/focus and a single-flight latch. A closed chooser is not delivery. Inspect
-interrupted backup scratch cleanup separately from restore safety journals.
+The .63 default diagnostic integrity slice is implemented and accepted within
+its report's boundaries: content-free projection, known notices, bounded legacy
+reads/share files and original screen-owned actions. A closed chooser is not
+delivery. Selected clinical evidence and interrupted backup scratch cleanup are
+separate work; neither is proved by the technical report reader.
 
 The owner's2026-10-11 pasted request adds local patient/settings/use history for
-coding agents across weeks. After the diagnostic repair, define a versioned,
+coding agents across weeks. Define a versioned,
 bounded local event/evidence contract alongside existing clinical history, then
 an explicit selected clinical export with app/source/dataset lineage, retention
 and missing-segment/completeness boundaries and an independent reader. Ordinary
@@ -208,10 +115,11 @@ pending implementation, not something the current100-error log already does.
 
 .62 closes place/extension deletion recovery and original device/star choices;
 remaining notebook kinds require their own parent/private-field contracts.
-Doctor's other communication and star/delete callbacks still need the same
-retained-choice review; the shared map fix does not certify them. An explicit
-empty-place filter in the ordinary extensions query remains a small API boundary
-follow-up (the current native list uses search, not this filter).
+Doctor's other communication and star callbacks still need retained-choice
+review; the shared map repair does not certify them. Doctor/occasion delete and
+trash recovery remain an unintegrated proposal with blocking primary-review
+findings. The explicit empty-place extensions filter was repaired in .63;
+it is no longer an open API item.
 
 | ID | Deliverable | Remaining acceptance or implementation |
 |---|---|---|
@@ -221,9 +129,9 @@ follow-up (the current native list uses search, not this filter).
 | W04 | Patient deck | Existing first-tab episode and bedside snapshot lead with identity/location/impressions/allergies, timed observations/labs, running orders and open work. Physician review and measured40-patient shift acceptance remain. Do not add a dashboard maze. |
 | W05 | Clinical history | Separate encounters, timeline filters/bounded previews/keyset pages and direct record access exist. .56 adds bounded correction history and seven clinical restore kinds. Accept new-source native pagination/every kind/pressure; note and clinical history retain separate codecs. |
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
-| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Notebook tombstones still need appropriate recovery; the places-list phone intent needs a handled rejection. Native contact/follow-up recovery, denied notification permission, retry and cold persistence pass in .58; actual alarm delivery remains separate. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
+| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Remaining notebook tombstones need appropriate recovery; places/extensions now have original-choice recovery and handled device rejections (.62, native .63). Native contact/follow-up recovery, denied notification permission, retry and cold persistence pass in .58; actual alarm delivery remains separate. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
 | W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
-| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. .51 connects idea/topic raw recovery and exposes area-read rejection/retry; .55 connects the remaining notebook forms. Topic/reference checks and merged search commit with publication. Extension creation/editing rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. Complete broad edit/search acceptance and deleted-place recovery/move; bounded recovery checks do not finish every native workflow. |
+| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. .51 connects idea/topic raw recovery and exposes area-read rejection/retry; .55 connects the remaining notebook forms. Topic/reference checks and merged search commit with publication. Extension creation/editing rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. Place/extension recovery is accepted within .63's native boundaries; complete broader edit/search and explicit parent-change workflows. Bounded recovery checks do not finish every native workflow. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |
 
 ## Priority2: validated clinical tools and future AI
@@ -241,6 +149,10 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
 
 ## Priority3: performance and delivery evidence
 
+- The shared Input's visible Field label is not automatically bound to its
+  TextInput accessibility label; current native snapshots show value-only input
+  metadata. Forward the label while preserving explicit overrides, then inspect
+  actual native metadata. This is not a completed TalkBack interaction test.
 - Long single-command .55 ASCII injection failures have native stale-drop evidence.
   The original short mismatch is still unexplained; diagnose it before accepting
   input under pressure. Capture IME readiness/event-time/native ordering and host versus

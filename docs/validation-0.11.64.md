@@ -31,10 +31,18 @@ source/document bytes stay unchanged. Normal push repeats the same197 suites/
 2,945 tests and five workflow checks, zero lint warnings; Jest286.603 seconds.
 Frozen94b43c0 succeeds in
 [exact-source CI](https://github.com/CodeinScrubs/medos/actions/runs/38194337674/job/114633604748).
-Native dismissal/edit/cold acceptance is combined with the next frozen .65
-candidate; no standalone .64 APK/native pass is claimed. Prior .63 evidence remains
-attributed to57ae67e and does not substitute for the final .64 artifact. Current
-source/docs are frozen during checks/builds. Unrelated review files remain untracked.
+The inherited repair is now accepted on installed frozen58642e8/.65 bytes:
+Android Back and an observed tap above the dialog dismiss the original
+three-choice menu; Edit opens the shown original extension/parent and its
+unchanged form closes normally. The menu also dismisses after intentional
+app-only cold start. In the before/after archive comparison, 52 of 55 tables
+and all 34 media byte hashes match. A far-edge tap and an initial
+flattened-field selector fail as recorded probes; they do not count as passes.
+See [validation-0.11.65.md](validation-0.11.65.md) for exact artifact hashes,
+receipt differences, environmental observations and shutdown/base verification.
+No standalone .64 APK/native pass is claimed. Prior .63 evidence remains
+attributed to57ae67e. Source/docs are frozen during checks/builds; unrelated
+review files remain untracked.
 
 The private unfinished doctor/occasion recovery proposal is not integrated.
 Rich text, other notebook recovery/doctor actions, broader workflows, selected

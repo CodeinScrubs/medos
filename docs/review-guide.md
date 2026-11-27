@@ -80,22 +80,11 @@ Start with the newest entry in `docs/HANDOFF.md`, then its version-specific
 validation report and `docs/IMPLEMENTATION.md`. Read the exact commit named there;
 earlier test counts, PR checks and APKs are evidence for their own source only.
 
-PR6 contains the .51 recovery pilot (`a541ce5`), .52 Kardex context correction
-(`41a592b`) and .53 discharge scope (`e357dbf`). Read their validation reports
-for each source's automated, hosted, native and inspected-APK boundaries.
-The current owner arm64 .53 artifact is built and inspected from `e357dbf`,
-whose actual native preview/publication and complete-state comparisons pass.
-No physical phone run is implied. Later documentation commits do not change
-the application bytes used for those witnesses; never substitute an older APK.
-
-The separate `codex/kardex-form-recovery` continuation starts at PR6's delivered
-`e68e6a4`, whose CI38029238968 also passes. Review this incremental diff against
-that parent: .54 extends the shared lifecycle with an explicit clinical parent
-key and feature-owned Order validation/publication. Its full-source, bounded
-native and inspected .54 owner-APK witnesses pass on frozen d69163d.
-Read validation-0.11.54 for complete-state comparison details;
-Exact d403933 passes CI38034525674. Draft PR7 remains separate from its
-prerequisite PR6 and physical-phone acceptance.
+The current review starts at [validation-0.11.68](validation-0.11.68.md) and the
+[ward workflow plan](../plans/006-ward-intake-and-followthrough.md). The frozen
+[0.11.65 report](validation-0.11.65.md) documents the earlier signed APK and
+emulator upgrade, restore and age/menu checks. Confirm the artifact's exact
+source, version and certificate before using its evidence in a release decision.
 
 | Area | Read together | Principal checks |
 |---|---|---|

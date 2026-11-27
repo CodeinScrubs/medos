@@ -33,6 +33,95 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-27 — Reconcile review branches and protect ward batch intake
+
+**Agent:** GPT-6 via Codex.
+**Commits:** `1ea3f8b` on `codex/ward-intake-readiness`, combining PRs 17–19.
+
+**Changed**
+- Preserve the displayed admission in the all-admitted shortcut. Validate
+  the complete census inside the membership transaction and refresh on
+  conflict. Retain the existing button and per-patient picker.
+- Reconcile the October .65 native report with the current work. Update signer
+  backup instructions to name the two required files.
+
+**Verified**
+- Both new mounted-screen SQLite witnesses fail before and pass after the fix.
+  Prior .65 owner APK metadata, signature, library set and SHA-256 match.
+- Full `npm run check` passes 2,956 app tests and five workflow tests,
+  including the accelerated SQLite shift with 40 patients and 24 simulated hours.
+- See [validation-0.11.68.md](validation-0.11.68.md) for check results, GitHub
+  bases and native boundaries.
+
+**Not verified**
+- No physical phone was attached during this review. A full timed native
+  shift, provider/reboot reminder recovery and physician acceptance remain.
+
+**Open threads**
+- Finish .68 upgrade, intake and owner-phone acceptance. Coordinate the
+  draft review stack before merging main.
+- Continue minimal ward intake, timed result follow-through, and the private
+  doctor/occasion deletion proposal after proving retained-action safety.
+
+**Gotchas**
+- PR 19 and its current base PR 18 are sibling histories after `89f60d9`.
+  Check the integrated tree. The original .65 checkout still has October
+  documentation and separate untracked review work.
+
+## 2026-10-12 — Close combined age/menu native acceptance and reconcile the ledger
+
+**Agent:** GPT-6 via Codex; primary verification and documentation.
+**Commits:** `58642e8` on `codex/age-certainty`. This local evidence was saved
+with the November continuation.
+
+**Changed**
+- Record actual .65 owner/QA APK hashes, exact-source CI, in-place upgrade,
+  independent full-archive comparison, native menu/age/cold acceptance and limits.
+- .64's inherited repair is accepted on .65; no standalone .64 native pass.
+- Replace stale chronological ledger checkpoints with one current checkpoint
+  and report links. Diagnostic repair, place recovery/handled device rejection
+  and the empty-place query boundary are no longer described as unfinished.
+- No application bytes, schema, dependency, permission or archive scheme changed
+  by this documentation checkpoint; unrelated untracked review work is preserved.
+
+**Verified**
+- Frozen .65 and normal push pass197 suites/2,949 app tests plus five workflow
+  checks, typecheck/lint/format and zero lint warnings. Exact-source hosted CI
+  succeeds on58642e8. Both actual signed APKs pass version/code/ABI/signer/JNI
+  inspection; dist/MedOS-0.11.65.apk is the local owner artifact.
+- Native .50-to-.65 upgrade checks every53-to55 table,41 original synthetic
+  patients/248 notes and34 media byte hashes; exact technical deltas are checked.
+- Separate42-patient fixture and whole before/after-cold archives check all55
+  tables with52 identical. Notes/raw conflicting DOB/notebook drafts and34
+  media hashes remain unchanged; only enumerated backup/startup receipts differ.
+- Actual Back/above-dialog dismissal, original extension editor/clean Close,
+  header/deck withheld age and distinct cold PID pass without matching app fatal
+  in the bounded action intervals. Normal owned AVD shutdown removes PID/serial;
+  both base image lengths/hashes remain unchanged.
+
+**Not verified**
+- No physical phone, full timed40-patient shift, second-device/provider/power
+  recovery, actual reminder delivery/Doze/reboot or physician clinical acceptance.
+- Rich text, other notebook/doctor recovery, full outpatient/follow-up workflows
+  and selected local clinical/use-history evidence are still work. No merged
+  main branch, public APK release, complete product or crash-free claim.
+
+**Open threads**
+- The private doctor/occasion proposal remains unintegrated. Reproduce/fix the
+  completed doctor's retained identity and enabled communication/rating/profile/
+  edit actions before adoption; verify actual current overlay SQL/UI/types/lint.
+- Remaining contracts and native/physical gates are in IMPLEMENTATION.md;
+  do not mistake old checkpoint prose for another pending implementation.
+
+**Gotchas**
+- The read-only AVD base is .50, not the previous overlay's .63. Departed host
+  processes and short observers are not accepted completions; cause is unknown.
+- Keep System UI ANR, null-root/provider/field probes and the ineffective
+  far-edge tap separate from accepted app behavior. The above-dialog tap passes.
+- 159 historical private APK copies were moved after verified size/hash copies
+  to the ignored artifact archive (private .65 manifest); preserve its mapping
+  when reusing old QA helpers. Backups, keys, current artifacts and bases remain.
+
 ## 2026-10-12 — Withhold unestablished imported age and freeze combined acceptance
 
 **Agent:** GPT-6 via Codex; primary implementation and verification.
