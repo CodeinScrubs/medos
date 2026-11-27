@@ -9,6 +9,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import {
   addPatientToShift,
+  addPatientsToShift,
   activeShiftQuery,
   activeShiftWorkspaceQuery,
   deleteShift,
@@ -26,7 +27,7 @@ import {
   updateShiftPatient,
 } from './queries';
 import { deleteEncounter, openEncounter } from '../encounters/queries';
-import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
+import { createPatient, deletedPatientsQuery, deletePatient, updatePatient } from '../patients/queries';
 import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -225,6 +226,46 @@ describe('a shift', () => {
     expect(rows[0]?.member.encounterId).toBe(encounterId);
     expect(rows[0]?.encounter?.ward).toBe('CCU');
     expect(rows[1]?.member.encounterId).toBeNull();
+  });
+
+  it('adds a captured ward list atomically in its original order and preserves existing membership', async () => {
+    const shiftId = await startShift();
+    const firstPatient = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
+    const secondPatient = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    const thirdPatient = await createPatient({ firstName: 'Third', lastName: 'Patient', status: 'admitted' });
+    const episode = await openEncounter({ patientId: secondPatient, kind: 'admission', ward: 'PICU' });
+    const existing = await addPatientToShift(shiftId, firstPatient, { shiftSummary: 'Original handoff' });
+    const ids = await addPatientsToShift(shiftId, [firstPatient, secondPatient, thirdPatient]);
+    expect(ids[0]).toBe(existing);
+    expect(new Set(ids).size).toBe(3);
+    const rows = await shiftPatientsQuery(shiftId);
+    expect(rows.map((row) => row.patient.id)).toEqual([firstPatient, secondPatient, thirdPatient]);
+    expect(rows[0]?.member.shiftSummary).toBe('Original handoff');
+    expect(rows[1]?.member.encounterId).toBe(episode);
+    expect(await addPatientsToShift(shiftId, [firstPatient, secondPatient, thirdPatient])).toEqual(ids);
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(3);
+  });
+
+  it('refuses a changed admission list without partially adding its still-admitted members', async () => {
+    const shiftId = await startShift();
+    const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
+    const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    await updatePatient(second, { status: 'outpatient' });
+    await expect(addPatientsToShift(shiftId, [first, second])).rejects.toThrow();
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
+  });
+
+  it('rolls back every new membership when one batch insert fails', async () => {
+    const shiftId = await startShift();
+    const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
+    const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    t.sqlite.exec(
+      `CREATE TRIGGER reject_second_shift_member BEFORE INSERT ON shift_patients
+       WHEN NEW.patient_id = '${second}'
+       BEGIN SELECT RAISE(ABORT, 'synthetic batch insert failure'); END;`,
+    );
+    await expect(addPatientsToShift(shiftId, [first, second])).rejects.toThrow('synthetic batch insert failure');
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
   });
 
   it('does not list the same patient twice', async () => {

@@ -18,7 +18,7 @@ import { fullName, joinLabels, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { matchesShiftDeck } from './deck';
-import { addPatientToShift, endShift, reorderShiftPatients, shiftProgress, startShift } from './queries';
+import { addPatientToShift, addPatientsToShift, endShift, reorderShiftPatients, shiftProgress, startShift } from './queries';
 import { ShiftPatientRow } from './shift-patient-row';
 import { ShiftWorkspaceNotice, useShiftWorkspace } from './workspace';
 
@@ -90,9 +90,11 @@ function ShiftScreenContent() {
     writing.current = true;
     setBusy(true);
     try {
-      await withDatasetWrite(scope.generation, async () => {
-        for (const p of admittedNotInShift) await addPatientToShift(shift.id, p.id);
-      });
+      await addPatientsToShift(
+        shift.id,
+        admittedNotInShift.map((patient) => patient.id),
+        scope.generation,
+      );
     } catch (e) {
       alertError('اضافه نشد', e);
     } finally {

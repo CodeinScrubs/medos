@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db } from '@/db/client';
@@ -307,6 +307,91 @@ export async function addPatientToShift(
       .run();
     return id;
   });
+}
+
+/**
+ * Add a captured ward list in one SQLite transaction.
+ *
+ * The visible patient IDs are treated as one decision: if a patient or the
+ * shift changed, or any membership insert fails, none of the batch is applied.
+ * Existing memberships are returned idempotently and keep their original
+ * episode, handoff and reviewed state.
+ */
+export async function addPatientsToShift(
+  shiftId: string,
+  patientIds: string[],
+  generation = datasetGeneration(),
+): Promise<string[]> {
+  if (
+    !Array.isArray(patientIds) ||
+    patientIds.length > 500 ||
+    patientIds.some((id) => typeof id !== 'string' || !id.trim()) ||
+    new Set(patientIds).size !== patientIds.length
+  )
+    throw new Error('فهرست بیماران معتبر نیست؛ هیچ بیماری اضافه نشد.');
+  if (!patientIds.length) return [];
+
+  return withDatasetWrite(generation, async () =>
+    db.transaction((tx) => {
+      const shift = tx
+        .select({ id: shifts.id })
+        .from(shifts)
+        .where(and(alive, eq(shifts.isActive, true), eq(shifts.id, shiftId)))
+        .get();
+      if (!shift) throw new Error('این شیفت دیگر باز نیست؛ هیچ بیماری اضافه نشد.');
+
+      const livePatients = tx
+        .select({ id: patients.id, status: patients.status })
+        .from(patients)
+        .where(and(isNull(patients.deletedAt), inArray(patients.id, patientIds)))
+        .all();
+      const byId = new Map(livePatients.map((patient) => [patient.id, patient]));
+      if (patientIds.some((id) => byId.get(id)?.status !== 'admitted'))
+        throw new Error('فهرست بستری‌ها تغییر کرده است؛ آن را دوباره بخوانید. هیچ بیماری اضافه نشد.');
+
+      const existing = tx
+        .select()
+        .from(shiftPatients)
+        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId), inArray(shiftPatients.patientId, patientIds)))
+        .all();
+      const existingByPatient = new Map(existing.map((member) => [member.patientId, member]));
+      const last = tx
+        .select({ sortOrder: shiftPatients.sortOrder })
+        .from(shiftPatients)
+        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
+        .orderBy(desc(shiftPatients.sortOrder))
+        .get();
+      let sortOrder = (last?.sortOrder ?? 0) + 1;
+      const now = new Date();
+      const result: string[] = [];
+
+      for (const patientId of patientIds) {
+        const prior = existingByPatient.get(patientId);
+        if (prior) {
+          result.push(prior.id);
+          continue;
+        }
+        const encounterId = resolveActiveEncounterId(patientId, tx);
+        const id = newId();
+        tx.insert(shiftPatients)
+          .values({
+            id,
+            ...stamps(now),
+            shiftId,
+            patientId,
+            encounterId,
+            sortOrder,
+            shiftSummary: null,
+            handoffNote: null,
+            reviewedAt: null,
+          })
+          .run();
+        sortOrder += 1;
+        result.push(id);
+      }
+      return result;
+    }),
+  );
 }
 
 export async function removePatientFromShift(memberId: string): Promise<void> {
