@@ -36,7 +36,7 @@ wrong, never rewrite them to look better.
 ## 2026-11-27 — Keep the active shift and lab trends scoped to current evidence
 
 **Agent:** GPT-6 via Codex.
-**Commits:** `codex/shift-lab-integrity`, based on PR 23.
+**Commits:** `c82e049` on `codex/shift-lab-integrity`, based on PR 23.
 
 **Changed**
 - Show the current encounter in the active deck and retain the original shift
@@ -47,12 +47,15 @@ wrong, never rewrite them to look better.
 - Bump the APK candidate to 0.11.70/code 86.
 
 **Verified**
-- See the local and hosted check records for this branch. The 40-patient test
-  checks both the live episode and the unchanged historical membership.
+- `npm run check` passes 2,967 app tests and five workflow tests. The accelerated
+  24-hour shift checks 40 patients, the live episode, and historical ownership.
+- Inspected the signed owner APK. The separate A52s QA package has the same JS
+  payload and passed the synthetic migration, transfer, discharge, task and lab
+  checks. See [validation-0.11.70.md](validation-0.11.70.md).
 
 **Not verified**
-- The signed owner APK and synthetic physical-phone run require separate
-  evidence. The real installation is excluded from synthetic testing.
+- Production upgrade on the owner's data, full real-time shift and backup /
+  media / notification acceptance are still open.
 
 **Open threads**
 - Issue 21 tracks the pending discharge reconciliation and remaining clinical
