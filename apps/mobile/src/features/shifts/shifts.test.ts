@@ -27,7 +27,7 @@ import {
   updateShiftPatient,
 } from './queries';
 import { deleteEncounter, openEncounter } from '../encounters/queries';
-import { createPatient, deletedPatientsQuery, deletePatient, updatePatient } from '../patients/queries';
+import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
 import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -253,8 +253,8 @@ describe('a shift', () => {
     const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
     const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
     await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
-    await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
-    await updatePatient(second, { status: 'outpatient' });
+    const secondEpisode = await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
+    await deleteEncounter(secondEpisode);
     await expect(addPatientsToShift(shiftId, [first, second])).rejects.toThrow();
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
   });
@@ -263,6 +263,8 @@ describe('a shift', () => {
     const shiftId = await startShift();
     const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
     const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
+    await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
     t.sqlite.exec(
       `CREATE TRIGGER reject_second_shift_member BEFORE INSERT ON shift_patients
        WHEN NEW.patient_id = '${second}'
