@@ -2,7 +2,7 @@
   "expo": {
     "name": "MedOS",
     "slug": "medos",
-    "version": "0.11.65",
+    "version": "0.11.66",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "medos",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "android": {
       "package": "com.shayan.medos",
-      "versionCode": 81,
+      "versionCode": 82,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#0E4A5F",
@@ -26,7 +26,9 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.SCHEDULE_EXACT_ALARM"
       ],
-      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"]
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -76,7 +78,9 @@
         {
           "supportsRTL": true,
           "forcesRTL": true,
-          "supportedLocales": ["fa-IR"]
+          "supportedLocales": [
+            "fa-IR"
+          ]
         }
       ],
       "./plugins/with-release-signing",
