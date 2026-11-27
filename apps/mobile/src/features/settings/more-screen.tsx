@@ -81,7 +81,7 @@ export function MoreScreen() {
             ? 'warning'
             : 'success',
     },
-    { icon: 'trash-outline', title: 'حذف‌شده‌ها', subtitle: 'پرونده، نوت و ثبت سریعِ حذف‌شده', href: '/trash' },
+    { icon: 'trash-outline', title: 'حذف‌شده‌ها', subtitle: 'بازیابی پرونده و سوابق حذف‌شده', href: '/trash' },
     { icon: 'settings-outline', title: 'تنظیمات', subtitle: 'قفل اپ، حافظه', href: '/settings' },
   ];
 

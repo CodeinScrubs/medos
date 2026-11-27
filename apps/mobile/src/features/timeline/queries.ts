@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, not, sql, type SQL } from 'drizzle-orm';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 
 import { db } from '@/db/client';
@@ -12,6 +12,7 @@ import {
   patients,
   type NoteType,
 } from '@/db/schema';
+import { labPanelHasForeignValues } from '@/features/labs/ownership-queries';
 
 import { TIMELINE_LAB_PREVIEW_SIZE, TIMELINE_PAGE_SIZE, type TimelineCursor, type TimelineKind } from './logic';
 
@@ -87,7 +88,15 @@ export function timelineLabsQuery(patientId: string, enabled = true, cursor?: Ti
   const at = sql`${labPanels.collectedAt}`,
     key = keyOf('lab', labPanels.id);
   return db
-    .select(fields('lab', labPanels.id, at, sql`${labPanels.name}`, sql`${labPanels.labName}`))
+    .select(
+      fields(
+        'lab',
+        labPanels.id,
+        at,
+        sql`${labPanels.name}`,
+        sql`case when ${labPanelHasForeignValues()} then 'ارتباط بیمار در این برگه نیاز به بررسی دارد؛ نتایج نمایش داده نمی‌شود.' else ${labPanels.labName} end`,
+      ),
+    )
     .from(labPanels)
     .innerJoin(patients, eq(labPanels.patientId, patients.id))
     .where(
@@ -220,6 +229,7 @@ export function timelineLabPreviewQuery(patientId: string, panelIds: readonly st
         isNull(labPanels.deletedAt),
         isNull(labValues.deletedAt),
         isNull(patients.deletedAt),
+        not(labPanelHasForeignValues()),
         sql`length(trim(coalesce(${labValues.value}, ''))) > 0`,
       ),
     )

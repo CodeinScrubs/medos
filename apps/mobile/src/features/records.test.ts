@@ -37,6 +37,43 @@ beforeEach(async () => {
 const patientStatus = async () => (await t.db.select().from(patients))[0]?.status;
 
 describe('encounters', () => {
+  it.each(['active', 'held'] as const)(
+    'discharge preserves another patient\u2019s imported %s order even when its episode reference is wrong',
+    async (status) => {
+      const at = new Date('2025-01-01T12:00:00.123Z');
+      const encounterId = await openEncounter({ patientId, kind: 'admission', admittedAt: at });
+      const ownOrder = await createOrder({ patientId, kind: 'drug', name: 'Synthetic owned order', startAt: at });
+      const otherPatient = await createPatient({ firstName: 'Synthetic', lastName: 'Other' });
+      t.db
+        .insert(orders)
+        .values({
+          id: 'synthetic-foreign-order',
+          patientId: otherPatient,
+          encounterId,
+          createdAt: at,
+          updatedAt: at,
+          kind: 'drug',
+          name: 'Synthetic inconsistent import',
+          status,
+          startAt: at,
+        })
+        .run();
+      const beforeOrder = t.db.select().from(orders).where(eq(orders.id, 'synthetic-foreign-order')).get();
+      const beforePatient = t.db.select().from(patients).where(eq(patients.id, otherPatient)).get();
+      const dischargedAt = new Date('2025-01-02T12:00:00.123Z');
+
+      await dischargeEncounter(encounterId, { dischargedAt, dischargeType: 'improved', nextStatus: 'discharged' });
+
+      expect(t.db.select().from(orders).where(eq(orders.id, 'synthetic-foreign-order')).get()).toEqual(beforeOrder);
+      expect(t.db.select().from(patients).where(eq(patients.id, otherPatient)).get()).toEqual(beforePatient);
+      expect(t.db.select().from(orders).where(eq(orders.id, ownOrder)).get()).toMatchObject({
+        status: 'completed',
+        endAt: dischargedAt,
+      });
+      expect(t.db.select().from(patients).where(eq(patients.id, patientId)).get()?.status).toBe('discharged');
+    },
+  );
+
   it('admits, supersedes and discharges, keeping the patient’s status in step', async () => {
     const first = await openEncounter({ patientId, kind: 'emergency' });
     expect(await patientStatus()).toBe('admitted');

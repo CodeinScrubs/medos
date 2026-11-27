@@ -30,6 +30,8 @@ const fieldsSchema = z
     name: z.string(),
     nameTouched: z.boolean(),
     labName: z.string(),
+    specimen: z.string().optional(),
+    method: z.string().optional(),
     notes: z.string(),
     rangeEditor: z
       .object({ id: z.string().min(1), rowKey: z.string(), text: z.string() })
@@ -50,6 +52,8 @@ const baseSchema = z
     collectedAt: z.number(),
     name: z.string().nullable(),
     labName: z.string().nullable(),
+    specimen: z.string().optional(),
+    method: z.string().optional(),
     notes: z.string().nullable(),
     source: z.enum(['manual', 'excel', 'photo', 'draft']),
     values: z.array(
@@ -82,8 +86,8 @@ export type LabFormFields = z.infer<typeof fieldsSchema>;
 export type LabFormDocument = z.infer<typeof schema>;
 
 export class LabFormConflict extends Error {
-  constructor() {
-    super('پیش‌نویس یا آزمایش در صفحهٔ دیگری تغییر کرده است؛ نوشتهٔ این صفحه نگه داشته شد.');
+  constructor(message = 'پیش‌نویس یا آزمایش در صفحهٔ دیگری تغییر کرده است؛ نوشتهٔ این صفحه نگه داشته شد.') {
+    super(message);
     this.name = 'LabFormConflict';
   }
 }
@@ -95,6 +99,8 @@ export function labFormBase(panel: LabPanel, values: LabValue[]): NonNullable<La
     collectedAt: panel.collectedAt.getTime(),
     name: panel.name,
     labName: panel.labName,
+    ...(panel.specimen ? { specimen: panel.specimen } : {}),
+    ...(panel.method ? { method: panel.method } : {}),
     notes: panel.notes,
     source: panel.source,
     // Derived flags/numeric copies are deliberately excluded: reflag may repair them.
@@ -136,6 +142,8 @@ export function initialLabForm(
     name: panel?.name ?? '',
     nameTouched: Boolean(panel?.name),
     labName: panel?.labName ?? '',
+    specimen: panel?.specimen ?? '',
+    method: panel?.method ?? '',
     notes: panel?.notes ?? '',
     rangeEditor: null,
   };
@@ -192,6 +200,8 @@ export function labFormValues(document: LabFormDocument, now: Date, hasPhoto: bo
     collectedAt,
     name: f.name.trim() || null,
     labName: f.labName.trim() || null,
+    specimen: f.specimen?.trim() || null,
+    method: f.method?.trim() || null,
     notes: f.notes.trim() || null,
     source: document.base?.source ?? ('manual' as const),
     values: f.rows.map(({ analyte, value, unit, refLow, refHigh, notes }) => ({

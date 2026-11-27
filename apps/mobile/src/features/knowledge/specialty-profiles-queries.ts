@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 
-import { db } from '@/db/client';
+import { db, type DbTransaction } from '@/db/client';
 import { specialties, specialtyProfiles, type SpecialtyProfile } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -42,41 +42,60 @@ export type SpecialtyProfileInput = Omit<
 >;
 
 /** The specialty's own names, so searching "cardio" finds the Persian profile. */
-async function specialtyWords(specialtyId: string | null | undefined): Promise<string[]> {
-  if (!specialtyId) return [];
-  const row = (await db.select().from(specialties).where(eq(specialties.id, specialtyId)).limit(1))[0];
-  return row ? [row.nameFa, row.nameEn ?? '', ...(row.aliases ?? [])].filter(Boolean) : [];
+function specialtyWords(tx: DbTransaction, specialtyId: string | null | undefined, previous?: string | null): string[] {
+  if (specialtyId == null) return [];
+  const row = tx.select().from(specialties).where(eq(specialties.id, specialtyId)).get();
+  if (!row || (row.deletedAt !== null && specialtyId !== previous)) throw new Error('تخصص انتخاب‌شده در دسترس نیست.');
+  return [row.nameFa, row.nameEn ?? '', ...(row.aliases ?? [])].filter(Boolean);
 }
 
-export async function createSpecialtyProfile(input: SpecialtyProfileInput): Promise<string> {
+export function createSpecialtyProfileInTransaction(
+  tx: DbTransaction,
+  input: SpecialtyProfileInput,
+  now: Date,
+): string {
   const id = newId();
-  await db.insert(specialtyProfiles).values({
-    id,
-    ...stamps(),
-    ...input,
-    searchText: specialtyProfileSearchText(input, await specialtyWords(input.specialtyId)),
-  });
+  tx.insert(specialtyProfiles)
+    .values({
+      id,
+      ...stamps(now),
+      ...input,
+      searchText: specialtyProfileSearchText(input, specialtyWords(tx, input.specialtyId)),
+    })
+    .run();
   return id;
 }
 
-export async function updateSpecialtyProfile(id: string, patch: SpecialtyProfileInput): Promise<void> {
-  const current = (
-    await db
-      .select()
-      .from(specialtyProfiles)
-      .where(and(alive, eq(specialtyProfiles.id, id)))
-      .limit(1)
-  )[0];
-  if (!current) throw new Error(`Specialty profile ${id} not found`);
-  const merged = { ...current, ...patch };
-  await db
-    .update(specialtyProfiles)
+export function updateSpecialtyProfileInTransaction(
+  tx: DbTransaction,
+  id: string,
+  patch: SpecialtyProfileInput,
+  now: Date,
+): void {
+  const current = tx
+    .select()
+    .from(specialtyProfiles)
+    .where(and(alive, eq(specialtyProfiles.id, id)))
+    .get();
+  if (!current) throw new Error('رشته در دسترس نیست.');
+  const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const merged = { ...current, ...defined };
+  tx.update(specialtyProfiles)
     .set({
-      ...patch,
-      searchText: specialtyProfileSearchText(merged, await specialtyWords(merged.specialtyId)),
-      ...touch(),
+      ...defined,
+      searchText: specialtyProfileSearchText(merged, specialtyWords(tx, merged.specialtyId, current.specialtyId)),
+      ...touch(now),
     })
-    .where(and(alive, eq(specialtyProfiles.id, id)));
+    .where(and(alive, eq(specialtyProfiles.id, id)))
+    .run();
+}
+
+export async function createSpecialtyProfile(input: SpecialtyProfileInput): Promise<string> {
+  return db.transaction((tx) => createSpecialtyProfileInTransaction(tx, input, new Date()));
+}
+
+export async function updateSpecialtyProfile(id: string, patch: SpecialtyProfileInput): Promise<void> {
+  db.transaction((tx) => updateSpecialtyProfileInTransaction(tx, id, patch, new Date()));
 }
 
 export async function deleteSpecialtyProfile(id: string): Promise<void> {

@@ -17,6 +17,7 @@ import { createFollowUp } from './queries';
 let mockParams: Record<string, unknown> = {};
 let mockNow = new Date(2026, 8, 30, 12).getTime();
 jest.mock('expo-router', () => ({ useLocalSearchParams: () => mockParams, useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => true }) }));
 jest.mock('expo-sqlite', () => ({ addDatabaseChangeListener: () => ({ remove: () => {} }) }));
 jest.mock('@/components/use-now', () => ({ useNow: () => mockNow }));
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));

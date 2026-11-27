@@ -2,6 +2,7 @@ import { and, asc, eq, getTableColumns, inArray, isNull, ne, or, sql } from 'dri
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import {
   attachments,
   captureInbox,
@@ -381,17 +382,20 @@ function publish(expected: PhotoImportBatch, now: Date): string[] {
       conflict();
     if (row.mode === 'lab_panel') {
       if (tx.select({ id: labPanels.id }).from(labPanels).where(eq(labPanels.id, row.entityId)).get()) conflict();
-      tx.insert(labPanels)
-        .values({
-          id: row.entityId,
-          ...stamps(row.createdAt),
-          patientId: row.patientId!,
-          encounterId: row.encounterId,
-          collectedAt: row.capturedAt,
-          name: 'عکس برگه',
-          source: 'photo',
-        })
-        .run();
+      withClinicalHistory(tx, 'lab', row.entityId, now, () =>
+        tx
+          .insert(labPanels)
+          .values({
+            id: row.entityId,
+            ...stamps(row.createdAt),
+            patientId: row.patientId!,
+            encounterId: row.encounterId,
+            collectedAt: row.capturedAt,
+            name: 'عکس برگه',
+            source: 'photo',
+          })
+          .run(),
+      );
     }
     const ids = body.assets.map((item) => {
       if (!item.full.path || !item.thumb.path || !item.full.fingerprint || !item.source.path) conflict();

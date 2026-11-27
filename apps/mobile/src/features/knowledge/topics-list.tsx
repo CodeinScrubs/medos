@@ -8,6 +8,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { doctorDisplayName } from '@/features/doctors/logic';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -38,6 +39,15 @@ export function TopicsList() {
   return (
     <View style={styles.flex}>
       <Column gap="sm" style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <UnfinishedWorkspaceForms
+          kind="topic"
+          onOpen={(recordId, draftId) =>
+            router.push({
+              pathname: '/knowledge/topic/edit',
+              params: { ...(recordId ? { topicId: recordId } : {}), draftId },
+            })
+          }
+        />
         <SearchBar value={search} onChange={setSearch} placeholder="عنوان، استاد، متن خلاصه…" />
         <ChipSelect options={FILTERS} value={filter} onChange={(v) => v && setFilter(v)} />
         <ErrorNotice error={error} what="فهرست مباحث" />

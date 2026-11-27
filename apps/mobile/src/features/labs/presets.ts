@@ -39,6 +39,16 @@ export type PanelPreset = {
 
 const r = (low: number | null, high: number | null): RefRange => ({ low, high });
 
+// The source report supplies reference ranges for blood gases.
+const bloodGasAnalytes: AnalyteDef[] = [
+  { analyte: 'pH' },
+  { analyte: 'pCO2', unit: 'mmHg' },
+  { analyte: 'pO2', unit: 'mmHg' },
+  { analyte: 'HCO3', unit: 'mEq/L' },
+  { analyte: 'BE', unit: 'mEq/L' },
+  { analyte: 'Lactate', unit: 'mmol/L' },
+];
+
 export const LAB_PRESETS: PanelPreset[] = [
   {
     key: 'cbc',
@@ -97,16 +107,13 @@ export const LAB_PRESETS: PanelPreset[] = [
   },
   {
     key: 'abg',
-    label: 'ABG / VBG',
-    analytes: [
-      { analyte: 'pH', ref: r(7.35, 7.45) },
-      { analyte: 'pCO2', unit: 'mmHg', ref: r(35, 45) },
-      { analyte: 'pO2', unit: 'mmHg' },
-      { analyte: 'HCO3', unit: 'mEq/L', ref: r(22, 26) },
-      { analyte: 'BE', unit: 'mEq/L' },
-      { analyte: 'SaO2', unit: '%' },
-      { analyte: 'Lactate', unit: 'mmol/L' },
-    ],
+    label: 'ABG',
+    analytes: [...bloodGasAnalytes, { analyte: 'SaO2', unit: '%' }],
+  },
+  {
+    key: 'vbg',
+    label: 'VBG',
+    analytes: bloodGasAnalytes,
   },
   {
     key: 'ua',
@@ -187,14 +194,12 @@ export const LAB_PRESETS: PanelPreset[] = [
   },
 ];
 
-/** Canonical row order for the flowsheet: preset order first, then anything custom. */
-export const ANALYTE_ORDER: Map<string, number> = new Map(
-  LAB_PRESETS.flatMap((p) => p.analytes.map((a) => a.analyte)).map((name, i) => [name.toLowerCase(), i]),
-);
-
 const DEF_BY_NAME: Map<string, AnalyteDef> = new Map(
   LAB_PRESETS.flatMap((p) => p.analytes).map((a) => [a.analyte.toLowerCase(), a]),
 );
+
+/** First appearance in the preset list determines flowsheet order. */
+export const ANALYTE_ORDER = new Map([...DEF_BY_NAME.keys()].map((name, index) => [name, index]));
 
 export function analyteDef(name: string): AnalyteDef | undefined {
   return DEF_BY_NAME.get(name.trim().toLowerCase());

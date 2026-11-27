@@ -1,5 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router/react-navigation';
+import { useEffect, useRef } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
@@ -26,11 +28,20 @@ import { useTheme } from '@/theme';
 
 import { CallRow } from './patient-header';
 import { PatientSnapshot } from './patient-snapshot';
-import { deletePatientContact, patientContactsQuery } from './queries';
+import { deletePatientContact, patientContactsQuery, type ShownPatientContact } from './queries';
 
 export function OverviewTab({ patient }: { patient: Patient }) {
   const { generation, stale } = useDatasetIntent();
   const router = useRouter();
+  const navigation = useNavigation();
+  const mounted = useRef(true);
+  const removing = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const { colors } = useTheme();
   const patientId = patient.id;
 
@@ -59,6 +70,48 @@ export function OverviewTab({ patient }: { patient: Patient }) {
     { label: 'عادات', value: patient.habitualHistory },
     { label: 'سابقه خانوادگی', value: patient.familyHistory },
   ].filter((f) => f.value);
+
+  function confirmContactRemoval(contact: ShownPatientContact) {
+    if (!mounted.current || removing.current || !navigation.isFocused() || stale || contactsError) return;
+    let used = false;
+    Alert.alert(
+      'حذف این شماره؟',
+      contact.name ?? contact.phone,
+      [
+        {
+          text: 'انصراف',
+          style: 'cancel',
+          onPress: () => {
+            used = true;
+          },
+        },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: () => {
+            if (used) return;
+            used = true;
+            if (!mounted.current || removing.current || !navigation.isFocused()) return;
+            removing.current = true;
+            void withDatasetWrite(generation, () => deletePatientContact(contact.id, contact))
+              .catch((e: unknown) => {
+                if (mounted.current && navigation.isFocused()) alertError('حذف نشد', e);
+              })
+              .finally(() => {
+                removing.current = false;
+                if (mounted.current) retryContacts();
+              });
+          },
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => {
+          used = true;
+        },
+      },
+    );
+  }
 
   return (
     <Column gap="none">
@@ -164,22 +217,7 @@ export function OverviewTab({ patient }: { patient: Patient }) {
       {contacts && contacts.length > 0 ? (
         <Column gap="sm">
           {contacts.map((c) => (
-            <Pressable
-              key={c.id}
-              onLongPress={() =>
-                Alert.alert('حذف این شماره؟', c.name ?? c.phone, [
-                  { text: 'انصراف', style: 'cancel' },
-                  {
-                    text: 'حذف',
-                    style: 'destructive',
-                    onPress: () =>
-                      void withDatasetWrite(generation, () => deletePatientContact(c.id)).catch((e) =>
-                        alertError('حذف نشد', e),
-                      ),
-                  },
-                ])
-              }
-            >
+            <Pressable key={c.id} disabled={stale || !!contactsError} onLongPress={() => confirmContactRemoval(c)}>
               <CallRow phone={c.phone} label={c.name ?? 'همراه'} relation={c.relation} />
               {c.notes ? (
                 <Text variant="tiny" color="textFaint" style={{ marginTop: 2, marginHorizontal: 4 }}>

@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import { consultations, doctors, encounters, patients, type Consultation } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
@@ -101,7 +102,7 @@ export function createConsultInTransaction(tx: DbTransaction, input: ConsultInpu
     input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx);
   // Historical linkage is retained through discharge or soft deletion. It must still belong to this patient.
   if (
-    encounterId &&
+    encounterId !== null &&
     !tx
       .select({ id: encounters.id })
       .from(encounters)
@@ -110,6 +111,7 @@ export function createConsultInTransaction(tx: DbTransaction, input: ConsultInpu
   )
     throw new Error('نوبت مراجعه به این بیمار تعلق ندارد.');
   const id = newId();
+  const now = new Date();
   const row = {
     patientId: input.patientId,
     // Undefined means "whatever admission is active"; null means explicitly none.
@@ -122,32 +124,41 @@ export function createConsultInTransaction(tx: DbTransaction, input: ConsultInpu
     requestedAt: input.requestedAt ?? null,
     noteId: input.noteId ?? null,
   };
-  tx.insert(consultations)
-    .values({
-      id,
-      ...stamps(),
-      ...row,
-      searchText: consultSearchText({ ...row, response: null, followUpInstruction: null }),
-    })
-    .run();
-  return id;
+  return withClinicalHistory(tx, 'consult', id, now, () => {
+    tx.insert(consultations)
+      .values({
+        id,
+        ...stamps(now),
+        ...row,
+        searchText: consultSearchText({ ...row, response: null, followUpInstruction: null }),
+      })
+      .run();
+    return id;
+  });
 }
 
 /** It has actually been asked now. */
 export async function markConsultRequested(id: string, requestedAt: Date = new Date()): Promise<void> {
   if (!Number.isFinite(requestedAt.getTime())) throw new Error('Invalid consult date');
-  const changed = db.transaction((tx) => {
+  const now = new Date();
+  db.transaction((tx) => {
     const current = consultForWrite(tx, id);
     if (current.status === 'requested') return false;
     requireOpen(current);
-    tx.update(consultations)
-      .set({ status: 'requested', requestedAt, ...touch() })
-      .where(eq(consultations.id, id))
-      .run();
-    return true;
+    return withClinicalHistory(tx, 'consult', id, now, () => {
+      tx.update(consultations)
+        .set({ status: 'requested', requestedAt, ...touch(now) })
+        .where(eq(consultations.id, id))
+        .run();
+      auditInTransaction(
+        tx,
+        'consult.statusChanged',
+        { entityType: 'consult', entityId: id, detail: { status: 'requested' } },
+        now,
+      );
+      return true;
+    });
   });
-  if (changed)
-    await audit('consult.statusChanged', { entityType: 'consult', entityId: id, detail: { status: 'requested' } });
 }
 
 function consultForWrite(tx: DbTransaction, id: string): Consultation {
@@ -203,7 +214,8 @@ export async function commitConsultAnswerDraft(
   respondedAt = new Date(),
 ): Promise<void> {
   if (!Number.isFinite(respondedAt.getTime())) throw new Error('Invalid consult date');
-  const changed = db.transaction((tx) => {
+  const now = new Date();
+  db.transaction((tx) => {
     const current = consultForWrite(tx, id);
     // Retrying a completed publish cannot create another event or change its timestamp.
     if (
@@ -218,50 +230,67 @@ export async function commitConsultAnswerDraft(
     const response = current.draftResponse.trim();
     if (!response) throw new Error('پاسخ کانسالت را بنویسید.');
     const followUpInstruction = current.draftInstruction.trim() || null;
-    tx.update(consultations)
-      .set({
-        status: 'answered',
-        response,
-        followUpInstruction,
-        respondedAt,
-        draftResponse: '',
-        draftInstruction: '',
-        draftRevision: current.draftRevision + 1,
-        searchText: consultSearchText({ ...current, response, followUpInstruction }),
-        ...touch(),
-      })
-      .where(eq(consultations.id, id))
-      .run();
-    return true;
+    return withClinicalHistory(tx, 'consult', id, now, () => {
+      tx.update(consultations)
+        .set({
+          status: 'answered',
+          response,
+          followUpInstruction,
+          respondedAt,
+          draftResponse: '',
+          draftInstruction: '',
+          draftRevision: current.draftRevision + 1,
+          searchText: consultSearchText({ ...current, response, followUpInstruction }),
+          ...touch(now),
+        })
+        .where(eq(consultations.id, id))
+        .run();
+      auditInTransaction(
+        tx,
+        'consult.statusChanged',
+        { entityType: 'consult', entityId: id, detail: { status: 'answered' } },
+        now,
+      );
+      return true;
+    });
   });
-  if (changed)
-    await audit('consult.statusChanged', { entityType: 'consult', entityId: id, detail: { status: 'answered' } });
 }
 
 export async function cancelConsult(id: string): Promise<void> {
-  const changed = db.transaction((tx) => {
+  const now = new Date();
+  db.transaction((tx) => {
     const current = consultForWrite(tx, id);
     if (current.status === 'cancelled') return false;
     requireOpen(current);
     // Keep any unsubmitted draft, including through cancellation/deletion.
-    tx.update(consultations)
-      .set({ status: 'cancelled', ...touch() })
-      .where(eq(consultations.id, id))
-      .run();
-    return true;
+    return withClinicalHistory(tx, 'consult', id, now, () => {
+      tx.update(consultations)
+        .set({ status: 'cancelled', ...touch(now) })
+        .where(eq(consultations.id, id))
+        .run();
+      auditInTransaction(
+        tx,
+        'consult.statusChanged',
+        { entityType: 'consult', entityId: id, detail: { status: 'cancelled' } },
+        now,
+      );
+      return true;
+    });
   });
-  if (changed)
-    await audit('consult.statusChanged', { entityType: 'consult', entityId: id, detail: { status: 'cancelled' } });
 }
 
 export async function deleteConsult(id: string): Promise<void> {
-  const changed = await db
-    .update(consultations)
-    .set(softDelete())
-    .where(and(alive, eq(consultations.id, id)))
-    .returning({ id: consultations.id });
-  if (!changed.length) throw new Error('Consult not found');
-  await audit('consult.deleted', { entityType: 'consult', entityId: id });
+  const now = new Date();
+  db.transaction((tx) => {
+    const current = consultForWrite(tx, id);
+    return withClinicalHistory(tx, 'consult', current.id, now, () => {
+      tx.update(consultations)
+        .set(softDelete(now))
+        .where(and(alive, eq(consultations.id, id)))
+        .run();
+      auditInTransaction(tx, 'consult.deleted', { entityType: 'consult', entityId: id }, now);
+    });
+  });
 }
 
 export async function reindexConsults(): Promise<number> {

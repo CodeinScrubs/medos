@@ -101,11 +101,13 @@ describe('trash restore transactions', () => {
     const episode = await openEncounter({ patientId: other, kind: 'admission' });
     const id = await createNote({
       patientId,
-      encounterId: episode,
+      encounterId: null,
       type: 'general',
       body: 'Synthetic invalid association',
     });
     await deleteNote(id);
+    // Inject a legacy/imported bad association; public writers now refuse it.
+    t.db.update(notes).set({ encounterId: episode }).where(eq(notes.id, id)).run();
     const before = databaseRows(t);
     await expect(restoreNote(id)).rejects.toThrow();
     expect(databaseRows(t)).toEqual(before);

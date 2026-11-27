@@ -33,6 +33,1436 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-27 — Keep the active shift and lab trends scoped to current evidence
+
+**Agent:** GPT-6 via Codex.
+**Commits:** `c82e049` on `codex/shift-lab-integrity`, based on PR 23.
+
+**Changed**
+- Show the current encounter in the active deck and retain the original shift
+  membership for history. Hide explicitly discharged patients from rounds while
+  keeping their open work in the existing tasks screen.
+- Split lab trends and bedside review by recorded context. Keep ambiguous values
+  in raw history. Add nullable specimen and method; old drafts still publish.
+- Bump the APK candidate to 0.11.70/code 86.
+
+**Verified**
+- `npm run check` passes 2,967 app tests and five workflow tests. The accelerated
+  24-hour shift checks 40 patients, the live episode, and historical ownership.
+- Inspected the signed owner APK. The separate A52s QA package has the same JS
+  payload and passed the synthetic migration, transfer, discharge, task and lab
+  checks. See [validation-0.11.70.md](validation-0.11.70.md).
+
+**Not verified**
+- Production upgrade on the owner's data, full real-time shift and backup /
+  media / notification acceptance are still open.
+
+**Open threads**
+- Issue 21 tracks the pending discharge reconciliation and remaining clinical
+  workflow and device gates.
+
+## 2026-11-27 — Require a current discharge preflight before publication
+
+**Agent:** GPT-6 via Codex.
+**Commits:** `4f96f82` on `codex/discharge-preflight` (PR 23) follows
+`2ad3231` (PR 22).
+
+**Changed**
+- Read the discharge consequences in one episode-scoped snapshot. Keep
+  patient-level work, reject stale or failed previews, and compare affected
+  IDs in the same transaction as discharge and raw draft retirement.
+- Keep the existing screen and show pending follow-ups alongside other
+  work that stays open. See [validation-0.11.69.md](validation-0.11.69.md).
+
+**Verified**
+- Both original mounted-screen regressions reproduced on .68. The fix
+  preserves the draft and blocks discharge until explicit retry.
+- Full `npm run check` passes 2,959 app tests and five workflow tests.
+- Exact-source hosted CI and both signed APK inspections pass. Native
+  .50-to-.69 upgrade, 40-to-41 shift intake, cold draft recovery and
+  discharge with an outstanding task pass on the read-only synthetic AVD.
+
+**Not verified**
+- Physical phone, timed native shift, and .69 full-archive comparison remain
+  open. Per-item result reconciliation is future work.
+
+**Open threads**
+- Test the signed .69 owner artifact on the phone, including the timed
+  40-patient shift, image markup, alarms and recovery.
+- Continue the issue 21 specimen/context and ward transfer findings before
+  expanding clinical features. Confirm active versus historical encounter
+  presentation for existing shift members.
+
+**Gotchas**
+- Drizzle's method form of `unionAll` takes one branch per call.
+  The real SQLite projection test covers all four branches.
+- Use a short Windows checkout for clean release builds. The longer review
+  path generated a 352-character Ninja object path and failed.
+
+## 2026-11-27 — Reconcile review branches and protect ward batch intake
+
+**Agent:** GPT-6 via Codex.
+**Commits:** `1ea3f8b` on `codex/ward-intake-readiness`, combining PRs 17–19.
+
+**Changed**
+- Preserve the displayed admission in the all-admitted shortcut. Validate
+  the complete census inside the membership transaction and refresh on
+  conflict. Retain the existing button and per-patient picker.
+- Reconcile the October .65 native report with the current work. Update signer
+  backup instructions to name the two required files.
+
+**Verified**
+- Both new mounted-screen SQLite witnesses fail before and pass after the fix.
+  Prior .65 owner APK metadata, signature, library set and SHA-256 match.
+- Full `npm run check` passes 2,956 app tests and five workflow tests,
+  including the accelerated SQLite shift with 40 patients and 24 simulated hours.
+- See [validation-0.11.68.md](validation-0.11.68.md) for check results, GitHub
+  bases and native boundaries.
+
+**Not verified**
+- No physical phone was attached during this review. A full timed native
+  shift, provider/reboot reminder recovery and physician acceptance remain.
+
+**Open threads**
+- Finish .68 upgrade, intake and owner-phone acceptance. Coordinate the
+  draft review stack before merging main.
+- Continue minimal ward intake, timed result follow-through, and the private
+  doctor/occasion deletion proposal after proving retained-action safety.
+
+**Gotchas**
+- PR 19 and its current base PR 18 are sibling histories after `89f60d9`.
+  Check the integrated tree. The original .65 checkout still has October
+  documentation and separate untracked review work.
+
+## 2026-10-12 — Close combined age/menu native acceptance and reconcile the ledger
+
+**Agent:** GPT-6 via Codex; primary verification and documentation.
+**Commits:** `58642e8` on `codex/age-certainty`. This local evidence was saved
+with the November continuation.
+
+**Changed**
+- Record actual .65 owner/QA APK hashes, exact-source CI, in-place upgrade,
+  independent full-archive comparison, native menu/age/cold acceptance and limits.
+- .64's inherited repair is accepted on .65; no standalone .64 native pass.
+- Replace stale chronological ledger checkpoints with one current checkpoint
+  and report links. Diagnostic repair, place recovery/handled device rejection
+  and the empty-place query boundary are no longer described as unfinished.
+- No application bytes, schema, dependency, permission or archive scheme changed
+  by this documentation checkpoint; unrelated untracked review work is preserved.
+
+**Verified**
+- Frozen .65 and normal push pass197 suites/2,949 app tests plus five workflow
+  checks, typecheck/lint/format and zero lint warnings. Exact-source hosted CI
+  succeeds on58642e8. Both actual signed APKs pass version/code/ABI/signer/JNI
+  inspection; dist/MedOS-0.11.65.apk is the local owner artifact.
+- Native .50-to-.65 upgrade checks every53-to55 table,41 original synthetic
+  patients/248 notes and34 media byte hashes; exact technical deltas are checked.
+- Separate42-patient fixture and whole before/after-cold archives check all55
+  tables with52 identical. Notes/raw conflicting DOB/notebook drafts and34
+  media hashes remain unchanged; only enumerated backup/startup receipts differ.
+- Actual Back/above-dialog dismissal, original extension editor/clean Close,
+  header/deck withheld age and distinct cold PID pass without matching app fatal
+  in the bounded action intervals. Normal owned AVD shutdown removes PID/serial;
+  both base image lengths/hashes remain unchanged.
+
+**Not verified**
+- No physical phone, full timed40-patient shift, second-device/provider/power
+  recovery, actual reminder delivery/Doze/reboot or physician clinical acceptance.
+- Rich text, other notebook/doctor recovery, full outpatient/follow-up workflows
+  and selected local clinical/use-history evidence are still work. No merged
+  main branch, public APK release, complete product or crash-free claim.
+
+**Open threads**
+- The private doctor/occasion proposal remains unintegrated. Reproduce/fix the
+  completed doctor's retained identity and enabled communication/rating/profile/
+  edit actions before adoption; verify actual current overlay SQL/UI/types/lint.
+- Remaining contracts and native/physical gates are in IMPLEMENTATION.md;
+  do not mistake old checkpoint prose for another pending implementation.
+
+**Gotchas**
+- The read-only AVD base is .50, not the previous overlay's .63. Departed host
+  processes and short observers are not accepted completions; cause is unknown.
+- Keep System UI ANR, null-root/provider/field probes and the ineffective
+  far-edge tap separate from accepted app behavior. The above-dialog tap passes.
+- 159 historical private APK copies were moved after verified size/hash copies
+  to the ignored artifact archive (private .65 manifest); preserve its mapping
+  when reusing old QA helpers. Backups, keys, current artifacts and bases remain.
+
+## 2026-10-12 — Withhold unestablished imported age and freeze combined acceptance
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint, based on94b43c0; codex/age-certainty.
+
+**Changed**
+- .65/code81: future imported DOB/invalid clock cannot display newborn age or
+  calculate negative/NaN years. Use civil days, preserve same-day unknown hour,
+  manual fallback and leap-day boundaries. No stored identity or schema changes.
+- Inherit .64 menu/edit repair; accept both on one frozen .65 APK. No standalone
+  .64 APK/native pass. Reports preserve exact source attribution and remaining gates.
+
+**Verified**
+- Private actual-source age witnesses four red/one green, then all five green.
+- Five integrated suites/119 tests plus actual doctor/occasion suites35 tests pass.
+- Full197-suite/2,949-app-test check and five workflow checks pass, with
+  typecheck/lint/format, zero lint warnings and unchanged checked bytes.
+- .64 normal push repeats197 suites/2,945 app tests and five workflow checks,
+  zero lint warnings; exact-source hosted CI succeeds on94b43c0.
+
+**Not verified**
+- .65 normal push/CI/APKs/native pending at this source checkpoint.
+  No physical phone/full timed shift; .63 remains the inspected owner artifact.
+
+**Open threads**
+- Finish .65 software and frozen artifacts; native inherited menu dismissal/edit/
+  cold and honest age display, then owned AVD shutdown/base-image verification.
+- Private doctor/occasion recovery is unfinished and unintegrated. Other notebook
+  recovery/rich text/full workflows/local agent evidence and physical gates remain.
+
+**Gotchas**
+- Normal form rejects future DOB already. Preserve imported records but withhold
+  derived age; do not silently invent0 days or replace a conflicting DOB with fallback.
+- Birthday is a civil date, not an inferred hour. Keep same-date later hour valid.
+- Source tests/CI do not prove an intermediate version was installed or tested.
+
+## 2026-10-12 — Dismiss extension menus and retain the original edit choice
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint, based on57ae67e; codex/extension-menu-continuity.
+
+**Changed**
+- .64/code80: existing extension menu dismisses on Back/outside. Its retained
+  editor choice reuses original row/dataset/focus/read/latch admission and SQL
+  validation. No new control/module/dependency/schema/archive/key.
+- Complete .63 validation documentation; keep the unfinished doctor/occasion
+  proposal private. Clinical data, .61 note and .62/.63 recovery guards remain.
+
+**Verified**
+- Original six navigation witnesses red with29 earlier tests passing;35 pass
+  after repair. Integrated101 places tests, final35 and types pass; first full
+  check stops on the Promise callback contract, repaired without weakened tests.
+  Final full197-suite/2,945-app-test check and five workflow checks pass, with
+  typecheck/lint/format, zero lint warnings and unchanged checked bytes.
+- .63 normal push/exact-source CI/both inspected APKs, native recovery/copy/star/
+  report chooser/local URI read/clear/cold and four complete authenticated archives
+  pass. All55 tables compared,49 identical;41 patients/34 media hashes preserved.
+  See validation-0.11.63.md; initial System UI ANR and failed probes remain explicit.
+
+**Not verified**
+- .64 normal push/CI/APKs/native pending. No physical phone, timed full shift
+  or clinical validation. The read-only AVD remains owned for the next acceptance.
+
+**Open threads**
+- Finish frozen .64 software/native dismissal/edit/cold and shutdown/base hashes.
+- Other notebook recovery/doctor actions, rich text, full workflows/local agent
+  evidence and physical gates remain; see IMPLEMENTATION. Avoid blind integration
+  of the interrupted private doctor/occasion proposal or claims of completion.
+
+**Gotchas**
+- A three-choice Android Alert without cancelable:true cannot escape on Back.
+- Validate edit navigation with the existing SQL basis, not only cached UI rows.
+- Native trees can precede hydration; require fresh acknowledged markers before
+  declaring a missing row. Coordinates must come from observed bounds.
+
+## 2026-10-12 — Bound default diagnostics and handle report actions
+
+**Agent:** GPT-6 via Codex; two GPT-6.1 Sol/xhigh helpers provide private
+proposals/reviews. Primary owns integration, repairs and verification.
+**Commits:** this source checkpoint, based on159c996; codex/diagnostic-boundaries.
+
+**Changed**
+- .63/code79: content-free default technical projection, exact useful notices,
+  strict bounded legacy log reads, persistent incomplete-write signal and
+  bounded immutable share files pinned through native awaits.
+- Catch share/clear/copy/retry errors; retain original screen lifetime/focus and
+  single-flight intent. Keep clinical export separate. No new module/dependency/
+  schema/permission/archive scheme. Preserve .62; fix explicit empty-place filter.
+- Preserve both original startup SQL tests. Repair installed Android's trailing
+  directory slash mismatch and strengthen the cache stand-in, not its assertions.
+
+**Verified**
+- Private source-backed red witnesses; integrated146 tests, final65 targeted
+  tests and installed-contract URI witness red3/green8. See validation-0.11.63.md.
+- Full197-suite/2,939-app-test check and five workflow checks pass, with
+  typecheck/lint/format and zero lint warnings. Checked bytes stay unchanged.
+- Independent installed-contract in-memory review finds no additional issue;
+  this is not device/filesystem execution.
+- .62 normal push and exact-source hosted CI succeed on159c996.
+
+**Not verified**
+- .63 normal push/CI/APK/native pending at this source checkpoint.
+  No physical phone; .61 remains the inspected owner APK.
+
+**Open threads**
+- Complete frozen software check/push and native .62/.63 acceptance, then owner APK.
+- Other notebook recovery/doctor actions, rich text, full shifts/workflows, local
+  agent evidence and physical gates remain; phone is not the only open work.
+
+**Gotchas**
+- A proposal must not replace existing tests with unrelated new ones.
+- Directory.uri ends in slash on Android; use File.name plus exact owner check.
+- Native move is not atomic overwrite; chooser closure is not recipient reading.
+- User steering may interrupt PTY sessions: use an owned hidden worker and its
+  completion/source manifest, not a partial log, as long-running check evidence.
+
+## 2026-10-12 — Recover places/extensions and retain original device choices
+
+**Agent:** GPT-6 via Codex; helper GPT-6.1 Sol/xhigh proposes privately; primary
+reviews, adds boundaries and owns all integrated verification.
+**Commits:** this source checkpoint, based on825ef23; codex/place-recovery.
+
+**Changed**
+- .62/code78: existing trash recovers places/extensions with bounded queries,
+  original parent/lifecycle and required transactional audit. Preserve .61 note
+  guards and separately deleted children. No route/schema/dependency change.
+- Copy/call/map and star retain original shown row/dataset/focus/mount/read/latch;
+  counters follow native acknowledgment, optional haptic failure stays optional.
+- Reject runtime form metadata keys; preserve supported fields/search/null and
+  explicit valid reassignment. Record limitations in validation-0.11.62.md.
+
+**Verified**
+- Source-backed private red witnesses, then primary's independent frozen98-test
+  proposal run. Additional24 runtime-key witnesses red before guard.
+- Integrated170 targeted tests, final88 after lint repair; full188-suite/2,879
+  app-test check, five workflow checks, typecheck/lint/format, zero lint warnings.
+- Source/WIP unchanged during checks; PR12's documentation825ef23 CI succeeds.
+
+**Not verified**
+- .62 push/hosted CI/native/APK pending at this source checkpoint. No real call,
+  message, native external app or physical phone test; .61 APK remains available.
+
+**Open threads**
+- Complete normal push/source CI. Accept .62 native copy/recovery with the next
+  frozen candidate if combining with diagnostic repair; do not reuse .61 proof.
+- Implement private content-free diagnostics, persistent incomplete-write signal
+  and bounded pending-safe share cache. Close explicit empty-place query filter.
+- Other notebook trash/doctor actions, rich text, full workflows, local agent use
+  evidence, native pressure/input and physical gates remain; see IMPLEMENTATION.
+
+**Gotchas**
+- Never copy an old mirrored TrashScreen over .61 note lifecycle guards.
+- Correlated page.id needs the fixed qualified alias; lifecycle qualification was
+  already correct. Native optional haptics can throw before returning a Promise.
+- Render map callback as an event-bound button, not a ref-reading closure pushed
+  into a render array; stable empty row constants avoid dependency warnings.
+
+## 2026-10-12 — Deliver inspected .61 APK and native note acceptance
+
+**Agent:** GPT-6 via Codex; primary native integration and verification.
+**Commits:** application3ee0ce5; this documentation checkpoint. Draft PR12.
+
+**Changed**
+- Deliver dist/MedOS-0.11.61.apk,arm64/code77 from frozen3ee0ce5; record exact
+  hashes, installed-byte provenance and the limited native acceptance matrix.
+- No additional application change. Private proposals are not integrated.
+
+**Verified**
+- Normal push repeats183 suites/2,759 app tests and five workflow checks,
+  zero lint warnings; exact-source hosted check/bundle succeeds.
+- Both signed APKs pass version/code/ABI/certificate/JNI checks. Actual native
+  note create/pin/edit/version-restore/delete/trash-restore/cold restart passes.
+- Independent authenticated three-archive comparison covers all55 tables,
+  preserves every old record,41 patients and34 media byte hashes. The one new
+  note retains four versions and original context. Owned AVD shuts down with
+  both base-image hashes unchanged; source/WIP remained frozen during builds.
+
+**Not verified**
+- Physical phone, full timed40-patient shift, broad native interruption and
+  clinical applicability. Initial System UI ANR/boot delay remain in the report.
+
+**Open threads**
+- Integrate/review the private content-free diagnostic proposal and corrected
+  places/extensions trash/device-action proposal, one clear checkpoint at a time.
+- Other notebook trash, rich text, full follow-up/outpatient workflows, native
+  pressure/input and physical gates remain. Local coding-agent use history/export
+  is a recorded requirement, not the current error log. See IMPLEMENTATION.md.
+
+**Gotchas**
+- Production AVD denies root; use authenticated owner-controlled archive copies
+  for independent full-state evidence. Note-specific saved wording and flattened
+  version rows require actual native selectors, not assumed generic helpers.
+
+## 2026-10-11 — Verify new AI reviews and close ordinary note mutation gaps
+
+**Agent:** GPT-6 via Codex; primary implementation and verification.
+**Commits:** this source checkpoint, based on8ecaa67.
+
+**Changed**
+- .61/code77: validate original patient/episode on ordinary note writers; typed
+  and runtime correction allowlist; defined-field merged search; atomic required
+  delete/restore audit. Preserve explicit null and original closed episodes.
+- Retained pin/delete and trash restore carry compact immutable-version/lifecycle
+  evidence, original dataset, mount and focus; list bounds stay unchanged.
+- Classify the supplied reports against actual source; record the owner's new
+  local coding-agent evidence requirement and separate selected-export contract.
+
+**Verified**
+- Original red witnesses for audit/ownership/runtime patch/search and four
+  rendered-card lifetime/focus cases, plus imported-empty version ownership.
+- Final full check:183 suites/2,759 app tests and five workflow checks;
+  typecheck/lint/format, zero lint warnings. Final parent focused set45 tests.
+- Public main2dcd60b/.50 and PR11's8ecaa67/.60 verified; open PR heads refreshed.
+
+**Not verified**
+- .61 push/hosted CI/frozen APK/native acceptance pending at this source commit;
+  physical phone, full timed shift and physician review were not performed.
+
+**Open threads**
+- Complete .61 frozen build/inspect/native note acceptance and owner artifact.
+- Default diagnostic text safety/handled sharing, then local agent-readable use
+  history with explicit scope/completeness. Places actions and notebook trash,
+  rich text, full workflows/native pressure and phone gates remain; see
+  validation-0.11.61.md and IMPLEMENTATION.md. No broad rewrite is justified.
+
+**Gotchas**
+- Single-table Drizzle projections remove outer qualifiers inside correlated
+  SQL; the action/lifecycle consumers retain a join. Keep real SQLite tests.
+- The old cross-patient trash fixture must inject legacy bad SQL directly;
+  guarded public create now correctly refuses it. Do not relax its assertion.
+
+## 2026-10-11 — Deliver verified .60 optional-lock repair and owner APK
+
+**Agent:** GPT-6 via Codex; primary integration and native verification.
+**Commits:** application source e34e79e; this documentation checkpoint.
+
+**Changed**
+- Record the final no-credential repair independently of first-source evidence.
+- Deliver the signed arm64 dist/MedOS-0.11.60.apk; no additional app change.
+
+**Verified**
+- Full source check: 182 suites/2,734 app tests, five workflow checks,
+  typecheck/lint/format, zero lint warnings. Normal push repeats it (Jest 221.912s).
+- Exact-source hosted CI succeeds. Both APKs pass actual version/code/ABI/signer/
+  essential-JNI inspection; installed QA bytes match. Exact hashes and build
+  warnings are in validation-0.11.60.md.
+- Actual no-enrollment refusal, enable cancel/retry, repaired disable after PIN
+  removal, enrolled disable cancel/success and cold cancel/retry pass on final
+  QA bytes. The original 41 synthetic patients remain. No MedOS fatal is observed
+  in this bounded run. Owned VM closes normally; persistent base hashes stay intact.
+
+**Not verified**
+- Physical phone, general native failure injection, alarm delivery/reboot/Doze,
+  media/IME/provider/power and full timed heavy shifts. The product is not finished.
+- Private next-slice proposals are not integrated app features or acceptance.
+
+**Open threads**
+- Handle places/extension phone, clipboard, usage-write and haptic failures with
+  original dataset and current source-screen ownership. A failed optional counter
+  must not turn an acknowledged copy into a reported copy failure.
+- Extend existing trash to notebook records, preserving original parent context
+  and separately deleted children; test stale callbacks, required audit rollback
+  and complete compatible archives. This is not permanent notebook edit history.
+- Prove rich-editor native IME/selection/snapshot drain before schema integration;
+  retain the single AutosaveScope and exact plain/NULL/history/export compatibility.
+- Complete the follow-up loop and measured 40-patient native shifts; physical and
+  physician acceptance remain separate. Do not claim that only phone testing remains.
+
+**Gotchas**
+- Boot wait and initial UI probe fail because of delayed boot/System UI ANR;
+  observed Wait exposes the same app PID. A too-early retry snapshot is also
+  retained. Use bounded fresh snapshots; do not invent app fixes for those failures.
+- The normal compressed hierarchy hides the covered clinical list; uncompressed
+  diagnostic nodes are not ordinary accessibility exposure.
+- App source/HEAD stay frozen throughout checks/builds. Unrelated untracked
+  review documents remain unchanged. PR 11 stays draft; no PR is merged here.
+
+## 2026-10-11 — Repair explicit lock removal after device credentials disappear
+
+**Agent:** GPT-6 via Codex; primary native investigation and integration.
+**Commits:** first .60 source 22ee485; this final-repair checkpoint.
+
+**Changed**
+- Allow explicit optional-lock removal when actual device enrollment is NONE;
+  enrolled authentication and acknowledgment failure behavior stay intact.
+- Add six regression/safety tests; no version/dependency/schema/permission change.
+
+**Verified**
+- First source passes the full 2,728-test check, normal push and exact hosted CI.
+- Actual installed bytes, native camera grant, cancel/retry, grace return and
+  cold lock pass in bounded emulator observations. Native no-credential disable
+  fails on 22ee485; one software witness also fails before the repair.
+- All 35 focused tests pass after repair (5.187s); full check passes
+  182 suites/2,734 tests/five workflow checks (Jest 233.077s), zero lint warnings.
+  The owned VM closes normally and both persistent base hashes remain unchanged.
+  Details are in .60 validation.
+
+**Not verified**
+- Repaired-source push/CI/new frozen QA/native/owner APK are pending.
+- Physical authentication/media/delivery/power/provider and complete long shifts.
+
+**Open threads**
+- Check/freeze/push this repair and accept actual no-credential removal, enrolled
+  cancel/retry/cold state on newly inspected QA bytes; build the owner arm64 APK.
+- Rich text, notebook recovery, full follow-up and measured shifts remain open.
+- Handle the places-list phone intent rejection; private next-slice proposals
+  are not integrated implementation or acceptance.
+
+**Gotchas**
+- The test VM had 60-second grace initially. Native radio selection is selected,
+  not checked; an uncompressed diagnostic tree includes hidden controls.
+- Initial boot wait/System UI ANR are preserved as environment evidence. They
+  do not justify calling the app crash-free or its cold-start time accepted.
+
+## 2026-10-11 — Handle settings and optional-lock native failures
+
+**Agent:** GPT-6 via Codex; primary .60 implementation/integration. Two
+GPT-6.1 Sol/xhigh helpers supplied private next-slice investigations only;
+no helper proposal is integrated or counted as verified implementation.
+**Commits:** this .60 source/checkpoint commit, following frozen .59 `b8820f9`.
+
+**Changed**
+- Catch existing settings/lock native failures; preserve retry, one prompt and
+  original dataset admission. Refuse retained old callbacks and orphaned UI.
+- Expose failed lock-setting reads through existing retry feedback; preserve
+  mounted content and withhold stale lock decisions.
+- Version .60/code76 only; no dependency/schema/route/permission/archive change.
+- Record .59's actual installed/native/CI evidence without borrowing it for .60.
+
+**Verified**
+- Actual original LockGate fails four regression witnesses before its repair;
+  all 29 focused settings/lock tests pass afterward (7.214s). Final full check:
+  182 suites/2,728 app tests/five workflow checks (236.423s), zero lint warnings.
+- .59 exact b8820f9 CI succeeds; installed QA bytes match. Same-PID camera-grant
+  return updates the mounted card; actual alarm switch changes two occasion
+  windows from one hour to zero. Owned AVD later closes, preserving both hashes.
+
+**Not verified**
+- .60 push/CI/frozen APK/native acceptance are pending at this entry.
+- Physical authentication/media/reminder delivery/power/provider and long shifts.
+
+**Open threads**
+- Push the checked .60 source, build frozen QA and owner APKs, then record
+  exact-source CI, installed bytes and actual native acceptance.
+- Rich text, notebook trash, full follow-up loop and measured shift gates remain
+  in IMPLEMENTATION. The physical phone is not the only remaining work.
+
+**Gotchas**
+- Native callback types can be void while async functions still reject. Catch
+  failures inside the action; do not assume a toggle awaits its callback.
+- .59 boot automation/SystemUI failures predate app installation. The initial
+  bounded shutdown wait timed out, but later PID/serial/hash checks pass.
+
+## 2026-10-11 — Verify replay-safe permission cleanup without a lint warning
+
+**Agent:** GPT-6 via Codex; primary integration, no new delegation.
+**Commits:** initial .59 `f2fecac`; this cleanup/checkpoint commit.
+
+**Changed**
+- Remove the redundant cleanup counter increment; mounted lifetime and each new
+  read fence old responses. Add real StrictMode setup/cleanup replay coverage.
+- Keep the existing UI and fix checkpoint wrapping; no further runtime feature.
+
+**Verified**
+- Actual focused suite: 15 tests (3.472s); final full check: 179 suites/2,699
+  app tests/five workflow checks (247.218s), zero lint warnings. Initial source
+  normal push and exact f2fecac hosted CI succeed. PR11 is attached and draft.
+
+**Not verified**
+- Frozen .59 APK/native return/special access/delivery and the physical phone.
+
+**Open threads**
+- Push this exact source, build private x86 QA and inspect installed bytes;
+  witness real native settings return before any acceptance/owner artifact claim.
+- Optional lock callback rejection is now reproduced in two private software
+  probes; it is not a phone crash witness. Continue that repair, notebook trash,
+  rich text, follow-up loop and measured shift gates in IMPLEMENTATION.
+
+**Gotchas**
+- Native permission reads have no cancel API. Do not remove the mounted/latest
+  result checks or suppress the hook warning with a copied old counter.
+
+## 2026-10-11 — Refresh actual permission state and handle native settings failures
+
+**Agent:** GPT-6 via Codex; primary integration, no new delegation.
+**Commits:** this .59 application/checkpoint commit, following delivered `7d1dfc4`.
+
+**Changed**
+- Refresh current grants after returning from Android Settings; refuse stale read
+  results and retained/unmounted/repeated native actions. Handle native failures
+  with existing retry/error UI. Mark the stored backup folder as selected.
+- Shorten settings copy, remove exact-delivery and unmeasured image-size claims.
+  Version .59/code75 only; no dependency/schema/route/permission/archive changes.
+
+**Verified**
+- Unchanged .58 check: 178 suites/2,684 tests; source .59 check: 179 suites/2,698
+  tests and five workflow checks. Typecheck/lint/formatting pass (Jest 203.978s).
+- Before resume/grant witness fails, after passes; 14 focused failure/race/
+  focus/unmount/action/cleanup scenarios pass. Diff and lock-version scope checked.
+
+**Not verified**
+- .59 installed APK, native Settings return, exact access/delivery and physical
+  phone acceptance are pending; see validation-0.11.59, not the .58 report.
+
+**Open threads**
+- Build and inspect frozen .59 x86/owner APKs, test real settings return and
+  exact-alarm access separately, then record normal push/CI and keep PR11 draft.
+- Review optional app-lock callback rejection/late confirmation, then notebook
+  trash, rich text, full follow-up and measured shifts in IMPLEMENTATION.
+
+**Gotchas**
+- Use the existing expo-router/react-navigation export; do not add a separate
+  navigation dependency. Preserve unrelated untracked documents and frozen builds.
+
+## 2026-10-11 — Accept the frozen .58 recovery candidate and record exact artifact evidence
+
+**Agent:** GPT-6 via Codex; primary native/artifact integration, no further delegation.
+**Commits:** application `5304451` + `7d557fe`; this documentation-only delivery.
+
+**Changed**
+- Record exact-source .58 CI/APKs and real companion/follow-up recovery, retained
+  results, denied permission, retry and cold-start evidence. Update current gates.
+- No application/dependency/schema/route/permission/backup changes in this delivery.
+
+**Verified**
+- Full software check passes 178 suites/2,684 app tests/five workflow checks.
+  Normal source push passes 2,684 (225.755s); exact `7d557fe` hosted CI succeeds.
+- Four actual native archives pass independent comparisons of 51 application
+  tables, 4,225 prior rows, full history/audit, 32 migrations and 34 media files.
+  Final history has 69 versions; context/outcome remain intact and the completed
+  follow-up stays completed. See validation-0.11.58.
+- Actual signed arm64/x86 APK contents/code74/cert/JNI pass; installed QA bytes
+  match. Owned read-only AVD closes with base hashes unchanged. PR10 stays draft.
+
+**Not verified**
+- Physical phone; exact/on-time notification delivery, Doze/reboot, provider/low
+  space/power/second-device recovery, a full 40-patient shift or clinical review.
+- Notification grant alone is insufficient: the accepted synthetic AVD has an
+  inexact one-hour OS window. Historical SystemUI/input/ANR boundaries remain.
+
+**Open threads**
+- Tighten permission/settings failure handling and the understated alarm-delay
+  copy; native exact access/delivery is a separate gate. Then continue notebook
+  trash, visual rich text, fuller follow-up and measured shift work in IMPLEMENTATION.
+- Keep PRs incremental; no automatic merges or 'only phone remains' claim.
+
+**Gotchas**
+- Permission revoke restarts Android's app and changes two occasion OS receipts.
+  Explicitly verify those known receipt-only transitions; never exclude clinical
+  rows broadly. Final/cold occasion rows and media match the original fixture.
+- Do not edit source/HEAD during a build. Both final APKs belong to `7d557fe`,
+  not the earlier first-source .58 artifact or this later documentation commit.
+
+## 2026-10-11 — Close an acknowledged outcome after leaving its screen
+
+**Agent:** GPT-6 via Codex; primary follow-on, no additional delegation.
+**Commits:** this follow-on to .58 source `5304451`.
+
+**Changed**
+- A final retained-screen probe finds that completed outcome input could remain
+  open after focus loss during native receipt acknowledgment. Close the local
+  acknowledged prompt while mounted; haptics remain limited to the focused
+  origin. Failed/refused input stays intact. No navigation/header change.
+
+**Verified**
+- The new witness fails before the fix; corrected card/list tests pass31/2.
+  Full check passes178 suites/2,684 app tests (209.541s), five workflow tests and
+  typecheck/lint/format without warnings. Normal first-source push passes2,683;
+  draft incremental PR10 is attached, based on PR9. No PR is merged.
+
+**Not verified**
+- New-source APK/native/hosted-CI acceptance. The private inspected x86 APK of
+  `5304451` predates this last UI correction and is not the final .58 candidate.
+- Physical phone, measured long shifts, provider/interruption/power or clinical
+  review. Emulator System UI has a pre-install boot ANR; keep that evidence.
+
+**Open threads**
+- Freeze this source, rebuild/inspect x86, accept contact/follow-up recovery with
+  independent whole archives, build/inspect owner arm64, push and verify exact-head
+  CI. Native receipt delivery remains separate from SQL acknowledgment.
+- Notebook trash, rich text, full follow-up and other IMPLEMENTATION gates remain.
+
+**Gotchas**
+- Closing a mounted local outcome prompt is different from popping a route or
+  presenting feedback on another screen. Focus loss must not leave completed
+  input blocked; mount/dataset ownership still apply.
+
+## 2026-10-11 — Recover companions and follow-ups without accepting stale choices
+
+**Agent:** GPT-6 via Codex; primary implementation/verification with one read-only
+GPT-6.1 Sol/xhigh review.
+**Commits:** this source commit, based on delivered PR9 `d1e9a5c`.
+
+**Changed**
+- .58/code74 adds companions and follow-ups to the existing bounded clinical
+  trash. Original context/status/result remain; reminder intent is durable before
+  native reconciliation, with a short conditional retry notice.
+- Include clinical sequence in every recovery basis. Companion delete checks
+  shown row/sequence; follow-up status/delete/postpone/result check original
+  clinical intent. Keep typed outcomes on refusal; retain focus/dataset ownership
+  and consume native choices once. No new dependency, migration or route.
+
+**Verified**
+- Four failing stale-action/cycle witnesses reproduce before fixes. Corrected
+  integrated recovery/UI run passes198/6; expanded receipt/import tests53/3;
+  final follow-up retained-action/card/query tests46/2. See validation-0.11.58.
+- Final full check passes178 suites/2,683 app tests (213.035s), five workflow
+  tests and typecheck/lint/format without warnings. No new migration; scoped
+  lockfile edits and unrelated WIP hashes are verified.
+
+**Not verified**
+- New-source native acceptance, owner .58 APK and hosted CI remain pending at
+  this source checkpoint. .57 evidence does not accept .58.
+- Physical phone/IME/alarm delivery, complete timed40-patient shifts, provider/
+  interruption/power acceptance or clinical review.
+
+**Open threads**
+- Finish frozen-source .58 checks, native whole-archive acceptance, inspected
+  owner artifact and exact-head CI. Keep notebook trash/rich text/full follow-up
+  workflow and remaining IMPLEMENTATION gates open; phone is not the sole work.
+- Diagnose original short .55 input mismatch and older focus ANR separately.
+
+**Gotchas**
+- Drizzle strips ordinary column qualification inside a single-table SQL
+  expression. Explicit schema-derived identifiers keep a correlated outer id
+  from binding to the inner history id. Native receipt-only changes are not a
+  different clinical decision; desired reminder revision still is.
+
+## 2026-10-11 — Deliver lab isolation with independent native state witnesses
+
+**Agent:** GPT-6 via Codex; primary verification, no additional delegation.
+**Commits:** frozen application `36d4ff1`; this evidence-only follow-on.
+
+**Changed**
+- Record exact-source .57 native ownership/repair/refusal/cold-start and healthy
+  deletion/restore evidence, whole-state comparisons and both inspected APKs.
+  Update incremental draft PR9 against PR8 and the current execution gates.
+- No application source, dependencies, migrations, routes, permissions or backup
+  format change in this delivery. Unrelated untracked WIP remains untouched.
+
+**Verified**
+- Final evidence-only check passes177 suites/2,625 app tests (208.049s), five workflow
+  tests and typecheck/lint/format; normal push repeats checks without bypass.
+  Exact-source hosted CI38118700197 passes including migrations and bundling.
+- Installed inspected x86 bytes match. Mixed-owner native restore keeps original
+  rows, withholds results and preserves healthy access; strict editor refuses.
+  Independent repair/cold archives check4,217 rows in51 tables,55 exact prior
+  versions plus2 complete new versions,34 media hashes and32 migrations.
+- Healthy native delete/restore changes only its parent with required history/
+  audit; independent oracles check4,219/4,220 prior rows,59 final versions and
+  unchanged children/media. Owned emulator shutdown preserves both base hashes.
+- Actual signed arm64 .57/code73 in `dist/MedOS-0.11.57.apk` passes certificate,
+  package/ABI/essential-JNI inspection; hashes are in validation-0.11.57.
+
+**Not verified**
+- Physical phone/IME, complete timed40-patient shift, provider/interruption/
+  low-space/power behavior or clinical review. Native restore repairs version0;
+  subsequent cold start is version1, not native version0 first-start proof.
+- No MedOS fatal/ANR observed in the bounded window; Android System UI and other
+  boot ANRs occurred and are retained. Whole-session health is not established.
+
+**Open threads**
+- Rich text, contact/follow-up/notebook trash and complete follow-up flow remain
+  in IMPLEMENTATION. Finish prioritized software work without adding a maze.
+- Diagnose the original short .55 input mismatch and older focus ANR; do not
+  infer physical IME acceptance from later exact ASCII input or surviving PIDs.
+
+**Gotchas**
+- A displayed ownership marker must not enter the stored full-row deletion CAS.
+  Version0 restore housekeeping and version0 StartupGate are separate witnesses.
+- Freeze source through both ABI builds; the owner APK has a different hash
+  from private x86 QA. No existing PR is merged automatically.
+
+## 2026-10-11 — Isolate mixed-owner labs without blocking healthy records
+
+**Agent:** GPT-6 via Codex; primary implementation/verification and one read-only
+GPT-6.1 Sol/xhigh ownership audit.
+**Commits:** this source commit, based on .56 `8ee111a` and delivered PR8 `faa7160`.
+
+**Changed**
+- .57/code73 preserves inconsistent imported lab panels and withholds all their
+  results from snapshot/table/trend/timeline. Healthy reflag continues; real
+  SQL/history errors still roll back the full pass. Counts/short conditional
+  notices distinguish withheld data from an empty/photo-only panel.
+- Keep raw editor ownership refusal. Reload validates the new basis before
+  reset and requires acknowledged draft flush. Strip the read projection from
+  stored delete CAS. Existing indexes bound candidate ownership-count reads.
+- Record completed .56 native seven-kind restore/history pages and independent
+  whole-archive comparisons/artifacts. No dependency, route, migration, permission
+  or backup format change; unrelated WIP remains untouched.
+
+**Verified**
+- Resumed .56 check:175 suites/2,607 tests. Three new real-SQLite regressions
+  fail before the fix and pass after it. Focused integrated checks:165/9 suites;
+  corrected UI/startup:70/5. Final full check:177 suites/2,625 app tests in211.156s,
+  five workflow tests and typecheck/lint/format without warnings; no new migration.
+- .56 source8ee native: all seven restores; trash20/5;40 star edits; history
+ 20/20/15. Independent old/current archives retain full prior rows,55 typed
+  versions and34 media hashes. Both actual APKs inspect correctly; owned read-only
+  emulator shutdown preserves both base hashes. See validation-0.11.56.
+
+**Not verified**
+- New .57 native/whole-archive/owner artifact and exact pushed-head hosted CI.
+- Physical phone/IME/clinical review, full timed40-patient shift, provider/power/
+  interruption acceptance. .56 native evidence does not accept .57.
+
+**Open threads**
+- Freeze .57, build/inspect x86 QA, restore a synthetic mixed-owner archive,
+  accept healthy access/owner warnings/refused editor/cold start, and independently
+  compare the exported full state. Then inspect owner arm64 and exact-head CI.
+- Rich text, remaining trash kinds, complete follow-up and other gates remain
+  in IMPLEMENTATION. The phone is not the only remaining work.
+
+**Gotchas**
+- Foreign keys validate existence, not value/panel ownership. Do not silently
+  reparent, normalize, hard-delete or filter the raw editor basis into a clean form.
+- A derived ownership marker is not a stored CAS field. Reflag skips explicit
+  ownership defects only; never swallow arbitrary SQL/history failure.
+
+## 2026-10-11 — Preserve clinical corrections and restore seven record kinds
+
+**Agent:** GPT-6 via Codex; primary integration/verification with a reused backend reviewer.
+**Commits:** this source commit, based on delivered PR8 `faa7160`.
+
+**Changed**
+- Add immutable clinical snapshots for ten record kinds and audited recovery for
+  seven clinical tombstones. Keep bounded Corrections/trash views in existing
+  screens. Restore old encounters as historical/inactive; retain separately
+  deleted children and original patient/episode ownership. Version .56/code72.
+- Guard full SQLite restore basis, lossy imported numeric/boolean/date rows,
+  required audit/history rollback, retained read failures and old dataset dialogs.
+  Two additive migrations; no dependency, permission, route or backup format change.
+
+**Verified**
+- Baseline .55 check passes 171 suites/2,474 tests. First integrated check passes
+  175 suites/2,597 app tests and five workflow tests; three import warnings were
+  then corrected. Imported-value/date guard focused tests pass 117 tests/3 suites
+  and typecheck. A full follow-up caught an overbroad INTEGER-affinity guard
+  blocking fractional glucose; corrected with explicit history/unit regressions.
+  Corrected full check passes 175 suites/2,607 app tests (202.822s), five
+  workflow tests and typecheck/lint/format without warnings. Focused glucose/
+  history/form coverage passes 75 tests in four suites (16.324s).
+- Older frozen .55 input diagnostics reproduce native stale-event injection
+  failures for long ASCII batches; accepted prefixes survive cold recovery.
+  Raw reports and unchanged AVD base hashes are retained privately.
+
+**Not verified**
+- New .56 native UI/whole-state archive acceptance, APK inspection, hosted CI
+  and physical phone. Prior-source native acceptance does not accept .56.
+
+**Open threads**
+- Freeze only after the final full check; build/inspect x86 QA bytes, run the
+  seven-kind restore/history matrix and independent whole-archive comparisons,
+  then build/inspect owner arm64 bytes and check the exact pushed CI head.
+- Rich text, remaining trash kinds, full timed 40-patient shift, complete
+  follow-up/provider/interruption/physical acceptance remain in IMPLEMENTATION.
+  The original short .55 input mismatch and older focus ANR remain unresolved.
+
+**Gotchas**
+- A zero-exit `adb input text` command can drop stale native key events. Observe
+  exact EditText contents; do not reinterpret a missing injected suffix as an
+  app autosave loss, or use later exact input as a causal explanation.
+- History is a typed clinical snapshot; unsupported imported INTEGER/boolean/
+  timestamp rows are refused intact. REAL lab doubles retain original raw text.
+
+## 2026-10-11 — Deliver five-form recovery with complete native state witnesses
+
+**Agent:** GPT-6 via Codex; primary verification, no additional delegation.
+**Commits:** application `bab597f` + `948883a`; evidence in this commit.
+
+**Changed**
+- Record exact-source .55 recovery, rejection, publication/retrieval and old
+  backup replacement in validation-0.11.55. Update current execution/review gates.
+- Push/attach incremental draft PR8 against PR7. Prior PR1–7 heads, bases and
+  draft states are unchanged; no existing PR is merged. Unrelated untracked
+  audit documents remain untouched and uncommitted.
+
+**Verified**
+- Full corrected source check passes 171 suites/2,474 app tests (221.402s),
+  five workflow checks and typecheck/lint/format. Normal source push repeats
+  the full check successfully (174.928s), without warnings or bypass.
+- Frozen 948883a inspected/installed x86_64 bytes match. Actual cold recovery,
+  invalid-date/partial-line refusal, five publications and list retrieval pass.
+  Independent authenticated archives preserve every prior field in 50 application
+  tables, 4,117 prior rows and 34 media hashes; all intended additions are checked.
+- Old-backup replacement retains original credential words read-only and exactly
+  restores the prior application state, without stale publication. Checked
+  PID 10736 survives; no fatal is observed for that process. Owned-emulator
+  shutdown preserves both original base hashes. Full details/hashes in the report.
+- Owner arm64-only .55/code71 APK built/inspected from 948883a: same signer,
+  actual version/ABI/essential JNI; SHA256 cb9f38f7…70f56c27. Not run on a phone.
+
+**Not verified**
+- Earlier synthetic typing mismatch under host native-build load remains
+  unexplained. Exact later input is not a root-cause result or pressure acceptance.
+- No physical phone, every-keystroke power-loss guarantee, full timed 40-patient
+  shift or completion of history/trash/rich-text and broader IMPLEMENTATION gates.
+
+**Open threads**
+- Prioritize native input/IME/event-time/pressure diagnosis, then remaining
+  integrity and everyday-workflow gates in IMPLEMENTATION. Phone is not the sole
+  remaining work. Hosted status is linked from PR8; verify its exact current SHA.
+
+**Gotchas**
+- Some native attempts fail in the observer: repeated/flattened labels, disabled
+  but readable inputs, scroll direction and assumed deep-link destinations.
+  Correct these with fresh XML/bounds; do not count failed attempts as app passes.
+- Raw fixtures start on intermediate bab597f; final 948883a recovery/publication/
+  replacement witnesses are separate. Neither the intermediate APK nor older
+  CI accepts a newer source. Later documentation leaves the tested app unchanged.
+
+---
+
+## 2026-10-10 — Match notebook selectors to the retained form lock
+
+**Agent:** GPT-6 via Codex; primary integration, no additional delegation.
+**Commits:** implementation in this commit; remaining-form parent `bab597f`.
+
+**Changed**
+- Pass the existing editing lock to both knowledge specialty selectors,
+  including their clear controls and accessibility state. No new workflow.
+- Extend mounted completion, dataset-replacement and read-retry checks.
+
+**Verified**
+- Six assertions fail on the parent source (10.672s): locked selectors still
+  present as enabled. Corrected full root check passes 171 suites/2,474 app
+  tests (221.402s), five workflow checks, typecheck/lint/format without warnings.
+- Intermediate bab597f native recovery passes for all five new raw forms after
+  actual process death. Independently authenticated archives retain all 4,117
+  prior rows in 50 application tables and 34 media hashes, plus the intended
+  raw drafts and one explicitly created parent fixture. No domain publication.
+
+**Not verified**
+- This newer source still needs its own frozen native publication/replacement
+  and owner artifact. Intermediate native results do not accept the change.
+- A native synthetic typing attempt produced two characters instead of the
+  requested string; a later idle retry matches. Cause remains unestablished.
+- No physical phone or full 40-patient shift; IMPLEMENTATION gates remain open.
+
+**Open threads**
+- Freeze, build, inspect and accept this source, then deliver an incremental
+  draft PR against PR7. Keep the input/IME/pressure diagnostic gate explicit.
+
+**Gotchas**
+- Empty Android EditText exposes its hint, and flattened columns require actual
+  label/bounds association. These observer defects do not explain the typing
+  mismatch. A first System UI ANR was observed and explicitly acknowledged.
+- Avoid needless app-clean for JS-only rebuilds; inspect actual ABI/JNI before
+  installation and clean/rebuild only when inspection shows it is necessary.
+
+---
+
+## 2026-10-10 — Recover the remaining notebook forms without a new workflow
+
+**Agent:** GPT-6 via Codex; two authorized GPT-6.1 Sol extra-high agents
+implement knowledge/place ports; primary owns vault, integration and verification.
+**Commits:** implementation in this commit; delivered parent PR7 `3d458ab`.
+
+**Changed**
+- Connect specialty profile, prescription, place, extension and credential to
+  the existing raw document/recovery/publication engine and feature lists.
+- Keep exact partial input, secret whitespace and invalid expiry separate from
+  published records. Refuse dropping a partial prescription line on Save.
+- Commit complete-basis comparison, feature/index writes, receipt/retirement
+  and required audit together. Explicit secret clear/replacement clears legacy
+  cipher/nonce; unrelated edits preserve them and unchanged expiry milliseconds.
+- Preserve original references, dataset/focus and native parents, including
+  children first mounted after replacement. Invalid imported ratings remain
+  editable until explicitly corrected. No new dependency/route/permission/SQL.
+
+**Verified**
+- Pre-change vault probes reproduce absent raw recovery and secret resurrection.
+  Integration probes reproduce two late-child labels and an uneditable rating;
+  corrected focused tests pass. Final root check passes 171 suites/2,474 app
+  tests (203.895s) and five workflow checks, without lint/act warnings.
+- Schema regeneration reports no changes; scoped version/lock edits checked.
+
+**Not verified**
+- Frozen .55 native recovery/publication/restore and owner artifact are pending
+  at this source checkpoint; .54 evidence does not accept the new source.
+- No physical phone, every-keystroke power guarantee, full timed 40-patient shift
+  or completion of history/trash/rich-text and other IMPLEMENTATION gates.
+
+**Open threads**
+- Freeze this source, test actual Android/complete authenticated archives, then
+  build/inspect the owner arm64 APK and deliver an incremental draft PR against PR7.
+- Continue the other priority gates; phone testing is not the only remaining work.
+
+**Gotchas**
+- Do not initialize retained labels from replacement rows on a late child mount.
+  Raw codecs must retain invalid finite imported ratings; publication validates.
+- Keep all tracked files and HEAD unchanged during native builds. QA x86_64
+  artifacts stay private; no real credential or private fixture enters the repo.
+
+---
+
+## 2026-10-10 — Deliver reviewed .54 evidence with exact hosted checks
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** app `d69163d`, native evidence `d403933`; delivery docs in this commit.
+
+**Changed**
+- Push/attach incremental draft PR7 against PR6 and record exact source CI.
+  Both PRs remain drafts/unmerged. APK/application attribution stays d69163d.
+
+**Verified**
+- Normal push hook full check:166 suites/2,388 app tests (156.044s), five workflow
+  checks, no act warnings. Exact d403933 CI38034525674 succeeds in every step,
+  including schema regeneration and Android bundle. PR1–5 heads are unchanged.
+- .54 owner APK rehash matches inspected SHA256 5ce4ca6c…f5824653; details and
+  complete native/archive/negative-probe evidence are in validation-0.11.54.
+
+**Not verified**
+- No physical phone, power-loss or full 40-patient timings; five other manual
+  forms plus history/trash, rich text and other IMPLEMENTATION gates remain.
+- This documentation-only delivery triggers its own CI; live checks are on PR7.
+
+**Open threads**
+- Continue D05: specialty profile, prescription, place, extension and credential.
+  Then the other priority gates. The phone is not the only remaining work.
+- Senior review can compare PR7 to delivered e68e6a4 without rereading all PR6.
+
+**Gotchas**
+- Fresh HEAD/CI metadata is required; never attribute parent CI or an older APK
+  to a newer app source. New documentation does not change the frozen app bytes.
+
+---
+
+## 2026-10-10 — Accept the frozen .54 Kardex recovery and owner APK
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** application `d69163d`; evidence in this commit; parent PR6 `e68e6a4`.
+
+**Changed**
+- Record bounded native recovery, publication/replacement and complete-state
+  acceptance in validation-0.11.54. Update the execution/review checkpoint.
+- Correct CI trigger wording only: pushes to main and all PRs; behavior unchanged.
+
+**Verified**
+- Full source check: 166 suites/2,388 app tests and five workflow checks; unchanged SQL.
+- Frozen actual x86_64 installed bytes match. Cold PID4146 ->7706 recovers exact
+  name/dose/spaced notes/invalid date without clinical publication. Invalid Save
+  refuses; separate corrected Save retains PID7706 and publishes once.
+- Complete authenticated exports: all50 application tables and34 media hashes
+  exact for upgrade4,117, fixture4,119, raw4,120, published4,121 and replacement4,119
+  intended rows. Integrity/FKs clean. Native old input/allergy remain read-only
+  across replacement and Save stays disabled. Original AVD base hashes unchanged.
+- Signed arm64-only owner APK 0.11.54/code70:53,415,455bytes;
+  SHA256 `5ce4ca6c7f2fa4c1b11298ed7c4435ef5caaf6c42c7e04fe00670040f5824653`.
+
+**Not verified**
+- Exact hosted CI for this incremental branch is pending; older CI is not substituted.
+- No physical phone, every-keystroke power durability or full pressure/40-patient timings.
+- Five other manual forms, clinical history/trash, rich text and other ledger gates remain.
+
+**Open threads**
+- Push this checked continuation and create/attach a draft PR against PR6; inspect its CI.
+- Continue D05's five remaining forms and the other priority gates; not only phone tests.
+
+**Gotchas**
+- System UI ANR/instrumentation timeout and private selector/RTL-clear failures
+  precede successful native witnesses; see report. Read-only controls require
+  geometry assertions, not actionable selectors. Generated dex lock is an
+  environment failure; no source/data/shared ADB deletion. Keep builds frozen.
+
+---
+
+## 2026-10-10 — Recover unfinished Kardex input in its original clinical context
+
+**Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
+**Commits:** implementation in this commit; parent PR6 `e68e6a4`.
+
+**Changed**
+- Extend the existing raw lifecycle with an explicit immutable parent key.
+  Order uses patient/episode, including null and imported empty keys; notebook
+  scope keys stay unchanged. No new SQL migration, route, dependency or permission.
+- Preserve exact partial text/invalid date input before publication. Original
+  record basis/revision, synchronous domain write, retirement/receipt/audit commit
+  together. Conflict adoption remains separate from clinical Save.
+- Keep recovery links in the existing Kardex and reset only read-only pager state
+  across patient/dataset changes. Keep original form/allergy/focus/removal ownership.
+
+**Verified**
+- Delivered parent `e68e6a4` CI38029238968 succeeds, including migrations/bundle.
+- Pre-change UI probe fails: unfinished text produces no raw draft (3.721s).
+- Three focused suites pass 49 tests in 9.202s without act warnings, covering raw
+  lifecycle, original context, conflicts, rollback, late callbacks and paging.
+- Full `npm run check` green: 166 suites/2,388 app tests (155.608s) and five
+  workflow tests; no act warnings. Includes late-child original-allergy regression.
+- Migration regeneration reports no schema changes; version edits are scoped.
+
+**Not verified**
+- Exact hosted CI, new native recovery and inspected .54 APK remain pending
+  here. Older .53 APK/native results do not accept this source.
+- No physical phone, complete pressure/40-patient performance or all product gates.
+
+**Open threads**
+- Freeze this checked source for native process-death/publication,
+  complete authenticated-state comparison and owner APK inspection.
+- Submit this incremental continuation against PR6 for clear senior review.
+- Five other raw forms plus the other IMPLEMENTATION gates remain; not only phone.
+
+**Gotchas**
+- Original null must never resolve to a later admission. No fresh dataset token in
+  old callbacks. Use replacement.committed/release, and run React notifications
+  inside act when testing. Close saves raw input; deletion is a separate confirmation.
+
+---
+
+## 2026-10-10 — Verify the delivered .53 branch on GitHub
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** application `e357dbf`; native evidence `5fe3c14`; this delivery checkpoint.
+
+**Changed**
+- Record the actual normal push and exact hosted result. Refresh PR6's review
+  scope with the .51 recovery, .52 original context and .53 discharge corrections.
+- No application, schema, dependency, permission or artifact change.
+
+**Verified**
+- Normal pre-push check: 164 suites/2,359 app tests and five workflow tests,
+  152.393 Jest seconds; clean typecheck/lint/formatting.
+- Exact `5fe3c14` CI38028660734 succeeds, including migration regeneration and
+  Android bundling. Local and remote branch heads match at that checkpoint.
+- Application-tree diff from frozen `e357dbf` is empty. Rehashed owner .53 APK
+  matches the full SHA-256 in validation-0.11.53; native evidence stays source-bound.
+
+**Not verified**
+- No physical phone, complete 40-patient pressure test or remaining product gates.
+- A later documentation/source head needs its own hosted check; follow PR6 checks.
+
+**Open threads**
+- Finish original-context raw recovery for the six manual forms, starting with
+  Kardex. Keep patient/episode context explicit, including null and imported keys.
+- The phone is not the sole remaining work. Use IMPLEMENTATION's acceptance gates.
+
+**Gotchas**
+- Do not relabel earlier native evidence or an earlier CI run as a later-source pass.
+
+---
+
+## 2026-10-10 — Verify native discharge scope and deliver the inspected .53 owner APK
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** applicatione357dbf; this evidence/documentation checkpoint.
+
+**Changed**
+- Record final-source native/whole-state/artifact evidence and refresh the live
+  ledger/review guide. No further application/dependency/schema/permission change.
+
+**Verified**
+- Frozen source check:164 suites/2,359 app tests plus five workflows; clean
+  typecheck/lint/formatting, no act warnings. Actual code/tests are in e357dbf.
+- Inspected x86 package installed in place; pulled bytes match. Independent
+  full exports preserve4,117 prior rows/34 media hashes and exactly match the
+  imported4,129 rows. Actual two-order preview/Save produces4,130 intended rows:
+  only owned orders end, one receipt retires, all other fields/media stay exact.
+- PID4550 remains; no app fatal/ANR observed in checked buffers. Original AVD
+  QCOW2 hashes match after owned read-only processes are closed.
+- Owner .53/code69 arm64 APK built and inspected from e357dbf,53,407,807 bytes,
+  SHA76aabc45a2f362261b0c58604a7e8782cf2034d7d11a682d5c0578ba899c6108.
+  Package, established signer and essential JNI pass. See validation-0.11.53.
+
+**Not verified**
+- Hosted final-branch CI awaits the normal push. No physical phone run.
+- Earlier .52 retained-form restore evidence remains on its own source; broad
+  40-patient timings, pressure/low-space/provider/power and product gates remain.
+
+**Open threads**
+- Push normally, verify final-head CI and update the existing draft PR6.
+- Finish original-context raw recovery for the six manual forms and the other
+  P0/product gates in IMPLEMENTATION; phone testing is not the sole remaining work.
+
+**Gotchas**
+- System UI cold-start ANR and a wrong plural route/PID-constant mistake are
+  observer/environment failures, not app passes. Corrected native tests complete.
+- Emu kill acknowledges but leaves the owned processes running; verify exact
+  SDK/AVD/port/read-only ownership before stopping only those processes.
+- Never edit source while building or relabel an older APK as the final source.
+
+---
+
+## 2026-10-10 — Keep discharge order reads and changes in their original clinical scope
+
+**Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
+**Commits:** this .53/code69 read correction after .52 evidence706345c.
+
+**Changed**
+- Only null requests standing orders alone. An explicit empty imported episode
+  includes its episode orders in the discharge preview without including a later
+  episode or deleted order. No ID repair, UI/schema/dependency/permission change.
+- Ending orders also requires the episode's patient: an inconsistent imported
+  cross-patient link cannot change another patient's active/held order.
+- Scoped version metadata changes keep the earlier inspected .52 APK separate.
+
+**Verified**
+- A migrated-SQLite pre-fix probe fails: an explicit empty episode omits its order.
+- Three new regression cases exercise historical/empty/null scopes and retained
+  rows; five context/mutation/record/read-failure/editor suites pass178 cases
+  in29.655 seconds without act warnings.
+- Two migrated-SQLite probes reproduce foreign active/held completion before
+  the additional guard. Two retained-row regressions cover the correction.
+- Initial read-only full check passes164 suites/2,357 app tests plus five
+  workflows in156.441 Jest seconds. The separate final check including the
+  mutation guard passes164 suites/2,359 app tests plus five workflows in157.338
+  Jest seconds, with clean typecheck/lint/formatting and no act warnings.
+
+**Not verified**
+- .53 hosted checks and native/artifact acceptance await the frozen source.
+  .52 evidence does not silently become evidence for this changed read.
+- Physical phone and broader product/pressure/recovery gates remain open.
+
+**Open threads**
+- Finish .53 source/native/artifact checks, then push normally and update PR6.
+- Six manual forms still need raw recovery. Follow IMPLEMENTATION's P0 order.
+
+**Gotchas**
+- Never use truthiness to distinguish an explicit SQLite text key from null.
+- Keep .52 artifacts/hashes and the failed pre-fix probe attached to their source.
+
+---
+
+## 2026-10-10 — Verify the final Kardex guard on Android and inspect its owner APK
+
+**Agent:** GPT-6 via Codex; primary verification, no new delegation.
+**Commits:** application41a592b; this evidence/documentation checkpoint.
+
+**Changed**
+- Record final-source native/whole-archive/artifact evidence, refresh the current
+  ledger/reviewer entry points and reconcile the architecture's old creation note.
+  No further application, dependency, schema, permission or backup-format change.
+
+**Verified**
+- Source41a592b full check:164 suites/2,354 app tests plus five workflows;
+  typecheck/lint/formatting pass without act warnings.
+- Its inspected x86 APK is installed in place. Independent authenticated exports
+  preserve all4,117 prior rows and34 media hashes, confirm both original order
+  associations after later admissions and exactly match4,120 replacement rows.
+- Actual restore retains old form words/allergy, shows stale notice and disables
+  native input/publication; no app fatal/ANR observed in the retained PID2640 buffers.
+  Owned read-only emulator shuts down with original QCOW2 hashes unchanged.
+- Owner arm64 .52/code68 APK built/inspected from41a592b:53,407,775 bytes,
+  SHA64f29b361a38b69ed32581d4ad92165b62dac65f54a7ee0d6cf16061731d1a68.
+  Package, established signer and essential JNI pass. Details: validation-0.11.52.
+
+**Not verified**
+- Hosted CI for this final branch checkpoint awaits the normal push.
+- Physical phone, complete40-patient native timings, low-space/provider/power
+  interruptions and broader product acceptance; six manual forms still need recovery.
+
+**Open threads**
+- Push normally, verify final-head CI and refresh the existing draft PR6 description.
+- Finish D05 original-context raw recovery, then the other P0/product gates in
+  IMPLEMENTATION; phone testing is not the sole remaining work.
+
+**Gotchas**
+- Initial owner packaging fails without a lower cause. Diagnostic incremental
+  package retry and normal APK build succeed with source unchanged; cause remains
+  unestablished. Do not claim a cache/memory fix or substitute the older66dda88 APK.
+- Every archive comparison checks all intended rows/media, not counts or sampling.
+
+---
+
+## 2026-10-10 — Close an imported empty-episode ownership bypass
+
+**Agent:** GPT-6 via Codex; primary implementation/verification, no new delegation.
+**Commits:** this guard checkpoint after66dda88.
+
+**Changed**
+- Only null means an order has no episode. A stored empty-string reference now
+  receives the same live patient/episode check for create/edit/status/delete.
+  No rekeying, schema/dependency/route/permission/crypto change or added UI.
+
+**Verified**
+- Two real migrated-SQLite probes fail before correction: a foreign/deleted
+  empty episode permits an order. Ten regression cases cover these references,
+  a missing reference, a valid owned reference and unchanged order/audit on refusal.
+- Three suites/96 tests pass in15.920 seconds without act warnings.
+- Full check passes164 suites/2,354 app tests plus five workflows in166.189
+  Jest seconds; typecheck/lint/formatting are green with no act warnings.
+- Earlier frozen66dda88 native publication/restore, full archive comparisons
+  and inspected x86/owner arm64 APKs pass; exact sources/hashes and observer
+  failures are documented in validation-0.11.52. Original AVD images are exact.
+
+**Not verified**
+- Final guard hosted CI/native replay/owner artifact remain pending.
+  The66dda88 witnesses do not silently become evidence for changed source.
+- Physical-phone and broader product/release acceptance remain open.
+
+**Open threads**
+- Freeze this guard; build/inspect its own artifacts and
+  repeat native context/restore acceptance before the final normal push.
+- Six manual forms still need durable raw recovery. See IMPLEMENTATION.
+
+**Gotchas**
+- An empty imported SQLite text key is not absence. Preserve null explicitly.
+- Do not edit source during native builds, or infer success from a button tap;
+  independently compare the authenticated output database and media.
+
+---
+
+## 2026-10-10 — Keep new Kardex orders with their original episode/dataset
+
+**Agent:** GPT-6 via Codex; primary implementation and verification, no new delegation.
+**Commits:** this .52/code68 source checkpoint after .51 evidence7219d48.
+
+**Changed**
+- New manual order forms capture their original active episode, including null,
+  before typing; final insertion checks live patient/original episode ownership
+  in its synchronous transaction. Later admission does not redirect the order.
+- An old form cannot display replacement-dataset allergies beside old input.
+  Same-dataset allergy corrections remain live. Native parents remain mounted.
+- No schema/dependency/route/permission/crypto change. Scoped version edits only.
+
+**Verified**
+- Two real mounted regressions fail before the episode fix; a separate actual
+  same-ID database restore exposes mixed allergy display before correction.
+- Full check passes164 suites/2,344 app tests and five workflows in162.109 Jest
+  seconds. Typecheck/lint/formatting pass. The new test notification act warning
+  is corrected; both allergy cases pass cleanly afterward. Schema generation
+  reports no changes. Context, foreign/deleted ownership and original generation
+  are covered by migrated real SQLite and actual form handlers.
+
+**Not verified**
+- .52 hosted CI, native UI/archive acceptance and owner APK remain pending.
+  .51 native/APK evidence from a541ce5 does not witness the new .52 source.
+  No physical phone acceptance.
+
+**Open threads**
+- Freeze .52; inspect/install the x86 bytes, witness original null/old episode
+  through a later native admission and retained context after actual restore.
+  Compare complete independent exports, then build/inspect owner arm64.
+- All six manual forms still need raw recovery. This boundary correction does
+  not implement that or permanent clinical history/trash. Follow IMPLEMENTATION.
+
+**Gotchas**
+- New order creation uses active-only context, not the latest closed encounter.
+  Null is a captured association, never a nullish fallback to a later admission.
+- Full-check ref-render lint and app.json formatting failures were repaired,
+  not ignored. Preserve React act boundaries when replacing a mounted dataset.
+
+---
+
+## 2026-10-10 — Witness .51 raw recovery, full archives and owner APK
+
+**Agent:** GPT-6 via Codex; primary native validation, no new delegation.
+**Commits:** application a541ce5 following d1c0a5f; this evidence checkpoint.
+
+**Changed**
+- Record exact-source native recovery/conflict/archived-reference witnesses and
+  independent whole-archive comparisons. Build and inspect owner arm64 .51/code67.
+- Replace chronological detail in the current execution/review guides with the
+  live checkpoint and focused review paths; historical handoffs/reports remain.
+
+**Verified**
+- Normal push hook passes163 suites/2,329 app tests and five workflows without
+  warnings; exact-head a541ce5 CI38013693701 succeeds.
+- Actual in-place x86 upgrade matches the inspected/installed APK. Acknowledged
+  untitled whitespace and invalid-date raw forms survive process-stop/cold reopen.
+  Archived links/time precision, tied-draft selection, future raw refusal and
+  explicit adoption before separate Save pass their native witnesses.
+- Independent authenticated upgrade comparison preserves4,117 original rows;
+  adopted/final action exports match4,141 intended rows/50 tables/34 media.
+  Original read-only AVD userdata/key hashes match after acknowledged shutdown.
+- Frozen owner APK succeeds in8 minutes; actual .51/code67, arm64-only ABI,
+  essential JNI and unchanged owner certificate are inspected. Artifact hashes
+  and observer failures are in validation-0.11.51.
+
+**Not verified**
+- Physical-phone camera/audio/Doze/provider/power/second-device behavior,
+  full40-patient performance/pressure and wider product/clinical gates.
+  Native future-document clipboard copying is not witnessed.
+
+**Open threads**
+- D05 has six manual forms. First protect new Kardex's original active episode
+  including null; its current publisher resolves a later active episode at Save.
+  That containment is separate from implementing recoverable order drafts.
+- Complete remaining integrity/product gates in IMPLEMENTATION. No crash-free
+  or only-phone-testing claim is supported by this bounded milestone.
+
+**Gotchas**
+- Cold AVD System UI/input-service ANRs are distinct from observed MedOS actions.
+  Early empty UI trees, flattened labels, one wrong harness deep link and exact
+  paste mismatch refused acceptance until actual visible content matched.
+- ABI switches require generated app build clean; never erase app data.
+
+---
+
+## 2026-10-10 — Preserve archived teaching links during topic correction
+
+**Agent:** GPT-6 via Codex; primary implementation and verification, no delegation.
+**Commits:** this correction checkpoint, following pilot `d1c0a5f` on PR6.
+
+**Changed**
+- Editing an old topic may retain its original archived teacher/specialty.
+  Names remain searchable and visible with an archived label; archived rows
+  are not new picker choices. A newly selected unavailable reference still
+  refuses publication atomically. No dependency, schema or route change.
+
+**Verified**
+- A real-SQLite regression fails before the correction. All51 focused SQL/
+  mounted cases pass afterward, including four new regression cases.
+- Full `npm run check` passes163 suites/2,329 app tests and five workflows.
+  An import-order warning in the added test is corrected afterward and checked
+  with scoped lint. Regeneration reports no schema changes.
+- Pilot `d1c0a5f` is pushed through the normal full-check hook, attached as
+  draft PR6 and passes exact-head CI38011864223. Its frozen x86 build succeeds.
+
+**Not verified**
+- Hosted CI and native acceptance of this correction are pending.
+  The older x86 build cannot witness this new source. No physical phone run.
+
+**Open threads**
+- Freeze the corrected source, rebuild x86, inspect/install actual bytes, then
+  witness raw recovery and independent archive preservation before owner arm64.
+- D05 still has six other manual forms; the wider IMPLEMENTATION gates remain.
+
+**Gotchas**
+- Availability rules for newly selected references must not erase historical
+  relationships or block unrelated body corrections. Read only the selected
+  historical rows and match their IDs while a reactive query changes scope.
+
+---
+
+## 2026-10-10 — Pilot shared raw recovery in idea and teaching-topic forms
+
+**Agent:** GPT-6 via Codex; primary implementation and verification, no new delegation.
+**Commits:** this source checkpoint; branch `codex/workspace-form-recovery`, base `2dcd60b`.
+
+**Changed**
+- .51/code67 connects one bounded shared raw lifecycle to the existing idea/topic
+  routes. Feature codecs/publishers retain exact input and original context;
+  complete-basis/revision CAS and explicit review protect newer corrections.
+- Publication, retirement, replay receipt and id-only audit commit together.
+  Raw adoption requires separate Save. Unsupported bodies stay copyable;
+  old archives without the additive0029 table still restore. Frozen crypto
+  and existing clinical draft stores are untouched.
+- Three short, paged unfinished links stay in each existing notebook. Read
+  errors retain input/retry. Native header/screen parents and removal guards
+  remain mounted; late acknowledgments close only their originating focus.
+  No new dependency, permission or route.
+
+**Verified**
+- Fresh repaired baseline passes161 suites/2,275 app tests plus five workflows,
+  including the then-untracked20 codec cases. Three mounted regressions fail
+  before connection and pass afterward. The prior125 focused cases pass.
+- Targeted lifecycle/boundary checks pass46 cases. Final `npm run check`
+  passes163 suites/2,325 app tests and five workflows; typecheck/lint/both
+  formatting checks are clean. This includes the later foreign-document
+  loading regression and selectable-raw assertion.
+- Regeneration reports no schema changes and preserves the exact bundled
+  migration file hashes. Older migrations and archive/KDF rules are unchanged.
+- .50 final-head `2dcd60b` CI38007035821 succeeds. Existing PR1–5 heads are
+  unchanged. New pilot source is not yet pushed or validated by hosted CI.
+
+**Not verified**
+- Exact-source native/UI/archive acceptance, hosted CI and .51 APK.
+  The inspected owner artifact remains .50. No physical phone acceptance.
+
+**Open threads**
+- Push this pilot normally and inspect exact-head CI.
+  Freeze before building the inspected x86 native witness, then owner arm64.
+- D05 has six other manual forms; the null-parent workspace pilot must not
+  silently become a clinical-order port. Other IMPLEMENTATION gates remain.
+
+**Gotchas**
+- The first new full check stopped only on formatting of our added restore
+  cases; that file is corrected. Targeted lint also exposed unused raw-date
+  destructuring and a lazy-initializer ref callback; both are corrected.
+- Mounted observer failures from reading a renderer before act committed were
+  fixed in the harness; do not describe them as application crashes. Full
+  checks, native builds and native acceptance remain serialized.
+
+---
+
 ## 2026-10-10 — Validate .50 recovery/deck and inspect the owner APK
 
 **Agent:** GPT-6 via Codex; primary native validation and integration.

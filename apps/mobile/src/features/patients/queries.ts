@@ -1,13 +1,15 @@
-import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, inArray, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type Database, type DbTransaction } from '@/db/client';
+import { clinicalHistorySequence, withClinicalHistory } from '@/db/clinical-history';
 import { patientContacts, patients, type NewPatient, type Patient, type PatientStatus } from '@/db/schema';
 import { contains, matchesSearch } from '@/db/search';
 import { activeEncounterQuery, statusFor } from '@/features/encounters/status';
 import { cancelPatientReminders, rescheduleReminders } from '@/features/followups/queries';
 import { repairTaskReminders } from '@/features/tasks/reminder-queries';
 import { requireDeletedRecord } from '@/lib/deleted-record';
+import { formBasis } from '@/lib/form-document';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText, normalizePhone } from '@/lib/persian';
 
@@ -75,11 +77,15 @@ export function deletedPatientsQuery(limit = 50) {
 
 export function patientContactsQuery(patientId: string) {
   return db
-    .select()
+    .select({
+      ...getTableColumns(patientContacts),
+      clinicalSequence: clinicalHistorySequence('contact', patientContacts.id),
+    })
     .from(patientContacts)
     .where(and(eq(patientContacts.patientId, patientId), isNull(patientContacts.deletedAt)))
     .orderBy(desc(patientContacts.isPrimary));
 }
+export type ShownPatientContact = Awaited<ReturnType<typeof patientContactsQuery>>[number];
 
 /** Used by the duplicate check when creating a patient. */
 export function possibleDuplicatesQuery(
@@ -115,29 +121,36 @@ export async function findPossibleDuplicates(
 
 export type PatientInput = Omit<NewPatient, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'searchText'>;
 
-export function createPatientInTransaction(tx: DbTransaction, input: PatientInput): string {
+export function createPatientInTransaction(tx: DbTransaction, input: PatientInput, now = new Date()): string {
   const id = newId();
-  tx.insert(patients)
-    .values({
-      ...input,
-      id,
-      ...stamps(),
-      // A patient being created has no episode yet, so nothing can make them
-      // admitted. Coerced rather than refused: the value can also arrive from an
-      // import or an older backup, and losing the patient over it would be worse.
-      status: input.status === undefined || input.status === 'admitted' ? 'outpatient' : input.status,
-      phone: input.phone ? normalizePhone(input.phone) : null,
-      searchText: patientSearchText(input),
-    })
-    .run();
-  return id;
+  return withClinicalHistory(tx, 'patient', id, now, () => {
+    tx.insert(patients)
+      .values({
+        ...input,
+        id,
+        ...stamps(now),
+        // A patient being created has no episode yet, so nothing can make them
+        // admitted. Coerced rather than refused: the value can also arrive from an
+        // import or an older backup, and losing the patient over it would be worse.
+        status: input.status === undefined || input.status === 'admitted' ? 'outpatient' : input.status,
+        phone: input.phone ? normalizePhone(input.phone) : null,
+        searchText: patientSearchText(input),
+      })
+      .run();
+    return id;
+  });
 }
 
 export async function createPatient(input: PatientInput): Promise<string> {
   return db.transaction((tx) => createPatientInTransaction(tx, input));
 }
 
-export function updatePatientInTransaction(tx: DbTransaction, id: string, input: Partial<PatientInput>): void {
+export function updatePatientInTransaction(
+  tx: DbTransaction,
+  id: string,
+  input: Partial<PatientInput>,
+  now = new Date(),
+): void {
   // `searchText` is derived, so it has to be rebuilt from the merged row rather
   // than from the patch alone — otherwise editing only the phone would wipe the
   // name out of the search index.
@@ -152,16 +165,19 @@ export function updatePatientInTransaction(tx: DbTransaction, id: string, input:
   // Whether they are on a ward is the episode's answer, not this form's.
   const status =
     input.status === undefined ? undefined : statusFor(activeEncounterQuery(id, tx).get() ?? null, input.status);
-  tx.update(patients)
-    .set({
-      ...input,
-      status,
-      ...touch(),
-      phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
-      searchText: patientSearchText(merged, patientSearchContext(id, tx)),
-    })
-    .where(and(alive, eq(patients.id, id)))
-    .run();
+  withClinicalHistory(tx, 'patient', id, now, () =>
+    tx
+      .update(patients)
+      .set({
+        ...input,
+        status,
+        ...touch(now),
+        phone: input.phone !== undefined ? normalizePhone(input.phone ?? '') || null : current.phone,
+        searchText: patientSearchText(merged, patientSearchContext(id, tx)),
+      })
+      .where(and(alive, eq(patients.id, id)))
+      .run(),
+  );
 }
 
 export async function updatePatient(id: string, input: Partial<PatientInput>): Promise<void> {
@@ -169,10 +185,16 @@ export async function updatePatient(id: string, input: Partial<PatientInput>): P
 }
 
 export async function setPatientStarred(id: string, starred: boolean): Promise<void> {
-  await db
-    .update(patients)
-    .set({ starred, ...touch() })
-    .where(and(alive, eq(patients.id, id)));
+  const now = new Date();
+  db.transaction((tx) =>
+    withClinicalHistory(tx, 'patient', id, now, () =>
+      tx
+        .update(patients)
+        .set({ starred, ...touch(now) })
+        .where(and(alive, eq(patients.id, id)))
+        .run(),
+    ),
+  );
 }
 
 /**
@@ -182,10 +204,26 @@ export async function setPatientStarred(id: string, starred: boolean): Promise<v
  * keep buzzing — and come back if the patient is restored.
  */
 export async function deletePatient(id: string): Promise<void> {
-  await db.update(patients).set(softDelete()).where(eq(patients.id, id));
+  const now = new Date();
+  db.transaction((tx) => {
+    if (
+      !tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(alive, eq(patients.id, id)))
+        .get()
+    )
+      return;
+    withClinicalHistory(tx, 'patient', id, now, () => {
+      tx.update(patients)
+        .set(softDelete(now))
+        .where(and(alive, eq(patients.id, id)))
+        .run();
+      auditInTransaction(tx, 'patient.deleted', { entityType: 'patient', entityId: id }, now);
+    });
+  });
   await cancelPatientReminders(id);
   await repairTaskReminders({ patientId: id });
-  await audit('patient.deleted', { entityType: 'patient', entityId: id });
 }
 
 export async function restorePatient(id: string, expected?: Patient): Promise<void> {
@@ -194,16 +232,18 @@ export async function restorePatient(id: string, expected?: Patient): Promise<vo
     const current = requireDeletedRecord(tx.select().from(patients).where(eq(patients.id, id)).get(), expected);
     // Revival and the current episode's authoritative status commit together.
     // Never expose an admitted patient if reconciliation itself fails.
-    tx.update(patients)
-      .set({
-        deletedAt: null,
-        status: statusFor(activeEncounterQuery(id, tx).get() ?? null, current.status),
-        ...touch(now),
-      })
-      .where(and(eq(patients.id, id), isNotNull(patients.deletedAt)))
-      .run();
+    withClinicalHistory(tx, 'patient', id, now, () => {
+      tx.update(patients)
+        .set({
+          deletedAt: null,
+          status: statusFor(activeEncounterQuery(id, tx).get() ?? null, current.status),
+          ...touch(now),
+        })
+        .where(and(eq(patients.id, id), isNotNull(patients.deletedAt)))
+        .run();
+      auditInTransaction(tx, 'patient.restored', { entityType: 'patient', entityId: id }, now);
+    });
   });
-  await audit('patient.restored', { entityType: 'patient', entityId: id });
   await rescheduleReminders({ patientId: id });
   await repairTaskReminders({ patientId: id });
 }
@@ -226,6 +266,7 @@ export function addPatientContactInTransaction(
   contact: { name?: string; relation?: string; phone: string; isPrimary?: boolean; notes?: string },
 ): string {
   const id = newId();
+  const now = new Date();
   if (
     !tx
       .select({ id: patients.id })
@@ -234,23 +275,53 @@ export function addPatientContactInTransaction(
       .get()
   )
     throw new Error('پروندهٔ بیمار پیدا نشد.');
-  tx.insert(patientContacts)
-    .values({
-      id,
-      ...stamps(),
-      patientId,
-      name: contact.name ?? null,
-      relation: contact.relation ?? null,
-      phone: normalizePhone(contact.phone),
-      isPrimary: contact.isPrimary ?? false,
-      notes: contact.notes ?? null,
-    })
-    .run();
-  return id;
+  return withClinicalHistory(tx, 'contact', id, now, () => {
+    tx.insert(patientContacts)
+      .values({
+        id,
+        ...stamps(now),
+        patientId,
+        name: contact.name ?? null,
+        relation: contact.relation ?? null,
+        phone: normalizePhone(contact.phone),
+        isPrimary: contact.isPrimary ?? false,
+        notes: contact.notes ?? null,
+      })
+      .run();
+    return id;
+  });
 }
 
-export async function deletePatientContact(id: string): Promise<void> {
-  await db.update(patientContacts).set(softDelete()).where(eq(patientContacts.id, id));
+export async function deletePatientContact(id: string, expected: ShownPatientContact): Promise<void> {
+  const now = new Date();
+  db.transaction((tx) => {
+    const row = tx
+      .select()
+      .from(patientContacts)
+      .where(and(eq(patientContacts.id, id), isNull(patientContacts.deletedAt)))
+      .get();
+    if (!row) throw new Error('شمارهٔ همراه در دسترس نیست؛ فهرست را دوباره بخوانید.');
+    const sequence = tx
+      .select({ value: clinicalHistorySequence('contact', id) })
+      .from(patientContacts)
+      .where(eq(patientContacts.id, id))
+      .get()!.value;
+    const { clinicalSequence, ...shown } = expected;
+    if (id !== expected.id || sequence !== clinicalSequence || formBasis(row) !== formBasis(shown))
+      throw new Error('اطلاعات همراه تغییر کرده است؛ پیش از حذف دوباره آن را مرور کنید.');
+    if (
+      !tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(alive, eq(patients.id, row.patientId)))
+        .get()
+    )
+      throw new Error('پروندهٔ بیمار در دسترس نیست.');
+    withClinicalHistory(tx, 'contact', id, now, () => {
+      tx.update(patientContacts).set(softDelete(now)).where(eq(patientContacts.id, id)).run();
+      auditInTransaction(tx, 'contact.deleted', { entityType: 'patient_contact', entityId: id }, now);
+    });
+  });
 }
 
 /** Rebuild every patient's search index; see features/search/reindex.ts. */

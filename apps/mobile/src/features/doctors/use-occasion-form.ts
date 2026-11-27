@@ -9,6 +9,7 @@ import { alertError, notify } from '@/components/feedback';
 import { useNow } from '@/components/use-now';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 
 import {
@@ -133,7 +134,7 @@ export function useOccasionForm(seed: OccasionFormRow, onReset: (row: OccasionFo
         try {
           occasionFormValues(latest.current, new Date(now));
         } catch (e) {
-          notify('اطلاعات مناسبت کامل نیست', e instanceof Error ? e.message : 'ورودی‌ها را بررسی کنید.');
+          notify('اطلاعات مناسبت کامل نیست', safeErrorMessage(e, 'ورودی‌ها را بررسی کنید.'));
           return;
         }
         saver.change(latest.current);

@@ -4,8 +4,10 @@ import { eq } from 'drizzle-orm';
 import { auditLog, encounters, followUpFormDrafts, followUps, patients } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { openEncounter } from '@/features/encounters/queries';
+import { deletedClinicalQuery, restoreClinicalRecord } from '@/features/patients/clinical-trash-queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import { newId, softDelete } from '@/lib/ids';
+import { databaseRows } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { permission, resetNotifications, scheduled } from '@/test/mocks/notifications';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -24,6 +26,7 @@ import {
   replaceFollowUpFormDraft,
   saveFollowUpFormDraft,
 } from './form-draft-queries';
+import { deleteFollowUp } from './queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -51,6 +54,17 @@ afterEach(() => {
 });
 
 describe('raw follow-up drafts on migrated SQLite', () => {
+  it('returns the same published follow-up receipt after ordinary trash recovery without creating another record', async () => {
+    await save();
+    const id = await commitFollowUpFormDraft(draftId, patientId, 1, now);
+    await deleteFollowUp(id, records()[0]!);
+    const selected = deletedClinicalQuery({ kind: 'followup' }).get()!;
+    await restoreClinicalRecord('followup', id, selected.expectedBasis, new Date());
+    const before = databaseRows(t);
+    expect(await commitFollowUpFormDraft(draftId, patientId, 1, now)).toBe(id);
+    expect(databaseRows(t)).toEqual(before);
+    expect(records()).toHaveLength(1);
+  });
   it('does not create a blank draft, clinical record or reminder for an untouched editor', async () => {
     expect(await save(document())).toBe(0);
     expect(await t.db.select().from(followUpFormDrafts)).toEqual([]);

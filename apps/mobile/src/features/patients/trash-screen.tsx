@@ -1,20 +1,24 @@
 import { useRouter } from 'expo-router';
 import { useNavigation } from 'expo-router/react-navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { ErrorNotice } from '@/components/error-notice';
-import { alertError } from '@/components/feedback';
+import { alertError, notify } from '@/components/feedback';
 import { Button, Card, Column, EmptyState, Row, Screen, SectionHeader, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { deletedCapturesQuery, restoreCapture } from '@/features/capture/queries';
 import { NOTE_TYPE_LABELS } from '@/features/notes/labels';
 import { deletedNotesQuery, restoreNote } from '@/features/notes/queries';
-import { withDatasetWrite } from '@/lib/dataset-write';
+import { PlaceTrashPanel } from '@/features/places/trash-panel';
+import { deletedPlacesCountQuery } from '@/features/places/trash-queries';
+import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { fullName } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
+import { ClinicalTrashPanel } from './clinical-trash-panel';
+import { deletedClinicalCountQuery, type ClinicalRestoreNotice } from './clinical-trash-queries';
 import { deletedPatientsQuery, restorePatient } from './queries';
 
 /**
@@ -35,6 +39,8 @@ export function TrashScreen() {
   const patientRead = useLive(deletedPatientsQuery(patientLimit + 1), [patientLimit]);
   const noteRead = useLive(deletedNotesQuery(noteLimit + 1), [noteLimit]);
   const captureRead = useLive(deletedCapturesQuery(captureLimit + 1), [captureLimit]);
+  const clinicalCount = useLive(deletedClinicalCountQuery());
+  const placeCount = useLive(deletedPlacesCountQuery());
   const rows = (patientRead.data ?? []).slice(0, patientLimit);
   const noteRows = (noteRead.data ?? []).slice(0, noteLimit);
   const captureRows = (captureRead.data ?? []).slice(0, captureLimit);
@@ -47,17 +53,30 @@ export function TrashScreen() {
       mounted.current = false;
     };
   }, []);
-  const ready = [patientRead, noteRead, captureRead].every((read) => read.data !== undefined && !read.error);
+  const ready = [patientRead, noteRead, captureRead, clinicalCount, placeCount].every(
+    (read) => read.data !== undefined && !read.error,
+  );
   const locked = busy || stale || !ready;
+  const admission = useRef(!locked);
+  useLayoutEffect(() => {
+    admission.current = !locked;
+  }, [locked]);
 
-  async function restore(work: () => Promise<void>) {
+  async function restore(work: () => Promise<void | ClinicalRestoreNotice>) {
     // State alone cannot block two presses in the same render. Retain original
     // admission through reminders and audit, not just the first SQL statement.
-    if (acting.current || !mounted.current || !ready || !navigation.isFocused()) return;
+    if (acting.current || !mounted.current || !admission.current || !navigation.isFocused()) return;
     acting.current = true;
     setBusy(true);
     try {
-      await withDatasetWrite(generation, work);
+      const result = await withDatasetWrite(generation, work);
+      if (result?.reminderIssue && mounted.current && navigation.isFocused() && generation === datasetGeneration())
+        notify(
+          'پیگیری برگردانده شد',
+          result.reminderIssue === 'dirty'
+            ? 'یادآور نیاز به هماهنگی دارد؛ از کارت پیگیری دوباره تلاش کنید.'
+            : 'یادآور فعال نیست؛ از کارت پیگیری دوباره تلاش کنید.',
+        );
     } catch (e) {
       if (mounted.current && navigation.isFocused()) alertError('برگردانده نشد', e);
     } finally {
@@ -67,6 +86,8 @@ export function TrashScreen() {
         patientRead.retry();
         noteRead.retry();
         captureRead.retry();
+        clinicalCount.retry();
+        placeCount.retry();
       }
     }
   }
@@ -81,7 +102,9 @@ export function TrashScreen() {
         <ErrorNotice error={patientRead.error} what="بیماران حذف‌شده" onRetry={patientRead.retry} />
         <ErrorNotice error={noteRead.error} what="نوت‌های حذف‌شده" onRetry={noteRead.retry} />
         <ErrorNotice error={captureRead.error} what="ثبت‌های حذف‌شده" onRetry={captureRead.retry} />
-        {[patientRead, noteRead, captureRead].some((read) => read.loading) ? (
+        <ErrorNotice error={clinicalCount.error} what="سوابق حذف‌شده" onRetry={clinicalCount.retry} />
+        <ErrorNotice error={placeCount.error} what="مکان‌ها و داخلی‌های حذف‌شده" onRetry={placeCount.retry} />
+        {[patientRead, noteRead, captureRead, clinicalCount, placeCount].some((read) => read.loading) ? (
           <Text variant="caption" color="textMuted">
             در حال خواندن…
           </Text>
@@ -100,8 +123,22 @@ export function TrashScreen() {
             />
           </Column>
         ) : null}
-        {ready && !stale && rows.length === 0 && captureRows.length === 0 && noteRows.length === 0 ? (
+        {ready &&
+        !stale &&
+        rows.length === 0 &&
+        captureRows.length === 0 &&
+        noteRows.length === 0 &&
+        clinicalCount.data?.[0]?.count === 0 &&
+        placeCount.data?.[0]?.count === 0 ? (
           <EmptyState icon="trash-outline" title="چیزی حذف نشده" />
+        ) : null}
+
+        {(clinicalCount.data?.[0]?.count ?? 0) > 0 ? (
+          <ClinicalTrashPanel generation={generation} stale={stale} locked={locked} restore={restore} />
+        ) : null}
+
+        {(placeCount.data?.[0]?.count ?? 0) > 0 ? (
+          <PlaceTrashPanel generation={generation} stale={stale} locked={locked} restore={restore} />
         ) : null}
 
         {rows.length > 0 ? (
@@ -151,7 +188,7 @@ export function TrashScreen() {
               title="نوت‌ها"
               count={ready && !stale && noteRead.data!.length <= noteLimit ? noteRows.length : undefined}
             />
-            {noteRows.map(({ note, patient }) => (
+            {noteRows.map(({ note, patient, lifecycle }) => (
               <Card key={note.id}>
                 <Row justify="space-between" gap="sm">
                   <Column gap="xxs" style={{ flex: 1 }}>
@@ -174,7 +211,7 @@ export function TrashScreen() {
                     size="sm"
                     variant="secondary"
                     disabled={locked}
-                    onPress={() => void restore(() => restoreNote(note.id, note))}
+                    onPress={() => void restore(() => restoreNote(note.id, note, lifecycle))}
                   />
                 </Row>
               </Card>

@@ -8,6 +8,7 @@ import { useNow } from '@/components/use-now';
 import { useSaveBeforeLeave } from '@/components/use-save-before-leave';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 
 import {
@@ -29,7 +30,7 @@ import {
   type EncounterFormComparison,
 } from './form-draft-queries';
 import { ENCOUNTER_KIND_LABELS } from './labels';
-import { deleteEncounter, encounterRecordCount } from './queries';
+import { deleteEncounter, encounterRecordCount, type DischargeWork } from './queries';
 
 export type { EncounterFormSeed } from './form-draft-queries';
 
@@ -128,7 +129,7 @@ export function useEncounterFormDraft(
       end();
     }
   }
-  async function save() {
+  async function save(shownWork?: readonly DischargeWork[]) {
     if (!begin()) return;
     if (completedId) {
       try {
@@ -146,7 +147,7 @@ export function useEncounterFormDraft(
       encounterFormDate(latest.current, new Date(now));
     } catch (error) {
       end();
-      notify('اطلاعات کامل نیست', error instanceof Error ? error.message : 'ورودی‌ها را بررسی کنید.');
+      notify('اطلاعات کامل نیست', safeErrorMessage(error, 'ورودی‌ها را بررسی کنید.'));
       return;
     }
     try {
@@ -160,6 +161,7 @@ export function useEncounterFormDraft(
           persistence.revision(),
           latest.current,
           new Date(now),
+          shownWork,
         );
         published.current = true;
         setCompletedId(id);

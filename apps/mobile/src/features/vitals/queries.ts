@@ -1,7 +1,8 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
-import { audit } from '@/db/audit';
+import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
+import { withClinicalHistory } from '@/db/clinical-history';
 import { encounters, patients, vitals, type Vital } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
 import { isBloodSugarUnit, type BloodSugarUnit } from '@/lib/glucose-unit';
@@ -92,29 +93,31 @@ export function recordVitalInTransaction(tx: DbTransaction, input: VitalInput, n
     input.encounterId !== undefined ? input.encounterId : resolveActiveEncounterId(input.patientId, tx);
   requireContext(tx, input.patientId, encounterId);
   const id = newId();
-  tx.insert(vitals)
-    .values({
-      id,
-      ...stamps(now),
-      patientId: input.patientId,
-      encounterId,
-      measuredAt: input.measuredAt ?? now,
-      systolic: input.systolic ?? null,
-      diastolic: input.diastolic ?? null,
-      heartRate: input.heartRate ?? null,
-      respRate: input.respRate ?? null,
-      temperature: input.temperature ?? null,
-      spo2: input.spo2 ?? null,
-      bloodSugar: input.bloodSugar ?? null,
-      bloodSugarUnit: input.bloodSugarUnit ?? null,
-      weightKg: input.weightKg ?? null,
-      heightCm: input.heightCm ?? null,
-      painScore: input.painScore ?? null,
-      urineOutput: input.urineOutput?.trim() || null,
-      notes: input.notes?.trim() || null,
-    })
-    .run();
-  return id;
+  return withClinicalHistory(tx, 'vital', id, now, () => {
+    tx.insert(vitals)
+      .values({
+        id,
+        ...stamps(now),
+        patientId: input.patientId,
+        encounterId,
+        measuredAt: input.measuredAt ?? now,
+        systolic: input.systolic ?? null,
+        diastolic: input.diastolic ?? null,
+        heartRate: input.heartRate ?? null,
+        respRate: input.respRate ?? null,
+        temperature: input.temperature ?? null,
+        spo2: input.spo2 ?? null,
+        bloodSugar: input.bloodSugar ?? null,
+        bloodSugarUnit: input.bloodSugarUnit ?? null,
+        weightKg: input.weightKg ?? null,
+        heightCm: input.heightCm ?? null,
+        painScore: input.painScore ?? null,
+        urineOutput: input.urineOutput?.trim() || null,
+        notes: input.notes?.trim() || null,
+      })
+      .run();
+    return id;
+  });
 }
 
 /**
@@ -130,8 +133,7 @@ export async function updateVital(
   now = new Date(),
   expected?: Vital,
 ): Promise<void> {
-  const changed = db.transaction((tx) => updateVitalInTransaction(tx, id, patch, now, expected));
-  if (changed) await audit('vital.updated', { entityType: 'vital', entityId: id });
+  db.transaction((tx) => updateVitalInTransaction(tx, id, patch, now, expected));
 }
 
 const PATCH_KEYS = [
@@ -192,20 +194,23 @@ export function updateVitalInTransaction(
   )
     throw new Error('این اندازه‌گیری تغییر کرده است؛ نسخهٔ جدید را بررسی کنید. نوشتهٔ شما روی صفحه باقی مانده است.');
   if (Object.keys(definedPatch).length === 0) return false;
-  tx.update(vitals)
-    .set({
-      ...definedPatch,
-      urineOutput: patch.urineOutput === undefined ? undefined : patch.urineOutput?.trim() || null,
-      notes: patch.notes === undefined ? undefined : patch.notes?.trim() || null,
-      ...touch(now),
-    })
-    .where(and(alive, eq(vitals.id, id)))
-    .run();
-  return true;
+  return withClinicalHistory(tx, 'vital', id, now, () => {
+    tx.update(vitals)
+      .set({
+        ...definedPatch,
+        urineOutput: patch.urineOutput === undefined ? undefined : patch.urineOutput?.trim() || null,
+        notes: patch.notes === undefined ? undefined : patch.notes?.trim() || null,
+        ...touch(now),
+      })
+      .where(and(alive, eq(vitals.id, id)))
+      .run();
+    auditInTransaction(tx, 'vital.updated', { entityType: 'vital', entityId: id }, now);
+    return true;
+  });
 }
 
 export async function deleteVital(id: string, now = new Date()): Promise<void> {
-  const deleted = db.transaction((tx) => {
+  db.transaction((tx) => {
     const current = tx
       .select()
       .from(vitals)
@@ -213,13 +218,15 @@ export async function deleteVital(id: string, now = new Date()): Promise<void> {
       .get();
     if (!current) return false;
     requireContext(tx, current.patientId, current.encounterId);
-    tx.update(vitals)
-      .set(softDelete(now))
-      .where(and(alive, eq(vitals.id, id)))
-      .run();
-    return true;
+    return withClinicalHistory(tx, 'vital', id, now, () => {
+      tx.update(vitals)
+        .set(softDelete(now))
+        .where(and(alive, eq(vitals.id, id)))
+        .run();
+      auditInTransaction(tx, 'vital.deleted', { entityType: 'vital', entityId: id }, now);
+      return true;
+    });
   });
-  if (deleted) await audit('vital.deleted', { entityType: 'vital', entityId: id });
 }
 
 /** A measurement that can be plotted over time. */

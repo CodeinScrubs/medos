@@ -33,112 +33,80 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
-Source0.11.50/code66 persists the original Note/encounter basis, including null,
-raw date/clock and draft revision. A reopened draft cannot overwrite a newer
-correction or attach itself to a later admission. Invalid dates remain raw and
-cannot publish their older parsed timestamp. Legacy/conflicting drafts require
-exact shown-row review/adoption, which changes only the raw draft; clinical
-publication remains separate. Recovery cards select their own scoped draft ID.
-The original dataset and loaded/completed native parents remain intact.
-Recovery includes acknowledged canonical voice and filters empty recorder rows
-before its limit; the selected draft and its meaningful preview stay visible.
-Older recovery drafts are reachable in20-card replaceable pages, with stable
-time/ID cursors and a way back after an older page empties. Recovery follows the
-Today summary tiles with three previews and in-place access to the 20-card
-pages; scheduled patient work has a ten-row preview, exact total and matching
-full-list scope. Shared predicates and priority ordering prevent
-the preview/count/destination from disagreeing. Filter changes replace only
-read results, retaining the screen and native header parents.
-The combined recovery/deck corrections pass81 focused cases. Final full checks
-pass160 suites/2,255 application tests and five workflows, with typecheck/lint/
-both formatting checks clean and no warnings. Regeneration reports no schema
-changes. Preceding `a674921` exact-head hosted CI succeeds; current CI is pending.
-Frozen `1915ee5` x86 native acceptance includes explicit adoption before
-publication, original outpatient null association, invalid raw date/clock and
-voice-only recovery. Independent final exports preserve the intended4,136
-rows/34 media. Three native recovery pages select the oldest of41 tied drafts;
-their export preserves all4,178 rows/34 media. The ten-task preview opens the
-matching40-row full list. Acknowledged original-base restore/cold export
-preserves all4,117 rows/34 media with only the three additive draft defaults.
-The same frozen source produces an inspected, owner-signed .50/code66 arm64
-candidate in `dist/`. See [validation-0.11.50.md](validation-0.11.50.md).
-No phone acceptance has run. Restore latency and nonfatal native modal/audio
-warnings remain open; bounded correctness is not a performance budget.
+The 0.11.70/code 86 candidate uses the live episode for the shift card and
+rounds, and retains the episode captured at intake for shift history. An
+explicitly discharged patient leaves the active deck. Their outstanding
+patient tasks remain reachable from the existing shift task list. The chart
+and latest lab review use recorded specimen, panel, source lab, method, unit
+and reference range together. Unclassified gas results remain in the raw
+history. Migration 0032 adds two nullable metadata columns.
+The signed owner artifact and isolated physical A52s checks are recorded in
+[validation-0.11.70.md](validation-0.11.70.md).
 
-Preceding .49 scopes note/history readers to the live patient and validates
-version/current-row/parent/dataset ownership in atomic history restoration.
-Success returns to the patient workspace. Its frozen-source native witnesses
-now pass: foreign-route refusal, intended version restoration and acknowledged
-base restore/cold export, with all4,117 original rows/49 tables/34 media exact.
-See [validation-0.11.49.md](validation-0.11.49.md). These witnesses do not validate
-.50 code or a complete shift.
+The 0.11.69/code 85 follow-up requires a successful discharge preview and
+compares the affected work inside the publication transaction. A new pending
+item, a failed read, or a retained preview cannot close the admission
+unnoticed. The inspected signed APK is in the owner's local `dist/` folder.
+The synthetic emulator upgrade, intake, cold draft recovery and discharge
+pass. See [validation-0.11.69.md](validation-0.11.69.md) for the exact
+source, package hashes and remaining device gates.
 
-The preceding .48 binds delayed removal/old-dataset confirmation to the
-original mounted navigator and one removal attempt. A new route supersedes an
-old Back without a normal-path prompt; unchanged background stack cleanup still
-works. Extension creation/editing validates the live place in its synchronous
-write transaction; place rename and child search indexes commit together.
-The manual place/extension editors still need raw recovery and original-intent
-fencing. Final .48 source checks pass157 suites/2,168 application tests and five
-workflows with typecheck/lint/both formatting checks green and no warnings.
-Native .48 upgrade, old-form/normal exits and live-parent refusal/creation pass
-their bounded witnesses. The independent post-action archive matches4,121
-rows/49 tables/34 media after exactly one specified extension insertion; the cold
-base matches all4,117 original rows/34 media. A native foreign-note read exposes
-the scope gap addressed in .49. Rejected locator/script attempts and the late
-restore completion without a tapped acknowledgment are preserved in
-[validation-0.11.48.md](validation-0.11.48.md).
+The 0.11.68/code 84 candidate combines the calendar and ward intake changes in
+PRs 17–19 with an intake consistency fix. A batch retains every displayed
+candidate's admission and checks it against the full current census in one
+transaction. A new, discharged or readmitted patient invalidates the old choice.
+See [validation-0.11.68.md](validation-0.11.68.md) for current evidence and limits.
 
-The preceding .47 makes current-card Kardex status/delete acknowledgments
-transactional: exact shown row, live parent/episode, original dataset and atomic
-id-only audit. Retained read failures cannot authorize actions. The manual order
-form retains its original identity/input through route reuse, deletion and read
-failure, locks duplicate publication, and prevents delayed suggestions or closing
-another screen. Unknown start remains unknown. This is not raw draft recovery,
-permanent correction history or implemented order-trash restore.
+Frozen 0.11.65/code 81 (`58642e8`, PR 16) retains its own signed APK, hosted
+CI and bounded emulator evidence. GitHub's default branch remains at 0.11.50
+while the application stack is in review.
 
-The preceding .45 shares a deterministic current-encounter fallback; duplicate
-episodes remain intact. .46 adds40-card note cursor pages, bounded highlights,
-visible-note voice counts and display-only backup progress updates. Full source
-documents/history/crypto are unchanged. .47 full source checks pass156 suites/
-2,143 application tests and five workflows, with typecheck/lint/both formatting
-checks green. Source checks and native acceptance are tracked separately.
+- Future imported DOB/invalid calculation clock cannot invent newborn age or
+  negative/NaN years. Stored identity remains unchanged; normal form rejection
+  already existed. Same-day unknown hour/manual fallback/leap boundaries remain.
+- The inherited .64 extension menu dismisses with Back and a verified
+  above-dialog tap. Original-choice Edit and unchanged-form Close work. The
+  header and filtered deck withhold unestablished age on the warm launch. The
+  separate cold launch repeats the header and menu checks.
+- Native .50-to-.65 in-place upgrade checks all53-to55 tables,41 original
+  patients/248 notes and34 exact media hashes. A separate42-patient synthetic
+  fixture and before/after cold archives check all55 tables with52 unchanged;
+  only enumerated backup/audit/startup receipts differ. No private data is pushed.
+- The owned read-only AVD is shut down normally; PID/serial are absent and both
+  base-image hashes match. System UI ANR, interrupted host work and failed probes
+  remain explicit; no app fatal was observed in the bounded accepted intervals.
 
-Native .46 upgrade, all90 long-note titles across three pages, whole-record
-operation filter and full32,036-character editor witnesses pass. Its actual
-post-witness archive matches4,212 rows/49 tables/34 media exactly; acknowledged
-base restore/cold export matches the original4,117 rows/34 media. Interrupted
-automation and the System UI boot ANR are explicitly retained in
-[validation-0.11.46.md](validation-0.11.46.md). .47 native current/standing
-Kardex actions, unknown-start edit and foreign-route refusal pass. Independent
-archives match all4,128 rows after exactly three intended changes and34 media
-hashes; acknowledged base restore/cold export matches the original4,117 rows.
-See [validation-0.11.47.md](validation-0.11.47.md).
-Native tied-episode Kardex is recorded in
-[validation-0.11.45.md](validation-0.11.45.md). Patient/note delete/refusal/restore is recorded in
-[validation-0.11.43.md](validation-0.11.43.md).
-Raw vitals/context/timeline have bounded native evidence in
-[validation-0.11.41.md](validation-0.11.41.md); explicit glucose units, separate
-charts and old/current restore in [validation-0.11.42.md](validation-0.11.42.md).
-These do not prove full-shift performance, every failure path or phone acceptance.
-`dist/` now includes the inspected .50 owner candidate; an APK is not phone
-acceptance or completion of the remaining product gates.
+See [validation-0.11.65.md](validation-0.11.65.md) for exact hashes, independent
+oracles, failed attempts and limits; [validation-0.11.64.md](validation-0.11.64.md)
+attributes its inherited menu repair. Prior [.63 diagnostics and place recovery](validation-0.11.63.md),
+[.61 notes](validation-0.11.61.md), [.58 clinical recovery](validation-0.11.58.md),
+[.57 mixed-owner import](validation-0.11.57.md) and earlier reports retain their
+own source/artifact boundaries. Do not treat historical checkpoints as current
+pending work or re-run every old matrix for an unrelated edit.
+
+The private doctor/occasion recovery proposal is not integrated. Primary review
+finds incomplete retained completed-screen identity/action handling; prove and
+fix those before adoption. Other notebook recovery, visual rich text, selected
+local coding-agent evidence, fuller outpatient/follow-up workflows and a timed
+40-patient native shift remain implementation/acceptance work. Physical media,
+providers, notifications/reboot/Doze/power, second-device recovery and physician
+clinical review are additional gates. The phone is not the sole remaining work.
 
 ## Priority0: finish integrity and recovery
 
 | ID | Contract | Current boundary and next work |
 |---|---|---|
-| D01 | Exact history | Note history retains SOAP boundaries, metadata, text and deterministic rapid-save ordering. Visual rich text needs a versioned codec and backward-compatible plain export/search. Permanent patient-field and other clinical correction history is not proved by note versions, soft deletion, id-only audit or retained raw drafts; complete and expose that owner requirement separately. Do not prune history. |
+| D01 | Exact history | Note history retains SOAP boundaries, metadata, text and deterministic rapid-save ordering. Visual rich text needs a versioned codec and backward-compatible plain export/search. .56 adds permanent typed snapshots for ten clinical kinds and before/after access in the existing timeline; old rows start with a real baseline on first correction. Unknown/misowned bodies stay unverified. Complete new-source native/whole-archive acceptance separately. Do not prune history. |
 | D02 | Atomic note/version/draft acknowledgment | .50 persists original Note/encounter basis, including null, and raw date/clock/revision. Legacy or conflicting recovered drafts require exact shown-row adoption before separate publication; scoped recovery selects the intended draft. Software conflict, audit rollback, lifecycle and old/current import checks pass. Bounded native adoption/publication, outpatient/date/voice recovery, pages and whole archives pass in validation-0.11.50. .49 version restore has bounded native evidence. Preserve original dataset/native parents; general interruption/power acceptance remains open. |
 | D03 | Durable stopped voice publication | Existing record, draft-note and capture journals support verified-copy retry and atomic metadata acknowledgment. Active/pre-journal recording loss and physical recorder/audio behavior are separate gates. |
 | D04 | Atomic quick capture filing | Software preserves selected context, same-operation retry and one destination. Copied photo batches have a journal. Picker/pre-journal interruption and provider-loss/native failures still need acceptance. |
-| D05 | Recover every manual form | Patient, encounter, task/schedule, follow-up, consult, occasion, companion, doctor/profile/rating, lab, imaging and vital raw recovery exist. Eight remain: Kardex order, topic, idea, specialty profile, prescription, place, extension, credential. Use bounded shared draft lifecycle with feature-owned versioned codecs/publishers; pilot idea/topic without modifying existing draft stores. Preserve invalid raw dates, exact credential whitespace and partial prescription lines. Order intent must capture its original patient/encounter including null, compare its shown clinical basis, and retain explicit conflict recovery. Never copy a500-line engine eight times or reuse doctor drafts for unrelated entities. |
+| D05 | Recover every manual form | Existing clinical stores and the .51 idea/topic and .54 Order ports are retained. .55 adds specialty profile, prescription, place, extension and credential to the same engine. Strict raw codecs preserve partial fields/secret whitespace; full-basis comparison, feature mutation, receipt/retirement and audit are one transaction. Blank-drug partial lines and invalid expiry refuse publication without losing raw input; explicit credential replacement/clear removes legacy cipher/nonce. Live references, original dataset/focus and retained native parents remain required. See validation-0.11.55 for actual software/native/artifact boundaries. Broader interruption/physical acceptance remains open; this milestone does not prove every keystroke durable. Clinical forms must validate original ownership rather than use an unparented notebook port. Never copy the engine or reuse doctor drafts for unrelated entities. |
 | D06 | Consult reply ownership | Software keeps replies with their original consultation and preserves failed input. Verify full native request/answer/follow-up workflow. |
 | D07 | Numerical integrity | Blank differs from invalid; paired BP conflicts cannot be half-merged; observation time/context stay explicit. Glucose units are recorded, never guessed/converted, and charts separate units. Broader chart/device and clinical applicability review remain open. |
-| D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. Labs, imaging, vitals, orders, consults, diagnoses and encounters need appropriate restore/audit paths. Order status/delete audit now commits atomically; order restore and permanent correction history remain. Lab deletion still needs audit. Never infer a deleted encounter's former active state. |
+| D08 | Truthful failures and recoverable deletion | Covered screens retain input with retry; old dataset callbacks refuse writes. Patient/note/capture/task restore exists. .56 adds audited restore for labs, imaging, vitals, orders, consults, diagnoses and historical/inactive encounters, with original full-row basis and patient/episode ownership. .58 adds companion/follow-up restore, clinical-sequence recovery tokens and retained delete/status/result/postpone intent. Lab deletion and required clinical audit/history share the write transaction. Notebook trash and broader interruption/device acceptance remain. Never infer a deleted encounter's former active state. |
 | D09 | Consistent rounds and active episode | New memberships validate live ownership, preserve reorder/handoff and use latest published clinical note independent of pins. .45 makes encounter readers consistent. Imported duplicate memberships/episodes are preserved; clinical duplicate resolution and broader native rounds acceptance remain open. |
 | D10 | Compatible verified backup/restore | Format/KDF remain frozen; verified destination strength governs pruning. Restore excludes admitted writers/file jobs and preserves original ownership of old forms. Independent old/current restore exists in versioned reports. Critical swap/commit interruption, low disk, provider grants and second-device recovery remain open. |
-| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. Actual alarm/reboot/Doze behavior and the complete received/reviewed/action/closed product flow remain open. |
+| D11 | Recoverable follow-up/reminder intent | Database-first writes, stable ids/revisions, repair and failed-outcome retention are covered in software. .58 recovery preserves outcome/status/deadline and reports native repair separately; retained row checks protect clinical choices across live refresh. Native denied-permission/retry/cold request acknowledgment passes in .58. .59 separately accepts actual special access and the occasion-request window transition; alarm/reboot/Doze delivery and the complete received/reviewed/action/closed product flow remain open. |
 | D12 | Jalali occasions and communication | Leap-day edits/raw recovery, scheduled occurrence-year text, database-first reminder revision/repair and explicit sent confirmation are implemented in software. Test real lifecycle/delivery separately. Do not transmit messages during development tests. |
 
 Reproduce before changing. Each new persistence path needs migrated-SQLite
@@ -147,17 +115,41 @@ not just pure serialization. Keep raw invalid input separate from clinical truth
 
 ## Priority1: finish everyday workflows
 
+The .63 default diagnostic integrity slice is implemented and accepted within
+its report's boundaries: content-free projection, known notices, bounded legacy
+reads/share files and original screen-owned actions. A closed chooser is not
+delivery. Selected clinical evidence and interrupted backup scratch cleanup are
+separate work; neither is proved by the technical report reader.
+
+The owner's2026-10-11 pasted request adds local patient/settings/use history for
+coding agents across weeks. Define a versioned,
+bounded local event/evidence contract alongside existing clinical history, then
+an explicit selected clinical export with app/source/dataset lineage, retention
+and missing-segment/completeness boundaries and an independent reader. Ordinary
+diagnostics cannot carry clinical bodies, credentials or colleague ratings;
+AGENTS.md now records the separate owner-controlled export exception. No
+automatic upload, duplicate chart or second navigation dashboard. This is
+pending implementation, not something the current100-error log already does.
+
+.62 closes place/extension deletion recovery and original device/star choices;
+remaining notebook kinds require their own parent/private-field contracts.
+Doctor's other communication and star callbacks still need retained-choice
+review; the shared map repair does not certify them. Doctor/occasion delete and
+trash recovery remain an unintegrated proposal with blocking primary-review
+findings. The explicit empty-place extensions filter was repaired in .63;
+it is no longer an open API item.
+
 | ID | Deliverable | Remaining acceptance or implementation |
 |---|---|---|
 | W01 | Inbox and tasks | Full matching totals/search/load-more, patient/global tasks, recovery, reopen/restore and explicit filing exist. Accept large-list/device navigation and broad search. |
 | W02 | Shift and rounds | History, explicit persistent ordering, handoff and separate reviewed status exist. Preserve accessible ordering alternatives and wrong-patient protection. Add optional ward/place/supervisor context without slowing quick start. Accept full native rounds. |
 | W03 | Due work | Explicit priority/urgency ranks and raw date/clock validation exist. Validate native software IME, alarm lifecycle and all editor exits. |
 | W04 | Patient deck | Existing first-tab episode and bedside snapshot lead with identity/location/impressions/allergies, timed observations/labs, running orders and open work. Physician review and measured40-patient shift acceptance remain. Do not add a dashboard maze. |
-| W05 | Clinical history | Separate encounters, timeline filters/bounded previews/keyset pages and direct record access exist. Accept native pagination/every kind/pressure and finish appropriate correction/restore. |
+| W05 | Clinical history | Separate encounters, timeline filters/bounded previews/keyset pages and direct record access exist. .56 adds bounded correction history and seven clinical restore kinds. Accept new-source native pagination/every kind/pressure; note and clinical history retain separate codecs. |
 | W06 | Follow-up loop | Distinguish result received, physician reviewed, subsequent action and closed. Preserve outstanding work; no inferred completion. |
-| W07 | Trash and correction | Extend appropriate original-context restore beyond current record kinds. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
+| W07 | Trash and correction | .56 extends original-context restore to seven clinical kinds; .58 adds companions/follow-ups and protects identical same-ms cycles. Remaining notebook tombstones need appropriate recovery; places/extensions now have original-choice recovery and handled device rejections (.62, native .63). Native contact/follow-up recovery, denied notification permission, retry and cold persistence pass in .58; actual alarm delivery remains separate. Parent restore must not revive separately deleted children. Stale/alive/cross-patient/conflicting records refuse acknowledgment. Any explicit cross-patient move needs visible destination identity and undo. |
 | W08 | Notes and media | Add visual headings/bold/lists/checklists with codec/history/export compatibility. .46 bounded card/highlight/voice retrieval has native pagination/filter/full-document witnesses; measured performance and broad shift acceptance remain. Keep original images and reversible crop/highlight/type/annotation, documents/PDF/video and external file import; accept native image/export/retry and capture interruptions. |
-| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. Complete remaining raw forms and actual edit/search acceptance. Handle idea-area read rejection/retry. Extension creation/editing now rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. These software checks do not finish raw recovery, intent fencing, deleted-place recovery/move or native acceptance. |
+| W09 | People, places and knowledge | Features exist for specialties/referrals/private ratings/social notes, teaching/teacher, specialty careers, personal prescriptions, extensions and ideas. .51 connects idea/topic raw recovery and exposes area-read rejection/retry; .55 connects the remaining notebook forms. Topic/reference checks and merged search commit with publication. Extension creation/editing rejects missing/deleted parents inside its transaction; a failing child index rolls back a place rename. Place/extension recovery is accepted within .63's native boundaries; complete broader edit/search and explicit parent-change workflows. Bounded recovery checks do not finish every native workflow. |
 | W10 | Calendar and communication | Accept Jalali/leap/time changes, reminders, occasion preparation and explicit actual sending history. No silent delivery claim or development transmission. |
 
 ## Priority2: validated clinical tools and future AI
@@ -175,6 +167,14 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
 
 ## Priority3: performance and delivery evidence
 
+- The shared Input's visible Field label is not automatically bound to its
+  TextInput accessibility label; current native snapshots show value-only input
+  metadata. Forward the label while preserving explicit overrides, then inspect
+  actual native metadata. This is not a completed TalkBack interaction test.
+- Long single-command .55 ASCII injection failures have native stale-drop evidence.
+  The original short mismatch is still unexplained; diagnose it before accepting
+  input under pressure. Capture IME readiness/event-time/native ordering and host versus
+  target load separately; idle retries and process survival do not establish cause.
 - Reproduce the older .33 focus/pressure ANR with event-time scheduling/stack
   evidence; the recovered matching late stack does not establish its cause.
 - Measure restore/key-derivation phases and target-device cost; .50 synthetic
@@ -182,6 +182,13 @@ WHO SMART is an engineering reference, not MedOS clinical validation:
   normalization schemes, golden keys and independent compatibility. Native
   keyboard-controller modal soft exceptions and audio dead-handler warnings
   remain diagnostic/acceptance work; retained processes do not prove harmlessness.
+- .59 accepts actual mounted camera-grant return and the system exact-alarm
+  switch, including two observed occasion-request windows changing from one hour
+  to zero. Actual delivery and OEM/Doze/reboot behavior remain separate.
+- .60 accepts handled lock/settings failures in software and bounded actual
+  no-credential/enrolled/cold behavior on frozen installed QA bytes. Its full
+  check, source CI and both inspected APKs pass. Physical authentication and
+  broader native failure/lifecycle cases remain separate.
 - Measure cold start, patient open/search,40-patient scrolling, capture, writes
   and backup. Exercise a complete long synthetic shift and record actual timings.
   Fast Jest or a build does not establish interactive performance.

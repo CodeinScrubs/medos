@@ -1,17 +1,15 @@
 import { useLocalSearchParams } from 'expo-router';
-import { type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { alertError } from '@/components/feedback';
 import { QuickDateField } from '@/components/quick-date-field';
 import { Button, Card, ChipSelect, Column, Input, Row, Screen, Text } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
 import type { Encounter } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { patientConsultsQuery } from '@/features/consults/queries';
-import { patientOrdersQuery } from '@/features/kardex/queries';
-import { taskCountQuery } from '@/features/tasks/queries';
 import { toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
@@ -19,6 +17,7 @@ import { encounterFormDisplayDate, type DischargeFormFields } from './form-draft
 import { EncounterFormDraftGate } from './form-draft-gate';
 import { EncounterFormDraftNotice } from './form-draft-notice';
 import { DISCHARGE_TYPE_LABELS } from './labels';
+import { dischargeWorkQuery, type DischargeWork } from './queries';
 import { useEncounterFormDraft, type EncounterFormSeed } from './use-form-draft';
 
 type DischargeType = NonNullable<Encounter['dischargeType']>;
@@ -71,31 +70,17 @@ function DischargeForm({
   const patientId = seed.row.patient.id;
   const encounterId = seed.encounterId!;
   const dateValidation = useDateValidation();
-  // What the discharge will do, and what it leaves open, said before it happens.
-  const {
-    data: orders,
-    error: orderError,
-    retry: retryOrders,
-  } = useLive(patientOrdersQuery(patientId, encounterId), [patientId, encounterId]);
-  const {
-    data: openTasks,
-    error: taskError,
-    retry: retryTasks,
-  } = useLive(taskCountQuery({ patientId, status: 'open' }), [patientId]);
-  const {
-    data: consults,
-    error: consultError,
-    retry: retryConsults,
-  } = useLive(patientConsultsQuery(patientId), [patientId]);
-  const endingOrders =
-    !orderError && orders
-      ? orders.filter((o) => o.encounterId === encounterId && (o.status === 'active' || o.status === 'held')).length
-      : 0;
-  const stillOpenTasks = !taskError ? (openTasks?.[0]?.total ?? 0) : 0;
-  const stillOpenConsults =
-    !consultError && consults
-      ? consults.filter(({ consult }) => consult.status === 'pending' || consult.status === 'requested').length
-      : 0;
+  const { data, error, loading, retry } = useLive(dischargeWorkQuery(patientId, encounterId), [patientId, encounterId]);
+  const work = error ? undefined : data;
+  const shownWork = useRef<DischargeWork[] | undefined>(undefined);
+  useLayoutEffect(() => {
+    shownWork.current = work;
+    return () => {
+      shownWork.current = undefined;
+    };
+  }, [work]);
+  const counts = { order: 0, task: 0, consult: 0, followup: 0 };
+  for (const item of work ?? []) counts[item.kind] += 1;
 
   return (
     <Screen scroll>
@@ -105,9 +90,7 @@ function DischargeForm({
           {seed.row.patient.firstName} {seed.row.patient.lastName}
         </Text>
         <EncounterFormDraftNotice editing={editing} seed={seed} />
-        <ErrorNotice error={orderError} what="کاردکس" onRetry={retryOrders} />
-        <ErrorNotice error={taskError} what="کارهای باز" onRetry={retryTasks} />
-        <ErrorNotice error={consultError} what="کانسالت‌ها" onRetry={retryConsults} />
+        <ErrorNotice error={error} what="کارهای باز و اثر ترخیص" onRetry={retry} />
         <ChipSelect
           label="نوع ترخیص"
           options={TYPE_OPTIONS}
@@ -146,18 +129,22 @@ function DischargeForm({
           multiline
         />
 
-        {endingOrders + stillOpenTasks + stillOpenConsults > 0 ? (
+        {loading ? <Text variant="caption">در حال بررسی کارهای باز…</Text> : null}
+        {work?.length ? (
           <Card tone="alt">
             <Column gap="xs">
               <Text variant="captionStrong">با ثبت ترخیص</Text>
-              {endingOrders > 0 ? (
-                <Consequence>{toPersianDigits(endingOrders)} دستور کاردکسِ این بستری «تمام‌شده» می‌شود.</Consequence>
+              {counts.order > 0 ? (
+                <Consequence>{toPersianDigits(counts.order)} دستور کاردکسِ این بستری «تمام‌شده» می‌شود.</Consequence>
               ) : null}
-              {stillOpenTasks > 0 ? (
-                <Consequence>{toPersianDigits(stillOpenTasks)} کار باز همچنان باز می‌ماند.</Consequence>
+              {counts.task > 0 ? (
+                <Consequence>{toPersianDigits(counts.task)} کار باز همچنان باز می‌ماند.</Consequence>
               ) : null}
-              {stillOpenConsults > 0 ? (
-                <Consequence>{toPersianDigits(stillOpenConsults)} کانسالت بی‌پاسخ همچنان باز می‌ماند.</Consequence>
+              {counts.consult > 0 ? (
+                <Consequence>{toPersianDigits(counts.consult)} کانسالت بی‌پاسخ همچنان باز می‌ماند.</Consequence>
+              ) : null}
+              {counts.followup > 0 ? (
+                <Consequence>{toPersianDigits(counts.followup)} پیگیری در انتظار همچنان باز می‌ماند.</Consequence>
               ) : null}
             </Column>
           </Card>
@@ -167,10 +154,14 @@ function DischargeForm({
           label="ثبت ترخیص"
           icon="exit-outline"
           onPress={() => {
-            if (dateValidation.check()) void editing.save();
+            if (work && shownWork.current === work && dateValidation.check())
+              void editing
+                .save(work)
+                .then(retry)
+                .catch((cause) => alertError('بررسی ترخیص انجام نشد', cause));
           }}
           loading={saving}
-          disabled={!!editing.finishedMessage}
+          disabled={locked || work === undefined}
           full
           style={{ marginTop: spacing.sm }}
         />

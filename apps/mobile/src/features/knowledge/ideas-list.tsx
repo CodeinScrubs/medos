@@ -8,6 +8,7 @@ import { alertError } from '@/components/feedback';
 import { Badge, Card, ChipSelect, Column, EmptyState, Fab, Row, Text } from '@/components/ui';
 import type { Idea } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { formatRelative } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
@@ -43,6 +44,12 @@ export function IdeasList() {
   return (
     <View style={styles.flex}>
       <Column gap="sm" style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <UnfinishedWorkspaceForms
+          kind="idea"
+          onOpen={(recordId, draftId) =>
+            router.push({ pathname: '/knowledge/idea', params: { ...(recordId ? { ideaId: recordId } : {}), draftId } })
+          }
+        />
         <SearchBar value={search} onChange={setSearch} placeholder="عنوان، توضیح، بخش…" />
         <ChipSelect options={FILTERS} value={filter} onChange={(v) => v && setFilter(v)} />
         <ErrorNotice error={error} what="دفترچه‌ی ایده‌ها" />

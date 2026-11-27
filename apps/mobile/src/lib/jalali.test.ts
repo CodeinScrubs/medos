@@ -121,6 +121,32 @@ describe('formatting', () => {
     expect(formatJalali(day.toISOString())).toBe('۱۴۰۳/۰۵/۱۲');
   });
 
+  it('accepts valid ISO date-times with local and offset clocks', () => {
+    const local = '2024-08-02T14:30:00';
+    expect(formatJalali(local)).toBe('۱۴۰۳/۰۵/۱۲');
+    expect(formatJalaliDateTime(local)).toBe('۱۲ مرداد ۱۴۰۳، ۱۴:۳۰');
+
+    const offset = '2024-08-02T14:30:00+03:30';
+    expect(formatJalaliDateTime(offset)).toBe(formatJalaliDateTime(new Date(offset)));
+  });
+
+  it('rejects impossible ISO date-times instead of normalizing them', () => {
+    for (const invalid of [
+      '2024-02-30T12:00:00.000Z',
+      '2023-02-29T12:00:00Z',
+      '2024-04-31T12:00:00Z',
+      '2024-08-02T24:00:00Z',
+      '2024-08-02T12:60:00Z',
+      '2024-08-02T12:00:60Z',
+      '2024-08-02T12:00:00+14:01',
+      '2024-08-02T12:00:00.1234Z',
+      '2024-08-02T12:00:00Zjunk',
+    ]) {
+      expect(formatJalali(invalid)).toBe('—');
+      expect(formatJalaliDateTime(invalid)).toBe('—');
+    }
+  });
+
   it('never guesses at anything else', () => {
     // new Date('1403/05/12') would read this as the Gregorian year 1403.
     expect(formatJalali('1403/05/12')).toBe('—');
@@ -221,6 +247,31 @@ describe('age', () => {
     expect(ageInYears('2000-06-02', null, now)).toBe(23);
     expect(ageInYears('2000-06-01', null, now)).toBe(24);
     expect(ageInYears(null, 30, now)).toBe(30);
+  });
+
+  it('withholds age from a future imported birth date without substituting a fallback', () => {
+    const current = d(2026, 10, 12, 10, 0);
+    expect(formatAge('2026-10-13', 42, current)).toBe('—');
+    expect(ageInYears('2026-10-13', 42, current)).toBeNull();
+  });
+
+  it('withholds a calculated age when the supplied clock is invalid', () => {
+    expect(formatAge('2026-10-01', null, new Date(NaN))).toBe('—');
+    expect(ageInYears('2026-10-01', null, new Date(NaN))).toBeNull();
+  });
+
+  it('uses the birth civil date without inferring its unknown hour', () => {
+    const current = d(2026, 10, 12, 10, 0);
+    const sameDate = d(2026, 10, 12, 20, 0);
+    expect(formatAge(sameDate, null, current)).toBe('۰ روزه');
+    expect(ageInYears(sameDate, null, current)).toBe(0);
+  });
+
+  it('preserves a leap-day birthday and recorded-age fallback at the boundaries', () => {
+    expect(ageInYears('2000-02-29', null, d(2025, 2, 28))).toBe(24);
+    expect(ageInYears('2000-02-29', null, d(2025, 3, 1))).toBe(25);
+    expect(formatAge(null, 40, new Date(NaN))).toBe('۴۰ ساله');
+    expect(ageInYears(null, 40, new Date(NaN))).toBe(40);
   });
 });
 

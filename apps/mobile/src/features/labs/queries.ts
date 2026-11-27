@@ -1,64 +1,102 @@
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, isNull, ne, not, sql } from 'drizzle-orm';
 
+import { auditInTransaction } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { labPanels, labValues, patients, type LabPanel } from '@/db/schema';
+import { withClinicalHistory } from '@/db/clinical-history';
+import { encounters, labPanels, labValues, patients, type LabPanel } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { formBasis } from '@/lib/form-document';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
 import { computeFlag, parseLabValue } from './flags';
+import { labPanelHasForeignValues } from './ownership-queries';
 
 const panelAlive = isNull(labPanels.deletedAt);
 const valueAlive = isNull(labValues.deletedAt);
+const panelContext = {
+  panelId: labPanels.id,
+  panelName: labPanels.name,
+  labName: labPanels.labName,
+  specimen: labPanels.specimen,
+  method: labPanels.method,
+};
 
 export function patientLabPanelsQuery(patientId: string) {
   return db
-    .select()
+    .select({
+      ...getTableColumns(labPanels),
+      ownershipIssue: sql<number>`case when ${labPanelHasForeignValues()} then 1 else 0 end`,
+    })
     .from(labPanels)
-    .where(and(panelAlive, eq(labPanels.patientId, patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(and(panelAlive, isNull(patients.deletedAt), eq(labPanels.patientId, patientId)))
     .orderBy(desc(labPanels.collectedAt));
 }
 
 export function labPanelQuery(panelId: string) {
   return db
-    .select()
+    .select(getTableColumns(labPanels))
     .from(labPanels)
-    .where(and(panelAlive, eq(labPanels.id, panelId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(and(panelAlive, isNull(patients.deletedAt), eq(labPanels.id, panelId)))
     .limit(1);
 }
 
 export function panelValuesQuery(panelId: string) {
   return db
-    .select()
+    .select(getTableColumns(labValues))
     .from(labValues)
-    .where(and(valueAlive, eq(labValues.panelId, panelId)))
+    .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(
+      and(
+        valueAlive,
+        panelAlive,
+        isNull(patients.deletedAt),
+        not(labPanelHasForeignValues()),
+        eq(labPanels.id, panelId),
+      ),
+    )
     .orderBy(asc(labValues.sortOrder));
 }
 
 /** Every live value for a patient with its draw time — the flowsheet's raw material. */
 export function patientLabValuesQuery(patientId: string) {
   return db
-    .select({ value: labValues, collectedAt: labPanels.collectedAt, panelId: labPanels.id })
+    .select({ value: labValues, collectedAt: labPanels.collectedAt, ...panelContext })
     .from(labValues)
-    .innerJoin(labPanels, eq(labValues.panelId, labPanels.id))
-    .where(and(valueAlive, panelAlive, eq(labValues.patientId, patientId)))
-    .orderBy(desc(labPanels.collectedAt), asc(labValues.sortOrder));
-}
-
-/** One analyte over time, oldest first, for the trend chart. Case-insensitive on the name. */
-export function analyteSeriesQuery(patientId: string, analyte: string) {
-  return db
-    .select({ value: labValues, collectedAt: labPanels.collectedAt })
-    .from(labValues)
-    .innerJoin(labPanels, eq(labValues.panelId, labPanels.id))
+    .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
     .where(
       and(
         valueAlive,
         panelAlive,
-        eq(labValues.patientId, patientId),
-        sql`lower(${labValues.analyte}) = lower(${analyte})`,
+        isNull(patients.deletedAt),
+        not(labPanelHasForeignValues()),
+        eq(labPanels.patientId, patientId),
       ),
     )
-    .orderBy(asc(labPanels.collectedAt));
+    .orderBy(desc(labPanels.collectedAt), asc(labValues.sortOrder));
+}
+
+/** Raw analyte history, oldest first. The chart groups only matching recorded contexts. */
+export function analyteSeriesQuery(patientId: string, analyte: string) {
+  return db
+    .select({ value: labValues, collectedAt: labPanels.collectedAt, ...panelContext })
+    .from(labValues)
+    .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
+    .innerJoin(patients, eq(labPanels.patientId, patients.id))
+    .where(
+      and(
+        valueAlive,
+        panelAlive,
+        isNull(patients.deletedAt),
+        not(labPanelHasForeignValues()),
+        eq(labPanels.patientId, patientId),
+        sql`lower(trim(${labValues.analyte})) = lower(trim(${analyte}))`,
+      ),
+    )
+    .orderBy(asc(labPanels.collectedAt), asc(labPanels.id), asc(labValues.sortOrder), asc(labValues.id));
 }
 
 export type LabValueInput = {
@@ -76,6 +114,8 @@ export type LabPanelInput = {
   name?: string | null;
   source: LabPanel['source'];
   labName?: string | null;
+  specimen?: string | null;
+  method?: string | null;
   notes?: string | null;
   values: LabValueInput[];
 };
@@ -120,6 +160,27 @@ function requirePatient(tx: DbTransaction, patientId: string) {
     throw new Error('پروندهٔ بیمار در دسترس نیست؛ آزمایش ثبت نشد.');
 }
 
+function requireContext(tx: DbTransaction, patientId: string, encounterId: string | null) {
+  requirePatient(tx, patientId);
+  if (encounterId !== null) {
+    const encounter = tx.select().from(encounters).where(eq(encounters.id, encounterId)).get();
+    if (!encounter || encounter.deletedAt !== null || encounter.patientId !== patientId)
+      throw new Error('نوبت اصلی بیمار در دسترس نیست؛ آزمایش تغییر نکرد.');
+  }
+}
+
+function requireValueOwners(tx: DbTransaction, panel: LabPanel) {
+  if (
+    tx
+      .select({ id: labValues.id })
+      .from(labValues)
+      .where(and(eq(labValues.panelId, panel.id), valueAlive, ne(labValues.patientId, panel.patientId)))
+      .limit(1)
+      .get()
+  )
+    throw new Error('مالک یک نتیجه با آزمایش سازگار نیست؛ آزمایش تغییر نکرد.');
+}
+
 /** Raw form publication calls these helpers in its own retirement transaction. */
 export function createLabPanelInTransaction(
   tx: DbTransaction,
@@ -127,25 +188,29 @@ export function createLabPanelInTransaction(
   now: Date,
   encounterId: string | null,
 ): string {
-  requirePatient(tx, input.patientId);
+  requireContext(tx, input.patientId, encounterId);
   if (!Number.isFinite(input.collectedAt.getTime())) throw new Error('زمان نمونه‌گیری معتبر نیست.');
   const panelId = newId();
   const rows = valueRows(panelId, input.patientId, input.values, now);
-  tx.insert(labPanels)
-    .values({
-      id: panelId,
-      ...stamps(now),
-      patientId: input.patientId,
-      encounterId,
-      name: input.name ?? null,
-      collectedAt: input.collectedAt,
-      source: input.source,
-      labName: input.labName ?? null,
-      notes: input.notes ?? null,
-    })
-    .run();
-  for (const row of rows) tx.insert(labValues).values(row).run();
-  return panelId;
+  return withClinicalHistory(tx, 'lab', panelId, now, () => {
+    tx.insert(labPanels)
+      .values({
+        id: panelId,
+        ...stamps(now),
+        patientId: input.patientId,
+        encounterId,
+        name: input.name ?? null,
+        collectedAt: input.collectedAt,
+        source: input.source,
+        labName: input.labName ?? null,
+        specimen: input.specimen?.trim() || null,
+        method: input.method?.trim() || null,
+        notes: input.notes ?? null,
+      })
+      .run();
+    for (const row of rows) tx.insert(labValues).values(row).run();
+    return panelId;
+  });
 }
 
 /**
@@ -168,27 +233,48 @@ export function updateLabPanelInTransaction(
     .where(and(panelAlive, eq(labPanels.id, panelId)))
     .get();
   if (!panel) throw new Error('آزمایش در دسترس نیست؛ نوشته نگه داشته شد.');
-  requirePatient(tx, panel.patientId);
+  requireContext(tx, panel.patientId, panel.encounterId);
+  requireValueOwners(tx, panel);
   if (!Number.isFinite(input.collectedAt.getTime())) throw new Error('زمان نمونه‌گیری معتبر نیست.');
   const rows = valueRows(panelId, panel.patientId, input.values, now);
-  tx.update(labPanels)
-    .set({
-      collectedAt: input.collectedAt,
-      name: input.name ?? null,
-      source: input.source,
-      labName: input.labName ?? null,
-      notes: input.notes ?? null,
-      ...touch(now),
-    })
-    .where(and(panelAlive, eq(labPanels.id, panelId)))
-    .run();
-  tx.update(labValues)
-    .set(softDelete(now))
-    .where(and(eq(labValues.panelId, panelId), isNull(labValues.deletedAt)))
-    .run();
-  for (const row of rows) tx.insert(labValues).values(row).run();
+  withClinicalHistory(tx, 'lab', panelId, now, () => {
+    tx.update(labPanels)
+      .set({
+        collectedAt: input.collectedAt,
+        name: input.name ?? null,
+        source: input.source,
+        labName: input.labName ?? null,
+        specimen: input.specimen === undefined ? undefined : input.specimen?.trim() || null,
+        method: input.method === undefined ? undefined : input.method?.trim() || null,
+        notes: input.notes ?? null,
+        ...touch(now),
+      })
+      .where(and(panelAlive, eq(labPanels.id, panelId)))
+      .run();
+    tx.update(labValues)
+      .set(softDelete(now))
+      .where(and(eq(labValues.panelId, panelId), isNull(labValues.deletedAt)))
+      .run();
+    for (const row of rows) tx.insert(labValues).values(row).run();
+  });
 }
 
-export async function deleteLabPanel(panelId: string): Promise<void> {
-  await db.update(labPanels).set(softDelete()).where(eq(labPanels.id, panelId));
+export async function deleteLabPanel(panelId: string, expected?: LabPanel, now = new Date()): Promise<void> {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('زمان حذف معتبر نیست.');
+  db.transaction((tx) => {
+    const panel = tx.select().from(labPanels).where(eq(labPanels.id, panelId)).get();
+    if (!panel) throw new Error('آزمایش در دسترس نیست؛ حذف نشد.');
+    if (panel.deletedAt !== null) return;
+    if (expected && formBasis(panel) !== formBasis(expected))
+      throw new Error('آزمایش تغییر کرده است؛ پیش از حذف دوباره آن را مرور کنید.');
+    requireContext(tx, panel.patientId, panel.encounterId);
+    requireValueOwners(tx, panel);
+    withClinicalHistory(tx, 'lab', panelId, now, () => {
+      tx.update(labPanels)
+        .set(softDelete(now))
+        .where(and(eq(labPanels.id, panelId), panelAlive))
+        .run();
+      auditInTransaction(tx, 'lab.deleted', { entityType: 'lab', entityId: panelId }, now);
+    });
+  });
 }

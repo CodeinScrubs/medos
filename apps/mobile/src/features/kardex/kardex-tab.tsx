@@ -12,10 +12,12 @@ import { Badge, Button, Card, Column, EmptyState, Row, SectionHeader, Text } fro
 import { useNow } from '@/components/use-now';
 import type { Order } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { UnfinishedWorkspaceForms } from '@/features/workspace-forms/unfinished-forms';
 import { datasetGeneration } from '@/lib/dataset-write';
 import { formatJalali } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
+import { orderDraftsQuery } from './form-draft-queries';
 import { ORDER_KIND_LABELS, ORDER_STATUS_LABELS } from './labels';
 import { isRunning, orderSig, therapyDay } from './logic';
 import { deleteOrder, patientCurrentOrdersQuery, setOrderStatus } from './queries';
@@ -48,6 +50,18 @@ export function KardexTab({ patientId }: { patientId: string }) {
   return (
     <Column gap="sm" style={{ marginTop: spacing.lg }}>
       <Button label="دستور جدید" icon="add" variant="secondary" full disabled={stale || !readReady} onPress={openNew} />
+      <UnfinishedWorkspaceForms
+        kind="order"
+        contextKey={patientId}
+        queryPage={(cursor) => orderDraftsQuery(patientId, cursor)}
+        onOpen={(recordId, draftId) => {
+          if (generation !== datasetGeneration() || !readReady || !navigation.isFocused()) return;
+          router.push({
+            pathname: '/patient/[id]/order',
+            params: { id: patientId, draftId, ...(recordId !== null ? { orderId: recordId } : {}) },
+          });
+        }}
+      />
       <ErrorNotice error={error} what="کاردکس" onRetry={retry} />
       {loading ? (
         <Text variant="caption" color="textMuted">

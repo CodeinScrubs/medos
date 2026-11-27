@@ -362,7 +362,8 @@ describe('patient overview read recovery', () => {
     await retryAll();
     await refresh(screen);
     expect(text()).toContain('بدون H یا L');
-    expect(mockRetried).toEqual(['lab_values']);
+    // The results and integrity count are separate hooks; both need a retry.
+    expect(mockRetried).toEqual(['lab_values', 'lab_values']);
   });
 
   it('keeps cached orders without claiming a current total and retries only the failed source', async () => {

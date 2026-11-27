@@ -9,6 +9,8 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import {
   addPatientToShift,
+  addAdmittedPatientsToShift,
+  admittedForShiftQuery,
   activeShiftQuery,
   activeShiftWorkspaceQuery,
   deleteShift,
@@ -25,8 +27,8 @@ import {
   startShift,
   updateShiftPatient,
 } from './queries';
-import { deleteEncounter, openEncounter } from '../encounters/queries';
-import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
+import { deleteEncounter, dischargeEncounter, openEncounter } from '../encounters/queries';
+import { createPatient, deletedPatientsQuery, deletePatient, updatePatient } from '../patients/queries';
 import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -73,7 +75,7 @@ describe('a shift', () => {
     expect(await activeShiftWorkspaceQuery()).toEqual([]);
   });
 
-  it('projects only the next open standing or captured-episode task for this shift, without duplicate patients', async () => {
+  it('projects only the next open standing or current-episode task for this shift, without duplicate patients', async () => {
     const otherShift = await startShift();
     const shift = await startShift();
     const episode = await openEncounter({ patientId, kind: 'admission' });
@@ -93,6 +95,27 @@ describe('a shift', () => {
     expect((await activeShiftWorkspaceQuery())[0]?.nextTask).toBeNull();
   });
 
+  it('hides a manually discharged patient without an episode and retains prior-shift work until readmission', async () => {
+    const earlier = await startShift();
+    const previousTask = await createTask({ patientId, title: 'Synthetic outstanding task', shiftId: earlier });
+    const shift = await startShift();
+    const member = await addPatientToShift(shift, patientId);
+    await updatePatient(patientId, { status: 'discharged' });
+    expect(activeShiftWorkspaceQuery().get()).toMatchObject({
+      discharged: true,
+      nextTask: { id: previousTask, status: 'open' },
+    });
+    await expect(setShiftPatientReviewed(member, true, null)).rejects.toThrow();
+
+    const episode = await openEncounter({ patientId, kind: 'admission' });
+    expect(activeShiftWorkspaceQuery().get()).toMatchObject({
+      discharged: false,
+      encounter: { id: episode },
+      member: { encounterId: null },
+      nextTask: null,
+    });
+  });
+
   it('persists a checked round order without changing patient, task or encounter data', async () => {
     const shift = await startShift();
     const ids: string[] = [];
@@ -106,6 +129,30 @@ describe('a shift', () => {
     expect((await activeShiftWorkspaceQuery()).filter((r) => r.patient)).toHaveLength(40);
     expect(t.sqlite.export()).not.toEqual(before);
     expect((await shiftPatientsQuery(shift)).every((r) => !r.member.reviewedAt && !r.member.deletedAt)).toBe(true);
+  });
+  it('rejects old review and reorder actions after discharge while preserving the historical slot', async () => {
+    const shift = await startShift();
+    const episode = await openEncounter({ patientId, kind: 'admission' });
+    const departing = await addPatientToShift(shift, patientId, { shiftSummary: 'Synthetic handoff' });
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Second member' });
+    const next = await addPatientToShift(shift, other);
+    const more = await createPatient({ firstName: 'Synthetic', lastName: 'Third member' });
+    const last = await addPatientToShift(shift, more);
+    await dischargeEncounter(episode, {
+      dischargedAt: new Date(),
+      dischargeType: 'improved',
+      nextStatus: 'discharged',
+    });
+    await expect(setShiftPatientReviewed(departing, true, episode)).rejects.toThrow('دیده‌شدن ثبت نشد');
+    await expect(reorderShiftPatients(shift, [last, next, departing], [departing, next, last])).rejects.toThrow();
+    await reorderShiftPatients(shift, [last, next], [next, last]);
+    const history = await shiftHistoryPatientsQuery(shift);
+    expect(history.map((row) => row.member.id)).toEqual([departing, last, next]);
+    expect(history[0]?.member).toMatchObject({
+      encounterId: episode,
+      shiftSummary: 'Synthetic handoff',
+      reviewedAt: null,
+    });
   });
 
   it('rejects an incomplete, duplicate, foreign or stale order atomically', async () => {
@@ -225,6 +272,64 @@ describe('a shift', () => {
     expect(rows[0]?.member.encounterId).toBe(encounterId);
     expect(rows[0]?.encounter?.ward).toBe('CCU');
     expect(rows[1]?.member.encounterId).toBeNull();
+  });
+
+  it('adds a captured ward list atomically in its original order and preserves existing membership', async () => {
+    const shiftId = await startShift();
+    const firstPatient = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
+    const secondPatient = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    const thirdPatient = await createPatient({ firstName: 'Third', lastName: 'Patient', status: 'admitted' });
+    const firstEpisode = await openEncounter({ patientId: firstPatient, kind: 'admission', ward: 'Ward A' });
+    const episode = await openEncounter({ patientId: secondPatient, kind: 'admission', ward: 'PICU' });
+    const thirdEpisode = await openEncounter({ patientId: thirdPatient, kind: 'admission', ward: 'Ward B' });
+    const existing = await addPatientToShift(shiftId, firstPatient, { shiftSummary: 'Original handoff' });
+    const shown = [
+      { patientId: firstPatient, encounterId: firstEpisode },
+      { patientId: secondPatient, encounterId: episode },
+      { patientId: thirdPatient, encounterId: thirdEpisode },
+    ];
+    const ids = await addAdmittedPatientsToShift(shiftId, shown);
+    expect(ids[0]).toBe(existing);
+    expect(new Set(ids).size).toBe(3);
+    const rows = await shiftPatientsQuery(shiftId);
+    expect(rows.map((row) => row.patient.id)).toEqual([firstPatient, secondPatient, thirdPatient]);
+    expect(rows[0]?.member.shiftSummary).toBe('Original handoff');
+    expect(rows[1]?.member.encounterId).toBe(episode);
+    expect(await addAdmittedPatientsToShift(shiftId, shown)).toEqual(ids);
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(3);
+  });
+
+  it('refuses a changed admission list without partially adding its still-admitted members', async () => {
+    const shiftId = await startShift();
+    const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
+    const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
+    const secondEpisode = await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
+    const shown = await admittedForShiftQuery();
+    await deleteEncounter(secondEpisode);
+    expect(shown).toHaveLength(2);
+    await expect(addAdmittedPatientsToShift(shiftId, shown)).rejects.toThrow('فهرست بستری‌ها تغییر کرده است');
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
+  });
+
+  it('rolls back every new membership when one batch insert fails', async () => {
+    const shiftId = await startShift();
+    const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
+    const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
+    const firstEpisode = await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
+    const secondEpisode = await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
+    t.sqlite.exec(
+      `CREATE TRIGGER reject_second_shift_member BEFORE INSERT ON shift_patients
+       WHEN NEW.patient_id = '${second}'
+       BEGIN SELECT RAISE(ABORT, 'synthetic batch insert failure'); END;`,
+    );
+    await expect(
+      addAdmittedPatientsToShift(shiftId, [
+        { patientId: first, encounterId: firstEpisode },
+        { patientId: second, encounterId: secondEpisode },
+      ]),
+    ).rejects.toThrow('synthetic batch insert failure');
+    expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
   });
 
   it('does not list the same patient twice', async () => {

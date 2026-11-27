@@ -80,6 +80,26 @@ async function panel() {
 }
 
 describe('raw laboratory drafts and atomic publication on migrated SQLite', () => {
+  it('publishes legacy drafts and preserves specimen and method across a subsequent edit', async () => {
+    const panelId = await panel();
+    const legacy = document(panelId);
+    delete legacy.fields.specimen;
+    delete legacy.fields.method;
+    delete legacy.initial.specimen;
+    delete legacy.initial.method;
+    legacy.fields.notes = 'Legacy raw draft';
+    await saveLabFormDraft('legacy', patientId, panelId, legacy, 0);
+    await commitLabFormDraft('legacy', patientId, panelId, 1, now);
+    expect(clinical().panels[0]).toMatchObject({ notes: 'Legacy raw draft', specimen: null, method: null });
+
+    const edit = document(panelId);
+    edit.fields.specimen = 'Arterial';
+    edit.fields.method = 'Method A';
+    await saveLabFormDraft('with-context', patientId, panelId, edit, 0);
+    await commitLabFormDraft('with-context', patientId, panelId, 1, now);
+    expect(document(panelId).fields).toMatchObject({ specimen: 'Arterial', method: 'Method A' });
+  });
+
   it('watches all five tables of the combined form snapshot', () => {
     expect(tablesOf(labFormQuery(patientId, null))).toEqual([
       'patients',

@@ -18,9 +18,9 @@ import { rescheduleAllReminders } from '@/features/reminders/reschedule';
 import { reindexSearchIfNeeded } from '@/features/search/reindex';
 import { deriveKey } from '@/lib/crypto';
 import { reserveDatasetReplacement, type DatasetReplacement } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { FileWorkBusyError, fileJobsActive, reserveFileMaintenance } from '@/lib/file-work';
 import { newId, stamps, touch } from '@/lib/ids';
-import { redactErrorText } from '@/lib/redact';
 import { logError } from '@/platform/error-log';
 import { MEDIA_ROOT } from '@/platform/media';
 
@@ -385,9 +385,11 @@ export async function createBackup({
         if (checked === 'failed') {
           // Sizes and the failed step only — no file names, no data. Without
           // this the owner's report is "it says the backup failed" and nothing else.
-          logError(new Error(`backup copy check failed at ${failedStep} (source ${out.size ?? -1} bytes)`), {
+          logError(new Error(), {
             source: 'handled',
             context: 'backup: verifying destination copy',
+            code: failedStep ?? undefined,
+            bytes: out.size ?? undefined,
           });
           throw new Error('بررسی فایل بکاپ در مقصد کامل نشد. بکاپ‌های قبلی نگه داشته شدند؛ دوباره تلاش کنید.');
         }
@@ -429,7 +431,7 @@ export async function createBackup({
       .set({
         status: 'failed',
         finishedAt: new Date(),
-        errorText: redactErrorText(e instanceof Error ? e.message : String(e)),
+        errorText: safeErrorMessage(e),
         ...touch(),
       })
       .where(eq(backupRuns.id, runId))
@@ -533,9 +535,10 @@ async function recoverRestoreMedia(database: Database = db): Promise<{ putBack: 
     removeQuietly(dir);
     await writeSetting(restoreInFlight, null, database);
   } else {
-    logError(new Error(`${failed.length} restored file(s) could not be put back`), {
+    logError(new Error(), {
       source: 'handled',
-      context: `restore recovery: kept in ${DISPLACED_ROOT}/${marker.dir}`,
+      context: 'restore.media.recovery',
+      count: failed.length,
     });
   }
   await audit(
@@ -893,7 +896,8 @@ export async function restoreBackup({
       );
       logError(e, {
         source: 'handled',
-        context: `restore: ${e.notPutBack.length} file(s) left in ${DISPLACED_ROOT}/${kept?.name ?? '?'}`,
+        context: 'restore.media.recovery',
+        count: e.notPutBack.length,
       });
     } else if (kept != null) {
       // A failed recovery belongs to an earlier attempt. Do not clear its

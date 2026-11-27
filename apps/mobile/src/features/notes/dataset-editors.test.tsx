@@ -15,6 +15,7 @@ import { OrderFormScreen } from '@/features/kardex/order-form-screen';
 import { createOrder } from '@/features/kardex/queries';
 import * as orderQueries from '@/features/kardex/queries';
 import { createPatient } from '@/features/patients/queries';
+import * as formDraftQueries from '@/features/workspace-forms/queries';
 import { DatasetChangedError, reserveDatasetReplacement } from '@/lib/dataset-write';
 import { softDelete, stamps } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
@@ -341,6 +342,78 @@ describe('exact unfinished note selection', () => {
 });
 
 describe('actual manual order form identity, pending publication and optional suggestions', () => {
+  it('a same-dataset allergy correction remains live without resetting typed words', async () => {
+    t.db.update(patients).set({ allergies: 'Original synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('نام دارو').props.onChangeText('Retained synthetic words'));
+    t.db.update(patients).set({ allergies: 'Corrected synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      tree!.update(<OrderFormScreen />);
+      await settle();
+    });
+    expect(tree!.root.findAllByProps({ text: 'Corrected synthetic allergy' })).toHaveLength(1);
+    expect(tree!.root.findAllByProps({ text: 'Original synthetic allergy' })).toHaveLength(0);
+    expect(input('نام دارو').props.value).toBe('Retained synthetic words');
+    expect(input('نام دارو').props.editable).toBe(true);
+  });
+
+  it('a same-ID dataset replacement cannot mix replacement allergies into the old order form', async () => {
+    t.db.update(patients).set({ allergies: 'Replacement synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    snapshot();
+    t.db.update(patients).set({ allergies: 'Original synthetic allergy' }).where(eq(patients.id, patientId)).run();
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('نام دارو').props.onChangeText('Original synthetic words'));
+    const save = button('افزودن به کاردکس').props.onPress;
+    expect(tree!.root.findAllByProps({ text: 'Original synthetic allergy' })).toHaveLength(1);
+    await act(async () => {
+      replace();
+      tree!.update(<OrderFormScreen />);
+      await settle();
+      save();
+      await settle();
+    });
+    expect(tree!.root.findAllByProps({ text: 'Replacement synthetic allergy' })).toHaveLength(0);
+    expect(tree!.root.findAllByProps({ text: 'Original synthetic allergy' })).toHaveLength(1);
+    expect(input('نام دارو').props.value).toBe('Original synthetic words');
+    expect(input('نام دارو').props.editable).toBe(false);
+    expect(t.db.select().from(orders).all()).toEqual([]);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('a new form retains its original active episode, including null (%s)', async (admitted) => {
+    const originalEpisode = admitted
+      ? await openEncounter({ patientId, kind: 'admission', admittedAt: new Date('2025-01-01T12:00:00Z') })
+      : null;
+    await act(async () => {
+      tree = create(<OrderFormScreen />);
+      await settle();
+    });
+    await act(async () => input('نام دارو').props.onChangeText('Synthetic original episode'));
+    const save = button('افزودن به کاردکس').props.onPress;
+    const nextEpisode = await openEncounter({
+      patientId,
+      kind: 'admission',
+      admittedAt: new Date('2025-01-03T12:00:00Z'),
+    });
+    await act(async () => {
+      tree!.update(<OrderFormScreen />);
+      await settle();
+      save();
+      await settle();
+    });
+    const rows = t.db.select().from(orders).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ patientId, encounterId: originalEpisode, name: 'Synthetic original episode' });
+    expect(rows[0]!.encounterId).not.toBe(nextEpisode);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
   it('an initial mismatched deep link cannot seed the other patient’s order', async () => {
     const other = await createPatient({ firstName: 'Synthetic', lastName: 'Foreign route' });
     const id = await createOrder({ patientId: other, kind: 'drug', name: 'Synthetic foreign order' });
@@ -396,7 +469,7 @@ describe('actual manual order form identity, pending publication and optional su
     const current = t.db.select().from(orders).where(eq(orders.id, id)).get()!;
     expect(current).toMatchObject({ dose: '3 g', notes: null });
     expect(input('یادداشت').props.value).toBe('Synthetic new note');
-    expect(alertError).toHaveBeenCalledWith('ذخیره نشد', expect.any(Error));
+    expect(alertError).toHaveBeenCalledWith('ثبت نشد', expect.any(Error));
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -412,13 +485,13 @@ describe('actual manual order form identity, pending publication and optional su
     const pending = new Promise<void>((resolve) => {
       acknowledge = resolve;
     });
-    const update = orderQueries.updateOrder;
-    const writes = jest.spyOn(orderQueries, 'updateOrder').mockImplementation(async (...args) => {
+    const publish = formDraftQueries.publishWorkspaceDraft;
+    const writes = jest.spyOn(formDraftQueries, 'publishWorkspaceDraft').mockImplementation(async (...args) => {
       await pending;
-      await update(...args);
+      return publish(...args);
     });
     const save = button('ذخیره').props.onPress;
-    const cancel = button('انصراف').props.onPress;
+    const cancel = button('بستن').props.onPress;
     const oldDose = input('دوز').props.onChangeText;
     await act(async () => {
       save();
@@ -431,7 +504,7 @@ describe('actual manual order form identity, pending publication and optional su
     expect(mockBack).not.toHaveBeenCalled();
     expect(input('دوز').props.value).toBe('2 g');
     expect(input('دوز').props.editable).toBe(false);
-    expect(button('انصراف').props.disabled).toBe(true);
+    expect(button('بستن').props.disabled).toBe(true);
     mockFocused = false;
     await act(async () => {
       acknowledge();
@@ -494,44 +567,50 @@ describe('actual manual order form identity, pending publication and optional su
     expect(input('نام دارو').props.value).toBe('Synthetic typed');
   });
 
-  it.each(['dose', 'name'] as const)('a delayed suggestion cannot overwrite a later manual %s edit', async (field) => {
-    const candidate = await createOrder({
-      patientId,
-      kind: 'fluid',
-      name: 'Synthetic candidate',
-      dose: '1000 cc',
-      route: 'IV',
-      rate: '40 cc/h',
-    });
-    const previous = t.db.select().from(orders).where(eq(orders.id, candidate)).get()!;
-    jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([previous.name]);
-    let release!: (value: typeof previous) => void;
-    const pending = new Promise<typeof previous>((resolve) => {
-      release = resolve;
-    });
-    jest.spyOn(orderQueries, 'lastOrderNamed').mockReturnValue(pending);
-    await act(async () => {
-      tree = create(<OrderFormScreen />);
-      await settle();
-    });
-    const picked = tree!.root
-      .findAllByType(Pressable)
-      .find((node) => node.findAllByType(Text).some((text) => text.props.children === previous.name))!;
-    await act(async () => {
-      picked.props.onPress();
-      await settle();
-    });
-    await act(async () => {
-      if (field === 'dose') input('دوز').props.onChangeText('125 mg');
-      else input('نام دارو').props.onChangeText('Synthetic newer name');
-      release(previous);
-      await settle();
-    });
-    expect(input('نام دارو').props.value).toBe(field === 'dose' ? previous.name : 'Synthetic newer name');
-    expect(input('دوز').props.value).toBe(field === 'dose' ? '125 mg' : '');
-    expect(tree!.root.findAllByType(Input).some((node) => node.props.label === 'سرعت')).toBe(false);
-    expect(mockBack).not.toHaveBeenCalled();
-  });
+  // React rendering and migrated SQLite share this worker. Allow host scheduling
+  // headroom; the deliberately delayed lookup still resolves inside the test.
+  it.each(['dose', 'name'] as const)(
+    'a delayed suggestion cannot overwrite a later manual %s edit',
+    async (field) => {
+      const candidate = await createOrder({
+        patientId,
+        kind: 'fluid',
+        name: 'Synthetic candidate',
+        dose: '1000 cc',
+        route: 'IV',
+        rate: '40 cc/h',
+      });
+      const previous = t.db.select().from(orders).where(eq(orders.id, candidate)).get()!;
+      jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([previous.name]);
+      let release!: (value: typeof previous) => void;
+      const pending = new Promise<typeof previous>((resolve) => {
+        release = resolve;
+      });
+      jest.spyOn(orderQueries, 'lastOrderNamed').mockReturnValue(pending);
+      await act(async () => {
+        tree = create(<OrderFormScreen />);
+        await settle();
+      });
+      const picked = tree!.root
+        .findAllByType(Pressable)
+        .find((node) => node.findAllByType(Text).some((text) => text.props.children === previous.name))!;
+      await act(async () => {
+        picked.props.onPress();
+        await settle();
+      });
+      await act(async () => {
+        if (field === 'dose') input('دوز').props.onChangeText('125 mg');
+        else input('نام دارو').props.onChangeText('Synthetic newer name');
+        release(previous);
+        await settle();
+      });
+      expect(input('نام دارو').props.value).toBe(field === 'dose' ? previous.name : 'Synthetic newer name');
+      expect(input('دوز').props.value).toBe(field === 'dose' ? '125 mg' : '');
+      expect(tree!.root.findAllByType(Input).some((node) => node.props.label === 'سرعت')).toBe(false);
+      expect(mockBack).not.toHaveBeenCalled();
+    },
+    15_000,
+  );
 
   it('only the latest of two deferred selections may prefill the draft', async () => {
     const first = await createOrder({ patientId, kind: 'drug', name: 'Synthetic first', dose: '1 g' });
@@ -1153,7 +1232,7 @@ describe('mounted note and order intents across real same-ID SQL import', () => 
       await settle();
     });
     expect(t.db.select().from(orders).get()!.dose).toBe('500 mg');
-    expect(jest.mocked(alertError)).toHaveBeenCalledWith('ذخیره نشد', expect.any(DatasetChangedError));
+    expect(jest.mocked(alertError)).toHaveBeenCalledWith('ثبت نشد', expect.any(DatasetChangedError));
     expect(mockBack).not.toHaveBeenCalled();
   });
 });

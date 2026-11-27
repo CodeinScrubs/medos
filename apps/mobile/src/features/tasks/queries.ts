@@ -1,8 +1,8 @@
-import { and, asc, count, desc, eq, isNotNull, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, isNotNull, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
 import { db, type DbTransaction } from '@/db/client';
-import { patients, tasks, type Task, type TaskKind } from '@/db/schema';
+import { patients, shiftPatients, shifts, tasks, type Task, type TaskKind } from '@/db/schema';
 import { matchesSearch } from '@/db/search';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { buildSearchText } from '@/lib/persian';
@@ -33,6 +33,8 @@ export type TaskFilter = {
   search?: string;
   patientId?: string | null;
   shiftId?: string | null;
+  /** Work belonging to the patients carried on this shift, including those discharged. */
+  memberShiftId?: string;
   status?: Task['status'];
   deleted?: boolean;
   /** Only tasks that are due, or overdue, at this moment. */
@@ -48,6 +50,25 @@ function taskConditions(filter: TaskFilter) {
   }
   if (filter.shiftId !== undefined) {
     clauses.push(filter.shiftId === null ? isNull(tasks.shiftId) : eq(tasks.shiftId, filter.shiftId));
+  }
+  if (filter.memberShiftId !== undefined) {
+    const shiftId = filter.memberShiftId;
+    clauses.push(
+      exists(
+        db
+          .select({ id: shiftPatients.id })
+          .from(shiftPatients)
+          .innerJoin(shifts, and(eq(shifts.id, shiftPatients.shiftId), isNull(shifts.deletedAt)))
+          .innerJoin(patients, and(eq(patients.id, shiftPatients.patientId), isNull(patients.deletedAt)))
+          .where(
+            and(
+              eq(shiftPatients.shiftId, shiftId),
+              eq(shiftPatients.patientId, tasks.patientId),
+              isNull(shiftPatients.deletedAt),
+            ),
+          ),
+      ),
+    );
   }
   if (filter.status) clauses.push(eq(tasks.status, filter.status));
   // A task with no due date is always "now": it is not waiting for anything.

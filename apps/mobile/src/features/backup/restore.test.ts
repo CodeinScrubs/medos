@@ -20,6 +20,7 @@ import {
   settings,
   taskDrafts,
   tasks,
+  workspaceFormDrafts,
 } from '@/db/schema';
 import { encodeOccasionForm, initialOccasionForm } from '@/features/doctors/occasion-form-draft';
 import { encodePatientForm, initialPatientFields } from '@/features/patients/form-draft';
@@ -73,6 +74,45 @@ const settingValue = async (t: TestDatabase, key: string) =>
   (await t.db.select().from(settings)).find((s) => s.key === key)?.value ?? null;
 
 describe('importTables', () => {
+  it('restores current workspace raw documents and revisions without decoding or normalizing them', async () => {
+    await backup.db.insert(workspaceFormDrafts).values({
+      id: 'synthetic-raw',
+      ...stamps(),
+      kind: 'topic',
+      parentId: null,
+      recordId: 'synthetic-topic',
+      scope: '[null,"synthetic-topic"]',
+      body: ' {"version":99,"fields":{"dateText":"1404/10/","body":" exact words  "}} ',
+      revision: 17,
+    });
+    const expected = backup.db.select().from(workspaceFormDrafts).get()!;
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(workspaceFormDrafts).get()).toEqual(expected);
+    expect(live.conn.getAllSync('PRAGMA foreign_key_check')).toEqual([]);
+  });
+  it('restores a pre-workspace-draft backup and leaves the new optional table empty', async () => {
+    await addPatient(backup, 'Synthetic older backup');
+    live.db
+      .insert(workspaceFormDrafts)
+      .values({ id: 'synthetic-local', ...stamps(), kind: 'idea', scope: '[null,null]', body: 'local draft' })
+      .run();
+    backup.conn.execSync('DROP TABLE workspace_form_drafts');
+    attachAsBackup(live, backup);
+    live.conn.execSync('PRAGMA foreign_keys = OFF');
+    try {
+      importTables(live.conn);
+    } finally {
+      live.conn.execSync('PRAGMA foreign_keys = ON');
+    }
+    expect(live.db.select().from(workspaceFormDrafts).all()).toEqual([]);
+    expect(await names(live)).toEqual(['Synthetic older backup']);
+  });
   it('restores pre-context note drafts with SQL defaults without inventing an origin or losing raw text', async () => {
     const patientId = await addPatient(backup, 'Synthetic legacy note draft');
     await backup.db.insert(noteDrafts).values({

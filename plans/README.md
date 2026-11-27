@@ -115,3 +115,7 @@ light/dark themes, RTL, increased font size, keyboard open/closed and gesture /
 three-button navigation. Use actual UI bounds for taps; do not guess coordinates.
 Record required taps and observed failures. Latency measurements must name device,
 build and scenario; no speed claim follows from a passing Jest suite.
+
+## New workflow scope
+
+[006 — Ward intake and follow-through](006-ward-intake-and-followthrough.md) records the owner's current ward workflow: minimal multi-patient intake, progressive patient completion, rounds/tasks, result follow-through, multi-page evidence, longitudinal labs, discharge and later retrieval. It is a design contract, not an implemented feature claim. The next implementation slices require source review and independent acceptance.

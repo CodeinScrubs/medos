@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, exists, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { db, type Database } from '@/db/client';
 import { encounters, patients, shiftPatients, shifts, tasks, type Shift, type ShiftPatient } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { activeEncounterIdQuery } from '@/features/encounters/status';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -32,15 +33,31 @@ export function activeShiftQuery() {
     .limit(1);
 }
 
-/** One SQLite snapshot, including an open shift with no visible members. */
-export function activeShiftWorkspaceQuery() {
-  const activeId = db
+/** Present the live episode without rewriting the membership captured at intake. */
+export function activeShiftWorkspaceQuery(reader: Pick<Database, 'select'> = db, memberId?: string) {
+  const activeId = reader
     .select({ id: shifts.id })
     .from(shifts)
     .where(and(alive, eq(shifts.isActive, true)))
     .orderBy(desc(shifts.startAt), desc(shifts.id))
     .limit(1);
-  const nextTask = db
+  const laterDischarge = reader
+    .select({ id: encounters.id })
+    .from(encounters)
+    .where(
+      and(
+        eq(encounters.patientId, patients.id),
+        isNull(encounters.deletedAt),
+        isNotNull(encounters.dischargedAt),
+        gte(encounters.createdAt, shiftPatients.createdAt),
+      ),
+    )
+    .orderBy(desc(encounters.createdAt), desc(encounters.dischargedAt), asc(encounters.id))
+    .limit(1);
+  // An active episode wins over historical or manually entered status.
+  const discharged = sql<boolean>`coalesce(${encounters.isActive}, 0) = 0 and
+    (${encounters.dischargedAt} is not null or coalesce(${patients.status} = 'discharged', 0))`.mapWith(Boolean);
+  const nextTask = reader
     .select({ id: tasks.id })
     .from(tasks)
     .where(
@@ -48,8 +65,8 @@ export function activeShiftWorkspaceQuery() {
         isNull(tasks.deletedAt),
         eq(tasks.status, 'open'),
         eq(tasks.patientId, patients.id),
-        or(isNull(tasks.encounterId), eq(tasks.encounterId, encounters.id)),
-        or(isNull(tasks.shiftId), eq(tasks.shiftId, shifts.id)),
+        or(discharged, isNull(tasks.encounterId), eq(tasks.encounterId, encounters.id)),
+        or(discharged, isNull(tasks.shiftId), eq(tasks.shiftId, shifts.id)),
       ),
     )
     .orderBy(
@@ -61,22 +78,32 @@ export function activeShiftWorkspaceQuery() {
     )
     .limit(1);
   return (
-    db
-      .select({ shift: shifts, member: shiftPatients, patient: patients, encounter: encounters, nextTask: tasks })
+    reader
+      .select({
+        shift: shifts,
+        member: shiftPatients,
+        patient: patients,
+        encounter: encounters,
+        nextTask: tasks,
+        discharged,
+      })
       .from(shifts)
       .leftJoin(shiftPatients, and(eq(shiftPatients.shiftId, shifts.id), memberAlive))
       .leftJoin(patients, and(eq(shiftPatients.patientId, patients.id), isNull(patients.deletedAt)))
       .leftJoin(
         encounters,
         and(
-          eq(shiftPatients.encounterId, encounters.id),
+          eq(
+            encounters.id,
+            sql`coalesce((${activeEncounterIdQuery(patients.id, reader)}), (${laterDischarge}), ${shiftPatients.encounterId})`,
+          ),
           eq(encounters.patientId, patients.id),
           isNull(encounters.deletedAt),
         ),
       )
       // Keep a real join: useLive must observe task changes, not only the subquery.
       .leftJoin(tasks, eq(tasks.id, nextTask))
-      .where(eq(shifts.id, activeId))
+      .where(and(eq(shifts.id, activeId), memberId === undefined ? undefined : eq(shiftPatients.id, memberId)))
       .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt), asc(shiftPatients.id))
   );
 }
@@ -100,14 +127,11 @@ export async function reorderShiftPatients(
           .get()
       )
         throw new Error('این شیفت دیگر باز نیست.');
-      const current = tx
-        .select({ id: shiftPatients.id })
-        .from(shiftPatients)
-        .innerJoin(patients, and(eq(patients.id, shiftPatients.patientId), isNull(patients.deletedAt)))
-        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
-        .orderBy(asc(shiftPatients.sortOrder), asc(shiftPatients.createdAt), asc(shiftPatients.id))
+      const members = activeShiftWorkspaceQuery(tx)
         .all()
-        .map((m) => m.id);
+        .filter((row) => row.shift.id === shiftId && row.member && row.patient);
+      const active = members.filter(({ discharged }) => !discharged);
+      const current = active.map(({ member }) => member!.id);
       if (
         JSON.stringify(current) !== JSON.stringify(expectedIds) ||
         orderedIds.length !== current.length ||
@@ -116,13 +140,14 @@ export async function reorderShiftPatients(
       )
         throw new Error('لیست شیفت تغییر کرده است؛ ترتیب تازه را بررسی کنید.');
       const now = new Date();
-      orderedIds.forEach((id, sortOrder) =>
-        tx
-          .update(shiftPatients)
+      let nextActive = 0;
+      members.forEach(({ member, discharged }, sortOrder) => {
+        const id = discharged ? member!.id : orderedIds[nextActive++]!;
+        tx.update(shiftPatients)
           .set({ sortOrder, ...touch(now) })
           .where(and(eq(shiftPatients.id, id), eq(shiftPatients.shiftId, shiftId), memberAlive))
-          .run(),
-      );
+          .run();
+      });
     }),
   );
 }
@@ -309,6 +334,97 @@ export async function addPatientToShift(
   });
 }
 
+/** Read the episode with each candidate so the displayed count has a clinical basis. */
+export function admittedForShiftQuery(reader: Pick<Database, 'select'> = db) {
+  return reader
+    .select({ patientId: patients.id, encounterId: encounters.id })
+    .from(patients)
+    .innerJoin(encounters, eq(encounters.id, activeEncounterIdQuery(patients.id, reader)))
+    .where(
+      and(
+        isNull(patients.deletedAt),
+        eq(patients.status, 'admitted'),
+        inArray(encounters.kind, ['admission', 'emergency']),
+      ),
+    )
+    .orderBy(desc(patients.starred), desc(patients.updatedAt), asc(patients.id));
+}
+
+type AdmittedForShift = Awaited<ReturnType<typeof admittedForShiftQuery>>[number];
+
+/** Compare and add the entire displayed census in one SQLite transaction. */
+export async function addAdmittedPatientsToShift(
+  shiftId: string,
+  shown: readonly AdmittedForShift[],
+  generation = datasetGeneration(),
+): Promise<string[]> {
+  if (!shown.length) return [];
+  const shownIds = new Set(shown.map(({ patientId }) => patientId));
+  if (shownIds.size !== shown.length) throw new Error('فهرست بیماران معتبر نیست؛ هیچ بیماری اضافه نشد.');
+
+  return withDatasetWrite(generation, async () =>
+    db.transaction((tx) => {
+      const shift = tx
+        .select({ id: shifts.id })
+        .from(shifts)
+        .where(and(alive, eq(shifts.isActive, true), eq(shifts.id, shiftId)))
+        .get();
+      if (!shift) throw new Error('این شیفت دیگر باز نیست؛ هیچ بیماری اضافه نشد.');
+
+      const existing = tx
+        .select({ id: shiftPatients.id, patientId: shiftPatients.patientId })
+        .from(shiftPatients)
+        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
+        .orderBy(desc(shiftPatients.createdAt), desc(shiftPatients.id))
+        .all();
+      // For imported duplicates, retain the same earliest member as single add.
+      const existingByPatient = new Map(existing.map(({ patientId, id }) => [patientId, id]));
+      const current = admittedForShiftQuery(tx).all();
+      const encountersByPatient = new Map(current.map(({ patientId, encounterId }) => [patientId, encounterId]));
+      if (
+        shown.some(({ patientId, encounterId }) => encountersByPatient.get(patientId) !== encounterId) ||
+        current.some(({ patientId }) => !existingByPatient.has(patientId) && !shownIds.has(patientId))
+      )
+        throw new Error('فهرست بستری‌ها تغییر کرده است؛ فهرست را بررسی کنید و دوباره بزنید.');
+
+      const last = tx
+        .select({ sortOrder: shiftPatients.sortOrder })
+        .from(shiftPatients)
+        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
+        .orderBy(desc(shiftPatients.sortOrder))
+        .get();
+      let sortOrder = (last?.sortOrder ?? 0) + 1;
+      const now = new Date();
+      const result: string[] = [];
+
+      for (const { patientId, encounterId } of shown) {
+        const prior = existingByPatient.get(patientId);
+        if (prior !== undefined) {
+          result.push(prior);
+          continue;
+        }
+        const id = newId();
+        tx.insert(shiftPatients)
+          .values({
+            id,
+            ...stamps(now),
+            shiftId,
+            patientId,
+            encounterId,
+            sortOrder,
+            shiftSummary: null,
+            handoffNote: null,
+            reviewedAt: null,
+          })
+          .run();
+        sortOrder += 1;
+        result.push(id);
+      }
+      return result;
+    }),
+  );
+}
+
 export async function removePatientFromShift(memberId: string): Promise<void> {
   await db
     .update(shiftPatients)
@@ -317,30 +433,25 @@ export async function removePatientFromShift(memberId: string): Promise<void> {
 }
 
 /** Mark a patient seen on this shift, or un-mark them. */
-export async function setShiftPatientReviewed(memberId: string, reviewed: boolean): Promise<void> {
-  const result = await db
-    .update(shiftPatients)
-    .set({ reviewedAt: reviewed ? new Date() : null, ...touch() })
-    .where(
-      and(
-        memberAlive,
-        eq(shiftPatients.id, memberId),
-        exists(
-          db
-            .select({ id: shifts.id })
-            .from(shifts)
-            .where(and(alive, eq(shifts.isActive, true), eq(shifts.id, shiftPatients.shiftId))),
-        ),
-        exists(
-          db
-            .select({ id: patients.id })
-            .from(patients)
-            .where(and(isNull(patients.deletedAt), eq(patients.id, shiftPatients.patientId))),
-        ),
-      ),
+export async function setShiftPatientReviewed(
+  memberId: string,
+  reviewed: boolean,
+  shownEncounterId?: string | null,
+): Promise<void> {
+  db.transaction((tx) => {
+    const row = activeShiftWorkspaceQuery(tx, memberId).get();
+    if (
+      !row?.patient ||
+      row.discharged ||
+      (shownEncounterId !== undefined && (row.encounter?.id ?? null) !== shownEncounterId)
     )
-    .returning({ id: shiftPatients.id });
-  if (result.length === 0) throw new Error('بیمار یا شیفت تغییر کرده است؛ دیده‌شدن ثبت نشد.');
+      throw new Error('بیمار یا شیفت تغییر کرده است؛ دیده‌شدن ثبت نشد.');
+    const now = new Date();
+    tx.update(shiftPatients)
+      .set({ reviewedAt: reviewed ? now : null, ...touch(now) })
+      .where(eq(shiftPatients.id, memberId))
+      .run();
+  });
 }
 
 export async function updateShiftPatient(

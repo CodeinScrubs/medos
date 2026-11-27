@@ -1,21 +1,24 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
+import { AutosaveScope } from '@/components/autosave-scope';
 import { CollapsibleSection } from '@/components/collapsible-section';
-import { EditGate } from '@/components/edit-gate';
-import { alertError, notify } from '@/components/feedback';
+import { notify } from '@/components/feedback';
 import { JalaliDateField } from '@/components/jalali-date-field';
 import { ScreenOptions } from '@/components/screen-options';
-import { Button, ChipSelect, Column, Input, Screen, SectionHeader, Text, Toggle } from '@/components/ui';
+import { Button, ChipSelect, Column, Input, Screen, SectionHeader, Toggle } from '@/components/ui';
 import { useDateValidation } from '@/components/use-date-validation';
 import type { Credential } from '@/db/schema';
-import { useLive } from '@/db/use-live';
-import { fromIsoDate, toIsoDate } from '@/lib/jalali';
+import { WorkspaceFormGate } from '@/features/workspace-forms/form-gate';
+import { WorkspaceFormDiscard, WorkspaceFormStatus } from '@/features/workspace-forms/form-status';
+import type { FormSeed } from '@/features/workspace-forms/types';
+import { useWorkspaceForm } from '@/features/workspace-forms/use-form';
+import { toIsoDate } from '@/lib/jalali';
 import { useTheme } from '@/theme';
 
+import type { CredentialFormFields } from './form-draft';
+import { credentialFormPort } from './form-draft-queries';
 import { CREDENTIAL_CATEGORY_LABELS, CREDENTIAL_OWNER_LABELS } from './labels';
-import { secretHint } from './logic';
-import { createCredential, credentialQuery, updateCredential } from './queries';
 
 const CATEGORY_OPTIONS = (Object.keys(CREDENTIAL_CATEGORY_LABELS) as Credential['category'][]).map((c) => ({
   value: c,
@@ -26,112 +29,117 @@ const OWNER_OPTIONS = (Object.keys(CREDENTIAL_OWNER_LABELS) as Credential['owner
   label: CREDENTIAL_OWNER_LABELS[o],
 }));
 
-const toList = (text: string) =>
-  text
-    .split(/[,،]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
 /** Add or edit one credential. Param: optional `credentialId`. */
 export function CredentialFormScreen() {
-  const { credentialId } = useLocalSearchParams<{ credentialId?: string }>();
-  const { data, error, retry } = useLive(credentialQuery(credentialId ?? ''), [credentialId]);
+  const { credentialId, draftId } = useLocalSearchParams<{ credentialId?: string; draftId?: string }>();
   return (
-    <EditGate editing={Boolean(credentialId)} rows={data} error={error} onRetry={retry} what="رمز">
-      {(credential, readNotice) => <CredentialForm readNotice={readNotice} credential={credential} />}
-    </EditGate>
+    <AutosaveScope>
+      <WorkspaceFormGate port={credentialFormPort} recordId={credentialId ?? null} draftId={draftId ?? null}>
+        {(seed, readNotice, unavailable) => (
+          <CredentialForm seed={seed} readNotice={readNotice} unavailable={unavailable} />
+        )}
+      </WorkspaceFormGate>
+    </AutosaveScope>
   );
 }
 
-function CredentialForm({ credential, readNotice }: { readNotice: ReactNode; credential: Credential | null }) {
+function CredentialForm({
+  seed,
+  readNotice,
+  unavailable,
+}: {
+  seed: FormSeed<Credential, CredentialFormFields>;
+  readNotice: ReactNode;
+  unavailable: boolean;
+}) {
   const router = useRouter();
   const { spacing } = useTheme();
-
-  const [systemName, setSystemName] = useState(credential?.systemName ?? '');
-  const [category, setCategory] = useState<Credential['category']>(credential?.category ?? 'prescription');
-  const [url, setUrl] = useState(credential?.url ?? '');
-  const [username, setUsername] = useState(credential?.username ?? '');
-  // Blank means preserve the stored secret. The detail screen can show current
-  // text; legacy encrypted entries remain distinguishable until replaced.
-  const [secret, setSecret] = useState('');
-  const [clearSecret, setClearSecret] = useState(false);
-  const [secondFactorNotes, setSecondFactorNotes] = useState(credential?.secondFactorNotes ?? '');
-  const [ownerKind, setOwnerKind] = useState<Credential['ownerKind']>(credential?.ownerKind ?? 'self');
-  const [ownerName, setOwnerName] = useState(credential?.ownerName ?? '');
-  const [ownerConsentNote, setOwnerConsentNote] = useState(credential?.ownerConsentNote ?? '');
-  const [notes, setNotes] = useState(credential?.notes ?? '');
-  const [tags, setTags] = useState((credential?.tags ?? []).join('، '));
-  const [expiresIso, setExpiresIso] = useState<string | null>(
-    credential?.expiresAt ? toIsoDate(credential.expiresAt) : null,
-  );
-  const [starred, setStarred] = useState(credential?.starred ?? false);
-  const [saving, setSaving] = useState(false);
+  const isEditing = seed.document.recordId !== null;
+  const editing = useWorkspaceForm(credentialFormPort, seed, unavailable, () => router.back());
+  const {
+    systemName,
+    category,
+    url,
+    username,
+    secret,
+    clearSecret,
+    secondFactorNotes,
+    ownerKind,
+    ownerName,
+    ownerConsentNote,
+    notes,
+    tags,
+    expiresValue,
+    expiresText,
+    starred,
+  } = editing.document.fields;
+  const setSystemName = (systemName: string) => editing.change({ systemName });
+  const setCategory = (category: Credential['category']) => editing.change({ category });
+  const setUrl = (url: string) => editing.change({ url });
+  const setUsername = (username: string) => editing.change({ username });
+  const setSecondFactorNotes = (secondFactorNotes: string) => editing.change({ secondFactorNotes });
+  const setOwnerKind = (ownerKind: Credential['ownerKind']) => editing.change({ ownerKind });
+  const setOwnerName = (ownerName: string) => editing.change({ ownerName });
+  const setOwnerConsentNote = (ownerConsentNote: string) => editing.change({ ownerConsentNote });
+  const setNotes = (notes: string) => editing.change({ notes });
+  const setTags = (tags: string) => editing.change({ tags });
+  const setStarred = (starred: boolean) => editing.change({ starred });
   const dateValidation = useDateValidation();
-
-  const hint = secretHint(secret);
-
-  async function save() {
-    if (!dateValidation.check()) return;
-    if (!systemName.trim()) {
-      notify('نام سامانه لازم است');
+  function save() {
+    if (editing.completed || editing.stale) {
+      editing.close();
       return;
     }
-    setSaving(true);
-    const payload = {
-      systemName,
-      category,
-      url,
-      username,
-      secondFactorNotes,
-      ownerKind,
-      ownerName,
-      ownerConsentNote,
-      notes,
-      tags: toList(tags),
-      expiresAt: fromIsoDate(expiresIso),
-      starred,
-    };
-    try {
-      if (credential) {
-        /*
-         * `secret` goes only when there is something to say about it. An empty
-         * box means "leave the stored password alone", because editing a
-         * username must not wipe it — clearing it on purpose is the button
-         * below the field, which says so.
-         */
-        const secretChange = clearSecret ? { secret: '' } : secret ? { secret } : {};
-        await updateCredential(credential.id, { ...payload, ...secretChange });
-      } else {
-        await createCredential({ ...payload, secret });
+    void editing.save((fields) => {
+      if (!dateValidation.check()) return false;
+      if (!fields.systemName.trim()) {
+        notify('نام سامانه لازم است');
+        return false;
       }
-      router.back();
-    } catch (e) {
-      alertError('ذخیره نشد', e);
-    } finally {
-      setSaving(false);
-    }
+      return true;
+    });
   }
 
   return (
     <Screen scroll>
-      <ScreenOptions options={{ title: credential ? 'ویرایش رمز' : 'رمز جدید' }} />
-      <Column gap="md" style={{ paddingTop: spacing.md }}>
+      <ScreenOptions options={{ title: isEditing ? 'ویرایش رمز' : 'رمز جدید' }} />
+      <Column
+        collapsable={false}
+        gap="md"
+        style={{ paddingTop: spacing.md }}
+        pointerEvents={editing.busy ? 'none' : 'auto'}
+      >
         {readNotice}
+        <WorkspaceFormStatus editing={editing} port={credentialFormPort} />
         <Input
           label="نام سامانه"
           required
           value={systemName}
+          editable={!editing.locked}
           onChangeText={setSystemName}
           placeholder="سامانه‌ی نسخه‌ی الکترونیک"
         />
-        <ChipSelect label="دسته" options={CATEGORY_OPTIONS} value={category} onChange={(v) => v && setCategory(v)} />
-        <Input label="یوزرنیم" value={username} onChangeText={setUsername} ltr autoCapitalize="none" />
+        <ChipSelect
+          disabled={editing.locked}
+          label="دسته"
+          options={CATEGORY_OPTIONS}
+          value={category}
+          onChange={(v) => v && setCategory(v)}
+        />
         <Input
-          label={credential ? 'رمز جدید' : 'رمز'}
+          editable={!editing.locked}
+          label="یوزرنیم"
+          value={username}
+          onChangeText={setUsername}
+          ltr
+          autoCapitalize="none"
+        />
+        <Input
+          label={isEditing ? 'رمز جدید' : 'رمز'}
           value={secret}
+          editable={!editing.locked}
           onChangeText={(v) => {
-            setSecret(v);
-            if (v) setClearSecret(false);
+            editing.change({ secret: v, ...(v ? { clearSecret: false } : {}) });
           }}
           secureTextEntry
           ltr
@@ -139,28 +147,41 @@ function CredentialForm({ credential, readNotice }: { readNotice: ReactNode; cre
           hint={
             clearSecret
               ? 'با ذخیره، رمز ذخیره‌شده پاک می‌شود'
-              : (hint ?? (credential ? 'خالی بگذارید تا رمز فعلی دست نخورد' : 'همان‌طور که می‌نویسید ذخیره می‌شود'))
+              : isEditing
+                ? 'خالی بگذارید تا رمز فعلی دست نخورد'
+                : undefined
           }
         />
-        {credential && !secret ? (
+        {isEditing && !secret ? (
           <Toggle
             label="رمز ذخیره‌شده پاک شود"
             description="فقط خود رمز؛ بقیه‌ی اطلاعات این سامانه می‌ماند"
             value={clearSecret}
-            onChange={setClearSecret}
+            onChange={(clearSecret) => editing.change({ clearSecret })}
+            disabled={editing.locked}
           />
         ) : null}
-        <Input label="آدرس سامانه" value={url} onChangeText={setUrl} ltr autoCapitalize="none" keyboardType="url" />
+        <Input
+          editable={!editing.locked}
+          label="آدرس سامانه"
+          value={url}
+          onChangeText={setUrl}
+          ltr
+          autoCapitalize="none"
+          keyboardType="url"
+        />
 
         <CollapsibleSection
           title="جزئیات"
           icon="options-outline"
-          filledCount={[secondFactorNotes, notes, tags, expiresIso].filter(Boolean).length}
+          defaultOpen={Boolean(secondFactorNotes || notes || tags || expiresText)}
+          filledCount={[secondFactorNotes, notes, tags, expiresText].filter(Boolean).length}
         >
           <Column gap="md">
             <Input
               label="ورود دو مرحله‌ای"
               value={secondFactorNotes}
+              editable={!editing.locked}
               onChangeText={setSecondFactorNotes}
               multiline
               hint="شماره‌ی بازیابی، سؤال امنیتی، اپ توکن"
@@ -168,44 +189,59 @@ function CredentialForm({ credential, readNotice }: { readNotice: ReactNode; cre
             <JalaliDateField
               onValidityChange={dateValidation.setValid}
               label="تاریخ انقضا"
-              value={expiresIso}
-              onChange={setExpiresIso}
+              value={expiresValue === null ? null : toIsoDate(new Date(expiresValue))}
+              rawText={expiresText}
+              onRawTextChange={(expiresText) => editing.change({ expiresText })}
+              onChange={() => {
+                /* The raw text is the source of truth. */
+              }}
+              editable={!editing.locked}
               allowFuture
             />
-            <Input label="یادداشت" value={notes} onChangeText={setNotes} multiline />
-            <Input label="برچسب‌ها" value={tags} onChangeText={setTags} hint="با ویرگول جدا کنید" />
+            <Input editable={!editing.locked} label="یادداشت" value={notes} onChangeText={setNotes} multiline />
+            <Input
+              editable={!editing.locked}
+              label="برچسب‌ها"
+              value={tags}
+              onChangeText={setTags}
+              hint="با ویرگول جدا کنید"
+            />
           </Column>
         </CollapsibleSection>
 
         <SectionHeader title="مال کیست" />
-        <ChipSelect options={OWNER_OPTIONS} value={ownerKind} onChange={(v) => v && setOwnerKind(v)} />
+        <ChipSelect
+          disabled={editing.locked}
+          options={OWNER_OPTIONS}
+          value={ownerKind}
+          onChange={(v) => v && setOwnerKind(v)}
+        />
         {ownerKind !== 'self' ? (
           <>
-            <Input label="نام صاحب رمز" value={ownerName} onChangeText={setOwnerName} />
+            <Input editable={!editing.locked} label="نام صاحب رمز" value={ownerName} onChangeText={setOwnerName} />
             <Input
               label="چرا دست شماست"
               value={ownerConsentNote}
+              editable={!editing.locked}
               onChangeText={setOwnerConsentNote}
               multiline
               placeholder="مثلاً: شیفت‌هایش را پوشش می‌دهم و خودش دسترسی داده."
             />
-            <Text variant="tiny" color="textFaint">
-              رمز یک همکار یعنی دسترسی به سامانه‌ای که به نام او نسخه می‌نویسد. دلیلش را بنویسید و هر وقت لازم نبود پاکش
-              کنید.
-            </Text>
           </>
         ) : null}
 
-        <Toggle label="ستاره‌دار" value={starred} onChange={setStarred} />
+        <Toggle disabled={editing.locked} label="ستاره‌دار" value={starred} onChange={setStarred} />
 
         <Button
-          label={credential ? 'ذخیره' : 'ثبت رمز'}
+          label={editing.completed || editing.stale ? 'بستن' : isEditing ? 'ذخیره' : 'ثبت رمز'}
           icon="checkmark"
           onPress={() => void save()}
-          loading={saving}
+          loading={editing.busy}
+          disabled={editing.busy || (editing.locked && !editing.completed && !editing.stale)}
           full
         />
-        <Button label="انصراف" variant="ghost" onPress={() => router.back()} full haptic={false} />
+        <Button label="بستن" variant="ghost" onPress={editing.close} disabled={editing.busy} full haptic={false} />
+        <WorkspaceFormDiscard editing={editing} />
       </Column>
     </Screen>
   );

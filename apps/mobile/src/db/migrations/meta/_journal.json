@@ -204,6 +204,34 @@
       "when": 1791564313228,
       "tag": "0028_perfect_ezekiel",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1791591399409,
+      "tag": "0029_living_lyja",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1791682510124,
+      "tag": "0030_lean_anthem",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1791683321218,
+      "tag": "0031_whole_proudstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1795788423836,
+      "tag": "0032_square_killraven",
+      "breakpoints": true
     }
   ]
 }

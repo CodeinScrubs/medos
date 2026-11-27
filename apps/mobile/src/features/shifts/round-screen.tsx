@@ -81,9 +81,9 @@ function RoundScreenContent() {
   }
 
   /** Seen: they are done, so the round moves past them or ends. */
-  async function seen(memberId: string, at: number) {
+  async function seen(memberId: string, encounterId: string | null, at: number) {
     try {
-      await setShiftPatientReviewed(memberId, true);
+      await setShiftPatientReviewed(memberId, true, encounterId);
       goTo(nextIndex(rows, at));
     } catch (e) {
       alertError('ثبت نشد', e);
@@ -100,7 +100,9 @@ function RoundScreenContent() {
     acting.current = true;
     setBusy(true);
     try {
-      await scope.perform(() => (markSeen ? seen(current.member.id, index) : skip(index)));
+      await scope.perform(() =>
+        markSeen ? seen(current.member.id, current.encounter?.id ?? null, index) : skip(index),
+      );
     } finally {
       acting.current = false;
       setBusy(false);
@@ -305,7 +307,6 @@ function RoundCard({ row }: { row: RoundRow }) {
                   </Text>
                 ) : null}
                 {elapsed ? <Badge label={elapsed} /> : null}
-                {encounter?.dischargedAt ? <Badge label="ترخیص شد" tone="neutral" /> : null}
                 {encounter && !encounter.isActive && !encounter.dischargedAt ? (
                   <Badge label="دورهٔ قبلی؛ پرونده را مرور کنید" />
                 ) : null}

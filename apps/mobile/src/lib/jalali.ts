@@ -125,7 +125,16 @@ export function parseJalaliInput(input: string | null | undefined, now: Date = n
 /** A stored date: a `Date`, unix ms, an ISO `YYYY-MM-DD` date or an ISO date-time string. */
 export type DateInput = Date | number | string | null | undefined;
 
-const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+const ISO_DATETIME_RE =
+  /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:(?:0\d|1[0-3]):[0-5]\d|14:00))?$/i;
+
+function fromIsoDateTime(value: string): Date | null {
+  const normalized = value.trim();
+  const match = ISO_DATETIME_RE.exec(normalized);
+  if (!match || !fromIsoDate(match[1])) return null;
+  const date = new Date(normalized);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
 
 /**
  * Only the storage formats are accepted. Anything else — a Jalali string
@@ -137,7 +146,7 @@ function coerce(value: DateInput): Date | null {
   let date: Date | null;
   if (value instanceof Date) date = value;
   else if (typeof value === 'number') date = new Date(value);
-  else date = fromIsoDate(value) ?? (ISO_DATETIME_RE.test(value.trim()) ? new Date(value.trim()) : null);
+  else date = fromIsoDate(value) ?? fromIsoDateTime(value);
   if (!date || !Number.isFinite(date.getTime())) return null;
   // A damaged/unsupported stored date must not crash a whole patient screen.
   try {
@@ -244,6 +253,10 @@ export function formatRelativeTime(value: DateInput, now: Date = new Date()): st
 export function formatAge(birthDate: DateInput, fallbackYears?: number | null, now: Date = new Date()): string {
   const date = coerce(birthDate);
   if (!date) return fallbackYears != null ? `${toPersianDigits(fallbackYears)} ساله` : '—';
+  // An imported future date or an invalid clock cannot establish an age.
+  // Birthday identity is a civil date: a later hour on the same day is valid.
+  const totalDays = daysBetween(now, date);
+  if (totalDays === null || totalDays < 0) return '—';
 
   let years = now.getFullYear() - date.getFullYear();
   let months = now.getMonth() - date.getMonth();
@@ -258,7 +271,6 @@ export function formatAge(birthDate: DateInput, fallbackYears?: number | null, n
   if (years >= 2) return `${toPersianDigits(years)} ساله`;
   const totalMonths = years * 12 + months;
   if (totalMonths >= 2) return `${toPersianDigits(totalMonths)} ماهه`;
-  const totalDays = Math.max(0, daysBetween(now, date) ?? 0);
   return `${toPersianDigits(totalDays)} روزه`;
 }
 
@@ -266,6 +278,8 @@ export function formatAge(birthDate: DateInput, fallbackYears?: number | null, n
 export function ageInYears(birthDate: DateInput, fallbackYears?: number | null, now: Date = new Date()): number | null {
   const date = coerce(birthDate);
   if (!date) return fallbackYears ?? null;
+  const elapsedDays = daysBetween(now, date);
+  if (elapsedDays === null || elapsedDays < 0) return null;
   let years = now.getFullYear() - date.getFullYear();
   const m = now.getMonth() - date.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < date.getDate())) years -= 1;

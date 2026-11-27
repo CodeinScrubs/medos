@@ -175,6 +175,15 @@ module.exports = defineConfig([
           message:
             'db.transaction() is synchronous with this driver: an async callback commits before your statements run. Use .run() / .all() / .get() inside it.',
         },
+        {
+          selector:
+            "CallExpression[callee.name='withClinicalHistory'] > :matches(ArrowFunctionExpression, FunctionExpression)[async=true]",
+          message: 'Clinical history shares a synchronous SQLite transaction. Never await inside its callback.',
+        },
+        {
+          selector: "CallExpression[callee.property.name='update'] > Identifier[name='clinicalVersions']",
+          message: 'Clinical versions are immutable. Append a new snapshot; never rewrite recorded history.',
+        },
         /*
          * Clinical data is never removed, only stamped with deletedAt, so a
          * mistaken delete during a shift stays recoverable.

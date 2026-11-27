@@ -54,19 +54,19 @@ function LabEntryGate({ patientId, panelId }: { patientId: string; panelId: stri
   const [reset, setReset] = useState(0);
   if (!stale && !retained && query.data?.[0]) setRetained(query.data);
   const rows = retained ?? query.data;
-  let invalidDraft: Error | undefined;
+  let invalidContext: Error | undefined;
   if (rows?.[0]) {
     try {
       labFormBasis(rows);
       if (rows[0].draft) decodeLabForm(rows[0].draft.body);
     } catch (e) {
-      invalidDraft = e instanceof Error ? e : new Error('پیش‌نویس خوانده نشد.');
+      invalidContext = e instanceof Error ? e : new Error('آزمایش خوانده نشد.');
     }
   }
-  if (invalidDraft || (stale && !retained))
+  if (invalidContext || (stale && !retained))
     return (
       <Screen scroll>
-        <ErrorNotice error={invalidDraft} what="پیش‌نویس آزمایش" />
+        <ErrorNotice error={invalidContext} what="آزمایش" />
         {stale ? <Text color="danger">اطلاعات جایگزین شده؛ فرم را دوباره باز کنید.</Text> : null}
         <Text selectable>{rows?.[0]?.draft?.body}</Text>
         <Button
@@ -128,7 +128,7 @@ function LabEntry({
   const { colors, radii, spacing } = useTheme();
 
   const editing = useLabForm(seed, onReset);
-  const { rows, presetKeys, name, labName, notes, rangeEditor } = editing.form;
+  const { rows, presetKeys, name, labName, specimen, method, notes, rangeEditor } = editing.form;
   const panel = seed[0]!.panel;
   const patient = seed[0]!.patient;
   const now = new Date(useNow());
@@ -494,6 +494,18 @@ function LabEntry({
           label="آزمایشگاه"
           value={labName}
           onChangeText={(labName) => editing.change({ labName })}
+          editable={!saving}
+        />
+        <Input
+          label="نوع نمونه"
+          value={specimen ?? ''}
+          onChangeText={(specimen) => editing.change({ specimen })}
+          editable={!saving}
+        />
+        <Input
+          label="روش آزمایش"
+          value={method ?? ''}
+          onChangeText={(method) => editing.change({ method })}
           editable={!saving}
         />
         <Input

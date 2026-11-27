@@ -23,8 +23,8 @@ import { baseColumns, bool, jsonList } from './_shared';
  * chose, and the screens say so rather than implying more.
  *
  * `secretCipher`/`secretNonce`/`keyVersion` are the earlier encrypted design.
- * Columns are never dropped, so they stay; `features/vault/queries.ts` reads
- * them only to carry an old row forward.
+ * Columns are never dropped, so they stay. Unrelated edits carry old bytes
+ * forward; explicit secret replacement or removal clears the legacy payload.
  *
  * `ownerKind` distinguishes the user's own logins from credentials that belong
  * to a colleague, which are shown with a warning — they are someone else's
@@ -47,9 +47,9 @@ export const credentials = sqliteTable(
     /** The password, as typed. See the note above on what this is not. */
     secretText: text('secret_text'),
 
-    /** Left from the encrypted design; only read, never written. */
+    /** Legacy encrypted payload; retained unless explicitly replaced/cleared. */
     secretCipher: text('secret_cipher'),
-    /** Left from the encrypted design; only read, never written. */
+    /** Legacy nonce; cleared together with an explicitly replaced secret. */
     secretNonce: text('secret_nonce'),
     /** Left from the encrypted design; only read, never written. */
     keyVersion: integer('key_version')

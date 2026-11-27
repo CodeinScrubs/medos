@@ -9,6 +9,7 @@ import { alertError, notify } from '@/components/feedback';
 import { useNow } from '@/components/use-now';
 import { Autosave, type AutosaveState } from '@/lib/autosave';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
+import { safeErrorMessage } from '@/lib/error-diagnostic';
 import { newId } from '@/lib/ids';
 
 import { decodeLabForm, initialLabForm, LabFormConflict, labFormValues, type LabFormFields } from './form-draft';
@@ -16,6 +17,7 @@ import {
   commitLabFormDraft,
   discardLabFormDraft,
   inspectLabForm,
+  labFormBasis,
   labFormQuery,
   replaceLabFormDraft,
   saveLabFormDraft,
@@ -140,7 +142,7 @@ export function useLabForm(seed: LabFormRows, onReset: (rows: LabFormRows) => vo
         try {
           labFormValues(latest.current, new Date(now), hasPhoto);
         } catch (e) {
-          notify('آزمایش ثبت نشد', e instanceof Error ? e.message : 'ورودی‌ها را بررسی کنید.');
+          notify('آزمایش ثبت نشد', safeErrorMessage(e, 'ورودی‌ها را بررسی کنید.'));
           return;
         }
         saver.change(latest.current);
@@ -198,9 +200,10 @@ export function useLabForm(seed: LabFormRows, onReset: (rows: LabFormRows) => vo
       'بارگذاری نسخهٔ ذخیره‌شده؟',
       'نوشتهٔ این فرم جایگزین می‌شود؛ پیش از ادامه آن را مرور یا کپی کنید.',
       async () => {
-        await saver.flush();
+        await flush();
         const rows = labFormQuery(patientId, panelId).all();
         if (!rows[0]) throw new LabFormConflict();
+        labFormBasis(rows);
         if (rows[0].draft) decodeLabForm(rows[0].draft.body);
         saver.cancel();
         acting.current = false;

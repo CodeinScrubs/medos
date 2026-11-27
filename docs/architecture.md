@@ -5,6 +5,219 @@ rejected, so a future revisit starts from the reasoning rather than from scratch
 
 ---
 
+## Owned settings actions and optional lock failures (0.11.60)
+
+SettingsScreen captures its dataset generation once. Native confirmation and
+subsequent setting/audit work keep the existing withDatasetWrite admission
+through awaits; restore cannot replace that dataset halfway through. Retained
+old callbacks never obtain a new token. Lock taps are single-flight, cancellation
+is quiet, and UI feedback belongs only to the mounted focused screen. Stale
+settings ask for reopening rather than claiming there is a clinical draft.
+
+The global optional LockGate handles native enrollment/authentication rejection,
+retains its cover and exposes the existing retry button. Unmounted native work
+cannot open a prompt or publish UI; late errors use the redacted local logger.
+Typed settings expose live-query error/retry. LockGate withholds stale settings
+and native prompts on a failed initial/refresh read, showing the existing retry
+notice without unmounting the clinical content. No new framework, feature,
+mandatory security flow or persistence format.
+
+Explicit lock removal also reads actual device enrollment. A phone whose
+screen credential disappeared cannot satisfy authentication; when the OS
+reports NONE, explicit removal writes/audits off without opening that impossible
+prompt. Enrolled phones still authenticate. Read/write/audit failures propagate
+through the same owned action; an API error is never treated as no enrollment.
+
+## Current native permission state (0.11.59)
+
+PermissionsCard reads notification/camera/microphone grants again when Android
+returns the app to the foreground. A monotonic read token and mounted check
+prevent older results or rejections replacing a newer snapshot. Failed reads
+withhold old grant badges and use the existing error/retry notice. Native
+permission/settings actions are single-flight; retained unfocused/unmounted
+handlers refuse work and delayed failures do not show over a different route.
+
+A stored backup folder means selected, not verified provider access. Notification
+permission does not prove exact-alarm access or delivery. The card keeps the
+existing system-settings link and explains delay without promising an exact
+arrival or claiming it has queried special access. No database mutation,
+shared permission framework, route or new native dependency is required.
+
+## Remaining notebook forms reuse raw recovery (0.11.55)
+
+Specialty profiles, personal prescription templates, places, extensions and
+credentials now use the existing workspace-form lifecycle. They have strict
+feature-owned version1 codecs and synchronous publishers; no new SQL table,
+route, dependency or permission. Editable specialty/place selections are fields
+of a notebook document, unlike Kardex's immutable clinical parent key.
+
+Raw acknowledgment retains exact text, separators, incomplete dates/coordinates
+and prescription lines without publishing a record. Prescription lines carry
+stable editor keys, removed from the published format. A line with other text
+but no drug must be completed or explicitly removed; Save cannot silently drop
+it. An imported invalid personal-fit rating stays recoverable and correctable,
+but cannot publish until the owner chooses a valid rating or clears it.
+Place digit normalization and map-coordinate derivation happen only on Save.
+
+Publication compares the complete original record, including secret/legacy
+payload, usage metadata and unchanged timestamps, and commits the feature
+write/search index, raw receipt and required audits together. Place renaming
+also rebuilds child extension indexes in that transaction. The existing live
+place requirement remains; a deleted parent does not become an implicit move.
+An unchanged archived specialty can remain in a historical profile/template;
+a newly selected missing or archived reference refuses publication.
+
+Credentials remain an ordinary organized notebook. Blank replacement input
+preserves the current password and legacy bytes. Explicit replacement/removal
+clears the legacy ciphertext/nonce as well, so an old secret cannot reappear as
+sealed after removal. Password whitespace is never normalized. Previews and
+comparison descriptions never echo secrets; the raw document remains inside
+the existing local database/encrypted backup contract. An unchanged expiry
+preserves its exact stored time; invalid visible text cannot publish a cached
+valid date. No extra unlock or strength lecture is added.
+
+Every screen keeps one original AutosaveScope/removal guard, native parents,
+route, dataset generation and publication focus. Display labels retain only
+original-dataset reads; a child first mounted after replacement cannot seed
+itself with a replacement specialty/place name. Recovery links use three-row
+pages inside existing lists, projecting only an allowlisted descriptive field.
+
+**Rejected: five copied draft engines, autosaving invalid input directly into
+published records, silently dropping a partial prescription line, and normalizing
+passwords or phone/coordinate input while typing.** Raw drafts and id-only audits
+are not permanent clinical correction history. Validation boundaries and the
+remaining product/device gates are in validation-0.11.55 and IMPLEMENTATION.
+
+---
+
+## Raw Kardex recovery with explicit clinical ownership (0.11.54)
+
+The shared lifecycle now accepts an immutable feature-owned parent key; its
+unparented idea/topic codecs and persisted scope keys stay unchanged. Kardex
+uses a canonical JSON tuple `[patientId, encounterId]`, retaining explicit null,
+imported empty episode keys and literal `new` keys distinctly. This extends the
+parent-aware contract explicitly; it does not treat clinical forms as notebooks.
+The existing raw table already has the parent column and an open-scope uniqueness
+index. Adding the TypeScript `order` kind changes no SQL schema or archive format.
+
+One watched query resolves the original active episode or selected draft before
+editing. A draft selected from an older episode retains that episode; the default
+new form resumes only its current scope. Patient-scoped recovery links remain in
+the existing Kardex, with three short rows and older/newer pages. Read-only pager
+state resets across patient/notebook or dataset changes; editing input never
+remounts to accomplish that reset. A short Jalali episode label makes the intended
+association visible without exposing technical identifiers.
+
+The strict feature codec retains exact partial names, doses, notes and visible
+invalid date text, independently of an Order. An unknown start stays null, and an
+unchanged known timestamp retains seconds/milliseconds. One original AutosaveScope
+flushes on background, Close and route removal. Partial input cannot publish an
+order. Explicit Save validates it and compares the complete original Order basis
+and draft revision, then uses the existing synchronous domain writes to publish,
+retire the draft and record acknowledgment/audit atomically. A failed audit rolls
+everything back. Explicit conflict comparison/adoption updates only the raw draft;
+a separate Save is still necessary. Clinical publication checks live patient and
+original episode ownership, including recovered historical contexts.
+
+Original route, selected draft, dataset and navigation ownership remain fixed.
+Read failures retain loaded input. Suggestions are optional history and cannot
+overwrite a newer edit, confirmation, publication or old dataset. Completed late
+publication does not close another route. Future raw documents remain copyable.
+This is recoverable draft persistence, not permanent clinical correction history
+or a guarantee that a keystroke survives before acknowledgment.
+
+**Rejected: copying another clinical draft engine, resolving an episode again at
+Save, converting invalid raw dates into the last valid value, or adding a separate
+recovery route.** Five other manual forms and order history/trash remain separate
+gates. Validation and native/artifact boundaries are in validation-0.11.54.
+
+---
+
+## A new Kardex form owns its original active episode (0.11.52)
+
+One watched SQLite read captures the live patient and active encounter before
+the new form becomes editable. No active encounter means an explicit null;
+the latest historical encounter is not substituted. The mounted form retains
+that snapshot through later admissions and passes it with its original dataset
+generation into `createOrder`. Its synchronous transaction verifies the patient
+and original live encounter belong together before insertion. A discharged but
+still-live original encounter remains an explicit historical association.
+Immediate non-editor callers retain the existing transactional active lookup.
+
+The allergy banner may refresh with a correction in the same dataset. Only its
+last successfully owned display text is retained across restore; replacement
+patient data cannot appear beside old typed order fields. Publication remains
+locked for stale/read-failed/route-changed contexts, without remounting the
+native form parents. Unknown start times remain unknown.
+
+**Rejected: resolving the newest admission at Save, silently replacing null,
+or freezing allergies against ordinary same-dataset corrections.** This fixes
+association/display boundaries only. It does not implement raw Kardex recovery,
+permanent order history or order-trash restoration. Those remain separate gates
+in IMPLEMENTATION; evidence is in validation-0.11.52.
+
+---
+
+## Shared raw recovery for workspace forms (0.11.51)
+
+Idea and teaching-topic forms pilot one bounded lifecycle in
+`features/workspace-forms/`. Features own strict raw-field codecs, their display
+descriptions and synchronous publishers. Shared code owns loading, draft CAS,
+publication receipts, removal/background flush and explicit conflict recovery.
+The existing routes and fields remain; three recovery links with replaceable
+cursor pages live in each existing list. Destructive draft controls follow the
+writing controls rather than appearing above them.
+
+Migration0029 adds `workspace_form_drafts`. Kind and a JSON tuple of parent/
+record ids identify the one open scope, including a distinct new-record null.
+No foreign key can erase raw input when its published target disappears. Raw
+documents contain their version, exact input, original context and a complete
+canonical published basis; date milliseconds and whitespace are preserved.
+Revision is an SQL-defaulted concurrency receipt, not permanent edit history.
+Strict parsing refuses unsupported/foreign documents without rewriting them;
+their original body remains readable/copyable and survives archive restore.
+Old archives without the new table still restore. The frozen backup/KDF format
+is unchanged.
+
+Each mounted form retains its original route, selected draft id, seed,
+AutosaveScope and dataset generation. A selected retired draft never opens a
+different draft or blank form. Refresh/route/record errors retain typed input
+and lock publication. Raw autosave preserves an incomplete date, empty title
+and separators without publishing. Background/Back flush raw input; only the
+explicit normal Save validates and publishes. Topic date validation uses the
+visible raw date, preserves unchanged seconds/milliseconds and checks live
+teacher/specialty references in the publication transaction. An edit may retain
+its original archived teacher/specialty link; a newly selected archived or
+missing reference is refused. The form reads only its selected historical
+references separately, labels archived names and keeps them out of picker
+choices. Search rebuilds from the merged record with the same transactional
+related reads, preserving historical names when the link is retained.
+
+Publication compares the exact draft revision and complete current record,
+then publishes, soft-retires the draft, stores its receipt and writes an id-only
+audit in one synchronous transaction. Receipt replay returns the same live
+destination without creating another record. Overflow, malformed receipts,
+deleted targets and failed audit writes refuse the operation atomically.
+Conflict review reads all shown rows together. Loading or keeping local input
+requires an exact comparison and an explicit confirmation; keeping it only
+rebases the raw draft. A separate Save publishes. Confirmation ownership is
+consumed once and bound to the original focus/route/read state/dataset. The
+shared hook releases its action/removal guard before requesting route closure,
+checks focus after acknowledgments, and retains native screen/header parents.
+
+**Rejected: copying eight separate draft engines, replacing existing clinical
+draft stores, or treating a raw save as final publication.** This pilot supports
+only idea/topic forms with `parentId=null`. Adding another workspace form needs
+its own codec, query, publisher, descriptions and lifecycle/database/native
+tests. Do not plug Kardex or other clinical forms into this null-parent model:
+they must preserve the original patient/encounter, including outpatient null,
+and validate all clinical ownership before publication. Existing clinical
+stores and meaningful note history are separate contracts. Tests, native
+witnesses and remaining gates are recorded in validation-0.11.51 and
+IMPLEMENTATION; this abstraction is not a claim that all manual forms recover.
+
+---
+
 ## Today previews do not bury unfinished work (0.11.50)
 
 An actual synthetic shift showed 40 scheduled patient tasks above unfinished
@@ -2223,8 +2436,284 @@ Each selection keeps its own token: a later manual edit, newer selection, restor
 unmount, loss of context or focus makes the response inapplicable. Suggestions
 are optional user-owned history, not dose validation or treatment advice.
 
-This editor still needs raw draft/CAS recovery, explicit original new-encounter
-capture, conflict resolution and permanent correction history. The synchronous
-create query validates its live patient and resolves the active episode atomically
-at publication; this does not establish an encounter chosen when editing began.
-Do not call the manual editor autosave or process-death recovery.
+As of .52, a new editor captures its original active encounter, including null,
+in one watched patient/episode query before typing. It carries that context and
+the originating dataset generation into the synchronous insertion transaction.
+A later admission cannot redirect the order; a closed but live original episode
+remains a valid historical association. Only null means no episode: even an
+imported empty-string reference must pass the live ownership check for creation,
+edit, status and deletion. Existing immediate callers may resolve context inside
+insertion; an already-mounted editor must supply its original context.
+
+The editor retains its last successful original-dataset allergy display across
+replacement while ordinary same-dataset corrections remain live. It still needs
+raw draft/CAS recovery, explicit conflict review and permanent correction history.
+Do not call this manual editor autosave or process-death recovery. Frozen-source
+software/native/archive boundaries are in `validation-0.11.52.md`.
+As of .53, episode-specific order reads also distinguish explicit strings,
+including an imported empty key, from null. The discharge preview includes the
+requested episode and standing orders; null selects standing orders alone.
+Discharge's bulk order update requires both that episode and its patient. An
+inconsistent imported cross-patient link is retained unchanged rather than
+ending another patient's order or repairing/moving it implicitly.
+
+## Permanent clinical corrections and bounded recovery (0.11.56)
+
+`clinical_versions` is an additive, immutable history table for patient fields,
+companions, encounters, diagnoses, vitals, whole lab panels, imaging, orders,
+consultations and follow-ups. Notes retain their existing separate version codec.
+`db/clinical-history.ts` wraps a synchronous domain mutation inside its caller's
+transaction. Exact before/after snapshots, required audit and any draft receipt
+therefore commit or roll back together. Async callbacks and lazy thenables are
+rejected; SQL still terminates with `.run()`, `.all()` or `.get()` inside the tx.
+Do not bypass the wrapper when introducing another write to these records.
+
+The version1 document preserves published fields, nullable values, text whitespace,
+date-column metadata and every live lab value. It does not publish raw typing or
+native reminder receipts. Equality excludes search/touch metadata and regenerated
+lab child ids, so an unchanged clinical save does not grow history. Every actual
+change receives a unique increasing per-record sequence, even in the same ms or
+after clock rollback. History is not automatically pruned or soft-deleted.
+Before typed reads, bounded SQL checks reject noncanonical imported booleans,
+unsafe stored INTEGERs and dates outside JavaScript's exact Date range. Such rows stay
+unchanged; history must not silently normalize or round them. REAL lab columns
+retain SQLite's stored double alongside the original clinical text. SQLite
+INTEGER affinity also legitimately stores REAL fractional glucose; that must
+remain supported without rounding or a blanket integer-column restriction. This is a
+typed clinical snapshot, not a byte-for-byte copy of SQLite's physical encoding.
+
+An older record gets its actual prior baseline on the first meaningful mutation.
+The baseline's recordedAt is the time it was retained, not a fabricated original
+edit time. Existing history cannot reconstruct edits made before this feature.
+Unknown/future/misowned bodies remain intact; decoding and UI clinical rendering
+require matching kind, record and patient, including lab children. Unverified
+bodies have an explicit raw-text view instead of being interpreted as a patient's
+clinical facts. Original reference ids are retained; they do not assert what a
+referenced doctor's name was at the historical time.
+
+The existing timeline has one Corrections filter. It fetches at most21 short
+metadata rows for a20-row keyset page and loads the full body only on expansion.
+Lab before/after result lists each render at most20 rows. No new route, native
+header, editor, dependency, permission, graph store or server is introduced.
+
+The existing trash adds labs, imaging, vitals, orders, consults, diagnoses and
+encounters. The backend hashes the full SQLite row and shown patient identity;
+integers/reals retain their storage type and lossless text before hashing, rather
+than rounding through JSON numbers. Restore compares the original token inside
+the write transaction and requires live original patient/episode/note ownership.
+Wrong-patient lab values or live encounter children reject recovery. Separately
+deleted children/attachments are never revived. Restored encounters are always
+historical/inactive: they cannot reopen an admission, change patient status,
+complete/restart orders or replace the current encounter.
+
+List/count SQL filters before pagination. Full-row basis reads use indexed
+primary-key scalar lookups only after the bounded global page; count has no full
+clinical payload projection. Seven additive encounter-owner indexes bound the
+child-ownership probes. Sorting/counting short tombstone metadata can still scan
+the clinical tables; this is not a measured device performance guarantee.
+
+Trash confirmations retain the original screen generation, exact shown basis,
+focus, mount, readable-result and single-attempt ownership. A delayed confirmation
+cannot borrow a newly mounted child's dataset token. The outer dataset admission
+encloses the entire action. Read failures keep rows visible with retry but do not
+authorize restore. Parent recovery does not recover separately deleted children.
+
+Authenticated SQL restore replaces clinical history with the archived dataset;
+it does not replay ordinary mutation wrappers or merge two patients' histories.
+An old archive without this table clears newer-dataset clinical versions. The
+existing pre-restore safety copy remains the way back. Derived status/flag repairs
+may then append explicit reconciliation history. Ordinary mutations still reject
+a misowned lab value rather than copying it into another patient's history; .57
+startup repair isolates that explicitly inconsistent panel without blocking healthy
+records. Backup
+format/KDF compatibility is unchanged. As of .58 contact/follow-up trash is
+implemented below; other notebook trash and broader product/device acceptance
+remain separate work.
+
+## Lab ownership is a read boundary as well as a write boundary (0.11.57)
+
+Foreign keys alone do not prove that a value and its panel belong to the same
+patient. Shared correlated SQL identifies any live wrong-owner child. A mixed
+panel's entire live result set is withheld from snapshot, flowsheet, trend and
+timeline hydration: startup cannot safely recalculate and retain its whole
+clinical snapshot, so its seemingly normal siblings may also carry stale flags.
+The original SQL remains in backup and storage, with no guessed repair or history.
+
+Reflag preflights ownership in its synchronous transaction and skips explicit
+mixed-owner groups. All real SQL/history errors still roll back the complete
+healthy pass. Deleted foreign children remain intact without hiding healthy
+siblings. Live result queries also require live panel and patient parents.
+Conditional owner-list/count notices distinguish withheld results from an empty
+panel; the count does not fetch either patient's clinical text. Actual table
+objects in the SQL tree preserve child-only useLive subscriptions.
+
+Raw editor joins remain unfiltered, so their existing basis check refuses a
+foreign row rather than creating an apparently clean form. Reload must validate
+the fetched basis and acknowledge the current draft before cancelling/resetting
+the saver. Keep the read-only ownership marker out of the stored CAS basis.
+No codec/schema/backup format change is needed for these boundaries.
+
+## Retained clinical choices and reminder-aware recovery (0.11.58)
+
+The existing clinical trash now supports companions and follow-ups as well as
+the seven original kinds. Its lossless SQLite-row/shown-patient basis includes
+the existing immutable clinical sequence. Even an identical same-millisecond
+restore/delete cycle requires a fresh choice. History sequence is an indexed
+scalar lookup after bounded pagination; count and global sorting do not fetch
+whole clinical/history bodies. The helper keeps actual table objects for live
+observers, but qualifies the outer record id with explicit schema identifiers:
+Drizzle otherwise strips its qualifier in a single-table SQL expression and
+SQLite may bind an inner id instead. Never interpolate user identifiers.
+
+Companion delete also checks shown row and sequence. Follow-up clinical actions
+compare the originally shown full clinical row and desired reminder revision,
+excluding only notificationId and reminderAppliedRevision, which are native
+receipts. The outcome prompt retains its opening basis across live refresh.
+Old or repeated native choices cannot silently affect a corrected row. Mount,
+focus and original dataset admission remain distinct from clinical row equality.
+
+Restore changes tombstone/touch only for a companion. Follow-up restore also
+increments desired reminder revision and marks receipt dirty, while preserving
+status, outcome, completion time, deadline and original episode. Required audit
+and immutable clinical snapshots commit with the row. Awaited reconciliation
+holds the outer original dataset admission; it does not ask permission on its
+own. Native receipt failure leaves recoverable clinical data and the existing
+card's reminder retry, with one conditional notice rather than a false restore
+failure. Unsupported imported state remains intact and refused. Native receipt
+writes do not create fabricated clinical corrections. Draft publication receipts
+still return the original recovered id, never a duplicate record.
+
+## Note mutation boundaries and retained card choices (0.11.61)
+
+The ordinary note writers now require the original live patient and, whenever
+encounterId is non-null, its live matching encounter. Undefined creation context
+still resolves the active episode inside the transaction; explicit null stays
+unassociated. A closed but live original encounter remains valid. Imported empty
+IDs are checked as IDs rather than interpreted as null. Version restoration uses
+the same parent boundary. No association is guessed or repaired.
+
+NotePatch excludes patient/encounter identity. Runtime keys are checked against
+the editable fields, so a cast/object spread cannot alter tombstones, IDs or
+stored search metadata. Undefined patch fields are omitted from both the SQL
+write and merged search projection; explicit null clears the field. Content
+and meaningful versions still commit together. Delete and trash restore now
+require their audit in that same synchronous transaction. An audit failure
+rolls back the mutation; missing/alive/repeated requests are refused.
+
+A note card carries a short ephemeral SQLite tuple of note/episode identity,
+creation/update time, latest immutable note version and existing delete/restore
+audit count. The shown patient is supplied separately. Full bodies are not
+loaded into the list, and the existing 32+1-page/33KB regression bound is unchanged.
+Same-clock edits that change back and identical delete/restore cycles still
+invalidate the old choice. The scalar queries use qualified outer columns:
+their consumers retain a join because Drizzle's single-table projection would
+otherwise remove those qualifiers inside correlated SQL. Actual SQLite tests
+pin that behavior and the added live-query table dependencies.
+
+All retained note-card pin/delete callers pass this shown basis and original
+dataset admission, plus mount/focus and a synchronous single-flight latch.
+Trash restore passes both the exact shown tombstone and lifecycle count. Trusted
+immediate internal writers may omit a shown-card basis; this is not permission
+for a new retained UI callback to do so. No schema, stored codec, route, dependency,
+permission or encrypted archive change is introduced.
+
+## Owner-requested local development evidence (decision, not implemented)
+
+The 2026-10-11 supplied conversation requests enough local patient/settings/use
+history for a coding agent to investigate weeks later. Clinical truth remains in
+the existing records and immutable correction history. Developer activity must
+describe receipts/failures/settings and evidence gaps without duplicating note
+bodies or secrets. Default diagnostics and a deliberate selected clinical export
+have different contracts, now stated in AGENTS.md. There is no automatic upload.
+
+The current 100-entry error log does not provide that history, and parameter
+redaction does not prove that arbitrary messages/stacks are safe. Implement
+bounded content-free diagnostics and handled export failures first, then a local
+versioned evidence manifest with source/app/dataset lineage, selected scope,
+retention/completeness boundaries and an independent reader. Never label an
+unobserved interaction, lost segment or failed native action as successful.
+This decision introduces no recorder framework or patient export today.
+
+## Places recovery and original device choices (0.11.62)
+
+The existing trash adds one places/extensions section: bounded20+1 keyset
+pages, matching total and independent read errors. Sorting/counting reads short
+metadata. Only page rows hydrate their full SQLite basis by existing primary-key
+indexes; scans/temp sorting remain possible. Correlated lifecycle IDs and page
+IDs are explicitly qualified with fixed schema/alias identifiers. Actual table
+objects retain useLive subscriptions. No new schema or route is needed.
+
+The ephemeral basis preserves SQLite storage type/value, then uses the existing
+form canonicalization and SHA256. It includes all current row columns and the
+existing id-only deletion/restoration audit count; extensions include original
+parent name, switchboard, deletion and lifecycle. The switchboard matters for
+a retained dial destination, even when updatedAt does not advance. The basis is
+neither a clinical record codec nor a stored/archive format. Required audit and
+soft delete/restore commit in one synchronous transaction. Parent restore does
+not undelete separately deleted children. Search rebuild uses the restored row
+and the validated original parent's current name, without moving a child.
+
+Retained dialogs and native actions keep original dataset, shown basis, readable
+query result, mount/focus and a synchronous attempt latch. Device operations are
+admitted across native awaits so restore cannot replace their underlying source.
+The verified row supplies the actual destination. After copy/launcher acknowledgment,
+optional usage rechecks the original live row in SQL. Optional counter/haptic
+failure records literal technical context and does not report a successful copy
+as failed; synchronous native throws and Promise rejection are both handled.
+Closing/opening a chooser is not proof of call completion. The shared doctor map
+caller also validates its original doctor/place association.
+
+Extension star is parent-screen work, sharing that action latch and original
+intent. Its backend requires shown basis and explicit valid now; a tombstone,
+changed/missing parent or stale row cannot be starred by id alone. Ordinary
+place/extension form writers accept only declared runtime keys. Undefined
+corrections follow Drizzle's omission behavior, explicit null clears supported
+fields, and rename/search propagation commits with the row. Deliberate valid
+parent reassignment remains supported; no implicit move or generic notebook
+history layer is introduced. Other notebook/doctor actions are separate work.
+
+## Default technical diagnostic boundary (.63)
+
+Default diagnostic data is a closed projection in lib/error-diagnostic.ts, not
+an attempt to scrub arbitrary error text. Known kinds/codes, fixed contexts,
+trusted app identity and bounded canonical Android bundle coordinates suffice
+for routine technical reports. Hermes offsets are distinct from source columns.
+Exact reviewed notices preserve useful recovery/validation instructions; unknown
+messages use a fixed fallback. Sensitive selected clinical evidence has the
+separate owner-authorized contract above and is not implicitly included here.
+
+The platform log uses strict version-2 JSONL with bounded native byte reads and
+explicit incomplete/read-failure states. Its persistent write marker protects
+honesty about interruption, not lossless atomic replacement or power durability.
+Legacy objects are projected before display/rewrite/export. Share snapshots are
+immutable, capped at20 files/10MiB with24-hour grace, and pinned until their
+native await ends even when the screen departs. Only exact direct owned UUID
+files may be retired; lack of an eligible victim refuses allocation. Android
+Directory.uri ends in slash, so retention uses File.name and exact reconstructed
+owner comparison. Recipient reading is not established by chooser completion.
+
+Report UI and route boundaries retain focus/mount/effect-lifetime and one action
+latch, and handle read/write/share/copy failures. Only the previous JS handler's
+explicit handoff is sanitized; other native exception routes can bypass it.
+The installed share module's retained pending state after a launch failure needs
+physical/provider acceptance; no fake Promise retry guarantee is made. This
+bounded100-error window is not the requested complete weeks-long use history.
+
+## Original extension menu navigation (.64)
+
+The existing star/edit/delete menu permits native Back/outside dismissal. It
+adds no fourth button. Edit navigation uses the parent row's original shown
+basis, dataset, focus/mount/read and shared synchronous action latch. The existing
+live-child/original-parent SQL validator runs under dataset admission immediately
+before routing. This catches hidden changes that a retained cached UI cannot see,
+without writing a record to open its editor. No new route or schema is required.
+An old native menu callback cannot navigate after the screen or dataset changes.
+
+## Birth identity versus derived age (.65)
+
+Normal patient raw publication already refuses future birth dates, while imported
+base snapshots preserve historical raw identity. Age display/calculation must not
+turn that uncertainty into a newborn, negative years or NaN. The pure helpers
+use civil-calendar day difference and withhold an unestablished result. A later
+unknown hour on the same birth date remains valid. No stored record is rewritten,
+manual fallback without DOB remains usable and existing leap-day behavior stays.

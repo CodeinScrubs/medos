@@ -58,6 +58,8 @@ let noteId: string;
 let tree: ReactTestRenderer | undefined;
 let mountedScope: ReturnType<typeof useAutosaveScope>;
 let snapshotCounter = 0;
+let mockFocused = true;
+jest.mock('expo-router/react-navigation', () => ({ useNavigation: () => ({ isFocused: () => mockFocused }) }));
 
 function CaptureScope() {
   const scope = useAutosaveScope();
@@ -140,6 +142,7 @@ function snapshot() {
 }
 
 beforeEach(async () => {
+  mockFocused = true;
   t = useTestDatabase(await createTestDatabase());
   patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Note' });
   noteId = await queries.createNote({
@@ -188,6 +191,57 @@ afterEach(async () => {
 });
 
 describe('mounted note card mutations retain their dataset identity', () => {
+  it.each(['pin', 'delete'] as const)(
+    'does not use a confirmation after an ordinary clinical edit: %s',
+    async (action) => {
+      await render();
+      let held: () => unknown;
+      if (action === 'pin') {
+        await menu();
+        held = confirmation('سنجاق کردن');
+      } else held = await finalDelete();
+      await queries.updateNote(noteId, { plan: 'Synthetic changed plan after dialog' });
+      const before = tracked();
+      await invoke(held!);
+      expect(tracked()).toEqual(before);
+      expect(alertError).toHaveBeenCalledWith(action === 'pin' ? 'تغییر ثبت نشد' : 'حذف نشد', expect.any(Error));
+    },
+  );
+
+  it.each(['pin', 'delete'] as const)(
+    'does not use a retained callback after its source unmounts: %s',
+    async (action) => {
+      await render();
+      let held: () => unknown;
+      if (action === 'pin') {
+        await menu();
+        held = confirmation('سنجاق کردن');
+      } else held = await finalDelete();
+      const before = tracked();
+      await act(async () => tree!.unmount());
+      tree = undefined;
+      await invoke(held!);
+      expect(tracked()).toEqual(before);
+      expect(alertError).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['pin', 'delete'] as const)(
+    'does not use a retained callback over a different focused route: %s',
+    async (action) => {
+      await render();
+      let held: () => unknown;
+      if (action === 'pin') {
+        await menu();
+        held = confirmation('سنجاق کردن');
+      } else held = await finalDelete();
+      const before = tracked();
+      mockFocused = false;
+      await invoke(held!);
+      expect(tracked()).toEqual(before);
+      expect(alertError).not.toHaveBeenCalled();
+    },
+  );
   it.each([false, true])('rejects a held pin action after a same-ID restore (pinned: %s)', async (pinned) => {
     if (pinned) await queries.setNotePinned(noteId, true);
     const restore = snapshot();
