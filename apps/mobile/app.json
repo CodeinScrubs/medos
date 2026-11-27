@@ -26,9 +26,7 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.SCHEDULE_EXACT_ALARM"
       ],
-      "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW"
-      ]
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"]
     },
     "plugins": [
       "expo-router",
@@ -78,9 +76,7 @@
         {
           "supportsRTL": true,
           "forcesRTL": true,
-          "supportedLocales": [
-            "fa-IR"
-          ]
+          "supportedLocales": ["fa-IR"]
         }
       ],
       "./plugins/with-release-signing",
