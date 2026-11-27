@@ -33,10 +33,10 @@ wrong, never rewrite them to look better.
 
 ---
 
-## 2026-11-27 — Verify ward follow-through and same-day lab trends
+## 2026-11-28 — Verify ward follow-through and same-day lab trends
 
 **Agent:** GPT-6 via Codex.
-**Commits:** Branch `codex/ward-release-followthrough` from the .70 merge.
+**Commits:** App source `92f291d`, PR 32.
 
 **Changed**
 - Space chart points by elapsed time, preserve ties without implying a change,
@@ -46,12 +46,21 @@ wrong, never rewrite them to look better.
 - Catch and redact failed automatic backup checks on startup and foreground.
 - Candidate version 0.11.71/code 87. No schema or backup format change.
 
-**Verification**
-- Record candidate and A52s evidence before marking PR ready for merge.
-  The isolated QA package uses only synthetic records.
+**Verified**
+- `npm run check`: 2,971 app tests and five workflow tests. Inspected the
+  signed arm64 APK and compared the exact Hermes bundle with the QA variant.
+- A52s .70 stored an encrypted synthetic archive in a Documents test folder.
+  Isolated .71 emulator passed elapsed lab charts, named discharge work,
+  40-to-39 active count, wrong password, restore and independent archive read.
+  See [validation-0.11.71.md](validation-0.11.71.md).
+
+**Not verified**
+- The A52s disconnected before the .71 install. The owner's installed
+  dataset was never opened or changed. Full hardware shift and reminder
+  delivery through reboot or Doze remain separate acceptance work.
 
 **Open threads**
-- Track remaining clinical workflow choices and device gates in issue 21.
+- Issue 21 retains explicit result closure and related workflow choices.
 
 ## 2026-11-27 — Keep the active shift and lab trends scoped to current evidence
 

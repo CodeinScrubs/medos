@@ -33,6 +33,13 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+0.11.71/code 87 uses real elapsed time for the chart axis and shows same-day
+collection clocks. The discharge preview lists the affected work and its
+known deadlines, and publication rejects changes to the shown rows. Automatic
+backup admission errors use the existing redacted diagnostics. The signed
+APK, emulator and partial A52s validation are in
+[validation-0.11.71.md](validation-0.11.71.md).
+
 The 0.11.70/code 86 candidate uses the live episode for the shift card and
 rounds, and retains the episode captured at intake for shift history. An
 explicitly discharged patient leaves the active deck. Their outstanding
