@@ -55,7 +55,6 @@ export function ShiftPatientBrief({
               {brief.summary}
             </Text>
           ) : null}
-          {row.encounter?.dischargedAt ? <Badge label="دورهٔ این شیفت ترخیص شده" /> : null}
           {row.encounter && !row.encounter.isActive && !row.encounter.dischargedAt ? (
             <Badge label="دورهٔ قبلی؛ پرونده را مرور کنید" />
           ) : null}

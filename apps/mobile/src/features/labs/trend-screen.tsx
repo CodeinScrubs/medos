@@ -1,37 +1,57 @@
 import { useLocalSearchParams } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { ErrorNotice } from '@/components/error-notice';
+import { PickerModal } from '@/components/picker-modal';
 import { ScreenOptions } from '@/components/screen-options';
 import { TrendChart, type TrendPoint } from '@/components/trend-chart';
-import { Card, Column, Divider, EmptyState, Row, Screen, Text } from '@/components/ui';
+import { Card, Column, Divider, EmptyState, Row, Screen, SelectField, Text } from '@/components/ui';
 import { useLive } from '@/db/use-live';
 import { FLAG_LABEL, flagTone, formatRange, parseLabValue } from '@/features/labs/flags';
-import { sameUnitSeries } from '@/features/labs/logic';
+import { labSeriesGroups } from '@/features/labs/logic';
 import { patientLabOwnershipIssuesQuery } from '@/features/labs/ownership-queries';
 import { analyteSeriesQuery } from '@/features/labs/queries';
 import { formatJalali, formatJalaliDateTime, toJalali } from '@/lib/jalali';
-import { ltrIsolate, toPersianDigits } from '@/lib/persian';
+import { joinLabels, ltrIsolate, toPersianDigits } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 /** One analyte's history for one patient. Params: `id` (patient), `analyte`. */
 export function TrendScreen() {
   const { id: patientId, analyte } = useLocalSearchParams<{ id: string; analyte: string }>();
+  return <Trend key={JSON.stringify([patientId, analyte])} patientId={patientId} analyte={analyte} />;
+}
+
+function Trend({ patientId, analyte }: { patientId: string; analyte: string }) {
   const { colors, spacing } = useTheme();
   const results = useLive(analyteSeriesQuery(patientId, analyte), [patientId, analyte]);
   const issues = useLive(patientLabOwnershipIssuesQuery(patientId), [patientId]);
   const failures = [results, issues].filter((source) => source.error);
-  const data = results.data;
+  const data = failures.length ? undefined : results.data;
   const rows = data ?? [];
+  const [selected, setSelected] = useState<string>();
+  const [picking, setPicking] = useState(false);
 
-  // Only results in the same unit share an axis; the rest are counted below.
-  const {
-    series,
-    unit: seriesUnit,
-    excluded,
-    unlabelled,
-  } = sameUnitSeries(rows.map((r) => ({ ...r, unit: r.value.unit })));
-  const hasUnit = (u: string | null | undefined) => !!(u ?? '').trim();
+  const groups = useMemo(() => labSeriesGroups(data ?? []), [data]);
+  const choices = [...groups]
+    .map(([id, group]) => {
+      const row = group.at(-1)!;
+      return {
+        id,
+        label: contextLabel(row),
+        sublabel: joinLabels([
+          row.value.unit?.trim() || 'بدون واحد ثبت‌شده',
+          row.value.refLow != null || row.value.refHigh != null
+            ? formatRange(row.value.refLow, row.value.refHigh)
+            : null,
+          formatJalali(row.collectedAt),
+        ]),
+        at: row.collectedAt.getTime(),
+      };
+    })
+    .sort((a, b) => b.at - a.at);
+  const choice = choices.find((item) => item.id === selected) ?? choices[0];
+  const series = (choice && groups.get(choice.id)) || [];
   const numeric: TrendPoint[] = series
     .filter((r) => r.value.valueNum != null)
     .map((r) => {
@@ -43,25 +63,12 @@ export function TrendScreen() {
         value: r.value.valueNum!,
         flag: r.value.flag,
         bound: comparator === '>' || comparator === '>=' ? 'above' : comparator ? 'below' : null,
-        assumedUnit: seriesUnit != null && !hasUnit(r.value.unit),
       };
     });
-  // One short line under the chart, only for the shapes that are actually on
-  // it. Two or three sentences of small print turn a glance into reading.
-  const legend = [
-    numeric.some((p) => p.bound) ? 'مثلث: عدد دقیق نیست' : null,
-    unlabelled > 0 ? 'توخالی: واحد ثبت نشده' : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
-  // The most recent range is the one worth drawing: labs change ranges when
-  // they change methods, and the latest is what today's values are read
-  // against. It has to come from a row that is actually on the chart — the
-  // newest result overall may be the one in another unit, left off it, and its
-  // range would be drawn against an axis it does not belong to.
-  const latest = series[series.length - 1]?.value;
-  const unit = seriesUnit ?? latest?.unit;
+  const legend = numeric.some((p) => p.bound) ? 'مثلث: عدد دقیق نیست' : null;
+  const latest = series.at(-1)?.value;
+  const unit = latest?.unit?.trim();
+  const excluded = rows.length - series.length;
 
   return (
     <>
@@ -88,6 +95,17 @@ export function TrendScreen() {
           ) : (
             <>
               <Card>
+                {choices.length > 1 ? (
+                  <SelectField
+                    label="گروه نمودار"
+                    value={joinLabels([choice?.label, choice?.sublabel])}
+                    onPress={() => setPicking(true)}
+                  />
+                ) : choice ? (
+                  <Text variant="caption" color="textMuted">
+                    {joinLabels([choice.label, choice.sublabel])}
+                  </Text>
+                ) : null}
                 <Row justify="space-between" style={{ marginBottom: spacing.sm }}>
                   <Text variant="heading" ltr>
                     {analyte}
@@ -111,7 +129,7 @@ export function TrendScreen() {
                   />
                 ) : (
                   <Text variant="caption" color="textFaint">
-                    برای نمودار حداقل دو مقدار عددی لازم است.
+                    برای نمودار دو مقدار با نمونه، روش، واحد و محدودهٔ هماهنگ لازم است.
                   </Text>
                 )}
                 {legend ? (
@@ -121,8 +139,7 @@ export function TrendScreen() {
                 ) : null}
                 {excluded > 0 ? (
                   <Text variant="tiny" color="warning" style={{ marginTop: spacing.xs }}>
-                    {toPersianDigits(excluded)} مقدار با واحد دیگر در نمودار نیامد (واحدها تبدیل نمی‌شوند). در جدول
-                    پایین همه هست.
+                    {toPersianDigits(excluded)} مقدار از گروه‌های دیگر یا با اطلاعات ناکافی در فهرست پایین است.
                   </Text>
                 ) : null}
               </Card>
@@ -145,9 +162,14 @@ export function TrendScreen() {
                         justify="space-between"
                         style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}
                       >
-                        <Text variant="caption" color="textMuted">
-                          {formatJalaliDateTime(r.collectedAt)}
-                        </Text>
+                        <Column gap="xxs" style={{ flex: 1 }}>
+                          <Text variant="caption" color="textMuted">
+                            {formatJalaliDateTime(r.collectedAt)}
+                          </Text>
+                          <Text variant="tiny" color="textMuted">
+                            {contextLabel(r)}
+                          </Text>
+                        </Column>
                         <Row gap="xs">
                           <Text numeric style={{ color }}>
                             {ltrIsolate(r.value.value)}
@@ -174,7 +196,27 @@ export function TrendScreen() {
             </>
           )}
         </Column>
+        <PickerModal
+          visible={picking && choices.length > 1}
+          title="گروه نمودار"
+          selectedId={choice?.id}
+          items={choices}
+          onClose={() => setPicking(false)}
+          onSelect={(item) => {
+            setSelected(item.id);
+            setPicking(false);
+          }}
+        />
       </Screen>
     </>
   );
+}
+
+function contextLabel(row: {
+  panelName: string | null;
+  specimen: string | null;
+  method: string | null;
+  labName: string | null;
+}) {
+  return joinLabels([row.panelName, row.specimen, row.method, row.labName]) || 'نوع نمونه ثبت نشده';
 }

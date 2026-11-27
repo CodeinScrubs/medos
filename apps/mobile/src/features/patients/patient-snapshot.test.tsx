@@ -230,12 +230,14 @@ describe('patient at a glance', () => {
       patientId,
       collectedAt: hoursAgo(30),
       source: 'manual',
+      name: 'Chemistry',
       values: [{ analyte: 'K', value: '5.9', refLow: 3.5, refHigh: 5.1 }],
     });
     await createLabPanel({
       patientId,
       collectedAt: hoursAgo(3),
       source: 'manual',
+      name: 'Chemistry',
       values: [
         { analyte: 'K', value: '4.2', refLow: 3.5, refHigh: 5.1 },
         { analyte: 'Cr', value: '1.9', refLow: 0.6, refHigh: 1.3 },

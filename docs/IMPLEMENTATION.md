@@ -33,6 +33,14 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+The 0.11.70/code 86 candidate uses the live episode for the shift card and
+rounds, and retains the episode captured at intake for shift history. An
+explicitly discharged patient leaves the active deck. Their outstanding
+patient tasks remain reachable from the existing shift task list. The chart
+and latest lab review use recorded specimen, panel, source lab, method, unit
+and reference range together. Unclassified gas results remain in the raw
+history. Migration 0032 adds two nullable metadata columns.
+
 The 0.11.69/code 85 follow-up requires a successful discharge preview and
 compares the affected work inside the publication transaction. A new pending
 item, a failed read, or a retained preview cannot close the admission

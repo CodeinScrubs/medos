@@ -5,7 +5,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { ErrorNotice } from '@/components/error-notice';
 import { Button, IconButton, Input, Text } from '@/components/ui';
 import { shiftPatients } from '@/db/schema';
-import { openEncounter } from '@/features/encounters/queries';
+import { dischargeEncounter, openEncounter } from '@/features/encounters/queries';
 import { createPatient } from '@/features/patients/queries';
 import { createTask, setTaskStatus } from '@/features/tasks/queries';
 import { fromJalali } from '@/lib/jalali';
@@ -177,6 +177,49 @@ describe('40-patient deck with real reads, autosave and write admission', () => 
         (n) => typeof n.props.onPress === 'function' && String(n.props.accessibilityLabel).startsWith('اقدام بعدی:'),
       ),
     ).toHaveLength(0);
+  });
+  it('takes a discharged patient out of the deck but keeps a direct route to outstanding tasks', async () => {
+    const { patient, encounter } = rows[0]!;
+    await mount(ShiftCard);
+    await dischargeEncounter(encounter!.id, {
+      dischargedAt: new Date(mockClock),
+      dischargeType: 'improved',
+      nextStatus: 'followup',
+    });
+    await refresh('encounters');
+    expect(textNodes().some((n) => n.props.children === 'Synthetic Patient 1')).toBe(false);
+    await press('کارهای بیماران شیفت');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/tasks', params: { memberShiftId: rows[0]!.member.shiftId } });
+    expect(
+      activeShiftWorkspaceQuery()
+        .all()
+        .find((r) => r.patient?.id === patient.id)?.nextTask?.status,
+    ).toBe('open');
+  });
+  it('uses the current ward and episode task after a transfer without overwriting the original membership', async () => {
+    const original = rows[0]!;
+    await mount(ShiftCard);
+    const moved = await openEncounter({
+      patientId: original.patient.id,
+      kind: 'admission',
+      ward: 'New Ward',
+      bed: 'B-NEW',
+    });
+    const task = await createTask({
+      patientId: original.patient.id,
+      encounterId: moved,
+      title: 'Current ward task',
+      priority: 'high',
+    });
+    await refresh('encounters');
+    const row = activeShiftWorkspaceQuery()
+      .all()
+      .find((entry) => entry.member?.id === original.member.id);
+    expect(row?.encounter?.id).toBe(moved);
+    expect(row?.nextTask?.id).toBe(task);
+    expect(row?.member?.encounterId).toBe(original.encounter?.id);
+    await type('جستجو در شیفت', 'B-NEW');
+    expect(textNodes().some((n) => n.props.children === 'Synthetic Patient 1')).toBe(true);
   });
   it.each(['new admission', 'replacement encounter'])('refreshes bulk intake after a %s', async (change) => {
     const patientId = await createPatient({ firstName: 'Awaiting', lastName: 'Intake' });

@@ -225,6 +225,13 @@
       "when": 1791683321218,
       "tag": "0031_whole_proudstar",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1795788423836,
+      "tag": "0032_square_killraven",
+      "breakpoints": true
     }
   ]
 }

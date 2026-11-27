@@ -51,7 +51,8 @@ function ShiftScreenContent() {
   const scope = useAutosaveScope()!;
   const router = useRouter();
   const { colors, spacing } = useTheme();
-  const { shift, rows, error, loading, blocked, changing, shiftChanging, saving, retry } = useShiftWorkspace();
+  const { shift, rows, hasDischargedWork, error, loading, blocked, changing, shiftChanging, saving, retry } =
+    useShiftWorkspace();
   const progress = blocked ? null : shiftProgress(rows);
   const now = new Date(useNow());
   const [search, setSearch] = useState('');
@@ -234,6 +235,18 @@ function ShiftScreenContent() {
                   onPress={() => setOptionsOpen((value) => !value)}
                 />
               </Row>
+
+              {hasDischargedWork ? (
+                <Button
+                  label="کارهای بیماران شیفت"
+                  variant="ghost"
+                  size="sm"
+                  disabled={blocked}
+                  onPress={() =>
+                    void scope.perform(() => router.push({ pathname: '/tasks', params: { memberShiftId: shift.id } }))
+                  }
+                />
+              ) : null}
 
               {optionsOpen ? (
                 <Column gap="xs">

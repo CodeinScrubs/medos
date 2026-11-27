@@ -529,6 +529,8 @@ export const labPanels = sqliteTable(
       .notNull()
       .$default(() => 'manual' as const),
     labName: text('lab_name'),
+    specimen: text('specimen'),
+    method: text('method'),
     notes: text('notes'),
   },
   (t) => [

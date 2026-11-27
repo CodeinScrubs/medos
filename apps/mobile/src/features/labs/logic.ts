@@ -74,36 +74,6 @@ function splitCsv(line: string): string[] {
   return cells;
 }
 
-/**
- * The rows that may share one chart: those measured in the unit of the most
- * recent result. A creatinine of 1.0 mg/dL and one of 88.4 µmol/L are the same
- * value in different units; plotted on one axis they look like a tenfold rise.
- * Converting between units is a decision per analyte, so the odd ones out are
- * left off the chart and counted instead.
- *
- * A result typed without a unit is not an odd one out — it is a result whose
- * unit was not written down, which is how most of them are entered. Only a
- * unit that is there and different excludes a row. Rows are expected oldest
- * first, the order the trend screen reads them in.
- */
-export function sameUnitSeries<T extends { unit: string | null }>(
-  rows: T[],
-): { series: T[]; unit: string | null; excluded: number; unlabelled: number } {
-  const normal = (u: string | null) => (u ?? '').trim();
-  let unit: string | null = null;
-  for (let i = rows.length - 1; i >= 0; i -= 1) {
-    if (normal(rows[i]!.unit)) {
-      unit = rows[i]!.unit;
-      break;
-    }
-  }
-  const series = rows.filter((r) => !normal(r.unit) || sameLabUnitLabel(r.unit, unit));
-  // Counted, not hidden: once a unit is known for the series, a point with no
-  // unit is an assumption the chart is making, and the screen says so.
-  const unlabelled = unit == null ? 0 : series.filter((r) => !normal(r.unit)).length;
-  return { series, unit, excluded: rows.length - series.length, unlabelled };
-}
-
 const HEADER_WORDS = /^(test|analyte|name|result|value|آزمایش|نام|نتیجه|مقدار)$/i;
 
 function isHeaderRow(first: string, second: string): boolean {
@@ -129,21 +99,66 @@ export function isUnreadableNumber(value: string, alwaysNumeric: boolean): boole
 
 const LOOKS_NUMERIC = /^(?:<=|>=|<|>|≤|≥)?\s*[-+]?[\d.,٫٬،۰-۹٠-٩]+$/;
 
-type LatestRow = { value: Pick<LabValue, 'analyte' | 'value' | 'valueNum' | 'flag'>; collectedAt: Date };
+type LabContext = {
+  panelId?: string;
+  panelName?: string | null;
+  labName?: string | null;
+  specimen?: string | null;
+  method?: string | null;
+  value: Pick<LabValue, 'analyte'> & Partial<Pick<LabValue, 'unit' | 'refLow' | 'refHigh'>>;
+};
+
+/** Context recorded on the source report. Empty or mixed gas labels are not evidence of specimen. */
+export function labSeriesKey(row: LabContext): string | null {
+  const normalized = (label?: string | null) => label?.trim().toLowerCase() || null;
+  const panel = normalized(row.panelName);
+  const specimen = normalized(row.specimen);
+  const analyte = normalized(row.value.analyte);
+  const bloodGas = /^(ph|pc?o[₂2]|hco[₃3]|be|s[av]o[₂2]|lactate)$/.test(analyte ?? '');
+  if (specimen && /[/+]|\b(?:unknown|mixed)\b|نامشخص|ترکیبی/.test(specimen)) return null;
+  if ((!panel && !specimen) || (bloodGas && !specimen && panel !== 'abg' && panel !== 'vbg')) return null;
+  return JSON.stringify([
+    analyte,
+    panel,
+    specimen,
+    normalized(row.labName),
+    normalized(row.method),
+    row.value.unit?.trim() || null,
+    row.value.refLow ?? null,
+    row.value.refHigh ?? null,
+  ]);
+}
+
+export function labSeriesGroups<T extends LabContext>(rows: readonly T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = labSeriesKey(row);
+    if (key === null) continue;
+    const series = groups.get(key);
+    if (series) series.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+type LatestRow = LabContext & {
+  value: Pick<LabValue, 'analyte' | 'value' | 'valueNum' | 'flag'>;
+  collectedAt: Date;
+};
 
 const OUTSIDE_RANGE: readonly (LabValue['flag'] & string)[] = ['high', 'low', 'critical_high', 'critical_low'];
 
 /**
  * What a patient's summary says about their labs.
  *
- * The newest result of each analyte decides: a potassium that was high
+ * The newest comparable result decides: a potassium that was high
  * yesterday and normal this morning is not shown. Of those newest results,
  * only the ones that need a look are returned — flagged outside the range
  * stored with them, or typed in a way that cannot be read as a number (a
  * "5,8" that got no flag at all). Nothing here judges a result without a
  * range; it is neither shown as abnormal nor counted as normal.
  *
- * `analytes` is how many analytes have a newest result, so the summary can say
+ * `analytes` is the number of result groups, so the summary can say
  * how much it looked at when it has nothing to show. Newest first.
  */
 export function labsToReview<T extends LatestRow>(
@@ -151,7 +166,7 @@ export function labsToReview<T extends LatestRow>(
 ): { rows: T[]; analytes: number; latestAt: Date | null } {
   const newest = new Map<string, T>();
   for (const row of rows) {
-    const key = row.value.analyte.trim().toLowerCase();
+    const key = labSeriesKey(row) ?? JSON.stringify([row.value.analyte.trim().toLowerCase(), row.panelId ?? null]);
     const seen = newest.get(key);
     if (!seen || row.collectedAt.getTime() > seen.collectedAt.getTime()) newest.set(key, row);
   }

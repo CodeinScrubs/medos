@@ -17,6 +17,7 @@ import {
   updateTask,
 } from './queries';
 import { createPatient, deletePatient } from '../patients/queries';
+import { addPatientToShift, startShift } from '../shifts/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -27,6 +28,24 @@ beforeEach(async () => {
 });
 
 describe('retrieving and correcting tasks', () => {
+  it('lists and counts a shift patient’s work across shifts and excludes other patients', async () => {
+    const patientId = await createPatient({ firstName: 'Synthetic', lastName: 'Shift member' });
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Other patient' });
+    const oldShift = await startShift();
+    const shift = await startShift();
+    await addPatientToShift(shift, patientId);
+    const standing = await createTask({ patientId, title: 'Open without a shift' });
+    const inShift = await createTask({ patientId, shiftId: shift, title: 'Open in this shift' });
+    const prior = await createTask({ patientId, shiftId: oldShift, title: 'Other shift' });
+    await createTask({ patientId: other, shiftId: shift, title: 'Other patient' });
+    await createTask({ shiftId: shift, title: 'Global work' });
+    const filter = { memberShiftId: shift, status: 'open' as const };
+    expect((await tasksQuery(filter)).map(({ task }) => task.id).sort()).toEqual([standing, inShift, prior].sort());
+    expect((await taskCountQuery(filter))[0]?.total).toBe(3);
+    await deletePatient(patientId);
+    expect(await tasksQuery(filter)).toEqual([]);
+    expect((await taskCountQuery(filter))[0]?.total).toBe(0);
+  });
   it('ranks high before normal before low, with known deadlines first within each rank', async () => {
     await createTask({ title: 'low', priority: 'low' });
     await createTask({ title: 'normal', priority: 'normal' });

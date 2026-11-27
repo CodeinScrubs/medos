@@ -5,23 +5,26 @@ import { Alert } from 'react-native';
 import { useAutosaveScope } from '@/components/autosave-scope';
 import { useDatasetIntent } from '@/components/dataset-intent';
 import { Button, Column, Text } from '@/components/ui';
-import type { Encounter, Patient, Shift, ShiftPatient, Task } from '@/db/schema';
+import type { Shift } from '@/db/schema';
 import { useLive } from '@/db/use-live';
 import { DatasetChangedError } from '@/lib/dataset-write';
 
+import type { ShiftDeckRow } from './deck';
 import { activeShiftWorkspaceQuery, type ActiveShiftWorkspaceRow } from './queries';
 
 type Workspace = {
   shift: Shift | null;
-  rows: { member: ShiftPatient; patient: Patient; encounter: Encounter | null; nextTask: Task | null }[];
+  rows: ShiftDeckRow[];
+  hasDischargedWork: boolean;
 };
 
 function workspace(rows: ActiveShiftWorkspaceRow[]): Workspace {
   return {
     shift: rows[0]?.shift ?? null,
-    rows: rows.flatMap(({ member, patient, encounter, nextTask }) =>
-      member && patient ? [{ member, patient, encounter, nextTask }] : [],
+    rows: rows.flatMap(({ member, patient, encounter, nextTask, discharged }) =>
+      member && patient && !discharged ? [{ member, patient, encounter, nextTask }] : [],
     ),
+    hasDischargedWork: rows.some(({ patient, nextTask, discharged }) => patient && discharged && nextTask),
   };
 }
 
@@ -29,7 +32,12 @@ function workspace(rows: ActiveShiftWorkspaceRow[]): Workspace {
 function identity(view: Workspace): string {
   return JSON.stringify([
     view.shift?.id ?? null,
-    view.rows.map(({ member, patient }) => [member.id, patient.id, member.reviewedAt !== null]),
+    view.rows.map(({ member, patient, encounter }) => [
+      member.id,
+      patient.id,
+      encounter?.id ?? null,
+      member.reviewedAt !== null,
+    ]),
   ]);
 }
 
@@ -85,6 +93,7 @@ export function useShiftWorkspace() {
   return {
     shift: view?.shift ?? null,
     rows: view?.rows ?? [],
+    hasDischargedWork: view?.hasDischargedWork ?? false,
     error,
     loading: view === undefined && error === undefined,
     blocked: error !== undefined || view === undefined || changing,

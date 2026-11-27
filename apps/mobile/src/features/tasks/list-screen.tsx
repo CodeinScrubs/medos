@@ -14,12 +14,17 @@ import { taskCountQuery, tasksQuery, type TaskFilter } from './queries';
 import { TaskRow } from './task-row';
 
 export function TaskListScreen() {
-  const { patientId, scope } = useLocalSearchParams<{ patientId?: string; scope?: string }>();
+  const { patientId, scope, memberShiftId } = useLocalSearchParams<{
+    patientId?: string;
+    scope?: string;
+    memberShiftId?: string;
+  }>();
   return (
     <TaskList
-      key={JSON.stringify([patientId ?? null, scope ?? null])}
+      key={JSON.stringify([patientId ?? null, scope ?? null, memberShiftId ?? null])}
       patientId={patientId ?? (scope === 'global' ? null : undefined)}
       dueOnly={scope === 'due'}
+      memberShiftId={memberShiftId}
     />
   );
 }
@@ -27,9 +32,11 @@ export function TaskListScreen() {
 function TaskList({
   patientId: initialPatientId,
   dueOnly: initialDueOnly,
+  memberShiftId,
 }: {
   patientId: string | null | undefined;
   dueOnly: boolean;
+  memberShiftId?: string;
 }) {
   const { spacing } = useTheme();
   const [patientId, setPatientId] = useState(initialPatientId);
@@ -40,6 +47,7 @@ function TaskList({
   const until = endOfDay(new Date(useNow()));
   const filter: TaskFilter = {
     patientId,
+    memberShiftId,
     search,
     ...(status === 'deleted' ? { deleted: true } : { status }),
     ...(dueOnly ? { patientDueBy: until } : {}),
@@ -54,10 +62,19 @@ function TaskList({
   return (
     <Screen scroll>
       <ScreenOptions
-        options={{ title: dueOnly ? 'کارهای موعددار بیماران' : patientId === null ? 'کارهای بدون بیمار' : 'کارها' }}
+        options={{
+          title:
+            memberShiftId !== undefined
+              ? 'کارهای بیماران شیفت'
+              : dueOnly
+                ? 'کارهای موعددار بیماران'
+                : patientId === null
+                  ? 'کارهای بدون بیمار'
+                  : 'کارها',
+        }}
       />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        {!initialPatientId ? (
+        {!initialPatientId && memberShiftId === undefined ? (
           <ChipSelect
             value={dueOnly ? 'due' : patientId === null ? 'global' : 'all'}
             options={[

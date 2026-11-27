@@ -9,7 +9,7 @@ import {
   parseRangeInput,
   type LabFlag,
 } from './flags';
-import { isUnreadableNumber, labsToReview, panelResultsLine, parsePastedTable, sameUnitSeries } from './logic';
+import { isUnreadableNumber, labsToReview, panelResultsLine, labSeriesGroups, parsePastedTable } from './logic';
 import { analyteDef, ANALYTE_ORDER, LAB_PRESETS, rangeFor } from './presets';
 
 describe('parseLabNumber', () => {
@@ -157,17 +157,24 @@ describe('presets', () => {
     expect(rangeFor(undefined, adultMale)).toBeNull();
   });
 
-  it('has sane, unique entries', () => {
-    const names = LAB_PRESETS.flatMap((p) => p.analytes.map((a) => a.analyte.toLowerCase()));
-    expect(new Set(names).size).toBe(names.length);
-    expect(ANALYTE_ORDER.size).toBe(names.length);
+  it('uses unique panel keys and consistent definitions for shared analytes', () => {
+    expect(new Set(LAB_PRESETS.map((p) => p.key)).size).toBe(LAB_PRESETS.length);
+    const definitions = LAB_PRESETS.flatMap((p) => p.analytes);
+    expect(ANALYTE_ORDER.size).toBe(new Set(definitions.map((a) => a.analyte.toLowerCase())).size);
     for (const preset of LAB_PRESETS) {
+      expect(new Set(preset.analytes.map((a) => a.analyte.toLowerCase())).size).toBe(preset.analytes.length);
       for (const a of preset.analytes) {
+        expect(analyteDef(a.analyte)).toEqual(a);
         for (const range of [a.ref, a.refMale, a.refFemale]) {
           if (range?.low != null && range.high != null) expect(range.low).toBeLessThan(range.high);
         }
       }
     }
+  });
+  it.each(['abg', 'vbg'])('leaves %s reference ranges for the source report', (key) => {
+    const panel = LAB_PRESETS.find((p) => p.key === key)!;
+    expect(panel.analytes.some((a) => a.analyte === 'pH')).toBe(true);
+    expect(panel.analytes.every((a) => !a.ref && !a.refMale && !a.refFemale)).toBe(true);
   });
 });
 
@@ -204,40 +211,48 @@ describe('parsePastedTable', () => {
   });
 });
 
-describe('sameUnitSeries', () => {
-  const row = (unit: string | null, value: number) => ({ unit, value });
-
-  // Cr 1.0 mg/dL and Cr 88.4 µmol/L are the same result. On one axis they look
-  // like a tenfold rise, so the odd ones out are left off and counted.
-  it('keeps the unit of the most recent result and counts what it drops', () => {
-    const rows = [row('µmol/L', 88.4), row('mg/dL', 1), row('mg/dL', 1.4)];
-    expect(sameUnitSeries(rows)).toEqual({ series: [rows[1], rows[2]], unit: 'mg/dL', excluded: 1, unlabelled: 0 });
+describe('labSeriesGroups', () => {
+  const row = (
+    unit: string | null,
+    context: { specimen?: string; method?: string; title?: string; refHigh?: number; labName?: string } = {},
+  ) => ({
+    panelName: context.title ?? 'Chemistry',
+    specimen: context.specimen,
+    method: context.method,
+    labName: context.labName,
+    value: { analyte: 'Cr', unit, refHigh: context.refHigh },
   });
 
-  it('treats outer spacing as the same unit', () => {
-    expect(sameUnitSeries([row(' mg/dL ', 1), row('mg/dL', 1.4)]).excluded).toBe(0);
-  });
-  it.each([
-    ['mg/dL', 'Mg/dL'],
-    ['mmol/L', 'Mmol/L'],
-  ])('does not merge prefix case in %p and %p', (older, newer) => {
-    const rows = [row(older, 1), row(newer, 1.4)];
-    expect(sameUnitSeries(rows)).toEqual({ series: [rows[1]], unit: newer, excluded: 1, unlabelled: 0 });
+  it('never merges recorded units or assumes a unit for an unlabeled result', () => {
+    const a = row('mg/dL'),
+      b = row(' mg/dL '),
+      c = row(null),
+      d = row('Mg/dL');
+    expect([...labSeriesGroups([a, b, c, d]).values()]).toEqual([[a, b], [c], [d]]);
   });
 
-  // Most results are typed without a unit. That is a unit nobody wrote down,
-  // not a different one, so it stays on the chart.
-  it('keeps results typed without a unit, and takes the unit from the newest that has one', () => {
-    const rows = [row('mg/dL', 1), row(null, 1.4)];
-    // Kept on the chart, but counted: assuming the unit is an assumption the
-    // screen has to admit to.
-    expect(sameUnitSeries(rows)).toEqual({ series: rows, unit: 'mg/dL', excluded: 0, unlabelled: 1 });
-    expect(sameUnitSeries([row(null, 1), row(null, 2)]).unit).toBeNull();
-    expect(sameUnitSeries([row(null, 1), row(null, 2)]).unlabelled).toBe(0);
-    expect(sameUnitSeries([])).toEqual({ series: [], unit: null, excluded: 0, unlabelled: 0 });
+  it('separates specimen, method, source lab and reference band', () => {
+    const a = row('mg/dL', { specimen: 'serum', method: 'Method A', refHigh: 1.2, labName: 'Lab A' });
+    expect(
+      labSeriesGroups([
+        a,
+        { ...a, specimen: 'urine' },
+        { ...a, method: 'Method B' },
+        { ...a, labName: 'Lab B' },
+        { ...a, value: { ...a.value, refHigh: 1.3 } },
+      ]).size,
+    ).toBe(5);
+  });
+
+  it('keeps explicit mixed and unknown specimens out of the chart', () => {
+    const ambiguous = ['arterial / venous', 'mixed blood', 'unknown', 'نامشخص'].map((specimen) => ({
+      panelName: 'ABG',
+      specimen,
+      value: { analyte: 'pH', unit: null },
+    }));
+    expect(labSeriesGroups(ambiguous).size).toBe(0);
   });
 });
-
 describe('isUnreadableNumber', () => {
   /*
    * A potassium typed as "5,8" was stored as text, got no flag and sat in the

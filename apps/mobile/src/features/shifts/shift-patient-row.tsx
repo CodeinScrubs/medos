@@ -47,7 +47,9 @@ export function ShiftPatientRow({
             disabled={blocked}
             accessibilityLabel={seen ? 'برگرداندن به دیده‌نشده' : 'دیدم'}
             style={{ minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}
-            onPress={() => void scope.perform(() => setShiftPatientReviewed(member.id, !seen))}
+            onPress={() =>
+              void scope.perform(() => setShiftPatientReviewed(member.id, !seen, row.encounter?.id ?? null))
+            }
           >
             <Ionicons
               name={seen ? 'checkmark-circle' : 'ellipse-outline'}

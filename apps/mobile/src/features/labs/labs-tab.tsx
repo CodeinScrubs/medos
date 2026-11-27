@@ -152,7 +152,7 @@ export function LabsTab({ patientId }: { patientId: string }) {
 /*  Flowsheet: analytes down, draws across, newest first                        */
 /* -------------------------------------------------------------------------- */
 
-type ValueRow = { value: LabValue; collectedAt: Date; panelId: string };
+type ValueRow = Awaited<ReturnType<typeof patientLabValuesQuery>>[number];
 
 function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] }) {
   const router = useRouter();
@@ -162,12 +162,12 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
   // Numeric Text uses mono metrics, even with variant="tiny". Both lines must
   // fit in their row, including when Android increases the owner's font size.
   const rowHeight = Math.max(ROW_H, Math.ceil((VALUE_LINE_H + UNIT_LINE_H) * scale + 6));
-  const headerHeight = Math.max(rowHeight + 8, Math.ceil(2 * (typography.tiny.lineHeight ?? 18) * scale + 8));
+  const headerHeight = Math.max(rowHeight + 8, Math.ceil(3 * (typography.tiny.lineHeight ?? 18) * scale + 8));
   const nameWidth = Math.ceil(NAME_W * scale);
   const columnWidth = Math.ceil(COL_W * scale);
 
   const { columns, analytes, cell } = useMemo(() => {
-    const colMap = new Map<string, Date>();
+    const colMap = new Map<string, { at: Date; context: string | null }>();
     const nameMap = new Map<string, string>();
     const cells = new Map<string, LabValue>();
     // Analytes with numbers but no reference range anywhere: their lack of an
@@ -176,7 +176,7 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
     const ranged = new Set<string>();
 
     for (const r of rows) {
-      colMap.set(r.panelId, r.collectedAt);
+      colMap.set(r.panelId, { at: r.collectedAt, context: joinLabels([r.panelName, r.specimen]) });
       const key = r.value.analyte.toLowerCase();
       if (!nameMap.has(key)) nameMap.set(key, r.value.analyte);
       cells.set(`${key}|${r.panelId}`, r.value);
@@ -186,8 +186,8 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
 
     // Newest draw first: on a phone, the latest value belongs next to the name.
     const cols = [...colMap.entries()]
-      .sort((a, b) => b[1].getTime() - a[1].getTime())
-      .map(([panelId, at]) => ({ panelId, at }));
+      .sort((a, b) => b[1].at.getTime() - a[1].at.getTime())
+      .map(([panelId, column]) => ({ panelId, ...column }));
 
     const names = [...nameMap.entries()]
       .sort((a, b) => {
@@ -273,6 +273,9 @@ function Flowsheet({ patientId, rows }: { patientId: string; rows: ValueRow[] })
                   </Text>
                   <Text variant="tiny" color="textFaint" align="center">
                     {formatTime(c.at)}
+                  </Text>
+                  <Text variant="tiny" color="textMuted" align="center" numberOfLines={1}>
+                    {c.context || '—'}
                   </Text>
                 </View>
               ))}

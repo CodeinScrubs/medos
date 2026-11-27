@@ -13,6 +13,13 @@ import { labPanelHasForeignValues } from './ownership-queries';
 
 const panelAlive = isNull(labPanels.deletedAt);
 const valueAlive = isNull(labValues.deletedAt);
+const panelContext = {
+  panelId: labPanels.id,
+  panelName: labPanels.name,
+  labName: labPanels.labName,
+  specimen: labPanels.specimen,
+  method: labPanels.method,
+};
 
 export function patientLabPanelsQuery(patientId: string) {
   return db
@@ -56,7 +63,7 @@ export function panelValuesQuery(panelId: string) {
 /** Every live value for a patient with its draw time — the flowsheet's raw material. */
 export function patientLabValuesQuery(patientId: string) {
   return db
-    .select({ value: labValues, collectedAt: labPanels.collectedAt, panelId: labPanels.id })
+    .select({ value: labValues, collectedAt: labPanels.collectedAt, ...panelContext })
     .from(labValues)
     .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
     .innerJoin(patients, eq(labPanels.patientId, patients.id))
@@ -72,10 +79,10 @@ export function patientLabValuesQuery(patientId: string) {
     .orderBy(desc(labPanels.collectedAt), asc(labValues.sortOrder));
 }
 
-/** One analyte over time, oldest first, for the trend chart. Case-insensitive on the name. */
+/** Raw analyte history, oldest first. The chart groups only matching recorded contexts. */
 export function analyteSeriesQuery(patientId: string, analyte: string) {
   return db
-    .select({ value: labValues, collectedAt: labPanels.collectedAt })
+    .select({ value: labValues, collectedAt: labPanels.collectedAt, ...panelContext })
     .from(labValues)
     .innerJoin(labPanels, and(eq(labValues.panelId, labPanels.id), eq(labValues.patientId, labPanels.patientId)))
     .innerJoin(patients, eq(labPanels.patientId, patients.id))
@@ -86,10 +93,10 @@ export function analyteSeriesQuery(patientId: string, analyte: string) {
         isNull(patients.deletedAt),
         not(labPanelHasForeignValues()),
         eq(labPanels.patientId, patientId),
-        sql`lower(${labValues.analyte}) = lower(${analyte})`,
+        sql`lower(trim(${labValues.analyte})) = lower(trim(${analyte}))`,
       ),
     )
-    .orderBy(asc(labPanels.collectedAt));
+    .orderBy(asc(labPanels.collectedAt), asc(labPanels.id), asc(labValues.sortOrder), asc(labValues.id));
 }
 
 export type LabValueInput = {
@@ -107,6 +114,8 @@ export type LabPanelInput = {
   name?: string | null;
   source: LabPanel['source'];
   labName?: string | null;
+  specimen?: string | null;
+  method?: string | null;
   notes?: string | null;
   values: LabValueInput[];
 };
@@ -194,6 +203,8 @@ export function createLabPanelInTransaction(
         collectedAt: input.collectedAt,
         source: input.source,
         labName: input.labName ?? null,
+        specimen: input.specimen?.trim() || null,
+        method: input.method?.trim() || null,
         notes: input.notes ?? null,
       })
       .run();
@@ -233,6 +244,8 @@ export function updateLabPanelInTransaction(
         name: input.name ?? null,
         source: input.source,
         labName: input.labName ?? null,
+        specimen: input.specimen === undefined ? undefined : input.specimen?.trim() || null,
+        method: input.method === undefined ? undefined : input.method?.trim() || null,
         notes: input.notes ?? null,
         ...touch(now),
       })

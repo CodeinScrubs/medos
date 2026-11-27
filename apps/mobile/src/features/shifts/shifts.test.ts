@@ -27,8 +27,8 @@ import {
   startShift,
   updateShiftPatient,
 } from './queries';
-import { deleteEncounter, openEncounter } from '../encounters/queries';
-import { createPatient, deletedPatientsQuery, deletePatient } from '../patients/queries';
+import { deleteEncounter, dischargeEncounter, openEncounter } from '../encounters/queries';
+import { createPatient, deletedPatientsQuery, deletePatient, updatePatient } from '../patients/queries';
 import { createTask, setTaskStatus, tasksQuery } from '../tasks/queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
@@ -75,7 +75,7 @@ describe('a shift', () => {
     expect(await activeShiftWorkspaceQuery()).toEqual([]);
   });
 
-  it('projects only the next open standing or captured-episode task for this shift, without duplicate patients', async () => {
+  it('projects only the next open standing or current-episode task for this shift, without duplicate patients', async () => {
     const otherShift = await startShift();
     const shift = await startShift();
     const episode = await openEncounter({ patientId, kind: 'admission' });
@@ -95,6 +95,27 @@ describe('a shift', () => {
     expect((await activeShiftWorkspaceQuery())[0]?.nextTask).toBeNull();
   });
 
+  it('hides a manually discharged patient without an episode and retains prior-shift work until readmission', async () => {
+    const earlier = await startShift();
+    const previousTask = await createTask({ patientId, title: 'Synthetic outstanding task', shiftId: earlier });
+    const shift = await startShift();
+    const member = await addPatientToShift(shift, patientId);
+    await updatePatient(patientId, { status: 'discharged' });
+    expect(activeShiftWorkspaceQuery().get()).toMatchObject({
+      discharged: true,
+      nextTask: { id: previousTask, status: 'open' },
+    });
+    await expect(setShiftPatientReviewed(member, true, null)).rejects.toThrow();
+
+    const episode = await openEncounter({ patientId, kind: 'admission' });
+    expect(activeShiftWorkspaceQuery().get()).toMatchObject({
+      discharged: false,
+      encounter: { id: episode },
+      member: { encounterId: null },
+      nextTask: null,
+    });
+  });
+
   it('persists a checked round order without changing patient, task or encounter data', async () => {
     const shift = await startShift();
     const ids: string[] = [];
@@ -108,6 +129,30 @@ describe('a shift', () => {
     expect((await activeShiftWorkspaceQuery()).filter((r) => r.patient)).toHaveLength(40);
     expect(t.sqlite.export()).not.toEqual(before);
     expect((await shiftPatientsQuery(shift)).every((r) => !r.member.reviewedAt && !r.member.deletedAt)).toBe(true);
+  });
+  it('rejects old review and reorder actions after discharge while preserving the historical slot', async () => {
+    const shift = await startShift();
+    const episode = await openEncounter({ patientId, kind: 'admission' });
+    const departing = await addPatientToShift(shift, patientId, { shiftSummary: 'Synthetic handoff' });
+    const other = await createPatient({ firstName: 'Synthetic', lastName: 'Second member' });
+    const next = await addPatientToShift(shift, other);
+    const more = await createPatient({ firstName: 'Synthetic', lastName: 'Third member' });
+    const last = await addPatientToShift(shift, more);
+    await dischargeEncounter(episode, {
+      dischargedAt: new Date(),
+      dischargeType: 'improved',
+      nextStatus: 'discharged',
+    });
+    await expect(setShiftPatientReviewed(departing, true, episode)).rejects.toThrow('دیده‌شدن ثبت نشد');
+    await expect(reorderShiftPatients(shift, [last, next, departing], [departing, next, last])).rejects.toThrow();
+    await reorderShiftPatients(shift, [last, next], [next, last]);
+    const history = await shiftHistoryPatientsQuery(shift);
+    expect(history.map((row) => row.member.id)).toEqual([departing, last, next]);
+    expect(history[0]?.member).toMatchObject({
+      encounterId: episode,
+      shiftSummary: 'Synthetic handoff',
+      reviewedAt: null,
+    });
   });
 
   it('rejects an incomplete, duplicate, foreign or stale order atomically', async () => {

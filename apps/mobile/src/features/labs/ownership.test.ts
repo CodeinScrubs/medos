@@ -9,9 +9,11 @@ import { databaseRows } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
+import { labSeriesGroups, labsToReview } from './logic';
 import { patientLabOwnershipIssuesQuery } from './ownership-queries';
 import {
   analyteSeriesQuery,
+  createLabPanel,
   deleteLabPanel,
   panelValuesQuery,
   patientLabPanelsQuery,
@@ -23,6 +25,33 @@ import { reflagLabValuesIfNeeded } from './reflag';
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 const now = new Date('2026-10-11T09:00:00Z');
 let t: TestDatabase;
+
+it('preserves raw gas results while keeping arterial, venous and ambiguous contexts apart', async () => {
+  for (const [n, name, specimen, measured] of [
+    [0, 'ABG', 'arterial', '7.1'],
+    [1, 'ABG', 'arterial', '7.2'],
+    [2, 'VBG', 'venous', '7.4'],
+    [3, 'ABG / VBG', undefined, '7.3'],
+  ] as const) {
+    await createLabPanel({
+      patientId: 'owner',
+      source: 'manual',
+      collectedAt: new Date(now.getTime() + n * 1000),
+      name,
+      specimen,
+      method: 'Synthetic method',
+      values: [{ analyte: 'pH', value: measured, refLow: 7.3, refHigh: 7.5 }],
+    });
+  }
+  const rows = await analyteSeriesQuery('owner', ' pH ');
+  expect(rows.map((r) => r.value.value)).toEqual(['7.1', '7.2', '7.4', '7.3']);
+  expect([...labSeriesGroups(rows).values()].map((group) => group.map((r) => r.value.value))).toEqual([
+    ['7.1', '7.2'],
+    ['7.4'],
+  ]);
+  expect(labsToReview(rows).rows.map(({ value }) => value.value)).toEqual(['7.2']);
+});
+
 function panel(id: string, patientId = 'owner', deletedAt: Date | null = null) {
   t.db
     .insert(labPanels)

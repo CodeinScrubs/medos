@@ -33,6 +33,31 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-27 — Keep the active shift and lab trends scoped to current evidence
+
+**Agent:** GPT-6 via Codex.
+**Commits:** `codex/shift-lab-integrity`, based on PR 23.
+
+**Changed**
+- Show the current encounter in the active deck and retain the original shift
+  membership for history. Hide explicitly discharged patients from rounds while
+  keeping their open work in the existing tasks screen.
+- Split lab trends and bedside review by recorded context. Keep ambiguous values
+  in raw history. Add nullable specimen and method; old drafts still publish.
+- Bump the APK candidate to 0.11.70/code 86.
+
+**Verified**
+- See the local and hosted check records for this branch. The 40-patient test
+  checks both the live episode and the unchanged historical membership.
+
+**Not verified**
+- The signed owner APK and synthetic physical-phone run require separate
+  evidence. The real installation is excluded from synthetic testing.
+
+**Open threads**
+- Issue 21 tracks the pending discharge reconciliation and remaining clinical
+  workflow and device gates.
+
 ## 2026-11-27 — Require a current discharge preflight before publication
 
 **Agent:** GPT-6 via Codex.

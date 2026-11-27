@@ -128,7 +128,7 @@ function LabEntry({
   const { colors, radii, spacing } = useTheme();
 
   const editing = useLabForm(seed, onReset);
-  const { rows, presetKeys, name, labName, notes, rangeEditor } = editing.form;
+  const { rows, presetKeys, name, labName, specimen, method, notes, rangeEditor } = editing.form;
   const panel = seed[0]!.panel;
   const patient = seed[0]!.patient;
   const now = new Date(useNow());
@@ -494,6 +494,18 @@ function LabEntry({
           label="آزمایشگاه"
           value={labName}
           onChangeText={(labName) => editing.change({ labName })}
+          editable={!saving}
+        />
+        <Input
+          label="نوع نمونه"
+          value={specimen ?? ''}
+          onChangeText={(specimen) => editing.change({ specimen })}
+          editable={!saving}
+        />
+        <Input
+          label="روش آزمایش"
+          value={method ?? ''}
+          onChangeText={(method) => editing.change({ method })}
           editable={!saving}
         />
         <Input

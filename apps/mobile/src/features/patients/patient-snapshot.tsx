@@ -110,7 +110,7 @@ export function PatientSnapshot({ patientId }: { patientId: string }) {
                   value={r.value.value}
                   flag={r.value.flag}
                   unit={r.value.unit}
-                  when={age === latestLabAge ? undefined : age}
+                  when={joinLabels([r.specimen || r.panelName, age === latestLabAge ? null : age]) ?? undefined}
                 />
               );
             })}

@@ -99,6 +99,7 @@ describe('accelerated 24-hour, 40-patient shift integration', () => {
         if (item.latestTask) await setTaskStatus(item.latestTask, 'done', `Reviewed during hour ${hour}`);
         item.latestTask = await createTask({
           patientId: item.patientId,
+          encounterId: item.encounterId,
           shiftId,
           title: `Check result ${i + 1} at hour ${hour}`,
           dueAt: now,
@@ -193,13 +194,26 @@ describe('accelerated 24-hour, 40-patient shift integration', () => {
     const prior = members[0]!;
     const newEncounter = await openEncounter({ patientId: prior.patientId, kind: 'admission', ward: 'Later ward' });
     await createOrder({ patientId: prior.patientId, kind: 'drug', name: 'Later episode only' });
-    const laterTask = await createTask({ patientId: prior.patientId, title: 'Later episode task', priority: 'high' });
-    const originalMember = activeShiftWorkspaceQuery()
+    const laterTask = await createTask({
+      patientId: prior.patientId,
+      encounterId: newEncounter,
+      title: 'Later episode task',
+      priority: 'high',
+    });
+    const liveMember = activeShiftWorkspaceQuery()
       .all()
       .find((row) => row.member?.id === prior.member.id)!;
-    expect(originalMember.encounter?.id).toBe(prior.encounterId);
-    expect(originalMember.nextTask?.id).toBe(prior.latestTask);
-    expect(originalMember.nextTask?.id).not.toBe(laterTask);
+    expect(liveMember.encounter?.id).toBe(newEncounter);
+    expect(liveMember.nextTask?.id).toBe(laterTask);
+    expect(liveMember.member?.encounterId).toBe(prior.encounterId);
+    expect(
+      t.db
+        .select()
+        .from(tasks)
+        .all()
+        .find((task) => task.id === prior.latestTask),
+    ).toMatchObject({ encounterId: prior.encounterId, status: 'open' });
+    await expect(setShiftPatientReviewed(prior.member.id, false, prior.encounterId)).rejects.toThrow();
     expect(
       patientCurrentOrdersQuery(prior.patientId)
         .all()
@@ -232,7 +246,9 @@ describe('accelerated 24-hour, 40-patient shift integration', () => {
     for (const item of members) item.saver.cancel();
     // A new intent can close the restored shift; all 40 handoffs remain readable.
     await endShift(shiftId);
-    expect(shiftHistoryPatientsQuery(shiftId).all()).toHaveLength(40);
+    const history = shiftHistoryPatientsQuery(shiftId).all();
+    expect(history).toHaveLength(40);
+    expect(history.find(({ member }) => member.id === prior.member.id)?.member.encounterId).toBe(prior.encounterId);
     expect(t.db.select().from(orders).all()).toHaveLength(121);
   }, 90000);
 });

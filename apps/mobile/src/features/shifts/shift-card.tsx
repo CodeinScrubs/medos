@@ -22,8 +22,8 @@ export function ShiftCard({ onShiftPresence }: { onShiftPresence?: (active: bool
   const shift = data?.[0]?.shift ?? null;
   const rows = useMemo(
     () =>
-      (data ?? []).flatMap(({ member, patient, encounter, nextTask }) =>
-        member && patient ? [{ member, patient, encounter, nextTask }] : [],
+      (data ?? []).flatMap(({ member, patient, encounter, nextTask, discharged }) =>
+        member && patient && !discharged ? [{ member, patient, encounter, nextTask }] : [],
       ),
     [data],
   );
@@ -55,6 +55,14 @@ export function ShiftCard({ onShiftPresence }: { onShiftPresence?: (active: bool
         </Row>
         <ErrorNotice error={error} what="بیماران شیفت" onRetry={retry} />
         {shift ? <ActiveDeck key={shift.id} rows={rows} now={now} reliable={reliable} /> : null}
+        {reliable && shift && data.some(({ patient, nextTask, discharged }) => patient && discharged && nextTask) ? (
+          <Button
+            label="کارهای بیماران شیفت"
+            variant="ghost"
+            size="sm"
+            onPress={() => router.push({ pathname: '/tasks', params: { memberShiftId: shift.id } })}
+          />
+        ) : null}
       </Column>
     </Card>
   );
