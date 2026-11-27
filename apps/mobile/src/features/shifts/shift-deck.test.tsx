@@ -178,6 +178,35 @@ describe('40-patient deck with real reads, autosave and write admission', () => 
       ),
     ).toHaveLength(0);
   });
+  it.each(['new admission', 'replacement encounter'])('refreshes bulk intake after a %s', async (change) => {
+    const patientId = await createPatient({ firstName: 'Awaiting', lastName: 'Intake' });
+    await openEncounter({ patientId, kind: 'admission', ward: 'Original ward' });
+    await mount(ShiftScreen);
+    await act(async () => {
+      tree!.root
+        .findAllByType(IconButton)
+        .find((n) => n.props.label === 'گزینه‌های شیفت')!
+        .props.onPress();
+    });
+    const capture = button('افزودن همه‌ی بستری‌ها (۱)').props.onPress;
+
+    const newPatientId =
+      change === 'new admission' ? await createPatient({ firstName: 'New', lastName: 'Intake' }) : patientId;
+    const latest = await openEncounter({ patientId: newPatientId, kind: 'admission', ward: 'Latest ward' });
+
+    // The native change event has not refreshed the rendered button yet.
+    await act(async () => {
+      capture();
+      await settle();
+    });
+    expect(activeShiftWorkspaceQuery().all()).toHaveLength(40);
+
+    // Rejection refreshes the intake basis so the next tap can succeed.
+    await press(change === 'new admission' ? 'افزودن همه‌ی بستری‌ها (۲)' : 'افزودن همه‌ی بستری‌ها (۱)');
+    const current = activeShiftWorkspaceQuery().all();
+    expect(current).toHaveLength(change === 'new admission' ? 42 : 41);
+    expect(current.find((row) => row.patient?.id === newPatientId)?.member?.encounterId).toBe(latest);
+  });
   it('retains a hidden patient editor while searching, then flushes it before a persistent reorder', async () => {
     await mount(ShiftScreen);
     await press('تحویل شیفت');

@@ -9,7 +9,8 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import {
   addPatientToShift,
-  addPatientsToShift,
+  addAdmittedPatientsToShift,
+  admittedForShiftQuery,
   activeShiftQuery,
   activeShiftWorkspaceQuery,
   deleteShift,
@@ -233,18 +234,23 @@ describe('a shift', () => {
     const firstPatient = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
     const secondPatient = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
     const thirdPatient = await createPatient({ firstName: 'Third', lastName: 'Patient', status: 'admitted' });
-    await openEncounter({ patientId: firstPatient, kind: 'admission', ward: 'Ward A' });
+    const firstEpisode = await openEncounter({ patientId: firstPatient, kind: 'admission', ward: 'Ward A' });
     const episode = await openEncounter({ patientId: secondPatient, kind: 'admission', ward: 'PICU' });
-    await openEncounter({ patientId: thirdPatient, kind: 'admission', ward: 'Ward B' });
+    const thirdEpisode = await openEncounter({ patientId: thirdPatient, kind: 'admission', ward: 'Ward B' });
     const existing = await addPatientToShift(shiftId, firstPatient, { shiftSummary: 'Original handoff' });
-    const ids = await addPatientsToShift(shiftId, [firstPatient, secondPatient, thirdPatient]);
+    const shown = [
+      { patientId: firstPatient, encounterId: firstEpisode },
+      { patientId: secondPatient, encounterId: episode },
+      { patientId: thirdPatient, encounterId: thirdEpisode },
+    ];
+    const ids = await addAdmittedPatientsToShift(shiftId, shown);
     expect(ids[0]).toBe(existing);
     expect(new Set(ids).size).toBe(3);
     const rows = await shiftPatientsQuery(shiftId);
     expect(rows.map((row) => row.patient.id)).toEqual([firstPatient, secondPatient, thirdPatient]);
     expect(rows[0]?.member.shiftSummary).toBe('Original handoff');
     expect(rows[1]?.member.encounterId).toBe(episode);
-    expect(await addPatientsToShift(shiftId, [firstPatient, secondPatient, thirdPatient])).toEqual(ids);
+    expect(await addAdmittedPatientsToShift(shiftId, shown)).toEqual(ids);
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(3);
   });
 
@@ -254,8 +260,10 @@ describe('a shift', () => {
     const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
     await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
     const secondEpisode = await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
+    const shown = await admittedForShiftQuery();
     await deleteEncounter(secondEpisode);
-    await expect(addPatientsToShift(shiftId, [first, second])).rejects.toThrow();
+    expect(shown).toHaveLength(2);
+    await expect(addAdmittedPatientsToShift(shiftId, shown)).rejects.toThrow('فهرست بستری‌ها تغییر کرده است');
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
   });
 
@@ -263,14 +271,19 @@ describe('a shift', () => {
     const shiftId = await startShift();
     const first = await createPatient({ firstName: 'First', lastName: 'Patient', status: 'admitted' });
     const second = await createPatient({ firstName: 'Second', lastName: 'Patient', status: 'admitted' });
-    await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
-    await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
+    const firstEpisode = await openEncounter({ patientId: first, kind: 'admission', ward: 'Ward A' });
+    const secondEpisode = await openEncounter({ patientId: second, kind: 'admission', ward: 'Ward B' });
     t.sqlite.exec(
       `CREATE TRIGGER reject_second_shift_member BEFORE INSERT ON shift_patients
        WHEN NEW.patient_id = '${second}'
        BEGIN SELECT RAISE(ABORT, 'synthetic batch insert failure'); END;`,
     );
-    await expect(addPatientsToShift(shiftId, [first, second])).rejects.toThrow('synthetic batch insert failure');
+    await expect(
+      addAdmittedPatientsToShift(shiftId, [
+        { patientId: first, encounterId: firstEpisode },
+        { patientId: second, encounterId: secondEpisode },
+      ]),
+    ).rejects.toThrow('synthetic batch insert failure');
     expect(await shiftPatientsQuery(shiftId)).toHaveLength(0);
   });
 

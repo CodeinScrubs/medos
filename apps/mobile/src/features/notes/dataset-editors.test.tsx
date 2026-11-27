@@ -567,44 +567,50 @@ describe('actual manual order form identity, pending publication and optional su
     expect(input('نام دارو').props.value).toBe('Synthetic typed');
   });
 
-  it.each(['dose', 'name'] as const)('a delayed suggestion cannot overwrite a later manual %s edit', async (field) => {
-    const candidate = await createOrder({
-      patientId,
-      kind: 'fluid',
-      name: 'Synthetic candidate',
-      dose: '1000 cc',
-      route: 'IV',
-      rate: '40 cc/h',
-    });
-    const previous = t.db.select().from(orders).where(eq(orders.id, candidate)).get()!;
-    jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([previous.name]);
-    let release!: (value: typeof previous) => void;
-    const pending = new Promise<typeof previous>((resolve) => {
-      release = resolve;
-    });
-    jest.spyOn(orderQueries, 'lastOrderNamed').mockReturnValue(pending);
-    await act(async () => {
-      tree = create(<OrderFormScreen />);
-      await settle();
-    });
-    const picked = tree!.root
-      .findAllByType(Pressable)
-      .find((node) => node.findAllByType(Text).some((text) => text.props.children === previous.name))!;
-    await act(async () => {
-      picked.props.onPress();
-      await settle();
-    });
-    await act(async () => {
-      if (field === 'dose') input('دوز').props.onChangeText('125 mg');
-      else input('نام دارو').props.onChangeText('Synthetic newer name');
-      release(previous);
-      await settle();
-    });
-    expect(input('نام دارو').props.value).toBe(field === 'dose' ? previous.name : 'Synthetic newer name');
-    expect(input('دوز').props.value).toBe(field === 'dose' ? '125 mg' : '');
-    expect(tree!.root.findAllByType(Input).some((node) => node.props.label === 'سرعت')).toBe(false);
-    expect(mockBack).not.toHaveBeenCalled();
-  });
+  // React rendering and migrated SQLite share this worker. Allow host scheduling
+  // headroom; the deliberately delayed lookup still resolves inside the test.
+  it.each(['dose', 'name'] as const)(
+    'a delayed suggestion cannot overwrite a later manual %s edit',
+    async (field) => {
+      const candidate = await createOrder({
+        patientId,
+        kind: 'fluid',
+        name: 'Synthetic candidate',
+        dose: '1000 cc',
+        route: 'IV',
+        rate: '40 cc/h',
+      });
+      const previous = t.db.select().from(orders).where(eq(orders.id, candidate)).get()!;
+      jest.spyOn(orderQueries, 'suggestOrderNames').mockResolvedValue([previous.name]);
+      let release!: (value: typeof previous) => void;
+      const pending = new Promise<typeof previous>((resolve) => {
+        release = resolve;
+      });
+      jest.spyOn(orderQueries, 'lastOrderNamed').mockReturnValue(pending);
+      await act(async () => {
+        tree = create(<OrderFormScreen />);
+        await settle();
+      });
+      const picked = tree!.root
+        .findAllByType(Pressable)
+        .find((node) => node.findAllByType(Text).some((text) => text.props.children === previous.name))!;
+      await act(async () => {
+        picked.props.onPress();
+        await settle();
+      });
+      await act(async () => {
+        if (field === 'dose') input('دوز').props.onChangeText('125 mg');
+        else input('نام دارو').props.onChangeText('Synthetic newer name');
+        release(previous);
+        await settle();
+      });
+      expect(input('نام دارو').props.value).toBe(field === 'dose' ? previous.name : 'Synthetic newer name');
+      expect(input('دوز').props.value).toBe(field === 'dose' ? '125 mg' : '');
+      expect(tree!.root.findAllByType(Input).some((node) => node.props.label === 'سرعت')).toBe(false);
+      expect(mockBack).not.toHaveBeenCalled();
+    },
+    15_000,
+  );
 
   it('only the latest of two deferred selections may prefill the draft', async () => {
     const first = await createOrder({ patientId, kind: 'drug', name: 'Synthetic first', dose: '1 g' });

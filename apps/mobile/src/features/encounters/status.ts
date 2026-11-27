@@ -43,7 +43,7 @@ export function encounterRecencyOrder() {
 }
 
 /** The same single-column context is used by publication and new raw forms. */
-export function activeEncounterIdQuery(patientId: string, handle: Pick<Database, 'select'> = db) {
+export function activeEncounterIdQuery(patientId: string | typeof patients.id, handle: Pick<Database, 'select'> = db) {
   return handle
     .select({ id: encounters.id })
     .from(encounters)

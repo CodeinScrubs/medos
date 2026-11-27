@@ -20,7 +20,8 @@ import { useTheme } from '@/theme';
 import { matchesShiftDeck } from './deck';
 import {
   addPatientToShift,
-  addPatientsToShift,
+  addAdmittedPatientsToShift,
+  admittedForShiftQuery,
   endShift,
   reorderShiftPatients,
   shiftProgress,
@@ -80,29 +81,25 @@ function ShiftScreenContent() {
     [patientRows],
   );
 
-  // On a ward, the shift is usually every admitted patient: one tap instead of
-  // one picker per patient. Anyone else is still added by hand.
+  const { data: admitted, error: intakeError, retry: retryIntake } = useLive(admittedForShiftQuery());
   const inShift = new Set(rows.map(({ patient }) => patient.id));
-  const admittedNotInShift = patientsError
-    ? []
-    : (patientRows ?? []).filter((p) => p.status === 'admitted' && !inShift.has(p.id));
+  const admittedNotInShift = intakeError ? [] : (admitted ?? []).filter(({ patientId }) => !inShift.has(patientId));
 
   function retryReads() {
     retry();
     if (patientsError) retryPatients();
+    if (intakeError) retryIntake();
   }
 
   async function addAllAdmitted() {
-    if (!shift || !progress || patientsError || patientsLoading || writing.current) return;
+    if (!shift || !progress || !admittedNotInShift.length || writing.current) return;
     writing.current = true;
     setBusy(true);
     try {
-      await addPatientsToShift(
-        shift.id,
-        admittedNotInShift.map((patient) => patient.id),
-        scope.generation,
-      );
+      await addAdmittedPatientsToShift(shift.id, admittedNotInShift, scope.generation);
     } catch (e) {
+      retry();
+      retryIntake();
       alertError('اضافه نشد', e);
     } finally {
       writing.current = false;
@@ -184,7 +181,7 @@ function ShiftScreenContent() {
     <Screen scroll edges={[]}>
       <ScreenOptions options={{ title: 'شیفت' }} />
       <Column gap="md" style={{ paddingTop: spacing.md }}>
-        <ErrorNotice error={error ?? patientsError} what="شیفت" onRetry={retryReads} />
+        <ErrorNotice error={error ?? patientsError ?? intakeError} what="شیفت" onRetry={retryReads} />
         <ShiftWorkspaceNotice changing={changing} saving={saving} onRetry={retry} />
         {loading ? (
           <Text variant="caption" color="textMuted">

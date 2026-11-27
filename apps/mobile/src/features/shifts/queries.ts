@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, exists, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { audit } from '@/db/audit';
-import { db } from '@/db/client';
+import { db, type Database } from '@/db/client';
 import { encounters, patients, shiftPatients, shifts, tasks, type Shift, type ShiftPatient } from '@/db/schema';
 import { resolveActiveEncounterId } from '@/features/encounters/queries';
+import { activeEncounterIdQuery } from '@/features/encounters/status';
 import { datasetGeneration, withDatasetWrite } from '@/lib/dataset-write';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 
@@ -309,27 +310,33 @@ export async function addPatientToShift(
   });
 }
 
-/**
- * Add a captured ward list in one SQLite transaction.
- *
- * The visible patient IDs are treated as one decision: if a patient or the
- * shift changed, or any membership insert fails, none of the batch is applied.
- * Existing memberships are returned idempotently and keep their original
- * episode, handoff and reviewed state.
- */
-export async function addPatientsToShift(
+/** Read the episode with each candidate so the displayed count has a clinical basis. */
+export function admittedForShiftQuery(reader: Pick<Database, 'select'> = db) {
+  return reader
+    .select({ patientId: patients.id, encounterId: encounters.id })
+    .from(patients)
+    .innerJoin(encounters, eq(encounters.id, activeEncounterIdQuery(patients.id, reader)))
+    .where(
+      and(
+        isNull(patients.deletedAt),
+        eq(patients.status, 'admitted'),
+        inArray(encounters.kind, ['admission', 'emergency']),
+      ),
+    )
+    .orderBy(desc(patients.starred), desc(patients.updatedAt), asc(patients.id));
+}
+
+type AdmittedForShift = Awaited<ReturnType<typeof admittedForShiftQuery>>[number];
+
+/** Compare and add the entire displayed census in one SQLite transaction. */
+export async function addAdmittedPatientsToShift(
   shiftId: string,
-  patientIds: string[],
+  shown: readonly AdmittedForShift[],
   generation = datasetGeneration(),
 ): Promise<string[]> {
-  if (
-    !Array.isArray(patientIds) ||
-    patientIds.length > 500 ||
-    patientIds.some((id) => typeof id !== 'string' || !id.trim()) ||
-    new Set(patientIds).size !== patientIds.length
-  )
-    throw new Error('فهرست بیماران معتبر نیست؛ هیچ بیماری اضافه نشد.');
-  if (!patientIds.length) return [];
+  if (!shown.length) return [];
+  const shownIds = new Set(shown.map(({ patientId }) => patientId));
+  if (shownIds.size !== shown.length) throw new Error('فهرست بیماران معتبر نیست؛ هیچ بیماری اضافه نشد.');
 
   return withDatasetWrite(generation, async () =>
     db.transaction((tx) => {
@@ -340,21 +347,22 @@ export async function addPatientsToShift(
         .get();
       if (!shift) throw new Error('این شیفت دیگر باز نیست؛ هیچ بیماری اضافه نشد.');
 
-      const livePatients = tx
-        .select({ id: patients.id, status: patients.status })
-        .from(patients)
-        .where(and(isNull(patients.deletedAt), inArray(patients.id, patientIds)))
-        .all();
-      const byId = new Map(livePatients.map((patient) => [patient.id, patient]));
-      if (patientIds.some((id) => byId.get(id)?.status !== 'admitted'))
-        throw new Error('فهرست بستری‌ها تغییر کرده است؛ آن را دوباره بخوانید. هیچ بیماری اضافه نشد.');
-
       const existing = tx
-        .select()
+        .select({ id: shiftPatients.id, patientId: shiftPatients.patientId })
         .from(shiftPatients)
-        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId), inArray(shiftPatients.patientId, patientIds)))
+        .where(and(memberAlive, eq(shiftPatients.shiftId, shiftId)))
+        .orderBy(desc(shiftPatients.createdAt), desc(shiftPatients.id))
         .all();
-      const existingByPatient = new Map(existing.map((member) => [member.patientId, member]));
+      // For imported duplicates, retain the same earliest member as single add.
+      const existingByPatient = new Map(existing.map(({ patientId, id }) => [patientId, id]));
+      const current = admittedForShiftQuery(tx).all();
+      const encountersByPatient = new Map(current.map(({ patientId, encounterId }) => [patientId, encounterId]));
+      if (
+        shown.some(({ patientId, encounterId }) => encountersByPatient.get(patientId) !== encounterId) ||
+        current.some(({ patientId }) => !existingByPatient.has(patientId) && !shownIds.has(patientId))
+      )
+        throw new Error('فهرست بستری‌ها تغییر کرده است؛ فهرست را بررسی کنید و دوباره بزنید.');
+
       const last = tx
         .select({ sortOrder: shiftPatients.sortOrder })
         .from(shiftPatients)
@@ -365,13 +373,12 @@ export async function addPatientsToShift(
       const now = new Date();
       const result: string[] = [];
 
-      for (const patientId of patientIds) {
+      for (const { patientId, encounterId } of shown) {
         const prior = existingByPatient.get(patientId);
-        if (prior) {
-          result.push(prior.id);
+        if (prior !== undefined) {
+          result.push(prior);
           continue;
         }
-        const encounterId = resolveActiveEncounterId(patientId, tx);
         const id = newId();
         tx.insert(shiftPatients)
           .values({

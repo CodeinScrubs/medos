@@ -5,6 +5,9 @@ const STACK_LIMIT = 64 * 1024;
 // Deliberately reviewed operational/validation notices. Exact matching preserves
 // useful instructions without trusting a native error or an appended private value.
 const notices = {
+  'shift.intake-invalid': 'فهرست بیماران معتبر نیست؛ هیچ بیماری اضافه نشد.',
+  'shift.intake-closed': 'این شیفت دیگر باز نیست؛ هیچ بیماری اضافه نشد.',
+  'shift.intake-changed': 'فهرست بستری‌ها تغییر کرده است؛ فهرست را بررسی کنید و دوباره بزنید.',
   'place.choice': 'مکان تغییر کرده است؛ فهرست را دوباره بخوانید.',
   'place.missing': 'مکان در دسترس نیست؛ ممکن است حذف شده باشد.',
   'place.changed': 'مکان تغییر کرده یا در دسترس نیست؛ فهرست را دوباره بخوانید.',
