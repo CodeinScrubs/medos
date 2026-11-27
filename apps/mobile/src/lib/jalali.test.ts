@@ -121,6 +121,32 @@ describe('formatting', () => {
     expect(formatJalali(day.toISOString())).toBe('۱۴۰۳/۰۵/۱۲');
   });
 
+  it('accepts valid ISO date-times with local and offset clocks', () => {
+    const local = '2024-08-02T14:30:00';
+    expect(formatJalali(local)).toBe('۱۴۰۳/۰۵/۱۲');
+    expect(formatJalaliDateTime(local)).toBe('۱۲ مرداد ۱۴۰۳، ۱۴:۳۰');
+
+    const offset = '2024-08-02T14:30:00+03:30';
+    expect(formatJalaliDateTime(offset)).toBe(formatJalaliDateTime(new Date(offset)));
+  });
+
+  it('rejects impossible ISO date-times instead of normalizing them', () => {
+    for (const invalid of [
+      '2024-02-30T12:00:00.000Z',
+      '2023-02-29T12:00:00Z',
+      '2024-04-31T12:00:00Z',
+      '2024-08-02T24:00:00Z',
+      '2024-08-02T12:60:00Z',
+      '2024-08-02T12:00:60Z',
+      '2024-08-02T12:00:00+14:01',
+      '2024-08-02T12:00:00.1234Z',
+      '2024-08-02T12:00:00Zjunk',
+    ]) {
+      expect(formatJalali(invalid)).toBe('—');
+      expect(formatJalaliDateTime(invalid)).toBe('—');
+    }
+  });
+
   it('never guesses at anything else', () => {
     // new Date('1403/05/12') would read this as the Gregorian year 1403.
     expect(formatJalali('1403/05/12')).toBe('—');
