@@ -1,9 +1,22 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
-import { auditLog, encounterFormDrafts, encounters, patients } from '@/db/schema';
+import {
+  auditLog,
+  consultations,
+  encounterFormDrafts,
+  encounters,
+  followUps,
+  orders,
+  patients,
+  tasks,
+} from '@/db/schema';
 import { importTables } from '@/features/backup/import';
+import { createConsult } from '@/features/consults/queries';
+import { createFollowUp } from '@/features/followups/queries';
+import { createOrder } from '@/features/kardex/queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
+import { createTask } from '@/features/tasks/queries';
 import { newId, softDelete } from '@/lib/ids';
 import { useTestDatabase } from '@/test/db-client';
 import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
@@ -24,7 +37,7 @@ import {
   replaceEncounterFormDraft,
   saveEncounterFormDraft,
 } from './form-draft-queries';
-import { dischargeEncounter, openEncounter, updateEncounter } from './queries';
+import { dischargeEncounter, dischargeWorkQuery, openEncounter, updateEncounter } from './queries';
 
 jest.mock('@/db/client', () => jest.requireActual('@/test/db-client'));
 jest.mock('@/platform/notifications', () => jest.requireActual('@/test/mocks/notifications'));
@@ -40,8 +53,9 @@ const episodes = () => t.db.select().from(encounters).all();
 function save(doc: EncounterFormDocument, revision = 0, target: string | null = null) {
   return saveEncounterFormDraft(id, doc.mode, patientId, target, doc, revision);
 }
-function commit(doc: EncounterFormDocument, revision = 1, target: string | null = null) {
-  return commitEncounterFormDraft(id, doc.mode, patientId, target, revision, doc, now);
+async function commit(doc: EncounterFormDocument, revision = 1, target: string | null = null) {
+  const work = doc.mode === 'discharge' && target !== null ? await dischargeWorkQuery(patientId, target) : undefined;
+  return commitEncounterFormDraft(id, doc.mode, patientId, target, revision, doc, now, work);
 }
 function setText(doc: EncounterFormDocument, text: string) {
   if (doc.mode === 'discharge') doc.fields.outcomeNotes = text;
@@ -54,6 +68,43 @@ beforeEach(async () => {
 });
 
 describe('unpublished episode input on migrated SQLite', () => {
+  it('requires the current discharge work and keeps tasks, consults and follow-ups open', async () => {
+    const old = await openEncounter({ patientId, kind: 'admission', admittedAt: now });
+    const oldOrder = await createOrder({ patientId, kind: 'drug', name: 'Synthetic old order' });
+    await createTask({ patientId, encounterId: old, title: 'Synthetic historical task' });
+    const target = await openEncounter({ patientId, kind: 'admission', admittedAt: now });
+    const order = await createOrder({ patientId, kind: 'drug', name: 'Synthetic current order' });
+    const task = await createTask({ patientId, title: 'Synthetic patient-level task' });
+    const consult = await createConsult({ patientId, encounterId: target, reason: 'Synthetic open consult' });
+    const followup = await createFollowUp({
+      patientId,
+      dueAt: now,
+      reason: 'Synthetic pending follow-up',
+      channel: 'lab',
+      priority: 'normal',
+    });
+    const work = await dischargeWorkQuery(patientId, target);
+    expect(work).toHaveLength(4);
+    expect(work).toEqual(
+      expect.arrayContaining([
+        { kind: 'order', id: order },
+        { kind: 'task', id: task },
+        { kind: 'consult', id: consult },
+        { kind: 'followup', id: followup },
+      ]),
+    );
+    const doc = await document('discharge', target);
+    await expect(commitEncounterFormDraft(id, 'discharge', patientId, target, 0, doc, now)).rejects.toThrow(
+      'کارهای باز تغییر کرده‌اند',
+    );
+    expect(episodes().find((row) => row.id === target)?.isActive).toBe(true);
+    await expect(commitEncounterFormDraft(id, 'discharge', patientId, target, 0, doc, now, work)).resolves.toBe(target);
+    expect(t.db.select().from(orders).where(eq(orders.id, order)).get()?.status).toBe('completed');
+    expect(t.db.select().from(orders).where(eq(orders.id, oldOrder)).get()?.status).toBe('active');
+    expect(t.db.select().from(tasks).where(eq(tasks.id, task)).get()?.status).toBe('open');
+    expect(t.db.select().from(consultations).where(eq(consultations.id, consult)).get()?.status).toBe('pending');
+    expect(t.db.select().from(followUps).where(eq(followUps.id, followup)).get()?.status).toBe('pending');
+  });
   it('records one discharge action when publication is retried with the same token', async () => {
     const target = await openEncounter({ patientId, kind: 'admission', admittedAt: now });
     const doc = await document('discharge', target);

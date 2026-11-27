@@ -30,7 +30,7 @@ import {
   type EncounterFormComparison,
 } from './form-draft-queries';
 import { ENCOUNTER_KIND_LABELS } from './labels';
-import { deleteEncounter, encounterRecordCount } from './queries';
+import { deleteEncounter, encounterRecordCount, type DischargeWork } from './queries';
 
 export type { EncounterFormSeed } from './form-draft-queries';
 
@@ -129,7 +129,7 @@ export function useEncounterFormDraft(
       end();
     }
   }
-  async function save() {
+  async function save(shownWork?: readonly DischargeWork[]) {
     if (!begin()) return;
     if (completedId) {
       try {
@@ -161,6 +161,7 @@ export function useEncounterFormDraft(
           persistence.revision(),
           latest.current,
           new Date(now),
+          shownWork,
         );
         published.current = true;
         setCompletedId(id);

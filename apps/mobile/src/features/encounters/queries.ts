@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { auditInTransaction } from '@/db/audit';
 import { db, type Database, type DbTransaction } from '@/db/client';
@@ -229,6 +229,66 @@ export type DischargeInput = {
   nextStatus: PatientStatus;
 };
 
+function endingOrders(patientId: string, encounterId: string) {
+  return and(
+    eq(orders.patientId, patientId),
+    eq(orders.encounterId, encounterId),
+    isNull(orders.deletedAt),
+    inArray(orders.status, ['active', 'held']),
+  );
+}
+
+type DischargeWorkKind = 'order' | 'task' | 'consult' | 'followup';
+
+/** One read for the current admission and outstanding patient-level work. */
+export function dischargeWorkQuery(patientId: string, encounterId: string, reader: Pick<Database, 'select'> = db) {
+  return reader
+    .select({ kind: sql<DischargeWorkKind>`'order'`, id: orders.id })
+    .from(orders)
+    .where(endingOrders(patientId, encounterId))
+    .unionAll(
+      reader
+        .select({ kind: sql<DischargeWorkKind>`'task'`, id: tasks.id })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.patientId, patientId),
+            or(eq(tasks.encounterId, encounterId), isNull(tasks.encounterId)),
+            isNull(tasks.deletedAt),
+            eq(tasks.status, 'open'),
+          ),
+        ),
+    )
+    .unionAll(
+      reader
+        .select({ kind: sql<DischargeWorkKind>`'consult'`, id: consultations.id })
+        .from(consultations)
+        .where(
+          and(
+            eq(consultations.patientId, patientId),
+            or(eq(consultations.encounterId, encounterId), isNull(consultations.encounterId)),
+            isNull(consultations.deletedAt),
+            inArray(consultations.status, ['pending', 'requested']),
+          ),
+        ),
+    )
+    .unionAll(
+      reader
+        .select({ kind: sql<DischargeWorkKind>`'followup'`, id: followUps.id })
+        .from(followUps)
+        .where(
+          and(
+            eq(followUps.patientId, patientId),
+            or(eq(followUps.encounterId, encounterId), isNull(followUps.encounterId)),
+            isNull(followUps.deletedAt),
+            eq(followUps.status, 'pending'),
+          ),
+        ),
+    );
+}
+
+export type DischargeWork = Awaited<ReturnType<typeof dischargeWorkQuery>>[number];
+
 export async function dischargeEncounter(id: string, input: DischargeInput): Promise<void> {
   db.transaction((tx) => dischargeEncounterInTransaction(tx, id, input, new Date()));
 }
@@ -258,19 +318,8 @@ export function dischargeEncounterInTransaction(tx: DbTransaction, id: string, i
     // Inpatient orders end with the admission. Without this they stay
     // "active" for ever and reappear on the next admission's kardex, day
     // count and all — a drug the patient stopped months ago.
-    const endingOrders = tx
-      .select({ id: orders.id })
-      .from(orders)
-      .where(
-        and(
-          eq(orders.patientId, current.patientId),
-          eq(orders.encounterId, id),
-          isNull(orders.deletedAt),
-          inArray(orders.status, ['active', 'held']),
-        ),
-      )
-      .all();
-    for (const order of endingOrders)
+    const affectedOrders = tx.select({ id: orders.id }).from(orders).where(endingOrders(current.patientId, id)).all();
+    for (const order of affectedOrders)
       withClinicalHistory(tx, 'order', order.id, now, () =>
         tx
           .update(orders)

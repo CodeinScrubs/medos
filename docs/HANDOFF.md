@@ -33,6 +33,38 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-27 — Require a current discharge preflight before publication
+
+**Agent:** GPT-6 via Codex.
+**Commits:** `codex/discharge-preflight` follows `2ad3231` (PR 22).
+
+**Changed**
+- Read the discharge consequences in one episode-scoped snapshot. Keep
+  patient-level work, reject stale or failed previews, and compare affected
+  IDs in the same transaction as discharge and raw draft retirement.
+- Keep the existing screen and show pending follow-ups alongside other
+  work that stays open. See [validation-0.11.69.md](validation-0.11.69.md).
+
+**Verified**
+- Both original mounted-screen regressions reproduced on .68. The fix
+  preserves the draft and blocks discharge until explicit retry.
+- Full `npm run check` passes 2,959 app tests and five workflow tests.
+
+**Not verified**
+- .69 native upgrade and physical workflow acceptance remain open.
+  Per-item result reconciliation is future work.
+
+**Open threads**
+- Finish Android acceptance for the current candidate and the timed
+  40-patient phone shift.
+- Continue the issue 21 specimen/context and ward transfer findings before
+  expanding clinical features. Confirm active versus historical encounter
+  presentation for existing shift members.
+
+**Gotchas**
+- Drizzle's method form of `unionAll` takes one branch per call.
+  The real SQLite projection test covers all four branches.
+
 ## 2026-11-27 — Reconcile review branches and protect ward batch intake
 
 **Agent:** GPT-6 via Codex.

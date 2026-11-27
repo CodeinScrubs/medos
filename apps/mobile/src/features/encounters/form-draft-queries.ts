@@ -18,7 +18,13 @@ import {
   type EncounterFormDocument,
   type EncounterFormMode,
 } from './form-draft';
-import { dischargeEncounterInTransaction, openEncounterInTransaction, updateEncounterInTransaction } from './queries';
+import {
+  dischargeEncounterInTransaction,
+  dischargeWorkQuery,
+  openEncounterInTransaction,
+  updateEncounterInTransaction,
+  type DischargeWork,
+} from './queries';
 
 const target = alias(encounters, 'form_target');
 const scope = (mode: EncounterFormMode, patientId: string, encounterId: string | null) =>
@@ -169,6 +175,7 @@ export async function commitEncounterFormDraft(
   expectedRevision: number,
   document: EncounterFormDocument,
   now: Date,
+  shownWork?: readonly DischargeWork[],
 ): Promise<string> {
   assertDocument(mode, patientId, encounterId, document);
   const result = db.transaction((tx) => {
@@ -228,6 +235,14 @@ export async function commitEncounterFormDraft(
         .run();
     let publishedId: string;
     if (stored.mode === 'discharge') {
+      const shown = new Set(shownWork?.map(({ kind, id }) => `${kind}:${id}`));
+      const currentWork = dischargeWorkQuery(patientId, encounterId!, tx).all();
+      if (
+        !shownWork ||
+        currentWork.length !== shown.size ||
+        currentWork.some(({ kind, id }) => !shown.has(`${kind}:${id}`))
+      )
+        throw new Error('کارهای باز تغییر کرده‌اند. فهرست تازه را مرور کنید و دوباره ثبت کنید.');
       dischargeEncounterInTransaction(
         tx,
         encounterId!,

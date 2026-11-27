@@ -33,6 +33,11 @@ integration and verification. A passing milestone does not complete the product.
 
 ## Current checkpoint
 
+The 0.11.69/code 85 follow-up requires a successful discharge preview and
+compares the affected work inside the publication transaction. A new pending
+item, a failed read, or a retained preview cannot close the admission
+unnoticed. See [validation-0.11.69.md](validation-0.11.69.md).
+
 The 0.11.68/code 84 candidate combines the calendar and ward intake changes in
 PRs 17–19 with an intake consistency fix. A batch retains every displayed
 candidate's admission and checks it against the full current census in one

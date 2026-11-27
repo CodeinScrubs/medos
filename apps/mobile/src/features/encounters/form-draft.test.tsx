@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { ErrorNotice } from '@/components/error-notice';
 import { alertError } from '@/components/feedback';
 import { PickerModal } from '@/components/picker-modal';
 import { Button, ChipSelect, Input } from '@/components/ui';
 import { encounterFormDrafts, encounters } from '@/db/schema';
 import { createPatient } from '@/features/patients/queries';
+import { createTask } from '@/features/tasks/queries';
 import { DatasetBusyError, DatasetChangedError } from '@/lib/dataset-write';
 import { databaseRows, replacementFailure, snapshotDataset } from '@/test/dataset-snapshot';
 import { useTestDatabase } from '@/test/db-client';
@@ -130,6 +132,64 @@ afterEach(async () => {
 });
 
 describe('episode draft editor handlers', () => {
+  it('keeps the discharge draft and rejects a retained Save when outstanding work cannot be read', async () => {
+    discharge = true;
+    mockEncounterId = await openEncounter({
+      patientId: mockPatientId,
+      kind: 'admission',
+      admittedAt: new Date('2026-09-30T12:00:00Z'),
+    });
+    await mount();
+    await type('خلاصه‌ی نتیجه', 'Synthetic draft before failed read');
+    const save = button('ثبت ترخیص').props.onPress;
+    const prepare = t.sqlite.prepare.bind(t.sqlite);
+    const broken = jest.spyOn(t.sqlite, 'prepare').mockImplementation((sql, params) => {
+      if (sql.includes('from "tasks"')) throw new Error('Synthetic error reading outstanding tasks');
+      return prepare(sql, params);
+    });
+    await act(async () => {
+      mockListeners.forEach((listener) => listener({ tableName: 'tasks' }));
+      jest.advanceTimersByTime(80);
+      await settle();
+    });
+    await act(async () => {
+      save();
+      await settle();
+    });
+    expect(t.db.select().from(encounters).get()?.isActive).toBe(true);
+    expect(button('ثبت ترخیص').props.disabled).toBe(true);
+    expect(input('خلاصه‌ی نتیجه').props.value).toBe('Synthetic draft before failed read');
+    const notice = tree!.root.findAllByType(ErrorNotice).find((node) => node.props.error)!;
+    broken.mockRestore();
+    await act(async () => {
+      notice.props.onRetry();
+      await settle();
+    });
+    expect(button('ثبت ترخیص').props.disabled).toBe(false);
+    await click('ثبت ترخیص');
+    expect(t.db.select().from(encounters).get()?.isActive).toBe(false);
+  });
+  it('refreshes discharge consequences if an open task arrives before the live read catches up', async () => {
+    discharge = true;
+    mockEncounterId = await openEncounter({
+      patientId: mockPatientId,
+      kind: 'admission',
+      admittedAt: new Date('2026-09-30T12:00:00Z'),
+    });
+    await mount();
+    await type('خلاصه‌ی نتیجه', 'Synthetic draft before new task');
+    const save = button('ثبت ترخیص').props.onPress;
+    await createTask({ patientId: mockPatientId, encounterId: mockEncounterId, title: 'Synthetic outstanding result' });
+    await act(async () => {
+      save();
+      await settle();
+    });
+    expect(t.db.select().from(encounters).get()?.isActive).toBe(true);
+    expect(input('خلاصه‌ی نتیجه').props.value).toBe('Synthetic draft before new task');
+    expect(stored().deletedAt).toBeNull();
+    await click('ثبت ترخیص');
+    expect(t.db.select().from(encounters).get()?.isActive).toBe(false);
+  });
   it.each([false, true])(
     'recovers raw text/date/clock without a clinical transition (discharge=%s)',
     async (closing) => {

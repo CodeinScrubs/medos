@@ -80,7 +80,8 @@ Start with the newest entry in `docs/HANDOFF.md`, then its version-specific
 validation report and `docs/IMPLEMENTATION.md`. Read the exact commit named there;
 earlier test counts, PR checks and APKs are evidence for their own source only.
 
-The current review starts at [validation-0.11.68](validation-0.11.68.md) and the
+The current review starts with [discharge preflight](validation-0.11.69.md),
+[ward census validation](validation-0.11.68.md) and the
 [ward workflow plan](../plans/006-ward-intake-and-followthrough.md). The frozen
 [0.11.65 report](validation-0.11.65.md) documents the earlier signed APK and
 emulator upgrade, restore and age/menu checks. Confirm the artifact's exact
