@@ -677,6 +677,7 @@ export const followUps = sqliteTable(
       .$default(() => 'normal' as const),
     outcome: text('outcome'),
     completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+    resultStage: text('result_stage', { enum: ['received', 'reviewed', 'actionTaken', 'noActionNeeded'] }),
     /** expo-notifications id, so the reminder can be cancelled or rescheduled. */
     notificationId: text('notification_id'),
     /** Desired reminder generation and the last generation confirmed with Android. */

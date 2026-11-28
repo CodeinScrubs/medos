@@ -21,7 +21,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { FollowUpCard } from './follow-up-card';
 import { postponedDueDate } from './logic';
-import { completeFollowUp, createFollowUp, deleteFollowUp, updateFollowUp } from './queries';
+import { changeFollowUpResultStage, completeFollowUp, createFollowUp, deleteFollowUp, updateFollowUp } from './queries';
 
 // Keep the real PromptModal; expose native press handlers without native hit testing.
 let mockFocused = true;
@@ -140,6 +140,43 @@ afterEach(async () => {
 });
 
 describe('follow-up card save and retry', () => {
+  it('offers one next result step and only closes after a saved decision', async () => {
+    await updateFollowUp(current().id, { channel: 'lab' });
+    await render();
+    expect(action('انجام شد')).toBeUndefined();
+    expect(action('بستن پیگیری')).toBeUndefined();
+    await invoke(action('ثبت دریافت').props.onPress);
+    await act(async () => tree!.update(scoped()));
+    expect(current()).toMatchObject({ resultStage: 'received', status: 'pending' });
+    await invoke(action('ثبت مرور').props.onPress);
+    await act(async () => tree!.update(scoped()));
+    const dismiss = await ask('ثبت تصمیم', 'انصراف');
+    await invoke(dismiss);
+    expect(current()).toMatchObject({ resultStage: 'reviewed', status: 'pending' });
+    const decide = await ask('ثبت تصمیم', 'اقدامی لازم نبود');
+    await invoke(decide);
+    await act(async () => tree!.update(scoped()));
+    expect(current()).toMatchObject({ resultStage: 'noActionNeeded', status: 'pending' });
+    await invoke(action('بستن پیگیری').props.onPress);
+    expect(prompt().props.title).toBe('بستن پیگیری نتیجه');
+    await invoke(button('ثبت').props.onPress);
+    expect(current()).toMatchObject({ resultStage: 'noActionNeeded', status: 'done' });
+  });
+
+  it('refuses a retained result decision after same-ID dataset replacement', async () => {
+    await updateFollowUp(current().id, { channel: 'lab' });
+    await changeFollowUpResultStage(current(), 'received', new Date());
+    await changeFollowUpResultStage(current(), 'reviewed', new Date());
+    const original = current();
+    const restore = snapshot();
+    await render();
+    const decide = await ask('ثبت تصمیم', 'اقدام انجام شد');
+    await act(async () => restore());
+    await invoke(decide);
+    expect(current()).toEqual(original);
+    expect(alertError).toHaveBeenCalledWith('عملیات انجام نشد', expect.any(DatasetChangedError));
+  });
+
   it('keeps the completion dialog and typed outcome after a failed save, then allows retry', async () => {
     await render();
     await act(async () => {

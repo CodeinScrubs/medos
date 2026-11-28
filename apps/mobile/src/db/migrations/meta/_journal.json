@@ -232,6 +232,13 @@
       "when": 1795788423836,
       "tag": "0032_square_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1795864743101,
+      "tag": "0033_typical_nick_fury",
+      "breakpoints": true
     }
   ]
 }

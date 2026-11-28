@@ -2717,3 +2717,22 @@ turn that uncertainty into a newborn, negative years or NaN. The pure helpers
 use civil-calendar day difference and withhold an unestablished result. A later
 unknown hour on the same birth date remains valid. No stored record is rewritten,
 manual fallback without DOB remains usable and existing leap-day behavior stays.
+
+## Explicit result follow-through (0.11.72)
+
+The existing follow-up channel `lab` is the owner's explicit selection for
+tracking a result. It can describe a lab, pathology or imaging report. Other
+channels retain ordinary completion. Pending result follow-ups progress from
+waiting to received, reviewed and one recorded decision (action performed or
+no action needed). These milestones record the owner's actions, not a clinical
+interpretation or a change to an order. Closure requires a decision and uses
+normal follow-up completion, including reminder cancellation. A correction
+within an open follow-up steps back one milestone and retains the past version.
+
+Migration 0033 adds nullable `follow_ups.result_stage`. Old statuses and outcome
+text are retained without inferring any milestones. Keep the original patient,
+encounter, due date and reminder while the result is in progress. Each change,
+its clinical history and local audit commit in one transaction. The discharge
+read includes the exact stage, so even a same-millisecond progression invalidates
+an older discharge preview. The existing backup table importer preserves the
+stage on current archives and leaves it absent when an older archive has no column.

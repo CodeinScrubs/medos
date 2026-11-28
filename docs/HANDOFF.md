@@ -33,6 +33,35 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-28 — Track result receipt, review, decision and closure
+
+**Agent:** GPT-6 via Codex.
+**Commits:** App source `8676be5`, version 0.11.72/code 88, migration 0033.
+
+**Changed**
+- One next action on the existing result follow-up card. Record receipt, review
+  and a decision before explicitly closing. The long-press action corrects a
+  mistaken open stage. Legacy closed records gain no invented milestones.
+- Discharge shows the phase of open results and rejects a stale preview. It
+  preserves the patient, encounter, open work, and reminder deadline.
+
+**Verified**
+- `npm run check` passed 2,977 mobile tests in 198 suites plus five workflow
+  tests. The generated migration set matches the schema.
+- Owner arm64 and isolated x86_64 QA APKs use the same Hermes payload and
+  signing certificate. APK identity, version code and native ABI were checked.
+- Installed .71, upgraded to .72 in place on Android 16 and tested receipt
+  across cold start, review, Back dismissal, decision, discharge with open
+  work, and explicit closure. See [the QA report](validation-0.11.72.md).
+
+**Not verified**
+- A52s result workflow, reminder reboot/Doze and owner data upgrade. ADB
+  found no physical device in this session.
+
+**Open threads**
+- Issue 21 still has open broader workflow and device checks. Its explicit
+  result follow-through is implemented and accepted on the emulator.
+
 ## 2026-11-28 — Close 0.11.71 release verification and record reminder limits
 
 **Agent:** GPT-6 via Codex.

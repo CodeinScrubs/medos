@@ -10,6 +10,7 @@ import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
 import type { Encounter } from '@/db/schema';
 import { useLive } from '@/db/use-live';
+import { resultStageLabel } from '@/features/followups/labels';
 import { formatJalaliDateTime } from '@/lib/jalali';
 import { joinLabels } from '@/lib/persian';
 import { useTheme } from '@/theme';
@@ -147,7 +148,7 @@ function DischargeForm({
                       <Consequence key={item.id}>
                         {joinLabels([
                           item.title,
-                          item.detail,
+                          item.kind === 'followup' && item.detail ? resultStageLabel(item.detail) : item.detail,
                           item.kind === 'order' && item.status === 'held' ? 'متوقف موقت' : null,
                           item.kind === 'consult'
                             ? item.status === 'requested'

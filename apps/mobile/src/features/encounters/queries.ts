@@ -302,7 +302,9 @@ export function dischargeWorkQuery(patientId: string, encounterId: string, reade
           kind: sql<DischargeWorkKind>`'followup'`,
           id: followUps.id,
           title: followUps.reason,
-          detail: sql<string | null>`null`,
+          detail: sql<
+            string | null
+          >`case when ${followUps.channel} = 'lab' then coalesce(${followUps.resultStage}, 'waiting') end`,
           status: sql<string>`${followUps.status}`,
           dueAt: followUps.dueAt,
           changedAt: followUps.updatedAt,

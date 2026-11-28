@@ -59,6 +59,7 @@ export type AuditAction =
   | 'consult.deleted'
   | 'consult.restored'
   | 'followup.statusChanged'
+  | 'followup.resultStageChanged'
   | 'followup.deleted'
   | 'followup.restored'
   | 'followup.draftDiscarded'
