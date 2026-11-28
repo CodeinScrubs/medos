@@ -70,12 +70,45 @@ remained on .11.2 and its dataset was outside this test.
   Documents folder. An independent read authenticated the archive, confirmed
   42 fixture patients and three media files, and found the saved photo edit
   revision. Test archives and media stayed local.
+- The full archive created by the .71 emulator also restored on the A52s.
+  The 14 compared clinical tables and all 35 media digests matched. The
+  phone's own synthetic archive was then restored and checked again,
+  including its three media files and saved image edit.
+- The native rounds view traversed all 38 unreviewed members of the 39-patient
+  deck, wrapped to the first and did not record an extra review. This took
+  129.1 seconds including ADB and accessibility dumps. The sweep did not
+  include routine charting or measure real shift duration.
+
+## Reminder lifecycle on Android 16 (API 36)
+
+These tests used the isolated x86_64 QA install, synthetic tasks and explicit
+notification and exact-alarm grants. The A52s was unavailable during this run.
+The QA task was scheduled through the UI and Android's notification list was
+checked for its exact ID with the app in the background. A changed kernel boot
+ID confirmed a real emulator reboot. For Doze, the device was put to sleep
+and forced into deep idle using the [Android test procedure][doze-test].
+
+- In forced deep Doze, Android posted the scheduled task notification while
+  the QA app was in the background. The test first observed the notification
+  three seconds after its deadline, with Doze still `IDLE`. The test reset the
+  battery and idle overrides before continuing.
+- A short-lead reboot trial scheduled the reminder for 14:12. Android reported a
+  completed boot at 14:10:41, but its boot broadcast reached Expo's notification
+  receiver at 14:12:55. The receiver discarded the expired trigger and no
+  notification was posted during the observation window. The task remained
+  open. Boot completion alone is insufficient evidence of alarm recovery.
+- With a later deadline, Android finished booting at 14:19:16 and had
+  re-registered the alarm by 14:21:07. The 14:23 reminder was first observed
+  in Android's notification list at 14:23:04. The QA app was never reopened
+  between reboot and delivery. No QA crash entry was present after the retry.
 
 ## Still outside this evidence
 
-The owner-package in-place upgrade with live data, second-device physical
-restore, whole-shift measurements, on-device media picker/camera acceptance
-and alarm delivery through reboot/Doze remain separate.
+The owner-package in-place upgrade with live data, restore between two physical
+phones, whole-shift measurements, on-device media picker/camera acceptance,
+and A52s alarm delivery through reboot/Doze remain separate.
 Result receipt, clinical review and closure require explicit workflow
 states and remain tracked in issue 21. The saved APK is a local sideload
 artifact and was never uploaded.
+
+[doze-test]: https://developer.android.com/training/monitoring-device-state/doze-standby#test_doze
