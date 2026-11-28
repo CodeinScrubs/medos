@@ -1,17 +1,20 @@
-/** Date-label indices only; all clinical points remain on the chart. */
-export function chartDateIndices(pointCount: number, plotWidth: number, labelWidth: number): number[] {
-  if (!Number.isSafeInteger(pointCount) || pointCount < 1) return [];
-  if (pointCount === 1) return [0];
-  // End labels extend inward by a full width; an adjacent centred label by
-  // half a width. Leave a gap and account for rounding to actual point indices.
+/** Sample sorted pixel positions without dropping any clinical points. */
+export function chartDateIndices(positions: readonly number[], labelWidth: number): number[] {
+  if (positions.length === 0) return [];
+  const last = positions.length - 1;
+  const start = positions[0]!;
+  const end = positions[last]!;
+  // End labels extend inward by a full width; a centred neighbour by half.
   const spacing = Math.max(labelWidth, 1) * 1.5 + 8;
-  const capacity = Math.min(5, pointCount, 1 + Math.floor(Math.max(plotWidth, 0) / spacing));
-  for (let count = capacity; count >= 2; count--) {
-    const indices = Array.from({ length: count }, (_, i) => Math.round((i * (pointCount - 1)) / (count - 1)));
-    const fits = indices.every(
-      (index, i) => i === 0 || ((index - indices[i - 1]!) * plotWidth) / (pointCount - 1) >= spacing,
-    );
-    if (fits) return indices;
+  if (end - start < spacing) return [last];
+  const indices = [0];
+  let previous = start;
+  for (let i = 1; i < last && indices.length < 4; i++) {
+    const position = positions[i]!;
+    if (position - previous < spacing) continue;
+    if (end - position < spacing) break;
+    indices.push(i);
+    previous = position;
   }
-  return [pointCount - 1];
+  return [...indices, last];
 }

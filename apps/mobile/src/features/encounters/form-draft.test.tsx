@@ -187,6 +187,12 @@ describe('episode draft editor handlers', () => {
     expect(t.db.select().from(encounters).get()?.isActive).toBe(true);
     expect(input('خلاصه‌ی نتیجه').props.value).toBe('Synthetic draft before new task');
     expect(stored().deletedAt).toBeNull();
+    expect(
+      tree!.root.findAll(
+        (node) =>
+          typeof node.props.children === 'string' && node.props.children.includes('Synthetic outstanding result'),
+      ).length,
+    ).toBeGreaterThan(0);
     await click('ثبت ترخیص');
     expect(t.db.select().from(encounters).get()?.isActive).toBe(false);
   });

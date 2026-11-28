@@ -243,12 +243,28 @@ type DischargeWorkKind = 'order' | 'task' | 'consult' | 'followup';
 /** One read for the current admission and outstanding patient-level work. */
 export function dischargeWorkQuery(patientId: string, encounterId: string, reader: Pick<Database, 'select'> = db) {
   return reader
-    .select({ kind: sql<DischargeWorkKind>`'order'`, id: orders.id })
+    .select({
+      kind: sql<DischargeWorkKind>`'order'`,
+      id: orders.id,
+      title: orders.name,
+      detail: sql<string | null>`null`,
+      status: sql<string>`${orders.status}`,
+      dueAt: sql`null`.mapWith((milliseconds: number): Date | null => new Date(milliseconds)),
+      changedAt: orders.updatedAt,
+    })
     .from(orders)
     .where(endingOrders(patientId, encounterId))
     .unionAll(
       reader
-        .select({ kind: sql<DischargeWorkKind>`'task'`, id: tasks.id })
+        .select({
+          kind: sql<DischargeWorkKind>`'task'`,
+          id: tasks.id,
+          title: tasks.title,
+          detail: sql<string | null>`null`,
+          status: sql<string>`${tasks.status}`,
+          dueAt: tasks.dueAt,
+          changedAt: tasks.updatedAt,
+        })
         .from(tasks)
         .where(
           and(
@@ -261,7 +277,15 @@ export function dischargeWorkQuery(patientId: string, encounterId: string, reade
     )
     .unionAll(
       reader
-        .select({ kind: sql<DischargeWorkKind>`'consult'`, id: consultations.id })
+        .select({
+          kind: sql<DischargeWorkKind>`'consult'`,
+          id: consultations.id,
+          title: consultations.reason,
+          detail: consultations.specialty,
+          status: sql<string>`${consultations.status}`,
+          dueAt: sql<Date | null>`null`,
+          changedAt: consultations.updatedAt,
+        })
         .from(consultations)
         .where(
           and(
@@ -274,7 +298,15 @@ export function dischargeWorkQuery(patientId: string, encounterId: string, reade
     )
     .unionAll(
       reader
-        .select({ kind: sql<DischargeWorkKind>`'followup'`, id: followUps.id })
+        .select({
+          kind: sql<DischargeWorkKind>`'followup'`,
+          id: followUps.id,
+          title: followUps.reason,
+          detail: sql<string | null>`null`,
+          status: sql<string>`${followUps.status}`,
+          dueAt: followUps.dueAt,
+          changedAt: followUps.updatedAt,
+        })
         .from(followUps)
         .where(
           and(

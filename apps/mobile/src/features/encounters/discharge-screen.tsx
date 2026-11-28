@@ -10,7 +10,8 @@ import { useDateValidation } from '@/components/use-date-validation';
 import { useNow } from '@/components/use-now';
 import type { Encounter } from '@/db/schema';
 import { useLive } from '@/db/use-live';
-import { toPersianDigits } from '@/lib/persian';
+import { formatJalaliDateTime } from '@/lib/jalali';
+import { joinLabels } from '@/lib/persian';
 import { useTheme } from '@/theme';
 
 import { encounterFormDisplayDate, type DischargeFormFields } from './form-draft';
@@ -31,6 +32,13 @@ const NEXT_STATUS_OPTIONS: { value: DischargeFormFields['nextStatus']; label: st
   { value: 'discharged', label: 'ترخیص‌شده' },
   { value: 'followup', label: 'ادامه‌ی پیگیری' },
   { value: 'outpatient', label: 'سرپایی' },
+];
+
+const WORK_GROUPS: { kind: DischargeWork['kind']; title: string }[] = [
+  { kind: 'task', title: 'کارهای باز می‌مانند' },
+  { kind: 'followup', title: 'پیگیری‌های در انتظار باز می‌مانند' },
+  { kind: 'consult', title: 'کانسالت‌های بی‌پاسخ باز می‌مانند' },
+  { kind: 'order', title: 'این دستورهای کاردکس با بستری پایان می‌یابند' },
 ];
 
 /** Close an admission. Route params: `id` (patient), `encounterId`. */
@@ -79,9 +87,6 @@ function DischargeForm({
       shownWork.current = undefined;
     };
   }, [work]);
-  const counts = { order: 0, task: 0, consult: 0, followup: 0 };
-  for (const item of work ?? []) counts[item.kind] += 1;
-
   return (
     <Screen scroll>
       <Column gap="md" style={{ paddingTop: spacing.md }}>
@@ -133,19 +138,29 @@ function DischargeForm({
         {work?.length ? (
           <Card tone="alt">
             <Column gap="xs">
-              <Text variant="captionStrong">با ثبت ترخیص</Text>
-              {counts.order > 0 ? (
-                <Consequence>{toPersianDigits(counts.order)} دستور کاردکسِ این بستری «تمام‌شده» می‌شود.</Consequence>
-              ) : null}
-              {counts.task > 0 ? (
-                <Consequence>{toPersianDigits(counts.task)} کار باز همچنان باز می‌ماند.</Consequence>
-              ) : null}
-              {counts.consult > 0 ? (
-                <Consequence>{toPersianDigits(counts.consult)} کانسالت بی‌پاسخ همچنان باز می‌ماند.</Consequence>
-              ) : null}
-              {counts.followup > 0 ? (
-                <Consequence>{toPersianDigits(counts.followup)} پیگیری در انتظار همچنان باز می‌ماند.</Consequence>
-              ) : null}
+              {WORK_GROUPS.map(({ kind, title }) => {
+                const items = work.filter((item) => item.kind === kind);
+                return items.length ? (
+                  <Column key={kind} gap="xxs">
+                    <Text variant="captionStrong">{title}</Text>
+                    {items.map((item) => (
+                      <Consequence key={item.id}>
+                        {joinLabels([
+                          item.title,
+                          item.detail,
+                          item.kind === 'order' && item.status === 'held' ? 'متوقف موقت' : null,
+                          item.kind === 'consult'
+                            ? item.status === 'requested'
+                              ? 'درخواست‌شده'
+                              : 'در انتظار درخواست'
+                            : null,
+                          item.dueAt ? formatJalaliDateTime(item.dueAt) : null,
+                        ])}
+                      </Consequence>
+                    ))}
+                  </Column>
+                ) : null;
+              })}
             </Column>
           </Card>
         ) : null}

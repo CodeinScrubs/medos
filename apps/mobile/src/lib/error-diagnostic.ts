@@ -208,6 +208,7 @@ export const diagnosticContexts = {
   'follow-up restore reminder receipt': 'followup.restore.reminder',
   'باز کردن قفل کامل نشد': 'lock.authentication',
   'backup: verifying destination copy': 'backup.copy.verify',
+  'checking automatic backup': 'backup.auto.check',
   'restore.media.recovery': 'restore.media.recovery',
   'restore cleanup: DETACH DATABASE restore_src': 'restore.cleanup.detach',
   'restore cleanup: PRAGMA foreign_keys = ON': 'restore.cleanup.foreign-keys',

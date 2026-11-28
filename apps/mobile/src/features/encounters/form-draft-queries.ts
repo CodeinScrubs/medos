@@ -235,12 +235,12 @@ export async function commitEncounterFormDraft(
         .run();
     let publishedId: string;
     if (stored.mode === 'discharge') {
-      const shown = new Set(shownWork?.map(({ kind, id }) => `${kind}:${id}`));
+      const shown = new Map(shownWork?.map((item) => [`${item.kind}:${item.id}`, JSON.stringify(item)]));
       const currentWork = dischargeWorkQuery(patientId, encounterId!, tx).all();
       if (
         !shownWork ||
         currentWork.length !== shown.size ||
-        currentWork.some(({ kind, id }) => !shown.has(`${kind}:${id}`))
+        currentWork.some((item) => shown.get(`${item.kind}:${item.id}`) !== JSON.stringify(item))
       )
         throw new Error('کارهای باز تغییر کرده‌اند. فهرست تازه را مرور کنید و دوباره ثبت کنید.');
       dischargeEncounterInTransaction(
