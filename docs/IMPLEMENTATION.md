@@ -36,7 +36,9 @@ integration and verification. A passing milestone does not complete the product.
 0.11.72/code 88 adds explicit result follow-through to the existing follow-up
 card and discharge preview. Receipt, review and a recorded decision leave the
 follow-up open. Closure is a separate action. Migration 0033 adds one nullable
-column and preserves the status and outcome of existing follow-ups.
+column and preserves the status and outcome of existing follow-ups. The signed
+APK and Android 16 upgrade and discharge checks are in
+[validation-0.11.72.md](validation-0.11.72.md).
 
 0.11.71/code 87 uses real elapsed time for the chart axis and shows same-day
 collection clocks. The discharge preview lists the affected work and its
