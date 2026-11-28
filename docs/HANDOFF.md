@@ -33,6 +33,29 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-28 — Complete physical A52s archive and workflow acceptance
+
+**Agent:** GPT-6 via Codex.
+**Commits:** Documentation only. Tested app source remains `92f291d`.
+
+**Verified**
+- `npm run check`: 2,971 app tests and five workflow tests.
+- Isolated A52s .70-to-.71 upgrade preserved the fixture. Its Hermes bundle
+  matches the signed arm64 owner APK byte-for-byte.
+- Physical SAF backup/restore and wrong-password protection passed with
+  independent table and file-byte comparison. Same-day ABG/VBG, discharge
+  and retained tasks passed. Android delivered a background task notification
+  that opened its exact task. Highlight, text and crop survived cold start
+  and preserved both image sources. Full evidence in
+  [validation-0.11.71.md](validation-0.11.71.md#a52s-physical-acceptance).
+
+**Not verified**
+- Production upgrade with the owner's data, delivery after reboot/Doze and
+  representative all-day physical timing.
+
+**Open threads**
+- Issue 21 retains explicit result closure and the remaining workflow review.
+
 ## 2026-11-28 — Verify ward follow-through and same-day lab trends
 
 **Agent:** GPT-6 via Codex.

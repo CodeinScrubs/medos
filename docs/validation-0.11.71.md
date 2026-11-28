@@ -23,7 +23,7 @@
   active patients. The ABG chart showed same-day collection clocks and
   proportional spacing for three unevenly timed draws. VBG and ambiguous
   values were separately visible. From the discharge form, a named open task
-  was shown; the charge left 39 active patients.
+  was shown; the discharge left 39 active patients.
 - Android's document picker reopened an older synthetic encrypted archive.
   A wrong passphrase showed the expected refusal. With the correct phrase
   and notification permission denied, the app reported restored records and
@@ -41,11 +41,41 @@
   recovered it so the application checks could run. No MedOS fatal crash
   appeared in the bounded crash-buffer check.
 
+## A52s physical acceptance
+
+After USB reconnected, the isolated arm64 QA package was upgraded in place
+from .70 to .71 without wiping its synthetic dataset. Its Hermes payload
+hash matches the signed owner APK above. Seven clinical fixture tables
+matched across the install before the first launch; the owner package
+remained on .11.2 and its dataset was outside this test.
+
+- Pulled the app-produced .70 encrypted archive from the synthetic Documents
+  folder and authenticated it independently. After deliberately completing
+  one synthetic task and replacing the test image bytes, the wrong passphrase
+  left eight clinical tables and the changed bytes identical.
+- Verified same-day ABG/VBG clocks and named discharge work. Completing a
+  second synthetic discharge took the active deck from 39 to 38. Correct
+  restore reopened the deliberately completed task, restored the admission
+  and original media bytes, and returned the deck to 39 after a cold launch.
+  Compared 14 full clinical tables on shared columns plus task and follow-up
+  ownership/status. SQLite integrity and foreign-key checks passed.
+- After explicitly enabling QA notification and exact-alarm permissions, a
+  newly scheduled synthetic task was posted in the Android notification list
+  while MedOS was in the background. Tapping it opened the expected task.
+- A seeded synthetic image accepted highlight, text and crop in the native
+  editor. Two persisted revisions and a cold reopen were checked
+  independently, with both working and full-resolution original bytes
+  matching the fixture. This editor check starts from an existing attachment.
+- The .71 app wrote a new encrypted full archive through the same granted
+  Documents folder. An independent read authenticated the archive, confirmed
+  42 fixture patients and three media files, and found the saved photo edit
+  revision. Test archives and media stayed local.
+
 ## Still outside this evidence
 
-Exact .71 device installation and production in-place upgrade on the A52s,
-second-device restore on physical hardware, whole-shift measurements,
-image markup and alarm delivery through reboot/Doze remain separate.
+The owner-package in-place upgrade with live data, second-device physical
+restore, whole-shift measurements, on-device media picker/camera acceptance
+and alarm delivery through reboot/Doze remain separate.
 Result receipt, clinical review and closure require explicit workflow
 states and remain tracked in issue 21. The saved APK is a local sideload
 artifact and was never uploaded.
