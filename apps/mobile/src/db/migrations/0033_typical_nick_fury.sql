@@ -1,0 +1,1 @@
+ALTER TABLE `follow_ups` ADD `result_stage` text;

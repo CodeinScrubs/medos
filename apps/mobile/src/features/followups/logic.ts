@@ -4,6 +4,37 @@ import type { FollowUp } from '@/db/schema';
 import { daysBetween } from '@/lib/jalali';
 import { addDays, startOfDay } from '@/lib/time';
 
+export type ResultStage = NonNullable<FollowUp['resultStage']>;
+
+export function resultDecisionRecorded(stage: FollowUp['resultStage']): boolean {
+  return stage === 'actionTaken' || stage === 'noActionNeeded';
+}
+
+export function canAdvanceResult(from: FollowUp['resultStage'], to: ResultStage): boolean {
+  switch (from) {
+    case null:
+      return to === 'received';
+    case 'received':
+      return to === 'reviewed';
+    case 'reviewed':
+      return resultDecisionRecorded(to);
+    default:
+      return false;
+  }
+}
+
+export function previousResultStage(stage: ResultStage): FollowUp['resultStage'] {
+  switch (stage) {
+    case 'received':
+      return null;
+    case 'reviewed':
+      return 'received';
+    case 'actionTaken':
+    case 'noActionNeeded':
+      return 'reviewed';
+  }
+}
+
 /**
  * Push a follow-up back by `days`. Something already overdue is postponed
  * from today, not from the day it was missed — "in 3 days" means three days

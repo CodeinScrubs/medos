@@ -1,4 +1,5 @@
 import type { ClinicalVersion } from '@/db/schema';
+import { resultStageLabel } from '@/features/followups/labels';
 import { type ClinicalHistoryKind, type HistoryRow } from '@/lib/clinical-history';
 import { formatJalali, formatJalaliDateTime } from '@/lib/jalali';
 
@@ -109,10 +110,11 @@ const FIELD_LABEL: Record<string, string> = {
   response: 'پاسخ',
   instruction: 'دستور پیگیری',
   dueAt: 'موعد',
-  channel: 'روش تماس',
+  channel: 'روش پیگیری',
   priority: 'اولویت',
   completedAt: 'زمان پایان',
   outcome: 'نتیجه',
+  resultStage: 'مرحلهٔ پیگیری نتیجه',
   deletedAt: 'زمان حذف',
   specialty: 'تخصص',
   followUpInstruction: 'دستور پیگیری',
@@ -152,6 +154,7 @@ export function historyFields(current: HistoryRow, previous?: HistoryRow) {
 export function historyValue(row: HistoryRow, key: string): string {
   if (!(key in row.fields)) return 'ثبت نشده';
   const value = row.fields[key];
+  if (key === 'resultStage' && (value === null || typeof value === 'string')) return resultStageLabel(value);
   if (value === null) return 'خالی';
   if (row.dates.includes(key) && typeof value === 'number') return formatJalaliDateTime(value);
   if (['birthDate', 'onsetDate'].includes(key) && typeof value === 'string') return formatJalali(value);

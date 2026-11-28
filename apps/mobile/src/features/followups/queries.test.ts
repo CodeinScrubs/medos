@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
-import { followUps } from '@/db/schema';
+import { auditLog, clinicalVersions, followUps } from '@/db/schema';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import * as notifications from '@/platform/notifications';
 import { useTestDatabase } from '@/test/db-client';
@@ -10,6 +10,7 @@ import { createTestDatabase, type TestDatabase } from '@/test/sqljs';
 
 import { parseReminderPayload } from './logic';
 import {
+  changeFollowUpResultStage,
   completeFollowUp,
   createFollowUp,
   deleteFollowUp,
@@ -45,6 +46,66 @@ beforeEach(async () => {
 });
 afterEach(() => {
   jest.restoreAllMocks();
+});
+
+describe('result follow-up', () => {
+  it.each(['noActionNeeded', 'actionTaken'] as const)(
+    'keeps the work and reminder open until explicit closure (%s)',
+    async (decision) => {
+      const id = await createFollowUp(input({ channel: 'lab' }));
+      const initial = await row(id);
+      const now = hoursFromNow(0);
+      const change = async (stage: 'received' | 'reviewed' | typeof decision) =>
+        changeFollowUpResultStage(await row(id), stage, now);
+      await expect(change('reviewed')).rejects.toThrow('مرحلهٔ نتیجه معتبر نیست');
+      await change('received');
+      await expect(changeFollowUpResultStage(initial, 'received', now)).rejects.toThrow('پیگیری تغییر کرده است');
+      await change('reviewed');
+      await expect(completeFollowUp(id, null, now)).rejects.toThrow('ابتدا دریافت، مرور و تصمیم را ثبت کنید');
+      await change(decision);
+      expect(await row(id)).toMatchObject({
+        status: 'pending',
+        resultStage: decision,
+        completedAt: null,
+        reminderRevision: initial.reminderRevision,
+      });
+      expect((await dueFollowUpsQuery(hoursFromNow(49))).map((entry) => entry.followUp.id)).toEqual([id]);
+      expect([...scheduled.keys()]).toEqual([followUpReminderId(id)]);
+      await completeFollowUp(id, 'Review summary', now, await row(id));
+      expect(await row(id)).toMatchObject({
+        status: 'done',
+        resultStage: decision,
+        completedAt: now,
+        outcome: 'Review summary',
+      });
+      expect(scheduled.size).toBe(0);
+      expect(await dueFollowUpsQuery(hoursFromNow(49))).toHaveLength(0);
+      expect(t.db.select().from(auditLog).where(eq(auditLog.action, 'followup.resultStageChanged')).all()).toHaveLength(
+        3,
+      );
+      expect(t.db.select().from(clinicalVersions).where(eq(clinicalVersions.recordId, id)).all()).toHaveLength(5);
+    },
+  );
+
+  it('can back up a mistaken step and retries a rolled-back audit with no partial progress', async () => {
+    const id = await createFollowUp(input({ channel: 'lab' }));
+    const now = hoursFromNow(0);
+    const initial = await row(id);
+    t.sqlite.exec(
+      `CREATE TRIGGER fail_result_audit BEFORE INSERT ON audit_log WHEN NEW.action = 'followup.resultStageChanged' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;`,
+    );
+    await expect(changeFollowUpResultStage(initial, 'received', now)).rejects.toThrow();
+    expect(await row(id)).toEqual(initial);
+    t.sqlite.exec('DROP TRIGGER fail_result_audit');
+    await changeFollowUpResultStage(initial, 'received', now);
+    await changeFollowUpResultStage(await row(id), 'previous', now);
+    expect(await row(id)).toMatchObject({
+      resultStage: null,
+      status: 'pending',
+      notificationId: initial.notificationId,
+    });
+    expect(t.db.select().from(clinicalVersions).where(eq(clinicalVersions.recordId, id)).all()).toHaveLength(3);
+  });
 });
 
 describe('follow-up reminders', () => {

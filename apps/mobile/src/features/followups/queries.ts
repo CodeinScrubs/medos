@@ -9,6 +9,7 @@ import { formBasis } from '@/lib/form-document';
 import { newId, softDelete, stamps, touch } from '@/lib/ids';
 import { endOfDay } from '@/lib/time';
 
+import { canAdvanceResult, previousResultStage, resultDecisionRecorded, type ResultStage } from './logic';
 import { reconcileFollowUpReminder, repairFollowUpReminders } from './reminder-queries';
 
 const alive = isNull(followUps.deletedAt);
@@ -119,6 +120,8 @@ export async function updateFollowUp(
       priority: patch.priority ?? current.priority,
     };
     validate(merged);
+    if (current.resultStage !== null && merged.channel !== 'lab')
+      throw new Error('نوع پیگیری نتیجه بعد از ثبت مرحله تغییر نمی‌کند.');
     withClinicalHistory(tx, 'followup', id, now, () =>
       tx
         .update(followUps)
@@ -177,6 +180,37 @@ function validate(input: Pick<FollowUpInput, 'reason' | 'dueAt'>): void {
   if (!Number.isFinite(input.dueAt.getTime())) throw new Error('تاریخ پیگیری معتبر نیست.');
 }
 
+/** Result milestones are separate from the deadline and never close the follow-up. */
+export async function changeFollowUpResultStage(
+  expected: FollowUp,
+  step: ResultStage | 'previous',
+  now: Date,
+): Promise<void> {
+  db.transaction((tx) => {
+    const current = requireFollowUp(tx, expected.id);
+    requireExpectedFollowUp(current, expected);
+    if (current.status !== 'pending' || current.channel !== 'lab')
+      throw new Error('این پیگیری برای ثبت مرحلهٔ نتیجه باز نیست.');
+    const previous = current.resultStage;
+    const stage = step === 'previous' ? (previous === null ? undefined : previousResultStage(previous)) : step;
+    if (stage === undefined || (step !== 'previous' && !canAdvanceResult(previous, step)))
+      throw new Error('مرحلهٔ نتیجه معتبر نیست؛ پیگیری را دوباره بررسی کنید.');
+
+    withClinicalHistory(tx, 'followup', current.id, now, () => {
+      tx.update(followUps)
+        .set({ resultStage: stage, ...touch(now) })
+        .where(eq(followUps.id, current.id))
+        .run();
+      auditInTransaction(
+        tx,
+        'followup.resultStageChanged',
+        { entityType: 'followUp', entityId: current.id, detail: { stage } },
+        now,
+      );
+    });
+  });
+}
+
 export async function completeFollowUp(
   id: string,
   outcome: string | null,
@@ -205,6 +239,12 @@ async function changeStatus(
   db.transaction((tx) => {
     const current = requireFollowUp(tx, id);
     requireExpectedFollowUp(current, expected);
+    if (
+      status === 'done' &&
+      current.channel === 'lab' &&
+      (current.status !== 'pending' || !resultDecisionRecorded(current.resultStage))
+    )
+      throw new Error('برای بستن پیگیری، ابتدا دریافت، مرور و تصمیم را ثبت کنید.');
     withClinicalHistory(tx, 'followup', id, now, () => {
       tx.update(followUps)
         .set({

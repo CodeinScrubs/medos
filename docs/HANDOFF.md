@@ -33,6 +33,27 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-28 — Track result receipt, review, decision and closure
+
+**Agent:** GPT-6 via Codex.
+**Commits:** 0.11.72/code 88, additive migration 0033.
+
+**Changed**
+- One next action on the existing result follow-up card. Record receipt, review
+  and a decision before explicitly closing. The long-press action corrects a
+  mistaken open stage. Legacy closed records gain no invented milestones.
+- Discharge shows the phase of open results and rejects a stale preview. It
+  preserves the patient, encounter, open work, and reminder deadline.
+
+**Verified**
+- `npm run check` passed 2,977 mobile tests in 198 suites plus five workflow
+  tests. The generated migration set matches the schema.
+- Owner arm64 and isolated x86_64 QA APKs use the same Hermes payload and
+  signing certificate. APK identity, version code and native ABI were checked.
+
+**Not verified**
+- Full native result scenario is in progress. The A52s is unavailable in ADB.
+
 ## 2026-11-28 — Close 0.11.71 release verification and record reminder limits
 
 **Agent:** GPT-6 via Codex.

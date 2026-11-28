@@ -402,10 +402,13 @@ describe('importTables', () => {
       patientId,
       dueAt: new Date('2030-01-02T12:00:00Z'),
       reason: 'Review',
+      channel: 'lab',
+      status: 'done',
+      outcome: 'Previous summary',
       notificationId: 'previous-phone-id',
     });
     backup.conn.execSync(
-      'ALTER TABLE follow_ups DROP COLUMN reminder_revision; ALTER TABLE follow_ups DROP COLUMN reminder_applied_revision;',
+      'ALTER TABLE follow_ups DROP COLUMN reminder_revision; ALTER TABLE follow_ups DROP COLUMN reminder_applied_revision; ALTER TABLE follow_ups DROP COLUMN result_stage;',
     );
     attachAsBackup(live, backup);
     live.conn.execSync('PRAGMA foreign_keys = OFF');
@@ -419,10 +422,13 @@ describe('importTables', () => {
       reminderRevision: 0,
       reminderAppliedRevision: -1,
       reason: 'Review',
+      status: 'done',
+      outcome: 'Previous summary',
+      resultStage: null,
     });
   });
 
-  it('preserves an interrupted reminder generation in a current backup', async () => {
+  it('preserves result progress and an interrupted reminder generation in a current backup', async () => {
     const patientId = await addPatient(backup, 'Current');
     await backup.db.insert(followUps).values({
       id: 'pending-repair',
@@ -430,6 +436,8 @@ describe('importTables', () => {
       patientId,
       dueAt: new Date('2030-01-02T12:00:00Z'),
       reason: 'Review',
+      channel: 'lab',
+      resultStage: 'reviewed',
       reminderRevision: 8,
       reminderAppliedRevision: -1,
     });
@@ -440,7 +448,12 @@ describe('importTables', () => {
     } finally {
       live.conn.execSync('PRAGMA foreign_keys = ON');
     }
-    expect(live.db.select().from(followUps).get()).toMatchObject({ reminderRevision: 8, reminderAppliedRevision: -1 });
+    expect(live.db.select().from(followUps).get()).toMatchObject({
+      status: 'pending',
+      resultStage: 'reviewed',
+      reminderRevision: 8,
+      reminderAppliedRevision: -1,
+    });
   });
 
   it('restores unsubmitted consult questions separately and accepts backups predating them', async () => {

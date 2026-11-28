@@ -34,6 +34,7 @@ import m0029 from './0029_living_lyja.sql';
 import m0030 from './0030_lean_anthem.sql';
 import m0031 from './0031_whole_proudstar.sql';
 import m0032 from './0032_square_killraven.sql';
+import m0033 from './0033_typical_nick_fury.sql';
 
   export default {
     journal,
@@ -70,7 +71,8 @@ m0028,
 m0029,
 m0030,
 m0031,
-m0032
+m0032,
+m0033
     }
   }
   

@@ -13,7 +13,7 @@ import {
 } from '@/db/schema';
 import { importTables } from '@/features/backup/import';
 import { createConsult } from '@/features/consults/queries';
-import { createFollowUp } from '@/features/followups/queries';
+import { changeFollowUpResultStage, createFollowUp } from '@/features/followups/queries';
 import { createOrder } from '@/features/kardex/queries';
 import { createPatient, deletePatient } from '@/features/patients/queries';
 import { createTask, updateTask } from '@/features/tasks/queries';
@@ -90,7 +90,13 @@ describe('unpublished episode input on migrated SQLite', () => {
         expect.objectContaining({ kind: 'order', id: order, title: 'Synthetic current order' }),
         expect.objectContaining({ kind: 'task', id: task, title: 'Synthetic patient-level task' }),
         expect.objectContaining({ kind: 'consult', id: consult, title: 'Synthetic open consult' }),
-        expect.objectContaining({ kind: 'followup', id: followup, title: 'Synthetic pending follow-up', dueAt: now }),
+        expect.objectContaining({
+          kind: 'followup',
+          id: followup,
+          title: 'Synthetic pending follow-up',
+          detail: 'waiting',
+          dueAt: now,
+        }),
       ]),
     );
     const doc = await document('discharge', target);
@@ -98,12 +104,26 @@ describe('unpublished episode input on migrated SQLite', () => {
       'کارهای باز تغییر کرده‌اند',
     );
     expect(episodes().find((row) => row.id === target)?.isActive).toBe(true);
-    await expect(commitEncounterFormDraft(id, 'discharge', patientId, target, 0, doc, now, work)).resolves.toBe(target);
+    const originalFollowUp = t.db.select().from(followUps).where(eq(followUps.id, followup)).get()!;
+    await changeFollowUpResultStage(originalFollowUp, 'received', originalFollowUp.updatedAt);
+    await expect(commitEncounterFormDraft(id, 'discharge', patientId, target, 0, doc, now, work)).rejects.toThrow(
+      'کارهای باز تغییر کرده‌اند',
+    );
+    const reviewedWork = await dischargeWorkQuery(patientId, target);
+    expect(reviewedWork).toContainEqual(
+      expect.objectContaining({ id: followup, detail: 'received', changedAt: originalFollowUp.updatedAt }),
+    );
+    await expect(commitEncounterFormDraft(id, 'discharge', patientId, target, 0, doc, now, reviewedWork)).resolves.toBe(
+      target,
+    );
     expect(t.db.select().from(orders).where(eq(orders.id, order)).get()?.status).toBe('completed');
     expect(t.db.select().from(orders).where(eq(orders.id, oldOrder)).get()?.status).toBe('active');
     expect(t.db.select().from(tasks).where(eq(tasks.id, task)).get()?.status).toBe('open');
     expect(t.db.select().from(consultations).where(eq(consultations.id, consult)).get()?.status).toBe('pending');
-    expect(t.db.select().from(followUps).where(eq(followUps.id, followup)).get()?.status).toBe('pending');
+    expect(t.db.select().from(followUps).where(eq(followUps.id, followup)).get()).toMatchObject({
+      status: 'pending',
+      resultStage: 'received',
+    });
   });
   it('requires a fresh preview after an existing task changes while retaining the written discharge draft', async () => {
     const target = await openEncounter({ patientId, kind: 'admission', admittedAt: now });

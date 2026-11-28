@@ -16,9 +16,15 @@ import { formatJalaliWithWeekday, formatRelative, formatTime } from '@/lib/jalal
 import { joinLabels, normalizePhone } from '@/lib/persian';
 import { MIN_TOUCH, useTheme } from '@/theme';
 
-import { FOLLOWUP_CHANNEL_LABELS } from './labels';
-import { postponedDueDate, urgencyOf } from './logic';
-import { completeFollowUp, deleteFollowUp, setFollowUpStatus, updateFollowUp } from './queries';
+import { FOLLOWUP_CHANNEL_LABELS, resultStageLabel } from './labels';
+import { postponedDueDate, resultDecisionRecorded, urgencyOf } from './logic';
+import {
+  changeFollowUpResultStage,
+  completeFollowUp,
+  deleteFollowUp,
+  setFollowUpStatus,
+  updateFollowUp,
+} from './queries';
 import { reconcileFollowUpReminder } from './reminder-queries';
 
 const CHANNEL_ICONS: Record<FollowUp['channel'], keyof typeof Ionicons.glyphMap> = {
@@ -30,9 +36,17 @@ const CHANNEL_ICONS: Record<FollowUp['channel'], keyof typeof Ionicons.glyphMap>
   other: 'ellipse-outline',
 };
 
+const CLOSE_RESULT = { icon: 'checkmark', label: 'بستن پیگیری', next: 'close' } as const;
+const RESULT_ACTIONS = {
+  waiting: { icon: 'download-outline', label: 'ثبت دریافت', next: 'received' },
+  received: { icon: 'eye-outline', label: 'ثبت مرور', next: 'reviewed' },
+  reviewed: { icon: 'list-outline', label: 'ثبت تصمیم', next: 'decision' },
+  actionTaken: CLOSE_RESULT,
+  noActionNeeded: CLOSE_RESULT,
+} as const;
+
 /**
- * One follow-up, with the three things you actually do to it: call, mark
- * done (with a line on what happened), or push it back.
+ * One follow-up with the next action, postponement and a completion summary.
  *
  * `showPatient` is for lists outside the record — the Today screen — where the
  * card has to say whose follow-up it is and tapping it opens that record.
@@ -53,11 +67,12 @@ export function FollowUpCard({
   const mounted = useRef(true);
   const { generation } = useDatasetIntent();
   const { colors, spacing } = useTheme();
-  const [prompting, setPrompting] = useState(false);
+  const [outcome, setOutcome] = useState<FollowUp | null>(null);
   const [working, setWorking] = useState(false);
   const busy = useRef(false);
   const outcomeBasis = useRef<FollowUp | null>(null);
   const now = new Date(useNow());
+  const prompting = outcome !== null;
 
   useEffect(() => {
     mounted.current = true;
@@ -72,6 +87,10 @@ export function FollowUpCard({
   }, [onPromptChange, followUp.id, prompting]);
 
   const pending = followUp.status === 'pending';
+  const tracksResult = followUp.channel === 'lab';
+  const stage = followUp.resultStage;
+  const closesResult = outcome?.channel === 'lab';
+  const resultAction = RESULT_ACTIONS[stage ?? 'waiting'];
   const urgency = urgencyOf(followUp, now);
   const reminderDirty = followUp.reminderRevision !== followUp.reminderAppliedRevision;
   const reminderUnavailable = pending && followUp.dueAt > now && !followUp.notificationId;
@@ -92,6 +111,43 @@ export function FollowUpCard({
       busy.current = false;
       if (mounted.current) setWorking(false);
     }
+  }
+
+  function openOutcome() {
+    if (!mounted.current || busy.current || !navigation.isFocused()) return;
+    const basis = { ...followUp };
+    outcomeBasis.current = basis;
+    setOutcome(basis);
+  }
+
+  function recordDecision() {
+    if (!mounted.current || busy.current || !navigation.isFocused()) return;
+    let used = false;
+    const choose = (decision: 'actionTaken' | 'noActionNeeded') => {
+      if (used) return;
+      used = true;
+      void perform(() => changeFollowUpResultStage(followUp, decision, new Date()));
+    };
+    const dismiss = () => {
+      used = true;
+    };
+    Alert.alert(
+      'تصمیم پس از مرور نتیجه',
+      undefined,
+      [
+        { text: 'انصراف', style: 'cancel', onPress: dismiss },
+        { text: 'اقدامی لازم نبود', onPress: () => choose('noActionNeeded') },
+        { text: 'اقدام انجام شد', onPress: () => choose('actionTaken') },
+      ],
+      { cancelable: true, onDismiss: dismiss },
+    );
+  }
+
+  function performResultAction() {
+    const next = resultAction?.next;
+    if (next === 'close') openOutcome();
+    else if (next === 'decision') recordDecision();
+    else if (next) void perform(() => changeFollowUpResultStage(followUp, next, new Date()));
   }
 
   function postpone() {
@@ -136,14 +192,19 @@ export function FollowUpCard({
       used = true;
       void perform(work);
     };
+    const canGoBack = pending && tracksResult && stage !== null;
     Alert.alert(
       followUp.reason,
       undefined,
       [
         {
-          text: pending ? 'انجام نشد' : 'دوباره فعال شود',
+          text: canGoBack ? 'برگشت به مرحلهٔ قبل' : pending ? 'انجام نشد' : 'دوباره فعال شود',
           onPress: () =>
-            choose(() => setFollowUpStatus(followUp.id, pending ? 'missed' : 'pending', new Date(now), followUp)),
+            choose(() =>
+              canGoBack
+                ? changeFollowUpResultStage(followUp, 'previous', new Date())
+                : setFollowUpStatus(followUp.id, pending ? 'missed' : 'pending', new Date(), followUp),
+            ),
         },
         {
           text: 'حذف',
@@ -201,12 +262,21 @@ export function FollowUpCard({
             <Row gap="xs" wrap>
               <Badge
                 label={
-                  pending ? formatRelative(followUp.dueAt, now) : followUp.status === 'done' ? 'انجام شد' : 'انجام نشد'
+                  pending
+                    ? formatRelative(followUp.dueAt, now)
+                    : followUp.status === 'done'
+                      ? tracksResult && resultDecisionRecorded(stage)
+                        ? 'بسته شد'
+                        : 'انجام شد'
+                      : 'انجام نشد'
                 }
                 tone={pending ? tone : followUp.status === 'done' ? 'success' : 'neutral'}
                 icon={overdue ? 'alert-circle' : undefined}
               />
               <Badge label={FOLLOWUP_CHANNEL_LABELS[followUp.channel]} tone="neutral" />
+              {tracksResult && (pending || stage !== null) ? (
+                <Badge label={resultStageLabel(stage)} tone="neutral" />
+              ) : null}
               {followUp.priority === 'high' && <Badge label="مهم" tone="accent" icon="flag" />}
               <Text variant="tiny" color="textFaint">
                 {joinLabels([formatJalaliWithWeekday(followUp.dueAt), formatTime(followUp.dueAt)])}
@@ -234,16 +304,16 @@ export function FollowUpCard({
 
             {pending && (
               <Row gap="sm" wrap style={{ marginTop: spacing.xs }}>
-                <Action
-                  icon="checkmark"
-                  label="انجام شد"
-                  tone="success"
-                  onPress={() => {
-                    if (!mounted.current || busy.current || !navigation.isFocused()) return;
-                    outcomeBasis.current = followUp;
-                    setPrompting(true);
-                  }}
-                />
+                {tracksResult && resultAction ? (
+                  <Action
+                    icon={resultAction.icon}
+                    label={resultAction.label}
+                    tone={resultAction.next === 'close' ? 'success' : 'neutral'}
+                    onPress={performResultAction}
+                  />
+                ) : !tracksResult ? (
+                  <Action icon="checkmark" label="انجام شد" tone="success" onPress={openOutcome} />
+                ) : null}
                 <Action icon="time-outline" label="تعویق" onPress={postpone} />
                 {phone && followUp.channel === 'call' ? (
                   <Action
@@ -261,26 +331,26 @@ export function FollowUpCard({
       <PromptModal
         visible={prompting}
         busy={working}
-        title="پیگیری انجام شد"
-        message="در یک خط بنویسید چه شد (اختیاری)."
-        placeholder="مثلاً حالش خوب است، آزمایش نرمال"
+        title={closesResult ? 'بستن پیگیری نتیجه' : 'پیگیری انجام شد'}
+        message={closesResult ? 'خلاصهٔ مرور یا اقدام را وارد کنید (اختیاری).' : 'در یک خط بنویسید چه شد (اختیاری).'}
+        initialValue={outcome?.outcome ?? ''}
         onCancel={() => {
-          if (!busy.current) {
+          if (!busy.current && outcomeBasis.current === outcome) {
             outcomeBasis.current = null;
-            setPrompting(false);
+            setOutcome(null);
           }
         }}
         onSubmit={(text) => {
           void perform(async () => {
             const basis = outcomeBasis.current;
-            if (!basis || basis.id !== followUp.id)
+            if (!basis || basis !== outcome || basis.id !== followUp.id)
               throw new Error('پیگیری مربوط به این نتیجه در دسترس نیست؛ متن نگه داشته شد.');
-            await completeFollowUp(basis.id, text || null, new Date(now), basis);
+            await completeFollowUp(basis.id, text || null, new Date(), basis);
             outcomeBasis.current = null;
             // Closing this acknowledged local prompt is not a navigation action.
             // Leave no completed input dialog behind when the owner returns.
             if (mounted.current) {
-              setPrompting(false);
+              setOutcome(null);
               if (navigation.isFocused())
                 void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
             }
