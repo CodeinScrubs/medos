@@ -33,6 +33,30 @@ wrong, never rewrite them to look better.
 
 ---
 
+## 2026-11-28 — Close 0.11.71 release verification and record reminder limits
+
+**Agent:** GPT-6 via Codex.
+**Commits:** Documentation only. Signed and tested app source remains `92f291d`.
+
+**Verified**
+- `npm run check` passed 2,971 mobile tests and five workflow tests.
+- Added the previous A52s cross-device restore and native rounds sweep to
+  [the release report](validation-0.11.71.md#a52s-physical-acceptance).
+- A synthetic reminder appeared while the Android 16 QA app was in the
+  background and the emulator remained in forced deep Doze. A separate
+  reminder was re-registered and delivered after reboot without opening the app.
+- The Android 16 cold-start trial exposed a real boundary: if the Expo boot
+  receiver runs after the deadline, the expired trigger is discarded. The
+  app's open task survives the missed notification.
+
+**Not verified**
+- A52s reboot/Doze in this run because USB was unavailable. The signed owner
+  package has not been upgraded over live records.
+
+**Open threads**
+- Issue 21 retains explicit result receipt/review/closure and remaining workflow
+  and device evidence. Do not treat a posted notification as proof of review.
+
 ## 2026-11-28 — Complete physical A52s archive and workflow acceptance
 
 **Agent:** GPT-6 via Codex.

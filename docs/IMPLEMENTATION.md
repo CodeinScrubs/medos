@@ -37,8 +37,10 @@ integration and verification. A passing milestone does not complete the product.
 collection clocks. The discharge preview lists the affected work and its
 known deadlines, and publication rejects changes to the shown rows. Automatic
 backup admission errors use the existing redacted diagnostics. The signed
-APK, emulator and partial A52s validation are in
+APK, emulator and A52s validation are in
 [validation-0.11.71.md](validation-0.11.71.md).
+That report includes the emulator-to-A52s archive recovery, a native rounds
+sweep and the remaining notification and live-upgrade boundaries.
 
 The 0.11.70/code 86 candidate uses the live episode for the shift card and
 rounds, and retains the episode captured at intake for shift history. An
@@ -65,8 +67,8 @@ transaction. A new, discharged or readmitted patient invalidates the old choice.
 See [validation-0.11.68.md](validation-0.11.68.md) for current evidence and limits.
 
 Frozen 0.11.65/code 81 (`58642e8`, PR 16) retains its own signed APK, hosted
-CI and bounded emulator evidence. GitHub's default branch remains at 0.11.50
-while the application stack is in review.
+CI and bounded emulator evidence. The current app checkpoint is .71 on
+GitHub's default branch.
 
 - Future imported DOB/invalid calculation clock cannot invent newborn age or
   negative/NaN years. Stored identity remains unchanged; normal form rejection
